@@ -34,21 +34,6 @@ class ro_dict(collections.Mapping):
         return self._dict.__iter__()
 
 
-class MemDataset(np.ndarray):
-    """Numpy array mocked up to look like an hdf5 dataset.
-    
-    This just allows a numpy array to carry around ab `attrs` dictionary
-    as a stand-in for hdf5 attributes.
-    """
-    
-    def __array_finalize__(self, obj):
-        self._attrs = MemAttrs(getattr(obj, 'attrs', {}))
-
-    @property
-    def attrs(self):
-        return self._attrs
-
-
 class MemGroup(ro_dict):
     """Dictionary mocked up to look like an hdf5 group.
 
@@ -155,6 +140,21 @@ class MemAttrs(dict):
     """
 
     pass
+
+
+class MemDataset(np.ndarray):
+    """Numpy array mocked up to look like an hdf5 dataset.
+    
+    This just allows a numpy array to carry around ab `attrs` dictionary
+    as a stand-in for hdf5 attributes.
+    """
+    
+    def __array_finalize__(self, obj):
+        self._attrs = MemAttrs(getattr(obj, 'attrs', {}))
+
+    @property
+    def attrs(self):
+        return self._attrs
 
 
 # Utilities
