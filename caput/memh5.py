@@ -50,7 +50,8 @@ class MemGroup(ro_dict):
         if len(key_parts) == 1:
             return ro_dict.__getitem__(self, key)
         else:
-            return self[key_parts[0]][key_parts[1:].join('/')]
+            # Enter the first level and call __getitem__ recursively.
+            return self[key_parts[0]]['/'.join(key_parts[1:])]
 
     @property
     def attrs(self):
@@ -78,7 +79,9 @@ class MemGroup(ro_dict):
             msg = "Group '%s' already exists." % key
             raise ValueError(msg)
         else:
-            self._dict[key] = MemGroup()
+            out = MemGroup()
+            self._dict[key] = out
+            return out
 
     def require_group(self, key):
         if key in self.keys():
@@ -86,12 +89,12 @@ class MemGroup(ro_dict):
                 msg = "Entry '%s' exists and is not a Group." % key
                 raise TypeError(msg)
             else:
-                pass
+                return self[key]
         else:
-            self.create_group(key)
+            return self.create_group(key)
 
     def create_dataset(self, name, shape=None, dtype=None, data=None,
-                       attrs=None, **kwargs):
+                       **kwargs):
         """Create a new dataset.
 
         """
@@ -122,14 +125,10 @@ class MemGroup(ro_dict):
             # Just copy the data.
             new_dataset = np.empty(shape=shape,
                                    dtype=dtype).view(MemDataset)
-            new_dataset[...] = data[...]
-        self._datasets[name] = new_dataset
-        # Copy over the attributes.
-        # XXX What about data.attrs!
-        # XXX What about making a copy using functions below.
-        if attrs:
-            for key, value in attrs.iteritems():
-                new_dataset.attrs[key] = value
+            if not data is None:
+                new_dataset[...] = data[...]
+        self._dict[name] = new_dataset
+        return new_dataset
 
 
 class MemAttrs(dict):
@@ -171,12 +170,13 @@ def attrs2dict(attrs):
     return out
 
 def copyattrs(attrs):
+    # Make sure everything is a copy.
     out = attrs2dict(attrs)
     out = MemAttrs(out)
     return out
 
 def is_group(obj):
-    """Check if the object is an h5py Group, which includes File objects."""
+    """Check if the object is a Group, which includes File objects."""
     
     return hasattr(obj, 'create_group')
 
