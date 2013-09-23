@@ -2,6 +2,7 @@
 
 import unittest
 import os
+import glob
 
 import numpy as np
 import h5py
@@ -54,6 +55,7 @@ class TestH5Files(unittest.TestCase):
         f.attrs['a'] = 5
         d1.attrs['b'] = 6
         l2.attrs['small'] = np.arange(3)
+        f.close()
 
     def assertGroupsEqual(self, a, b):
         self.assertEqual(a.keys(), b.keys())
@@ -80,10 +82,21 @@ class TestH5Files(unittest.TestCase):
     def test_h5_sanity(self):
         f = h5py.File(self.fname)
         self.assertGroupsEqual(f, f)
+        f.close()
+
+    def test_to_from_hdf5(self):
+        m = memh5.MemGroup.from_hdf5(self.fname)
+        f = h5py.File(self.fname)
+        self.assertGroupsEqual(f, m)
+        f.close()
+        f = m.to_hdf5(self.fname + '.new')
+        self.assertGroupsEqual(f, m)
+        f.close()
 
     def tearDown(self):
-        if os.path.isfile(self.fname):
-            os.remove(self.fname)
+        file_names = glob.glob(self.fname + '*')
+        for fname in file_names:
+            os.remove(fname)
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@
 
 
 import collections
+import warnings
 
 import numpy as np
 import h5py
@@ -63,16 +64,39 @@ class MemGroup(ro_dict):
 
         Agnostic as to whether the group to be copyed is a `MemGroup` or an
         `h5py.Group` (which includes `hdf5.File` objects). 
+        
         """
 
         self = cls()
-        for key, entry in group.iteritems():
-            if is_group(entry):
-                self._dict[key] = MemGroup.from_group(entry)
-                self[key].attrs = copyattrs(entry.attrs)
-            else:
-                self.create_dataset(key, entry)
+        deep_group_copy(group, self)
         return self
+
+    @classmethod
+    def from_hdf5(cls, f, **kwargs):
+        """Create a new instance by copying from an hdf5 group.
+
+        This is the same as `from_group` except that an hdf5 filename is
+        accepted.  Any keyword arguments are passed on to the constructor for
+        `h5py.File`.
+        
+        """
+
+        f, to_close = get_hdf5(f, **kwargs)
+        self = cls.from_group(f)
+        if to_close:
+            f.close()
+        return self
+
+    def to_hdf5(self, f, **kwargs):
+        """Replicate object on disk in an hdf5 file.
+      
+        Any keyword arguments are passed on to the constructor for `h5py.File`.
+        
+        """
+        
+        f, opened = get_hdf5(f, **kwargs)
+        deep_group_copy(self, f)
+        return f
 
     def create_group(self, key):
         if key in self.keys():
@@ -169,14 +193,55 @@ def attrs2dict(attrs):
         out[key] = value
     return out
 
-def copyattrs(attrs):
-    # Make sure everything is a copy.
-    out = attrs2dict(attrs)
-    out = MemAttrs(out)
-    return out
-
 def is_group(obj):
     """Check if the object is a Group, which includes File objects."""
     
     return hasattr(obj, 'create_group')
+
+def get_hdf5(f, **kwargs):
+    """Checks if argument is an hdf5 file or file name and returns the former.
+    
+
+    Parameters
+    ----------
+    f : hdf5 group or filename string
+    **kwargs : all keyword arguments
+        Passed to `h5py.File` constructor.
+
+    Returns
+    -------
+    f : hdf5 group
+    opened : bool
+        Whether the a file was opened or not.
+    """
+    
+    # Figure out if F is a file or a filename, and whether the file should be
+    # closed.
+    if is_group(f):
+        opened = False
+        if kwargs:
+            msg = "Got some keywork arguments but File is alrady open."
+            warnings.warn(msg)
+    else:
+        opened = True
+        f = h5py.File(f, **kwargs)
+    return f, opened
+
+def copyattrs(a1, a2):
+    # Make sure everything is a copy.
+    a1 = attrs2dict(a1)
+    for key, value in a1.iteritems():
+        a2[key] = value
+
+def deep_group_copy(g1, g2):
+    """Copy full data tree from one group to another."""
+    
+    copyattrs(g1.attrs, g2.attrs)
+    for key, entry in g1.iteritems():
+        if is_group(entry):
+            g2.create_group(key)
+            deep_group_copy(entry, g2[key])
+        else:
+            g2.create_dataset(key, data=entry)
+            copyattrs(entry.attrs, g2[key].attrs)
 
