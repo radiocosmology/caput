@@ -81,7 +81,7 @@ class MemGroup(ro_dict):
         
         """
 
-        f, to_close = get_hdf5(f, **kwargs)
+        f, to_close = get_h5py_File(f, **kwargs)
         self = cls.from_group(f)
         if to_close:
             f.close()
@@ -94,7 +94,7 @@ class MemGroup(ro_dict):
         
         """
         
-        f, opened = get_hdf5(f, **kwargs)
+        f, opened = get_h5py_File(f, **kwargs)
         deep_group_copy(self, f)
         return f
 
@@ -194,11 +194,15 @@ def attrs2dict(attrs):
     return out
 
 def is_group(obj):
-    """Check if the object is a Group, which includes File objects."""
+    """Check if the object is a Group, which includes File objects.
+    
+    In most cases, if it isn't a Group it's a Dataset, so this can be used to
+    check for Datasets as well.
+    """
     
     return hasattr(obj, 'create_group')
 
-def get_hdf5(f, **kwargs):
+def get_h5py_File(f, **kwargs):
     """Checks if argument is an hdf5 file or file name and returns the former.
     
 
