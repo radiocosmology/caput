@@ -58,13 +58,17 @@ class TestHashParams(unittest.TestCase):
         self.assertNotEqual(cache_tools.hash_obj(a), cache_tools.hash_obj(b))
         # Regression test.
         self.assertEqual(cache_tools.hash_obj(a), 
-                         '0dc008e6282cc273ca6d5bfb7b8d1c6998623fbb')
+                         '1c42d883c019d70ecb5b65d43d0ea0c605f46bcd')
 
-    def test_equivalent(self):
+    def test_manual(self):
         """Manually construct a few hashes."""
-
+        
         h = cache_tools.hash_obj
-        self.assertEqual(h(5.000 + 0.00j), h(h('num') + '5'))
+        self.assertEqual(h(5.000 + 0.00j), h(h('num') + '5 1 0 1'))
+        self.assertEqual(h(5j), h(h('num') + '0 1 5 1'))
+        self.assertEqual(h(float('nan')), h(h('num') + 'nan 0 1'))
+        self.assertEqual(h(-float('inf')), h(h('num') + '-inf 0 1'))
+        self.assertEqual(h(complex(5, float('nan'))), h(h('num') + '5 1 nan'))
         self.assertEqual(h(None), h(h('null')))
         self.assertEqual(h([7, 'a', 1]), h(h('seq') + h(7) + h('a') + h(1)))
         self.assertEqual(h({7, 'a', 1, 42}),
@@ -76,6 +80,15 @@ class TestHashParams(unittest.TestCase):
         dhash = [ x[0] + x[1] for x in dhash ]
         dhash = h('map') + ''.join(dhash)
         self.assertEqual(h(d), h(dhash))
+
+    def test_equivalent(self):
+        """Check hashes that should be the same."""
+
+        h = cache_tools.hash_obj
+        self.assertEqual(h(555), h(555.0))
+        self.assertEqual(h(555), h(555.0 + 0j))
+        self.assertEqual(h(False), h(0j))
+        self.assertEqual(h((1, 4, 3.)), h([1., 4, 3]))
         
 
 

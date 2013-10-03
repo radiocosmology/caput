@@ -6,6 +6,7 @@ SHA1, or installed version).
 
 """
 
+import math
 import subprocess
 import hashlib
 from os import path
@@ -115,19 +116,23 @@ def hash_obj(obj):
     else:
         # Try to interpret as a number.
         try:
-            string_to_hash += hash_obj('num')
-            if obj == obj.real:
-                obj = obj.real
-                if int(obj) == obj:
-                    obj = int(obj)
-            string_to_hash += repr((obj))
-        except TypeError, ValueError:
+            # Cast as most general type.
+            obj = complex(obj)
+        except TypeError:
             msg = "Argument type could not be interpreted."
             raise TypeError(msg)
+        string_to_hash += hash_obj('num')
+        string_to_hash += ' '.join(_float_hash_parts(obj.real)
+                                   + _float_hash_parts(obj.imag))
     # Compute the hash.
     hash_ = hashlib.sha1(string_to_hash).hexdigest()
     return hash_
 
+def _float_hash_parts(fl):
+    if math.isnan(fl) or math.isinf(fl):
+        return (str(fl), )
+    n, d = fl.as_integer_ratio()
+    return (str(n), str(d))
 
 class UnversionedError(Exception):
     """Raised when code that is expected to be under version control isn't."""
