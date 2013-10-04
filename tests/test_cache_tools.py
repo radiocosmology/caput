@@ -6,6 +6,7 @@ from os import path
 import subprocess
 
 import numpy as np
+from numpy import ma, linalg
 
 import caput
 from caput import cache_tools
@@ -20,7 +21,8 @@ if not path.isdir(git_dir):
            " control.")
     raise RuntimeError(msg)
 
-class TestGitSHA1(unittest.TestCase):
+
+class TestVersioning(unittest.TestCase):
     
     def test_find_git(self):
         self.assertEqual(cache_tools.get_git_dir(caput), git_dir)
@@ -41,6 +43,17 @@ class TestGitSHA1(unittest.TestCase):
         commit = commit_line.split()[1]
         self.assertEqual(cache_tools.get_package_commit(caput), commit)
         self.assertEqual(cache_tools.get_package_commit(cache_tools), commit)
+
+    def test_version_string(self):
+        np_ver = cache_tools.get_package_version(np)
+        self.assertEqual(cache_tools.get_package_version(ma), np_ver)
+        self.assertEqual(cache_tools.get_package_version(linalg), np_ver)
+
+    def test_hash_versions(self):
+        # These hash the same as the have the same code_bases.
+        self.assertEqual(cache_tools.hash_versions(cache_tools, np),
+                cache_tools.hash_versions(caput, linalg))
+
 
 class TestHashParams(unittest.TestCase):
 
@@ -92,8 +105,6 @@ class TestHashParams(unittest.TestCase):
         self.assertEqual(h(555), h(555.0 + 0j))
         self.assertEqual(h(False), h(0j))
         self.assertEqual(h((1, 4, 3.)), h([1., 4, 3]))
-        
-
 
         
 

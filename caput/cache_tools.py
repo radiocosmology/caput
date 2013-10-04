@@ -10,7 +10,16 @@ import math
 import subprocess
 import hashlib
 from os import path
+import sys
 
+
+# Determining Code Version
+# ------------------------
+
+class UnversionedError(Exception):
+    """Raised when code that is expected to be under version control isn't."""
+    
+    pass
 
 
 def get_git_dir(module_):
@@ -18,6 +27,15 @@ def get_git_dir(module_):
     
     If no .git directory can be found - as will be the case for any code not
     under local version control - raises an `UnversionedError`. 
+    
+    Parameters
+    ----------
+    module_ : python module
+
+    Returns
+    -------
+    git_dir : string
+        Path to the .git/ directory for the module's source.
 
     """
     
@@ -41,6 +59,15 @@ def get_git_dir(module_):
 
 def get_package_commit(module_):
     """For a module versioned under git, get the SHA1 of the current commit.
+    
+    Parameters
+    ----------
+    module_ : python module
+
+    Returns
+    -------
+    commit : string
+        Hex SHA1 hash representing the git commit.
 
     """
 
@@ -55,7 +82,80 @@ def get_package_commit(module_):
     commit_line = proc.stdout.readline()
     commit = commit_line.split()[1]
     return commit
+
+
+def get_package_version(module_):
+    """Determine the version of top level package from `__version__` attribute.
     
+    Pass any module from the package.  If no version can be determined, raise
+    an `UnversionedError`.
+
+    Parameters
+    ----------
+    module_ : python module
+
+    Returns
+    -------
+    version : string
+    
+    """
+    
+    pkg_name = module_.__package__.split('.')[0]
+    if pkg_name == module_.__name__:
+        # This is the top level.  Get the version.
+        try:
+            return module_.__version__
+        except AttributeError:
+            msg = "Package %s has not `__version__` attribute."
+            raise UnversionedError(msg % pkg_name)
+    else:
+        # Get the next level package.
+        try:
+            pkg = sys.modules[pkg_name]
+        except KeyError:
+            # Not in names space.  Import it.  As added bonus, this goes
+            # straight to the top level, possible skipping several levels of
+            # recursion.
+            pkg = __import__(pkg_name)
+        # Try again.
+        return get_package_version(pkg)
+
+
+def hash_versions(*args):
+    """Create a hash representing the versions of passed modules.
+    
+    The version of each module is identified by it's git commit or if not under
+    git version control, the `__version__` attribute of parent package. The
+    identifiers for all the modules are then hashed together to produce a
+    single identifier for the current state of the collective modules.
+
+    Hash is independent of the argument order.
+
+    Parameters
+    ----------
+    *args : any number of python modules
+
+    Returns
+    -------
+    hash : string
+        Hex SH1 hash representing the versions of all input modules.
+
+    """
+
+    version_strings = []
+    for module in args:
+        try:
+            version_strings.append(get_package_commit(module))
+        except UnversionedError:
+            version_strings.append(get_package_version(module))
+    version_strings.sort()
+    string_to_hash = ' '.join(version_strings)
+    hash = hashlib.sha1(string_to_hash).hexdigest()
+    return hash
+
+
+# Hashing Input Parameters
+# ------------------------
 
 def hash_obj(obj):
     """Reproducibly compute a hash of any object easily represented in YAML.
@@ -127,6 +227,7 @@ def hash_obj(obj):
     hash_ = hashlib.sha1(string_to_hash).hexdigest()
     return hash_
 
+
 def _num_hash_parts(num):
     """Split any number into integer/fractional parts for hashing."""
 
@@ -148,8 +249,14 @@ def _num_hash_parts(num):
         re_str = "%d %d" % frac
     return re_str + im_str
 
-class UnversionedError(Exception):
-    """Raised when code that is expected to be under version control isn't."""
-    
-    pass
+
+# Tools for caching results.
+
+class Cache(object):
+    """A cache on disk for computational products.
+
+    """
+
+    def __init__(self, name, inputs=None, parameters=None, modules=None):
+        pass
 
