@@ -116,23 +116,37 @@ def hash_obj(obj):
     else:
         # Try to interpret as a number.
         try:
-            # Cast as most general type.
-            obj = complex(obj)
+            num_repr = _num_hash_parts(obj)
         except TypeError:
-            msg = "Argument type could not be interpreted."
+            msg = "Argument type %s could not be interpreted."
+            msg = msg % repr(type(obj))
             raise TypeError(msg)
         string_to_hash += hash_obj('num')
-        string_to_hash += ' '.join(_float_hash_parts(obj.real)
-                                   + _float_hash_parts(obj.imag))
+        string_to_hash += num_repr
     # Compute the hash.
     hash_ = hashlib.sha1(string_to_hash).hexdigest()
     return hash_
 
-def _float_hash_parts(fl):
-    if math.isnan(fl) or math.isinf(fl):
-        return (str(fl), )
-    n, d = fl.as_integer_ratio()
-    return (str(n), str(d))
+def _num_hash_parts(num):
+    """Split any number into integer/fractional parts for hashing."""
+
+    if not num.imag == 0:
+        im_str = ' ' + _num_hash_parts(num.imag)
+    else:
+        im_str = ''
+    num = num.real
+    if math.isnan(num) or math.isinf(num):
+        re_str = str(num)
+    elif num == int(num):
+        # Either an integer (which we must represent at prefect precision),
+        # or non fractional in which case this is equivalent to the next case.
+        re_str = '%d 1' % int(num)
+    else:
+        # Unfortunate that I can't think of a way to do this at native
+        # precision (without the recasting).
+        frac = float(num).as_integer_ratio()
+        re_str = "%d %d" % frac
+    return re_str + im_str
 
 class UnversionedError(Exception):
     """Raised when code that is expected to be under version control isn't."""
