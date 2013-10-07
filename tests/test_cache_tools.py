@@ -96,6 +96,7 @@ class TestHashParams(unittest.TestCase):
         # Make sure it hashes integers with infinite precision.
         large_int = 3456723 ** 10
         self.assertEqual(h(large_int), h(h('num') + str(large_int) + ' 1'))
+        self.assertNotEqual(h(large_int), h(float(large_int)))
 
     def test_equivalent(self):
         """Check hashes that should be the same."""

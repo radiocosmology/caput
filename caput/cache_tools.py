@@ -250,13 +250,58 @@ def _num_hash_parts(num):
     return re_str + im_str
 
 
-# Tools for caching results.
+# Caching
+# -------
 
 class Cache(object):
     """A cache on disk for computational products.
 
     """
 
-    def __init__(self, name, inputs=None, parameters=None, modules=None):
-        pass
+    def __init__(self, name, inputs=None, parameters=None, modules=None,
+                 root_dir='', ignore_code=True):
+        self._name = name
+        self._inputs = inputs
+        self._parameters = parameters
+        
+        # First search for an existing cache.  If not found, then make one.
+        self._dir = root_dir + '/' + name + stuff
 
+        # Keep a log of cache usage.  Used by scripts to clear out very old and
+        # unused caches.  XXX write these scripts.
+        with f = file(self._dir + 'cache.usage', 'a'):
+            f.write("the date") # XXX
+
+    @property
+    def valid(self):
+        return path.isfile(self._dir + 'cache.valid')
+
+    @property
+    def directory(self):
+        return self_dir
+    
+    def write_info(self):
+        fname = self._dir + 'cache.info'
+        with f = file(fname, 'w'):
+            pass
+        # TODO: finish me.
+        
+
+    def validate(self):
+        self.write_info()
+        fname = self._dir + 'cache.valid'
+        with file(fname, 'a'):
+            os.utime(fname, times)
+
+    def invalidate(self):
+        if self.valid:
+            path.remove(self._dir + 'cache.valid') 
+        if self.code_hash != self._dir.split('_')[-1]:
+            # We're ignoring the code versions and modifying a cache created
+            # with a different version.
+            fname = self._dir + 'cache.code_mixed'
+            with file(fname, 'a'):
+                os.utime(fname, times)
+
+
+    
