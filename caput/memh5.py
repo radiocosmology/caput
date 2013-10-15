@@ -39,6 +39,7 @@ class MemGroup(ro_dict):
     """Dictionary mocked up to look like an hdf5 group.
 
     This exposes the bare minimum of the `h5py` `Group` interface.
+
     """
 
     def __init__(self):
@@ -170,6 +171,7 @@ class MemDataset(np.ndarray):
     
     This just allows a numpy array to carry around ab `attrs` dictionary
     as a stand-in for hdf5 attributes.
+
     """
     
     def __array_finalize__(self, obj):
