@@ -246,6 +246,7 @@ def deep_group_copy(g1, g2):
             g2.create_group(key)
             deep_group_copy(entry, g2[key])
         else:
-            g2.create_dataset(key, data=entry)
+            g2.create_dataset(key, shape=entry.shape, dtype=entry.dtype, 
+                    data=entry)
             copyattrs(entry.attrs, g2[key].attrs)
 
