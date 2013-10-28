@@ -269,7 +269,7 @@ class Cache(object):
 
         # Keep a log of cache usage.  Used by scripts to clear out very old and
         # unused caches.  XXX write these scripts.
-        with f = file(self._dir + 'cache.usage', 'a'):
+        with file(self._dir + 'cache.usage', 'a') as f:
             f.write("the date") # XXX
 
     @property
@@ -282,7 +282,7 @@ class Cache(object):
     
     def write_info(self):
         fname = self._dir + 'cache.info'
-        with f = file(fname, 'w'):
+        with file(fname, 'w') as f:
             pass
         # TODO: finish me.
         
