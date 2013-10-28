@@ -1,4 +1,40 @@
-"""Module for making in-memory mockups of h5py objects."""
+"""
+Module for making in-memory mockups of h5py objects.
+
+.. currentmodule:: caput.memh5
+
+It is sometimes usefull to have a consistent API for data that is independant
+of whether that data lives on disk or in memory. ``h5py`` provides this to a
+certain extent, having ``Dataset`` objects that act very much like ``numpy``
+arrays. ``memh5`` extends this, providing an in-memory containers, analagous to
+``h5py`` ``Group`` and ``Attribute`` objects.
+
+
+Classes
+=======
+
+.. autosummary::
+   :toctree: generated/
+
+    ro_dict
+    MemGroup
+    MemAttrs
+    MemDataset
+
+
+Utility Functions
+=================
+
+.. autosummary::
+   :toctree: generated/
+
+    attrs2dict
+    is_group
+    get_h5py_File
+    copyattrs
+    deep_group_copy
+
+"""
 
 
 import collections
@@ -15,14 +51,24 @@ class ro_dict(collections.Mapping):
     """A dict that is read-only to the user.
 
     This class isn't strictly read-only but it cannot be modified through the
-    traditional dict interface. This prevents the user from
-    mistaking this for a normal dictionary.
+    traditional dict interface. This prevents the user from mistaking this for
+    a normal dictionary.
+
+    Provides the same interface for reading as the builtin python ``dict``s but
+    no methods for writing.
+
+    Parameters
+    ----------
+    d : dict
+        Initial data for the new dictionary.
 
     """
     
     def __init__(self, d=None):
         if not d:
             d = {}
+        else:
+            d = dict(d)
         self._dict = d
 
     def __getitem__(self, key):
@@ -36,9 +82,24 @@ class ro_dict(collections.Mapping):
 
 
 class MemGroup(ro_dict):
-    """Dictionary mocked up to look like an hdf5 group.
+    """In memory implementation of the ``h5py.Group`` class.
 
-    This exposes the bare minimum of the `h5py` `Group` interface.
+    This class doubles as the a ``h5py.File``, object, since the destinction
+    between a file and a group for in-memory data is moot.
+
+    Attributes
+    ----------
+    attrs : MemAttrs
+
+    Methods
+    -------
+    __getitem__
+    from_group
+    from_hdf5
+    to_hdf5
+    create_group
+    require_group
+    create_dataset
 
     """
 
@@ -57,6 +118,14 @@ class MemGroup(ro_dict):
 
     @property
     def attrs(self):
+        """Attributes attached to this object.
+        
+        Returns
+        -------
+        attrs : MemAttrs
+    
+        """
+
         return self._attrs
 
     @classmethod
@@ -157,7 +226,7 @@ class MemGroup(ro_dict):
 
 
 class MemAttrs(dict):
-    """Dictionary mocked up to look like hdf5 attributes.
+    """In memory implementation of the ``h5py.AttributeManager``.
 
     Currently just a normal dictionary.
 
@@ -167,10 +236,15 @@ class MemAttrs(dict):
 
 
 class MemDataset(np.ndarray):
-    """Numpy array mocked up to look like an hdf5 dataset.
+    """In memory implementation of the ``h5py.Dataset`` class.
     
-    This just allows a numpy array to carry around ab `attrs` dictionary
-    as a stand-in for hdf5 attributes.
+    Numpy array mocked up to look like an hdf5 dataset.  This just allows a
+    numpy array to carry around ab `attrs` dictionary as a stand-in for hdf5
+    attributes.
+    
+    Attributes
+    ----------
+    attrs : MemAttrs
 
     """
     
@@ -179,13 +253,20 @@ class MemDataset(np.ndarray):
 
     @property
     def attrs(self):
+        """Attributes attached to this object.
+        
+        Returns
+        -------
+        attrs : MemAttrs
+    
+        """
+
         return self._attrs
 
     def resize(self):
         # h5py datasets' reshape() is different from numpy reshape.
         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
         raise NotImplementedError(msg)
-        
 
 
 # Utilities
@@ -201,6 +282,7 @@ def attrs2dict(attrs):
         out[key] = value
     return out
 
+
 def is_group(obj):
     """Check if the object is a Group, which includes File objects.
     
@@ -210,6 +292,7 @@ def is_group(obj):
     """
     
     return hasattr(obj, 'create_group')
+
 
 def get_h5py_File(f, **kwargs):
     """Checks if input is an `h5py.File` or filename and returns the former.
@@ -241,11 +324,13 @@ def get_h5py_File(f, **kwargs):
         f = h5py.File(f, **kwargs)
     return f, opened
 
+
 def copyattrs(a1, a2):
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
     for key, value in a1.iteritems():
         a2[key] = value
+
 
 def deep_group_copy(g1, g2):
     """Copy full data tree from one group to another."""
