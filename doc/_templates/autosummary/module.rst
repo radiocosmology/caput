@@ -5,3 +5,6 @@
 
 {% block exceptions %}
 {% endblock %}
+
+{% block functions %}
+{% endblock %}
