@@ -39,6 +39,7 @@ class MemGroup(ro_dict):
     """Dictionary mocked up to look like an hdf5 group.
 
     This exposes the bare minimum of the `h5py` `Group` interface.
+
     """
 
     def __init__(self):
@@ -179,6 +180,12 @@ class MemDataset(np.ndarray):
     def attrs(self):
         return self._attrs
 
+    def resize(self):
+        # h5py datasets' reshape() is different from numpy reshape.
+        msg = "Dataset reshaping not allowed. Perhapse make an new array view."
+        raise NotImplementedError(msg)
+        
+
 
 # Utilities
 # ---------
@@ -198,34 +205,36 @@ def is_group(obj):
     
     In most cases, if it isn't a Group it's a Dataset, so this can be used to
     check for Datasets as well.
+
     """
     
     return hasattr(obj, 'create_group')
 
 def get_h5py_File(f, **kwargs):
-    """Checks if argument is an hdf5 file or file name and returns the former.
+    """Checks if input is an `h5py.File` or filename and returns the former.
     
-
     Parameters
     ----------
-    f : hdf5 group or filename string
+    f : h5py Group or filename string
     **kwargs : all keyword arguments
-        Passed to `h5py.File` constructor.
+        Passed to `h5py.File` constructor. If `f` is already an open file,
+        silently ignores all keywords.
 
     Returns
     -------
     f : hdf5 group
     opened : bool
-        Whether the a file was opened or not.
+        Whether the a file was opened or not (i.e. was already open).
+
     """
     
     # Figure out if F is a file or a filename, and whether the file should be
     # closed.
     if is_group(f):
         opened = False
-        if kwargs:
-            msg = "Got some keywork arguments but File is alrady open."
-            warnings.warn(msg)
+        #if kwargs:
+        #    msg = "Got some keywork arguments but File is alrady open."
+        #    warnings.warn(msg)
     else:
         opened = True
         f = h5py.File(f, **kwargs)
