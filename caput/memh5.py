@@ -36,7 +36,7 @@ Utility Functions
 
 """
 
-
+import sys
 import collections
 import warnings
 
@@ -321,7 +321,12 @@ def get_h5py_File(f, **kwargs):
         #    warnings.warn(msg)
     else:
         opened = True
-        f = h5py.File(f, **kwargs)
+        try:
+            f = h5py.File(f, **kwargs)
+        except IOError as e:
+            msg = "Opening file %s caused an error: " % str(f)
+            new_e = IOError(msg + str(e))
+            raise new_e.__class__, new_e, sys.exc_info()[2]
     return f, opened
 
 
