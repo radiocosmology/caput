@@ -6,8 +6,8 @@ both what tasks are to be run and the parameters that go to those tasks.
 Included in this package are base classes for simplifying the construction of 
 data analysis tasks, as well as the pipeline manager which executes them.
 
-Pipelines are most easily executed using the script in
-caput/bin/caput_pipeline
+Pipelines are most easily executed using the script in ``caput_pipeline.py`,
+which ships with :mod:`caput`.
 
 Flow control classes
 ====================
