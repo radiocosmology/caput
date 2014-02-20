@@ -12,4 +12,7 @@ Packages
     :toctree: generated/
 
    memh5
+   config
+   pipeline
+   mpiutils
 

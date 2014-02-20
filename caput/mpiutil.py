@@ -1,3 +1,32 @@
+"""
+Utilities for making MPI usage transparent.
+
+This module exposes much of the functionality of :mod:`mpi4py` but will still
+run in serial if mpi is not present on the system.  It is thus useful for
+writing code that can be run in either parallel or serial.
+
+Functions
+=========
+
+.. autosummary::
+   :toctree: generated/
+
+   partition_list_alternate
+   partition_list_mpi
+   mpirange
+   barrier
+   parallel_map
+   typemap
+   split_m
+   split_all
+   split_local
+   transpose_blocks
+   allocate_hdf5_dataset
+   lock_and_write_buffer
+   parallel_rows_write_hdf5
+
+"""
+
 import warnings
 import sys
 

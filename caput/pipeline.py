@@ -1,10 +1,313 @@
-"""Meta-scripting infrastructure for stringing analysis tasks into a pipeline.
+"""
+Data Analysis and Simulation Pipeline.
 
-All public objects defined here are available in the directly from the
-`pipeline` package.  See the documentation in
-"ch_analysis/pipeline/__init__.py".
+A data analysis pipeline is completely specified by a YAML file that specifies
+both what tasks are to be run and the parameters that go to those tasks.
+Included in this package are base classes for simplifying the construction of 
+data analysis tasks, as well as the pipeline manager which executes them.
+
+Pipelines are most easily executed using the script in
+caput/bin/caput_pipeline
+
+Flow control classes
+====================
+
+.. autosummary::
+   :toctree: generated/
+
+   Manager
+   PipelineConfigError
+   PipelineRuntimeError
+   PipelineStopIteration
+
+
+Task base classes
+=================
+
+.. autosummary::
+    :toctree: generated/
+
+   TaskBase
+   SingleBase
+   IterBase
+   H5IOMixin
+   SingleH5Base
+   IterH5Base
+
+
+Examples
+========
+
+Basic Tasks
+-----------
+
+A pipeline task is a subclass of :class:`TaskBase` intended to perform some small,
+modular piece analysis. The developer of the task must specify what input
+parameters the task expects as well as code to perform the actual processing
+for the task.
+
+Input parameters are specified by adding class attributes whose values are
+instances of :class:`config.Property`. For instance a task definition might begin
+with
+
+>>> class SpamTask(TaskBase):
+...     eggs = config.Property(proptype=str)
+
+This defines a new task named :class:`SpamTask` with a parameter named *eggs*, whose
+type is a string.  The class attribute :attr:`SpamTask.eggs` will replaced with an
+instance attribute when an instance of the task is initialized, with it's value
+read from the pipeline configuration YAML file (see next section).
+
+The actual work for the task is specified by over-ridding any of the
+:meth:`~TaskBase.setup`, :meth:`~TaskBase.next` or
+:meth:`~TaskBase.finish` methods (:meth:`~TaskBase.__init__` may also be
+implemented`).  These are executed in order, with :meth:`~TaskBask.next`
+possibly being executed many times.  Iteration of :meth:`next` is halted by
+raising a :exc:`PipelineStopIteration`.  Here is a example of a somewhat
+trivial but fully implemented task:
+
+>>> class PrintEggs(TaskBase):
+...
+...     eggs = config.Property(proptype=list)
+...
+...     def __init__(self):
+...         self.i = 0
+...
+...     def setup(self):
+...         print "Setting up PrintEggs."
+...
+...     def next(self):
+...         if self.i >= len(self.eggs):
+...             raise PipelineStopIteration()
+...         print "Spam and %s eggs." % self.eggs[self.i]
+...         self.i += 1
+...
+...     def finish(self):
+...         print "Finished PrintEggs."
+
+Any return value of these three pipeline methods can be handled by the pipeline
+and provided to subsequent tasks. The methods :meth:`setup` and :meth:`next`
+may accept (positional only) arguments which will be received as the outputs of
+early tasks in a pipeline chain. The following is an example of a pair of tasks
+that are designed to operate in this manner.
+
+>>> class GetEggs(TaskBase):
+...     
+...     eggs = config.Property(proptype=list)
+...     
+...     def __init__(self):
+...         self.i = 0
+...
+...     def setup(self):
+...         print "Setting up GetEggs."
+...
+...     def next(self):
+...         if self.i >= len(self.eggs):
+...             raise PipelineStopIteration()
+...         egg = self.eggs[self.i]
+...         self.i += 1
+...         return egg
+...
+...     def finish(self):
+...         print "Finished GetEggs."
+
+>>> class CookEggs(TaskBase):
+...     
+...     style = config.Property(proptype=str)
+...     
+...     def setup(self):
+...         print "Setting up CookEggs."
+...
+...     def next(self, egg):
+...         print "Cooking %s %s eggs." % (self.style, egg)
+...
+...     def finish(self):
+...         print "Finished CookEggs."
+
+Note that :meth:`CookEggs.next` never raises a :exc:`PipelineStopIteration`.
+This is because there is no way for the task to internally know how long to
+iterate.  :meth:`next` will continue to be called as long as there are inputs
+for :meth:`next` and will stop iterating when there are none.
+
+Pipeline Configuration
+----------------------
+
+To actually run a task or series of tasks, a YAML pipeline configuration is
+required.  The pipeline configuration has two main functions: to specify the
+the pipeline (which tasks are run, in which order and how to handle the inputs and
+outputs of tasks) and to provide parameters to each individual task.  Here is
+an example of a pipeline configuration:
+
+>>> spam_config = '''
+... pipeline :
+...     tasks:
+...         -   type:   PrintEggs
+...             params: eggs_params
+...
+...         -   type:   GetEggs
+...             params: eggs_params
+...             out:    egg
+...           
+...         -   type:   CookEggs
+...             params: cook_params
+...             in:     egg
+...           
+... eggs_params:
+...     eggs: ['green', 'duck', 'ostrich']
+...
+... cook_params:
+...     style: 'fried'
+...           
+... '''
+
+Here the 'pipeline' section contains parameters that pertain to the pipeline as
+a whole.  The most important parameter is *tasks*, a list of tasks to be
+executed.  Each entry in this list may contain the following keys:
+
+type
+    (required) The name of the class relative to the global
+    name space. Any required imports will be performed dynamically.  Any
+    classes that are not importable (defined interactively) need to be
+    registered in the dictionary ``pipeline.local_tasks``.
+params
+    (required) Key or list of keys referring to sections of the pipeline
+    configuration holding parameters for the task.
+out
+    A 'pipeline product key' or list of keys that label any return values from
+    :meth:`setup`, :meth:`next` or :meth:`finish`.
+requires
+    A 'pipeline product key' or list of keys representing values to be passed
+    as arguments to :meth:`setup`.
+in
+    A 'pipeline product key' or list of keys representing values to be passed
+    as arguments to :meth:`next`.
+
+The sections other than 'pipeline' in the configuration contain the parameter
+for the various tasks, as specified be the 'params' keys.
+
+Execution Order
+---------------
+
+When the above pipeline is executed is produces the following output.
+
+>>> local_tasks.update(globals())  # Required for interactive sessions.
+>>> Manager.from_yaml_str(spam_config).run()
+Setting up PrintEggs.
+Setting up GetEggs.
+Setting up CookEggs.
+Spam and green eggs.
+Cooking fried green eggs.
+Spam and duck eggs.
+Cooking fried duck eggs.
+Spam and ostrich eggs.
+Cooking fried ostrich eggs.
+Finished PrintEggs.
+Finished GetEggs.
+Finished CookEggs.
+
+The rules for execution order are as follows:
+
+1. One of the methods `setup()`, `next()` or `finish()`, as appropriate, will
+   be executed from each task, in order.
+2. If the task method is missing its input, as specified by the 'requires' or 'in'
+   keys, restart at the beginning of the `tasks` list.
+3. If the input to `next()` is missing and the task is at the beginning of the
+   list there will be no opportunity to generate this input. Stop iterating
+   `next()` and proceed to `finish()`.
+4. Once a task has executed `finish()`, remove it from the list.
+5. Once a method from the last member of the `tasks` list is executed, restart
+   at the beginning of the list.
+
+If the above rules seem somewhat opaque, consider the following example which
+illustrates these rules in a pipeline with a slightly more non-trivial flow.
+
+>>> class DoNothing(TaskBase):
+...     
+...     def setup(self):
+...         print "Setting up DoNothing."
+...
+...     def next(self, input):
+...         print "DoNothing next."
+...
+...     def finish(self):
+...         print "Finished DoNothing."
+
+>>> local_tasks.update(globals())  # Required for interactive sessions only.
+>>> new_spam_config = '''
+... pipeline :
+...     tasks:
+...         -   type:   GetEggs
+...             params: eggs_params
+...             out:    egg
+...           
+...         -   type:   CookEggs
+...             params: cook_params
+...             in:     egg
+...           
+...         -   type:   DoNothing
+...             params: no_params
+...             in:     non_existent_data_product
+...           
+...         -   type:   PrintEggs
+...             params: eggs_params
+...
+... eggs_params:
+...     eggs: ['green', 'duck', 'ostrich']
+...
+... cook_params:
+...     style: 'fried'
+...
+... no_params: {}
+... '''
+
+>>> Manager.from_yaml_str(new_spam_config).run()
+Setting up GetEggs.
+Setting up CookEggs.
+Setting up DoNothing.
+Setting up PrintEggs.
+Cooking fried green eggs.
+Cooking fried duck eggs.
+Cooking fried ostrich eggs.
+Finished GetEggs.
+Finished CookEggs.
+Finished DoNothing.
+Spam and green eggs.
+Spam and duck eggs.
+Spam and ostrich eggs.
+Finished PrintEggs.
+
+Notice that :meth:`DoNothing.next` is nerver called, since the pipeline never
+generates its input, 'non_existent_data_product'.  Once everything before
+:class:`DoNothing` has been executed the pipeline notices that there is no
+opertunity for 'non_existent_data_product' to be generated and forces
+`DoNothing` to proceed to :meth:`finish`. This also unblocks :class:`PrintEggs`
+allowing it to proceed normally.
+
+Advanced Tasks
+--------------
+
+Several subclasses of :class:`TaskBase` provide advanced functionality for tasks that
+conform to the most common patterns. This functionality includes: optionally
+reading inputs from disk, instead of receiving them from the pipeline;
+optionally writing outputs to disk automatically; and caching the results of a
+large computation to disk in an intelligent manner (not yet implemented).
+
+Base classes providing this functionality are :class:`SingleBase` for 'one
+shot' tasks and :class:`IterBase` for task that need to iterate.  There are
+limited to a single input ('in' key) and a single output ('out' key).  Method
+:meth:`~SingleBase.process` should be overwritten instead of :meth:`next`.
+Optionally, :meth:`~SingleBase.read_input` and :meth:`~SingleBase.write_output`
+may be over-ridden for maximum functionality.  :meth:`setup` and :meth:`finish`
+may be overridden as usual.
+
+In addition :class:`SingleH5Base`, :class:`IterH5Base`, provide the
+:meth:`read_input` and :meth:`write_output` methods for the most common
+formats.
+
+See the documentation for these base classes for more details.
 
 """
+
 
 import sys
 import inspect
@@ -15,7 +318,7 @@ from os import path
 
 import yaml
 
-from drift.util import config
+import config
 
 
 # Set the module logger.
@@ -215,6 +518,8 @@ class Manager(config.Reader):
                 try:
                     task_cls = _import_class(task_path)
                 except (ImportError, KeyError):
+                    # XXX reminant from when this was part of ch_analysis.
+                    # Leave for now as it's harmless and used in ch_analysis.
                     task_cls = _import_class('ch_analysis.pipeline.' + task_path)
             except Exception as e:
                 e_str = e.__class__.__name__
@@ -825,53 +1130,6 @@ class IterBase(_OneAndOne):
         return output
 
 
-class AnDataMixin(object):
-    """Provides chime analysis format hdf5 IO for pipeline tasks.
-
-    As a mixin, this must be combined (using multiple inheritance) with a
-    subclass of `TaskBase`, providing the full task API.
-
-    Provides the methods `read_input`, `read_output` and `write_output` for
-    chime analysis format hdf5 data.
-    
-    """
-    
-    # TODO, think about how we want this to work.
-    #read_ondisk = config.Property(default=False, proptype=bool)
-
-    def cast_input(self, input):
-        """Casts variouse inputs to an :class:`AnData` instance."""
-        
-        from ch_util import andata
-        if andata.is_group(input):
-            input = andata.AnData(input)
-        return input
-    
-    def read_input(self, filename):
-        """Method for reading chime analysis format hdf5 input."""
-        
-        from ch_util import andata
-        data = andata.AnData.from_file(filename)
-        return data
-
-    def read_output(self, filename):
-        """Method for reading chime analysis format hdf5 output.
-        
-        Used for reading caches for long computations.
-
-        """
-        
-        # Replicate code from read_input in case read_input is overridden.
-        from ch_util import andata
-        data = andata.from_file(filename)
-        return data
-
-    def write_output(self, filename, output):
-        """Method for writing chime analysis format hdf5 output."""
-        
-        output.save(filename, mode='w')
-
-
 class H5IOMixin(object):
     """Provides hdf5 IO for pipeline tasks.
 
@@ -952,26 +1210,6 @@ class IterH5Base(H5IOMixin, IterBase):
     pass
 
 
-class SingleAnDataBase(AnDataMixin, SingleBase):
-    """Base class for tasks with analysis format hdf5 input and output.
-
-    Inherits from :class:`AnDataMixin` and :class:`SingleBase`. 
-
-    """
-
-    pass
-
-
-class IterAnDataBase(AnDataMixin, IterBase):
-    """Base class for iterating over analysis format hdf5 input and output.
-
-    Inherits from :class:`AnDataMixin` and :class:`IterBase`. 
-
-    """
-
-    pass
-
-
 # Internal Functions
 # ------------------
 
@@ -1018,3 +1256,7 @@ def _import_class(class_path):
         task_cls = globals()[class_name]
     return task_cls
 
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()

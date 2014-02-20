@@ -1,50 +1,64 @@
 """
-A module to define strictly typed attributes of a class, that can be loaded
+Configure class attributes using values from a dictionary.
+
+This module to defines strictly typed attributes of a class, that can be loaded
 from an input dictionary. This is particularly useful for loading a class from
 a YAML document.
 
+Classes
+=======
+
+.. autosummary::
+   :toctree: generated/
+
+   Property
+   Reader
+
+Examples
+========
 
 In this example we set up a class to store information about a person.
 
-    >>> class Person(Reader):
-    ...
-    ...     name = Property(default='Bill', proptype=str)
-    ...     age = Property(default=26, proptype=float, key='ageinyears')
+>>> class Person(Reader):
+...
+...     name = Property(default='Bill', proptype=str)
+...     age = Property(default=26, proptype=float, key='ageinyears')
 
 We then extend it to store information about a person with a pet. The
 configuration will be successfully inherited.
 
-    >>> class PersonWithPet(Person):
-    ... 
-    ...     petname = Property(default='Molly', proptype=str)
+>>> class PersonWithPet(Person):
+... 
+...     petname = Property(default='Molly', proptype=str)
 
 Let's create a couple of objects from these classes.
 
-    >>> person1 = Person()
-    >>> person2 = PersonWithPet()
+>>> person1 = Person()
+>>> person2 = PersonWithPet()
 
 And a dictionary of replacement parameters.
 
-    >>> testdict = { 'name' : 'Richard', 'ageinyears' : 40, 'petname' : 'Sooty'}
+>>> testdict = { 'name' : 'Richard', 'ageinyears' : 40, 'petname' : 'Sooty'}
 
 First let's check what the default parameters are:
 
-    >>> print person1.name, person1.age
-    Bill 26.0
-    >>> print person2.name, person2.age, person2.petname
-    Bill 26.0 Molly
+>>> print person1.name, person1.age
+Bill 26.0
+>>> print person2.name, person2.age, person2.petname
+Bill 26.0 Molly
 
 Now let's load the configuration from a dictionary:
 
-    >>> person1.read_config(testdict)
-    >>> person2.read_config(testdict)
+>>> person1.read_config(testdict)
+>>> person2.read_config(testdict)
     
 Then we'll print the output to see the updated configuration:
 
-    >>> print person1.name, person1.age
-    Richard 40.0
-    >>> print person2.name, person2.age, person2.petname
-    Richard 40.0 Sooty
+>>> print person1.name, person1.age
+Richard 40.0
+>>> print person2.name, person2.age, person2.petname
+Richard 40.0 Sooty
+
 """
 
 
@@ -130,8 +144,6 @@ class Property(object):
                         self.propname = propname
 
 
-
-
 class Reader(object):
     """A class that allows the values of Properties to be assigned from a dictionary.
     """
@@ -167,3 +179,7 @@ class Reader(object):
                 if isinstance(clsprop, Property):
                     clsprop._from_config(self, config)
 
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
