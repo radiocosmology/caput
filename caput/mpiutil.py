@@ -9,7 +9,7 @@ Functions
 =========
 
 .. autosummary::
-   :toctree: generated/
+    :toctree: generated/
 
    partition_list_alternate
    partition_list_mpi
@@ -185,7 +185,8 @@ def split_m(n, m):
 
     See Also
     --------
-    `split_all`, `split_local`
+    :fun:`split_all`, :fun:`split_local`
+
     """
     base = (n / m)
     rem = n % m
@@ -198,8 +199,7 @@ def split_m(n, m):
 
 
 def split_all(n, comm=None):
-    """
-    Split a range (0, n-1) into sub-ranges for each MPI Process.
+    """Split a range (0, n-1) into sub-ranges for each MPI Process.
 
     Parameters
     ----------
@@ -219,8 +219,10 @@ def split_all(n, comm=None):
 
     See Also
     --------
-    `split_all`, `split_local`
+    :fun:`split_m`, :fun:`split_local`
+    
     """
+    
     if not comm:
         try: 
             comm=MPI.COMM_WORLD
@@ -253,8 +255,10 @@ def split_local(n, comm=None):
 
     See Also
     --------
-    `split_all`, `split_local`
+    :fun:`split_all`, :fun:`split_local`
+     
     """
+    
     pse = split_all(n, comm=comm)
     if not comm:
         try: 

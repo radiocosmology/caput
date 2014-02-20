@@ -14,5 +14,5 @@ Packages
    memh5
    config
    pipeline
-   mpiutils
+   mpiutil
 
