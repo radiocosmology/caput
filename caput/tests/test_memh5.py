@@ -52,6 +52,7 @@ class TestGroup(unittest.TestCase):
         gd = g['/a/b/c/d/']
         self.assertEqual(gd.name, '/a/b/c/d')
 
+
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""
 
@@ -123,6 +124,9 @@ class TestH5Files(unittest.TestCase):
         for fname in file_names:
             os.remove(fname)
 
+
+class TestBasicCont(unittest.TestCase):
+    pass
 
 if __name__ == '__main__':
     unittest.main()

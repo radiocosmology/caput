@@ -323,28 +323,28 @@ class MemAttrs(dict):
 
 class MemDataset(np.ndarray):
     """In memory implementation of the ``h5py.Dataset`` class.
-    
+
     Numpy array mocked up to look like an hdf5 dataset.  This just allows a
     numpy array to carry around ab `attrs` dictionary as a stand-in for hdf5
     attributes.
-    
+
     Attributes
     ----------
     attrs : MemAttrs
 
     """
-    
+
     def __array_finalize__(self, obj):
         self._attrs = MemAttrs(getattr(obj, 'attrs', {}))
 
     @property
     def attrs(self):
         """Attributes attached to this object.
-        
+
         Returns
         -------
         attrs : MemAttrs
-    
+
         """
 
         return self._attrs
@@ -409,10 +409,6 @@ class MemDiskGroup(collections.Mapping):
         else:
             data_group, self._toclose = get_h5py_File(data_group)
         self._data = data_group
-        #self._data.require_group(u'history')
-        #self._data.require_group(u'index_map')
-        #if not 'order' in self._data['history'].attrs.keys():
-        #    self._data['history'].attrs[u'order'] = '[]'
 
     def __del__(self):
         """Closes file if on disk and if file was opened on initialization."""
@@ -586,7 +582,7 @@ class MemDiskGroup(collections.Mapping):
         if isinstance(self._data, MemGroup):
             return self
         else:
-            return AnData.from_file(self._data)
+            return self.__class__.from_file(self._data)
 
     def to_disk(self, h5_file, **kwargs):
         """Return a version of this data that lives on disk."""
@@ -596,7 +592,7 @@ class MemDiskGroup(collections.Mapping):
                    " anyway.")
             warnings.warn(msg)
         self.save(h5_file)
-        return AnData.from_file(h5_file, ondisk=True, **kwargs)
+        return self.__class__.from_file(h5_file, ondisk=True, **kwargs)
 
     def close(self):
         """Close underlying hdf5 file if on disk."""
@@ -620,14 +616,18 @@ class MemDiskGroup(collections.Mapping):
 
 
 def BasicCont(object):
-    """Container whose data may either be stored on disk or in memory.
+    """Basic high level data container.
 
-    This container is intended to have the same basic API :class:`h5py.Group`
-    and :class:`MemGroup` but whose underlying data could live either on disk
-    in the former or in memory in the later.
+    Inherits from :class:`MemDiskGroup`.
 
-    In addition, some added functionality is included in :attr:`index_map` and
-    :attr:`history`.
+    Basic one-level data container that allows any number of data sets in the
+    root group but no nesting. Data history tracking (in
+    :attr:`BasicCont.history`) and array axis interpretation (in
+    :attr:`BasicCont.index_map`) is also provided.
+
+    This container is intended to be an example of how a high level container,
+    with a strictly controlled data layout can be implemented by subclassing
+    :class:`MemDiskGroup`.
 
     Parameters
     ----------
@@ -638,80 +638,32 @@ def BasicCont(object):
 
     Attributes
     ----------
-    attrs
     datasets
     index_map
     history
-    ondisk
 
     Methods
     -------
-    __getitem__
-    from_file
-    create_dataset
+    group_name_allowed
+    dataset_name_allowed
+    create_index_map
     add_history
-    to_memory
-    to_disk
-    flush
-    close
-    save
 
     """
-    
-    @property 
-    def datasets(self):
-        """Stores hdf5 datasets holding all data.
-        
-        Each dataset can reference a calibration scheme in
-        ``datasets[name].attrs['cal']`` which refers to an entry in
-        :attr:`~AnData.cal`.
 
-        Do not try to add a new dataset by assigning to an item of this
-        property. Use `create_dataset` instead.
+    def __init__(self, data_group=None):
+        MemDiskGroup.__init__(self, data_group)
+        self._data.require_group(u'history')
+        self._data.require_group(u'index_map')
+        if not 'order' in self._data['history'].attrs.keys():
+            self._data['history'].attrs[u'order'] = '[]'
 
-        Returns
-        -------
-        datasets : read only dictionary
-            Entries are :mod:`h5py` or :mod:`caput.memh5` datasets.
-
-        """
-
-        out = {}
-        for name, value in self._data.iteritems():
-            if not is_group(value):
-                out[name] = value
-        return ro_dict(out)
-
-
-    def create_index_map(self, axis_name, index_map):
-        """Create a new index map.
-        
-        """
-        
-        self._data['index_map'].create_dataset(axis_name, data=index_map)
-
-    def add_history(self, name, history=None):
-        """Create a new history entry."""
-        
-        if name == 'order':
-            raise ValueError('"order" is a reserved name and may not be the'
-                             ' name of a history entry.')
-        if history is None:
-            history = {}
-        order = self.history['order']
-        order = order + [name]
-        history_group = self._data["history"]
-        history_group.attrs[u'order'] = str(order)
-        history_group.create_group(name)
-        for key, value in history.items():
-            history_group[name].attrs[key] = value
-
-    @property 
+    @property
     def history(self):
         """Stores the analysis history for this data.
-        
+
         Do not try to add a new entry by assigning to an element of this
-        property. Use :meth:`~AnData.add_history` instead.
+        property. Use :meth:`~BasicCont.add_history` instead.
 
         Returns
         -------
@@ -737,8 +689,8 @@ def BasicCont(object):
         the visibilities are described in the index map.
 
         Do not try to add a new index_map by assigning to an item of this
-        property. Use :meth:`~AnData.create_index_map` instead.
-        
+        property. Use :meth:`~BasicCont.create_index_map` instead.
+
         Returns
         -------
         index_map : read only dictionary
@@ -750,6 +702,42 @@ def BasicCont(object):
         for name, value in self._data['index_map'].iteritems():
             out[name] = value
         return ro_dict(out)
+
+    def group_name_allowed(self, name):
+        """No groups are exposed to the user. Returns ``False``."""
+        return False
+
+    def dataset_name_allowed(self, name):
+        """Datasets may only be created and accessed in the root level group.
+
+        Returns ``True`` is *name* contains no '/' characters.
+
+        """
+        return False if '/' in name else False
+
+    def create_index_map(self, axis_name, index_map):
+        """Create a new index map.
+
+        """
+
+        self._data['index_map'].create_dataset(axis_name, data=index_map)
+
+    def add_history(self, name, history=None):
+        """Create a new history entry."""
+
+        if name == 'order':
+            raise ValueError('"order" is a reserved name and may not be the'
+                             ' name of a history entry.')
+        if history is None:
+            history = {}
+        order = self.history['order']
+        order = order + [name]
+        history_group = self._data["history"]
+        history_group.attrs[u'order'] = str(order)
+        history_group.create_group(name)
+        for key, value in history.items():
+            history_group[name].attrs[key] = value
+
 
 
 
