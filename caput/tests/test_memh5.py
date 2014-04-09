@@ -28,20 +28,29 @@ class TestGroup(unittest.TestCase):
     """Unit tests for MemGroup."""
 
     def test_nested(self):
-        
         root = memh5.MemGroup()
         l1 = root.create_group('level1')
         l2 = l1.require_group('level2')
         self.assertTrue(root['level1'] is l1)
         self.assertTrue(root['level1/level2'] is l2)
+        self.assertEqual(root['level1/level2'].name, '/level1/level2')
 
     def test_create_dataset(self):
-
         g = memh5.MemGroup()
         data = np.arange(100, dtype=np.float32)
         g.create_dataset('data', data=data)
         self.assertTrue(np.allclose(data, g['data']))
 
+    def test_recursive_create(self):
+        g = memh5.MemGroup()
+        self.assertRaises(ValueError, g.create_group, '')
+        g2 = g.create_group('level2/')
+        self.assertRaises(ValueError, g2.create_group, '/')
+        g2.create_group('/level22')
+        self.assertEqual(set(g.keys()), {'level22', 'level2'}) 
+        g.create_group('/a/b/c/d/')
+        gd = g['/a/b/c/d/']
+        self.assertEqual(gd.name, '/a/b/c/d')
 
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""

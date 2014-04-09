@@ -1,13 +1,14 @@
 """
-Module for making in-memory mockups of h5py objects.
+Module for making in-memory mock-ups of :mod:`h5py` objects.
 
 .. currentmodule:: caput.memh5
 
-It is sometimes usefull to have a consistent API for data that is independant
-of whether that data lives on disk or in memory. ``h5py`` provides this to a
-certain extent, having ``Dataset`` objects that act very much like ``numpy``
-arrays. ``memh5`` extends this, providing an in-memory containers, analagous to
-``h5py`` ``Group`` and ``Attribute`` objects.
+It is sometimes usefull to have a consistent API for data that is independent
+of whether that data lives on disk or in memory. :mod:`h5py` provides this to a
+certain extent, having :class:`Dataset`` objects that act very much like
+:mod:`numpy` arrays. mod:`memh5` extends this, providing an in-memory
+containers, analogous to :class:`h5py.Group` and :class:`h5py.Attribute` and
+:class:`h5py.Dataset` objects.
 
 
 Classes
@@ -54,8 +55,8 @@ class ro_dict(collections.Mapping):
     traditional dict interface. This prevents the user from mistaking this for
     a normal dictionary.
 
-    Provides the same interface for reading as the builtin python ``dict``s but
-    no methods for writing.
+    Provides the same interface for reading as the builtin python
+    :class:`dict`s but no methods for writing.
 
     Parameters
     ----------
@@ -82,14 +83,18 @@ class ro_dict(collections.Mapping):
 
 
 class MemGroup(ro_dict):
-    """In memory implementation of the ``h5py.Group`` class.
+    """In memory implementation of the :class:`h5py.Group`.
 
-    This class doubles as the a ``h5py.File``, object, since the destinction
-    between a file and a group for in-memory data is moot.
+    This class doubles as the memory implementation of :class:`h5py.File`,
+    object, since the distinction between a file and a group for in-memory data
+    is moot.
 
     Attributes
     ----------
-    attrs : MemAttrs
+    attrs
+    name
+    parent
+    file
 
     Methods
     -------
@@ -100,18 +105,31 @@ class MemGroup(ro_dict):
     create_group
     require_group
     create_dataset
+    require_dataset
 
     """
 
     def __init__(self):
         ro_dict.__init__(self)
         self._attrs = MemAttrs()
+        # Set the following assuming we are the root group. If not, the method
+        # that created us will reset.
+        self._root = self
+        self._parent = self
+        self._name = ''
 
     def __getitem__(self, key):
-        """Impliment '/' for accessing nested groups."""
+        """Implement '/' for accessing nested groups."""
+        if not key:
+            return self
+        # If this is an absolute path, index from the root group.
+        if key[0] == '/':
+            return self._root[key[1:]]
         key_parts = key.split('/')
+        # Strip out any empty key parts.  Takes care of '//' and trailing '/'.
+        key_parts = [p for p in key_parts if p]
         if len(key_parts) == 1:
-            return ro_dict.__getitem__(self, key)
+            return ro_dict.__getitem__(self, key_parts[0])
         else:
             # Enter the first level and call __getitem__ recursively.
             return self[key_parts[0]]['/'.join(key_parts[1:])]
@@ -119,14 +137,32 @@ class MemGroup(ro_dict):
     @property
     def attrs(self):
         """Attributes attached to this object.
-        
+
         Returns
         -------
         attrs : MemAttrs
-    
+
         """
 
         return self._attrs
+
+    @property
+    def parent(self):
+        """Parent :class:`MemGroup` that contains this group."""
+        return self._parent
+
+    @property
+    def name(self):
+        """String giving the full path to this group."""
+        if self.parent is self._root:
+            return '/' + self._name
+        else:
+            return self.parent.name + '/' + self._name
+
+    @property
+    def file(self):
+        """Not a file at all but the top most :class:`MemGroup` of the tree."""
+        return self._root
 
     @classmethod
     def from_group(cls, group):
@@ -134,7 +170,7 @@ class MemGroup(ro_dict):
 
         Agnostic as to whether the group to be copyed is a `MemGroup` or an
         `h5py.Group` (which includes `hdf5.File` objects). 
-        
+
         """
 
         self = cls()
@@ -148,7 +184,7 @@ class MemGroup(ro_dict):
         This is the same as `from_group` except that an hdf5 filename is
         accepted.  Any keyword arguments are passed on to the constructor for
         `h5py.File`.
-        
+
         """
 
         f, to_close = get_h5py_File(f, **kwargs)
@@ -159,33 +195,57 @@ class MemGroup(ro_dict):
 
     def to_hdf5(self, f, **kwargs):
         """Replicate object on disk in an hdf5 file.
-      
+
         Any keyword arguments are passed on to the constructor for `h5py.File`.
-        
+
         """
-        
+
         f, opened = get_h5py_File(f, **kwargs)
         deep_group_copy(self, f)
         return f
 
     def create_group(self, key):
-        if key in self.keys():
-            msg = "Group '%s' already exists." % key
+        # Corner case if empty key.
+        if not key:
+            msg = "Empty group names not allowed."
             raise ValueError(msg)
+        if not '/' in key:
+            # Create group directly.
+            try:
+                self[key]
+            except KeyError:
+                out = MemGroup()
+                out._root = self._root
+                out._parent = self
+                out._name = key
+                self._dict[key] = out
+                return out
+            else:
+                msg = "Item '%s' already exists." % key
+                raise ValueError(msg)
         else:
-            out = MemGroup()
-            self._dict[key] = out
-            return out
+            # Recursively create groups.
+            key_parts = key.split('/')
+            # strip off trailing '/' if present.
+            if not key_parts[-1]:
+                key_parts = key_parts[:-1]
+            # Corner case of '/group_name':
+            if len(key_parts) == 2 and not key_parts[0]:
+                g = self._root
+            else:
+                g = self.require_group('/'.join(key_parts[:-1]))
+            return g.create_group(key_parts[-1])
 
     def require_group(self, key):
-        if key in self.keys():
-            if not isinstance(self[key], MemGroup):
-                msg = "Entry '%s' exists and is not a Group." % key
-                raise TypeError(msg)
-            else:
-                return self[key]
-        else:
+        try:
+            g = self[key]
+        except KeyError:
             return self.create_group(key)
+        if not isinstance(g, MemGroup):
+            msg = "Entry '%s' exists and is not a Group." % key
+            raise TypeError(msg)
+        else:
+            return g
 
     def create_dataset(self, name, shape=None, dtype=None, data=None,
                        **kwargs):
@@ -223,6 +283,17 @@ class MemGroup(ro_dict):
                 new_dataset[...] = data[...]
         self._dict[name] = new_dataset
         return new_dataset
+
+    def require_dataset(self, shape, dtype):
+        try:
+            d = self[key]
+        except KeyError:
+            return self.create_dataset(key, shape=shape, dtype=dtype)
+        if isinstance(g, MemGroup):
+            msg = "Entry '%s' exists and is not a Dataset." % key
+            raise TypeError(msg)
+        else:
+            return d
 
 
 class MemAttrs(dict):
