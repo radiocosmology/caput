@@ -102,6 +102,22 @@ class TestH5Files(unittest.TestCase):
         self.assertGroupsEqual(f, m)
         f.close()
 
+    def test_memdisk(self):
+        f = memh5.MemDiskGroup(self.fname)
+        self.assertEqual(set(f.keys()), set(f._data.keys()))
+        m = memh5.MemDiskGroup(memh5.MemGroup.from_hdf5(self.fname))
+        self.assertEqual(set(m.keys()), set(f.keys()))
+        # Recursive indexing.
+        self.assertEqual(set(f['/level1/'].keys()), set(m['/level1/'].keys()))
+        self.assertEqual(set(f.keys()), set(m['/level1']['/'].keys()))
+        self.assertTrue(np.all(f['/level1/large'][:] == m['/level1/large']))
+        gf = f.create_group('/level1/level2/level3/')
+        df = gf.create_dataset('new', np.arange(5))
+        gm = m.create_group('/level1/level2/level3/')
+        dm = gm.create_dataset('new', np.arange(5))
+        self.assertTrue(np.all(f['/level1/level2/level3/new'][:]
+                               == m['/level1/level2/level3/new'][:]))
+
     def tearDown(self):
         file_names = glob.glob(self.fname + '*')
         for fname in file_names:
