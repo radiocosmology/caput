@@ -373,7 +373,7 @@ class MemDiskGroup(collections.Mapping):
 
     Parameters
     ----------
-    data_group : :class:`h5py.Group`, :class:`MemGroup or string, optional
+    data_group : :class:`h5py.Group`, :class:`MemGroup` or string, optional
         Underlying :mod:`h5py` like data container where data will be stored.
         If a string, open a h5py file with that name. If not
         provided a new :class:`MemGroup` instance will be created.
@@ -631,14 +631,13 @@ class BasicCont(MemDiskGroup):
 
     Parameters
     ----------
-    data_group : :class:`h5py.Group`, :class:`MemGroup or string, optional
+    data_group : :class:`h5py.Group`, :class:`MemGroup` or string, optional
         Underlying :mod:`h5py` like data container where data will be stored.
         If a string, open an h5py file with that name. If not
         provided a new :class:`MemGroup` instance will be created.
 
     Attributes
     ----------
-    datasets
     index_map
     history
 
