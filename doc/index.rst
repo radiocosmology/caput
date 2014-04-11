@@ -16,3 +16,10 @@ Packages
    pipeline
    mpiutil
 
+Indices and tables
+==================
+
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
+
