@@ -79,7 +79,7 @@ class ro_dict(collections.Mapping):
         Initial data for the new dictionary.
 
     """
-    
+
     def __init__(self, d=None):
         if not d:
             d = {}
@@ -350,7 +350,7 @@ class MemDataset(np.ndarray):
         return self._attrs
 
     def resize(self):
-        # h5py datasets' reshape() is different from numpy reshape.
+        # h5py datasets reshape() is different from numpy reshape.
         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
         raise NotImplementedError(msg)
 
@@ -566,7 +566,7 @@ class MemDiskGroup(collections.Mapping):
 
     def create_group(self, key):
         if not self.group_name_allowed(key):
-            msg = "Group name %s not allowed." % name
+            msg = "Group name %s not allowed." % key
             raise ValueError(msg)
         return self._data.create_group(key)
 
@@ -615,7 +615,7 @@ class MemDiskGroup(collections.Mapping):
             f.close()
 
 
-def BasicCont(object):
+class BasicCont(MemDiskGroup):
     """Basic high level data container.
 
     Inherits from :class:`MemDiskGroup`.
@@ -713,7 +713,7 @@ def BasicCont(object):
         Returns ``True`` is *name* contains no '/' characters.
 
         """
-        return False if '/' in name else False
+        return False if '/' in name else True
 
     def create_index_map(self, axis_name, index_map):
         """Create a new index map.
@@ -737,8 +737,6 @@ def BasicCont(object):
         history_group.create_group(name)
         for key, value in history.items():
             history_group[name].attrs[key] = value
-
-
 
 
 # Utilities

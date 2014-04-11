@@ -126,7 +126,19 @@ class TestH5Files(unittest.TestCase):
 
 
 class TestBasicCont(unittest.TestCase):
-    pass
+
+    def test_access(self):
+        d = memh5.BasicCont()
+        self.assertTrue('history' in d._data.keys())
+        self.assertTrue('index_map' in d._data.keys())
+        self.assertRaises(KeyError, d.__getitem__, 'history')
+        self.assertRaises(KeyError, d.__getitem__, 'index_map')
+
+        self.assertRaises(ValueError, d.create_group, 'a')
+        self.assertRaises(ValueError, d.create_dataset, 'index_map/stuff',
+                          data=np.arange(5))
+        # But make sure this works.
+        d.create_dataset('a', data=np.arange(5))
 
 if __name__ == '__main__':
     unittest.main()
