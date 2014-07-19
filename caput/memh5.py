@@ -179,6 +179,15 @@ class MemGroup(ro_dict):
         """Not a file at all but the top most :class:`MemGroup` of the tree."""
         return self._root
 
+    @property
+    def mode(self):
+        """String indicating if group is readonly ("r") or read-write ("r+").
+
+        :class:`MemGroup`s are always read-write.
+
+        """
+        return 'r+'
+
     @classmethod
     def from_group(cls, group):
         """Create a new instance by deep copying an existing group.
@@ -297,6 +306,10 @@ class MemGroup(ro_dict):
             if not data is None:
                 new_dataset[...] = data[...]
         self._dict[name] = new_dataset
+        # Some subset of the h5py interface.
+        new_dataset._name = name
+        new_dataset._parent = self
+        new_dataset._root = self.file
         return new_dataset
 
     def require_dataset(self, shape, dtype):
@@ -330,12 +343,18 @@ class MemDataset(np.ndarray):
 
     Attributes
     ----------
-    attrs : MemAttrs
+    attrs
+    name
+    parent
+    file
 
     """
 
     def __array_finalize__(self, obj):
         self._attrs = MemAttrs(getattr(obj, 'attrs', {}))
+        self._parent = ''
+        self._name = ''
+        self._root = ''
 
     @property
     def attrs(self):
@@ -348,6 +367,33 @@ class MemDataset(np.ndarray):
         """
 
         return self._attrs
+
+    @property
+    def parent(self):
+        """Parent :class:`MemGroup` that contains this dataset."""
+        return self._parent
+
+    @property
+    def name(self):
+        """String giving the full path to this dataset."""
+        if self.parent is self._root:
+            return '/' + self._name
+        else:
+            return self.parent.name + '/' + self._name
+
+    @property
+    def file(self):
+        """Not a file at all but the top most :class:`MemGroup` of the tree."""
+        return self._root
+
+    @property
+    def mode(self):
+        """String indicating if group is readonly ("r") or read-write ("r+").
+
+        :class:`MemGroup`s are always read-write.
+
+        """
+        return 'r+'
 
     def resize(self):
         # h5py datasets reshape() is different from numpy reshape.
@@ -444,7 +490,8 @@ class MemDiskGroup(collections.Mapping):
             else:
                 continue
 
-    # TODO, something similar to __getitem__() for len() and __iter__().
+    # TODO, something similar to __getitem__(), restricting names,
+    # for len() and __iter__().
 
     ## The main interface ##
 
@@ -552,7 +599,8 @@ class MemDiskGroup(collections.Mapping):
             raise ValueError(msg)
         new_dataset = self._data.create_dataset(name, shape, dtype, data,
                                                 **kwargs)
-        # Copy over the attributes.  XXX Get rid of this?
+        # Copy over the attributes.  XXX Get rid of this?  Incompatible with
+        # h5py interface.
         if attrs:
             for key, value in attrs.iteritems():
                 new_dataset.attrs[key] = value
@@ -652,10 +700,12 @@ class BasicCont(MemDiskGroup):
 
     def __init__(self, data_group=None):
         MemDiskGroup.__init__(self, data_group)
-        self._data.require_group(u'history')
-        self._data.require_group(u'index_map')
-        if not 'order' in self._data['history'].attrs.keys():
-            self._data['history'].attrs[u'order'] = '[]'
+        # Initialize new groups only if writable.
+        if self._data.file.mode == 'r+':
+            self._data.require_group(u'history')
+            self._data.require_group(u'index_map')
+            if not 'order' in self._data['history'].attrs.keys():
+                self._data['history'].attrs[u'order'] = '[]'
 
     @property
     def history(self):
