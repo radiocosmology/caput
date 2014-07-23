@@ -13,6 +13,37 @@
 
 import sys, os
 
+# Check if we are on readthedocs
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+
+# Mock up modules missing on readthedocs.
+class Mock(object):
+
+    __all__ = []
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args, **kwargs):
+        return Mock()
+
+    @classmethod
+    def __getattr__(cls, name):
+        if name in ('__file__', '__path__'):
+            return '/dev/null'
+        elif name[0] == name[0].upper():
+            mockType = type(name, (), {})
+            mockType.__module__ = __name__
+            return mockType
+        else:
+            return Mock()
+
+MOCK_MODULES = ['h5py']
+if on_rtd:
+    for mod_name in MOCK_MODULES:
+        sys.modules[mod_name] = Mock()
+
+
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
@@ -27,7 +58,7 @@ import sys, os
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 # 'numpydoc' does not ship with sphinx. To get it use `pip install numpydoc`.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath', 'sphinx.ext.mathjax',
-              'numpydoc', 'sphinx.ext.autosummary']
+              'numpydoc', 'sphinx.ext.autosummary', 'sphinx.ext.viewcode']
 
 numpydoc_show_class_members = False
 import glob
@@ -48,7 +79,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'caput'
-copyright = u'2013, Kiyoshi Masui'
+copyright = u'2013-2014, Kiyoshi Masui'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
