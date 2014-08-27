@@ -220,22 +220,16 @@ def split_all(n, comm=None):
     See Also
     --------
     :fun:`split_m`, :fun:`split_local`
-    
     """
-    
-    if not comm:
-        try: 
-            comm=MPI.COMM_WORLD
-            m = comm.size
-        except NameError:
-            m = 1
+
+    m = size if comm is None else comm.size
+
     return split_m(n, m)
 
 
 def split_local(n, comm=None):
-    """
-    Split a range (0, n-1) into sub-ranges for each MPI Process. This returns
-    the parameters only for the current rank.
+    """Split a range (0, n-1) into sub-ranges for each MPI Process. This
+    returns the parameters only for the current rank.
 
     Parameters
     ----------
@@ -256,16 +250,11 @@ def split_local(n, comm=None):
     See Also
     --------
     :fun:`split_all`, :fun:`split_local`
-     
     """
-    
+
     pse = split_all(n, comm=comm)
-    if not comm:
-        try: 
-            comm=MPI.COMM_WORLD
-            m = comm.rank
-        except NameError:
-            m = 0
+    m = rank if comm is None else comm.rank
+
     return pse[:, m]
 
 
