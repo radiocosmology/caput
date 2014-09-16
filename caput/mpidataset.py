@@ -87,6 +87,8 @@ class MPIArray(np.ndarray):
     enumerate
     from_hdf5
     to_hdf5
+    transpose
+    reshape
     """
 
     @property
@@ -349,6 +351,74 @@ class MPIArray(np.ndarray):
 
             dist_arr._comm.Barrier()
 
+    def transpose(self, axes):
+        """Transpose the array axes.
+
+        Parameters
+        ----------
+        axes : tuple
+            Tuple of axes permutations.
+
+        Returns
+        -------
+        array : MPIArray
+            Transposed MPIArray as a view of the original data.
+        """
+
+        tdata = np.ndarray.transpose(self, axes)
+
+        tdata._global_shape = tuple([self.global_shape[ax] for ax in axes])
+        tdata._local_shape = tuple([self.local_shape[ax] for ax in axes])
+        tdata._local_offset = tuple([self.local_offset[ax] for ax in axes])
+
+        tdata._axis = list(axes).index(self.axis)
+        tdata._comm = self._comm
+
+        return tdata
+
+    def reshape(self, shape):
+        """Reshape the array.
+
+        Must not attempt to reshape the distributed axis. That axis must be
+        given an input length `None`.
+
+        Parameters
+        ----------
+        shape : tuple
+            Tuple of axis lengths. The distributed must be given `None`.
+
+        Returns
+        -------
+        array : MPIArray
+            Reshaped MPIArray as a view of the original data.
+        """
+
+        # Find which axis is distributed
+        list_shape = list(shape)
+        new_axis = list_shape.index(None)
+
+        # Fill in the missing value
+        local_shape = list_shape[:]
+        global_shape = list_shape[:]
+        local_offset = [0] * len(list_shape)
+        local_shape[new_axis] = self.local_shape[self.axis]
+        global_shape[new_axis] = self.global_shape[self.axis]
+        local_offset[new_axis] = self.local_offset[self.axis]
+
+        # Check that the array sizes are compatible
+        if np.prod(local_shape) != np.prod(self.local_shape):
+            raise Exception("Dataset shapes incompatible.")
+
+        rdata = np.ndarray.reshape(self, local_shape)
+
+        rdata._axis = new_axis
+        rdata._comm = self._comm
+        rdata._local_shape = tuple(local_shape)
+        rdata._global_shape = tuple(global_shape)
+        rdata._local_offset = tuple(local_offset)
+
+        return rdata
+
 
 class MPIDataset(collections.Mapping):
     """A container for distributed datasets.
@@ -404,6 +474,13 @@ class MPIDataset(collections.Mapping):
             comm = MPI.COMM_WORLD
 
         self._comm = comm
+
+        # Explicitly copy to ensure these are defined in the instance and not
+        # the class
+        self._attrs = self._attrs.copy()
+        self._common = self._common.copy()
+        self._distributed = self._distributed.copy()
+
 
     @classmethod
     def from_hdf5(cls, filename, comm=None):

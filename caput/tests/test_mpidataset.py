@@ -99,6 +99,56 @@ class TestMPIAray(unittest.TestCase):
 
         assert (ds2 == ds).all()
 
+    def test_transpose(self):
+
+        gshape = (1, 11, 2, 14)
+
+        l0, s0, e0 = mpiutil.split_local(11)
+
+        arr = mpidataset.MPIArray(gshape, axis=1, dtype=np.int64)
+
+        arr2 = arr.transpose((1, 3, 0, 2))
+
+        # Check type
+        assert isinstance(arr2, mpidataset.MPIArray)
+
+        # Check global shape
+        assert arr2.global_shape == (11, 14, 1, 2)
+
+        # Check local shape
+        assert arr2.local_shape == (l0, 14, 1, 2)
+
+        # Check local offset
+        assert arr2.local_offset == (s0, 0, 0, 0)
+
+        # Check axis
+        assert arr2.axis == 0
+
+    def test_reshape(self):
+
+        gshape = (1, 11, 2, 14)
+
+        l0, s0, e0 = mpiutil.split_local(11)
+
+        arr = mpidataset.MPIArray(gshape, axis=1, dtype=np.int64)
+
+        arr2 = arr.reshape((None, 28))
+
+        # Check type
+        assert isinstance(arr2, mpidataset.MPIArray)
+
+        # Check global shape
+        assert arr2.global_shape == (11, 28)
+
+        # Check local shape
+        assert arr2.local_shape == (l0, 28)
+
+        # Check local offset
+        assert arr2.local_offset == (s0, 0)
+
+        # Check axis
+        assert arr2.axis == 0
+
 
 class TestMPIDataset(unittest.TestCase):
 
