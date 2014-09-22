@@ -527,31 +527,30 @@ class Manager(config.Reader):
                 msg = "Loading task '%s' caused error - " % task_path
                 msg += e_str
                 raise PipelineConfigError(msg)
-        # Get the parameters and initialize the class.
-        try:
-            param_keys = task_spec['params']
-        except KeyError:
-            msg = "'params' not specified for task."
-            raise PipelineConfigError(msg)
 
+        # Get the parameters and initialize the class.
         params = {}
 
-        # If params is a dict, assume params are inline
-        if isinstance(param_keys, dict):
-            params.update(param_keys)
-        else:  # Otherwise assume it's a list of keys
+        if 'params' in task_spec:
 
-            # Must be a list of keys, convert if only one key was specified.
-            if not isinstance(param_keys, list):
-                param_keys = [param_keys]
+            # If params is a dict, assume params are inline
+            if isinstance(task_spec['params'], dict):
+                params.update(task_spec['params'])
+            else:  # Otherwise assume it's a list of keys
 
-            # Locate param sections, and add to dict
-            try:
-                for param_key in param_keys:
-                    params.update(self.all_params[param_key])
-            except KeyError:
-                msg = "Parameter group %s not found in config." % param_key
-                raise PipelineConfigError(msg)
+                param_keys = task_spec['params']
+
+                # Must be a list of keys, convert if only one key was specified.
+                if not isinstance(param_keys, list):
+                    param_keys = [param_keys]
+
+                # Locate param sections, and add to dict
+                try:
+                    for param_key in param_keys:
+                        params.update(self.all_params[param_key])
+                except KeyError:
+                    msg = "Parameter group %s not found in config." % param_key
+                    raise PipelineConfigError(msg)
 
         # Setup task
         task = task_cls._pipeline_from_config(params, task_spec)
