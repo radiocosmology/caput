@@ -1,0 +1,115 @@
+#!/usr/bin/env python
+"""Executes a data analysis pipeline given a pipeline YAML file.
+
+This script, when executed on the command line, accepts a single parameter, the
+path to a yaml pipeline file.  For an example of a pipeline file, see
+documentation for caput.pipeline.
+"""
+
+from argh import arg, dispatch_commands
+
+
+products = None
+
+
+@arg('configfile', help='Configuration file to run.')
+def run(configfile):
+    from caput.pipeline import Manager
+
+    P = Manager.from_yaml_file(configfile)
+    P.run()
+
+
+@arg('configfile', help='Configuration file to queue up.')
+@arg('--nosubmit', help='Don\'t submit the job to the queue.')
+def queue(configfile, nosubmit=False):
+
+    import os.path
+    import shutil
+    import yaml
+
+    with open(configfile, 'r') as f:
+        yconf = yaml.safe_load(f)
+
+    ## Global configuration
+    ## Create output directory and copy over params file.
+    if 'cluster' not in yconf:
+        raise Exception('Configuration file must have an \'config\' section.')
+
+    conf = yconf['cluster']
+
+    if 'directory' not in conf:
+        raise Exception("Must specify output directory.")
+    workdir = conf['directory']
+    workdir = os.path.normpath(os.path.expandvars(os.path.expanduser(workdir)))
+
+    if not os.path.isabs(workdir):
+        raise Exception("Output directory path must be absolute.")
+
+    pbsdir = os.path.normpath(workdir + '/pbs/')
+
+    # Create directory if required
+    if not os.path.exists(pbsdir):
+        os.makedirs(pbsdir)
+
+    # Copy config file into output directory (check it's not already there first)
+    sfile = os.path.realpath(os.path.abspath(configfile))
+    dfile = os.path.realpath(os.path.abspath(pbsdir + '/config.yaml'))
+
+    if sfile != dfile:
+        shutil.copy(sfile, dfile)
+
+    clusterconf = {}
+
+    # Set up required PBS vars
+    if 'nodes' not in conf:
+        raise Exception('Nodes is required.')
+    clusterconf['nodes'] = conf['nodes']
+
+    if 'time' not in conf:
+        raise Exception('Job time is required.')
+    clusterconf['time'] = conf['time']
+
+    # Set up optional PBS vars
+    clusterconf['ompnum'] = conf['ompnum'] if 'ompnum' in conf else 8
+    clusterconf['queue'] = conf['queue'] if 'queue' in conf else 'batch'
+    clusterconf['pernode'] = conf['pernode'] if 'pernode' in conf else 1
+    clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else 8
+    clusterconf['name'] = conf['name'] if 'name' in conf else 'job'
+
+    # Set vars only needed to create script
+    clusterconf['mpiproc'] = clusterconf['nodes'] * clusterconf['pernode']
+    clusterconf['workdir'] = pbsdir
+    clusterconf['scriptpath'] = os.path.realpath(__file__)
+    clusterconf['logpath'] = pbsdir + '/jobout.log'
+    clusterconf['configpath'] = pbsdir + '/config.yaml'
+
+    script = """#!/bin/bash
+#PBS -l nodes=%(nodes)i:ppn=%(ppn)i
+#PBS -q %(queue)s
+#PBS -r n
+#PBS -m abe
+#PBS -V
+#PBS -l walltime=%(time)s
+#PBS -N %(name)s
+
+
+cd %(workdir)s
+export OMP_NUM_THREADS=%(ompnum)i
+
+mpirun -np %(mpiproc)i -npernode %(pernode)i python %(scriptpath)s run %(configpath)s &> %(logpath)s
+"""
+
+    script = script % clusterconf
+
+    scriptname = pbsdir + "/jobscript.sh"
+
+    with open(scriptname, 'w') as f:
+        f.write(script)
+
+    if not nosubmit:
+        os.system('cd %s; qsub jobscript.sh' % pbsdir)
+
+
+if __name__ == "__main__":
+    dispatch_commands([run, queue])
