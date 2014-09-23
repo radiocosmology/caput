@@ -3,7 +3,7 @@ Data Analysis and Simulation Pipeline.
 
 A data analysis pipeline is completely specified by a YAML file that specifies
 both what tasks are to be run and the parameters that go to those tasks.
-Included in this package are base classes for simplifying the construction of 
+Included in this package are base classes for simplifying the construction of
 data analysis tasks, as well as the pipeline manager which executes them.
 
 Pipelines are most easily executed using the script in ``caput_pipeline.py`,
@@ -527,22 +527,32 @@ class Manager(config.Reader):
                 msg = "Loading task '%s' caused error - " % task_path
                 msg += e_str
                 raise PipelineConfigError(msg)
+
         # Get the parameters and initialize the class.
-        try:
-            param_keys = task_spec['params']
-        except KeyError:
-            msg = "'params' not specified for task."
-            raise PipelineConfigError(msg)
-        # Mush be a list of keys, convert if only one key was specified.
-        if not isinstance(param_keys, list):
-            param_keys = [param_keys]
         params = {}
-        try:
-            for param_key in param_keys:
-                params.update(self.all_params[param_key])
-        except KeyError:
-            msg ="Parameter group %s not found in config." % param_key
-            raise PipelineConfigError(msg)
+
+        if 'params' in task_spec:
+
+            # If params is a dict, assume params are inline
+            if isinstance(task_spec['params'], dict):
+                params.update(task_spec['params'])
+            else:  # Otherwise assume it's a list of keys
+
+                param_keys = task_spec['params']
+
+                # Must be a list of keys, convert if only one key was specified.
+                if not isinstance(param_keys, list):
+                    param_keys = [param_keys]
+
+                # Locate param sections, and add to dict
+                try:
+                    for param_key in param_keys:
+                        params.update(self.all_params[param_key])
+                except KeyError:
+                    msg = "Parameter group %s not found in config." % param_key
+                    raise PipelineConfigError(msg)
+
+        # Setup task
         task = task_cls._pipeline_from_config(params, task_spec)
         # Set up data product keys.
         return task
@@ -553,7 +563,7 @@ class Manager(config.Reader):
 
 class TaskBase(config.Reader):
     """Base class for all pipeline tasks.
-    
+
     All pipeline tasks should inherit from this class, with functionality and
     analysis added by over-riding `__init__`, `setup`, `next` and/or
     `finish`.
@@ -563,7 +573,7 @@ class TaskBase(config.Reader):
     pipeline yaml file when the pipeline is initialized.  The class attributes
     will be overridden with instance attributes with the same name but with the
     values specified in the pipeline file.
-    
+
     Attributes
     ----------
     cacheable
@@ -577,13 +587,13 @@ class TaskBase(config.Reader):
     finish
 
     """
-    
+
     # Overridable Attributes
     # -----------------------
 
     def __init__(self):
         """Initialize pipeline task.
-        
+
         May be overridden with no arguments.  Will be called after any
         `config.Property` attributes are set and after 'input' and 'requires'
         keys are set up.
@@ -598,10 +608,10 @@ class TaskBase(config.Reader):
         May be overridden with any number of positional only arguments
         (defaults are allowed).  Pipeline data-products will be passed as
         specified by `requires` keys in the pipeline setup.
-        
+
         Any return values will be treated as pipeline data-products as
         specified by the `out` keys in the pipeline setup.
-        
+
         """
 
         pass
@@ -626,7 +636,7 @@ class TaskBase(config.Reader):
 
     def finish(self):
         """Final analysis stage of pipeline task.
-        
+
         May be overridden with no arguments.
 
         Any return values will be treated as pipeline data-products as
@@ -643,7 +653,7 @@ class TaskBase(config.Reader):
         This property tells the pipeline that the problem can be parallelized
         trivially. This only applies to the `next()` method, which should not
         change the state of the task.
-        
+
         If this returns `True`, then the Pipeline will execute `next()` many
         times  in parallel and handle all the intermediate data efficiently.
         Otherwise `next()` must be parallelized internally if at all. `setup()`
@@ -658,16 +668,16 @@ class TaskBase(config.Reader):
     @property
     def cacheable(self):
         """Override to return `True` if caching results is implemented.
-        
+
         No caching infrastructure has yet been implemented.
 
         """
-        
+
         return False
-    
+
     # Pipeline Infrastructure
     # -----------------------
-    
+
     @classmethod
     def _pipeline_from_config(cls, config, task_spec):
         self = cls.__new__(cls)
@@ -678,7 +688,7 @@ class TaskBase(config.Reader):
 
     def _pipeline_setup(self, task_spec):
         """Setup the 'requires', 'in' and 'out' keys for this task."""
-        
+
         # Put pipeline in state such that `setup` is the next stage called.
         self._pipeline_advance_state()
         # Parse the task spec.

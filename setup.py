@@ -6,7 +6,7 @@ setup(
     version = 0.1,
 
     packages = find_packages(),
-    scripts=['scripts/caput_pipeline.py'],
+    scripts=['scripts/caput-pipeline'],
     requires = ['numpy', 'h5py'],  # Probably should change this.
 
     # metadata for upload to PyPI
