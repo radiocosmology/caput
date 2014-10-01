@@ -84,6 +84,15 @@ def queue(configfile, nosubmit=False):
     clusterconf['logpath'] = pbsdir + '/jobout.log'
     clusterconf['configpath'] = pbsdir + '/config.yaml'
 
+    # Set up virtualenv
+    if 'venv' in conf:
+        if not os.path.exists(conf['venv'] + '/bin/activate'):
+            raise Exception("Could not find virtualenv")
+
+        clusterconf['venv'] = conf['venv'] + '/bin/activate'
+    else:
+        clusterconf['venv'] = '/dev/null'
+
     script = """#!/bin/bash
 #PBS -l nodes=%(nodes)i:ppn=%(ppn)i
 #PBS -q %(queue)s
@@ -93,6 +102,7 @@ def queue(configfile, nosubmit=False):
 #PBS -l walltime=%(time)s
 #PBS -N %(name)s
 
+source %(venv)s
 
 cd %(workdir)s
 export OMP_NUM_THREADS=%(ompnum)i
