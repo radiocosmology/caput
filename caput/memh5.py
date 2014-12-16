@@ -55,6 +55,7 @@ Utility Functions
 import sys
 import collections
 import warnings
+import weakref
 
 import numpy as np
 import h5py
@@ -129,8 +130,11 @@ class MemGroup(ro_dict):
         self._attrs = MemAttrs()
         # Set the following assuming we are the root group. If not, the method
         # that created us will reset.
-        self._root = self
-        self._parent = self
+
+        # Both _root and _parent need to be weakrefs, otherwise we will end up
+        # generating reference cycles which can end up leaking memory
+        self._root = weakref.proxy(self)
+        self._parent = weakref.proxy(self)
         self._name = ''
 
     def __getitem__(self, key):
@@ -239,8 +243,8 @@ class MemGroup(ro_dict):
                 self[key]
             except KeyError:
                 out = MemGroup()
-                out._root = self._root
-                out._parent = self
+                out._root = self._root  # Should already be a weakref
+                out._parent = weakref.proxy(self)  # Must use weakref to avoid reference cycles
                 out._name = key
                 self._dict[key] = out
                 return out
@@ -308,8 +312,8 @@ class MemGroup(ro_dict):
         self._dict[name] = new_dataset
         # Some subset of the h5py interface.
         new_dataset._name = name
-        new_dataset._parent = self
-        new_dataset._root = self.file
+        new_dataset._parent = weakref.proxy(self)  # Must use weakref to avoid reference cycles
+        new_dataset._root = self.file  # This should already be a weakref
         return new_dataset
 
     def require_dataset(self, shape, dtype):
