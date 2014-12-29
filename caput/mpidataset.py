@@ -538,6 +538,13 @@ class MPIDataset(collections.Mapping):
             # if fh.attrs['__mpidataset_class'] != cls.__name__:
             #     raise Exception('Not correct MPIDataset class.')
 
+            if '__mpidataset_class' not in fh.attrs:
+                raise Exception('Not in the MPIDataset format.')
+
+            # Won't properly deal with inheritance. Ho hum.
+            if fh.attrs['__mpidataset_class'] != cls.__name__:
+                raise Exception('Not correct MPIDataset class.')
+
         # Read in attributes
         attr_dict = None
         if pdset._comm.rank == 0:
