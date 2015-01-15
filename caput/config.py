@@ -163,7 +163,6 @@ class Reader(object):
 
         return c
 
-
     def read_config(self, config):
         """Set all properties in this class from the supplied config.
 
@@ -178,6 +177,16 @@ class Reader(object):
             for propname, clsprop in basecls.__dict__.items():
                 if isinstance(clsprop, Property):
                     clsprop._from_config(self, config)
+
+        self._finalise_config()
+
+    def _finalise_config(self):
+        """Finish up the configuration.
+
+        To be overriden in subclasses if we need to perform some processing
+        post configutation.
+        """
+        pass
 
 
 if __name__ == "__main__":
