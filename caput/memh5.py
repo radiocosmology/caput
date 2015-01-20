@@ -612,9 +612,9 @@ class MemDiskGroup(collections.Mapping):
 
     def require_dataset(self, key, *args, **kwargs):
         if not self.dataset_name_allowed(key):
-            msg = "Dataset name %s not allowed." % name
+            msg = "Dataset name %s not allowed." % key
             raise ValueError(msg)
-        return self._data.require_dataset(name, *args, **kwargs)
+        return self._data.require_dataset(key, *args, **kwargs)
 
     def create_group(self, key):
         if not self.group_name_allowed(key):
@@ -623,8 +623,8 @@ class MemDiskGroup(collections.Mapping):
         return self._data.create_group(key)
 
     def require_group(self, key):
-        if not self.group_name_allowed(name):
-            msg = "Group name %s not allowed." % name
+        if not self.group_name_allowed(key):
+            msg = "Group name %s not allowed." % key
             raise ValueError(msg)
         return self._data.require_group(key)
 
