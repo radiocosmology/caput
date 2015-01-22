@@ -589,7 +589,7 @@ class MPIDataset(collections.Mapping):
         import h5py
 
         if os.path.exists(filename):
-            raise IOError('File already exists.')
+            raise IOError('File %s already exists.' % filename)
 
         self._comm.Barrier()
 

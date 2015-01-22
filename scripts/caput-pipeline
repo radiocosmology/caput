@@ -107,7 +107,7 @@ source %(venv)s
 cd %(workdir)s
 export OMP_NUM_THREADS=%(ompnum)i
 
-mpirun -np %(mpiproc)i -npernode %(pernode)i python %(scriptpath)s run %(configpath)s &> %(logpath)s
+mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
 """
 
     script = script % clusterconf
