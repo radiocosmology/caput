@@ -107,6 +107,10 @@ class MPIArray(np.ndarray):
     def local_offset(self):
         return self._local_offset
 
+    @property
+    def comm(self):
+        return self._comm
+
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
 
         if comm is None:
@@ -468,6 +472,21 @@ class MPIDataset(collections.Mapping):
     def comm(self):
         return self._comm
 
+    def copy(self, deep=False):
+
+        cdt = self.__class__.__new__(self.__class__)
+        cdt._attrs = self._attrs.copy()
+
+        for k, v in self._common.items():
+            cdt._common[k] = v.copy() if deep and v is not None else v
+
+        for k, v in self._distributed.items():
+            cdt._distributed[k] = MPIArray.wrap(v.copy(), axis=v.axis, comm=v.comm) if deep and v is not None else v
+
+        cdt._comm = self._comm
+
+        return cdt
+
     def __init__(self, comm=None):
 
         if comm is None:
@@ -480,7 +499,6 @@ class MPIDataset(collections.Mapping):
         self._attrs = self._attrs.copy()
         self._common = self._common.copy()
         self._distributed = self._distributed.copy()
-
 
     @classmethod
     def from_hdf5(cls, filename, comm=None):
@@ -512,10 +530,17 @@ class MPIDataset(collections.Mapping):
         if pdset._comm.rank == 0:
             fh = h5py.File(filename, 'r')
 
+            if '__mpidataset_class' not in fh.attrs:
+                raise Exception('Not in the MPIDataset format.')
+
+            # Won't properly deal with inheritance. Ho hum.
+            if fh.attrs['__mpidataset_class'] != cls.__name__:
+                raise Exception('Not correct MPIDataset class.')
+
         # Read in attributes
         attr_dict = None
         if pdset._comm.rank == 0:
-            attr_dict = { k : v for k, v in fh.attrs.items() }
+            attr_dict = { k: v for k, v in fh.attrs.items() }
         pdset._attrs = pdset._comm.bcast(attr_dict, root=0)
 
         # Read in common datasets and broadcast to all processes
@@ -523,17 +548,33 @@ class MPIDataset(collections.Mapping):
             cdata = None
 
             if pdset._comm.rank == 0:
-                cdata = fh[dset][:]
+
+                # Check if the dataset exists, If not, we are going to make it None.
+                if dset in fh:
+                    cdata = fh[dset][:]
 
             pdset.common[dset] = pdset._comm.bcast(cdata, root=0)
 
-        if pdset._comm.rank == 0:
-            fh.close()
-
         # Read in parallel datasets across all nodes
         for dset in pdset.distributed.keys():
-            pdata = MPIArray.from_hdf5(filename, dset, comm=pdset._comm)
+
+            # Check whether the datasets exists, and thus we should read it
+            # Do only on rank=0 and bcast to other ranks
+            should_read = True
+            if pdset._comm.rank == 0:
+                should_read = dset in fh
+            should_read = pdset._comm.bcast(should_read, root=0)
+
+            # Read in the dataset
+            if should_read:
+                pdata = MPIArray.from_hdf5(filename, dset, comm=pdset._comm)
+            else:
+                pdata = None
+
             pdset.distributed[dset] = pdata
+
+        if pdset._comm.rank == 0:
+            fh.close()
 
         return pdset
 
@@ -548,7 +589,7 @@ class MPIDataset(collections.Mapping):
         import h5py
 
         if os.path.exists(filename):
-            raise IOError('File already exists.')
+            raise IOError('File %s already exists.' % filename)
 
         self._comm.Barrier()
 
@@ -562,13 +603,18 @@ class MPIDataset(collections.Mapping):
 
                 # Save common datasets
                 for dsetname, dsetdata in self.common.items():
-                    fh.create_dataset(dsetname, data=dsetdata)
+
+                    if dsetdata is not None:
+                        fh.create_dataset(dsetname, data=dsetdata)
 
         self._comm.Barrier()
 
         # Save parallel datasets
         for dsetname, dsetdata in self.distributed.items():
-            dsetdata.to_hdf5(filename, dsetname)
+
+            # If a dataset is None, don't write it out.
+            if dsetdata is not None:
+                dsetdata.to_hdf5(filename, dsetname)
 
     def redistribute(self, axis):
         """Redistribute the distributed datasets onto a new axis.
@@ -581,7 +627,8 @@ class MPIDataset(collections.Mapping):
         """
 
         for dsetname, dsetdata in self.distributed.items():
-            self.distributed[dsetname] = dsetdata.redistribute(axis)
+            if dsetdata is not None:
+                self.distributed[dsetname] = dsetdata.redistribute(axis)
 
     def __getitem__(self, key):
 
