@@ -79,7 +79,7 @@ def queue(configfile, nosubmit=False):
 
     # Set vars only needed to create script
     clusterconf['mpiproc'] = clusterconf['nodes'] * clusterconf['pernode']
-    clusterconf['workdir'] = pbsdir
+    clusterconf['workdir'] = workdir
     clusterconf['scriptpath'] = os.path.realpath(__file__)
     clusterconf['logpath'] = pbsdir + '/jobout.log'
     clusterconf['configpath'] = pbsdir + '/config.yaml'
