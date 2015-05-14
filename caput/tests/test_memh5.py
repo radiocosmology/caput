@@ -47,7 +47,7 @@ class TestGroup(unittest.TestCase):
         g2 = g.create_group('level2/')
         self.assertRaises(ValueError, g2.create_group, '/')
         g2.create_group('/level22')
-        self.assertEqual(set(g.keys()), {'level22', 'level2'}) 
+        self.assertEqual(set(g.keys()), {'level22', 'level2'})
         g.create_group('/a/b/c/d/')
         gd = g['/a/b/c/d/']
         self.assertEqual(gd.name, '/a/b/c/d')
@@ -96,12 +96,16 @@ class TestH5Files(unittest.TestCase):
 
     def test_to_from_hdf5(self):
         m = memh5.MemGroup.from_hdf5(self.fname)
-        f = h5py.File(self.fname)
-        self.assertGroupsEqual(f, m)
-        f.close()
-        f = m.to_hdf5(self.fname + '.new')
-        self.assertGroupsEqual(f, m)
-        f.close()
+
+        # Check that read in file has same structure
+        with h5py.File(self.fname, 'r') as f:
+            self.assertGroupsEqual(f, m)
+
+        m.to_hdf5(self.fname + '.new')
+
+        # Check that written file has same structure
+        with h5py.File(self.fname + '.new', 'r') as f:
+            self.assertGroupsEqual(f, m)
 
     def test_memdisk(self):
         f = memh5.MemDiskGroup(self.fname)

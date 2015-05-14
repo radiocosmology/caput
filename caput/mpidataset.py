@@ -57,6 +57,117 @@ from mpi4py import MPI
 from caput import mpiutil
 
 
+class _global_resolver(object):
+    ## Private class implementing the global sampling for MPIArray
+
+    def __init__(self, array):
+
+        self.array = array
+        self.axis = array.axis
+        self.offset = array.local_offset[self.axis]
+        self.length = array.global_shape[self.axis]
+
+
+    def _resolve_slice(self, slobj):
+        # Transforms a numpy basic slice on the global arrays into a fully
+        # fleshed out slice tuple referencing the positions in the local arrays.
+        # If a single integer index is specified for the distributed axis, then
+        # either the local index is returned, or None if it doesn't exist on the
+        # current rank.
+
+        ndim = self.array.ndim
+        local_length = self.array.shape[self.axis]
+
+        # Expand a single integer or slice index
+        if isinstance(slobj, int) or isinstance(slobj, slice):
+            slobj = (slobj, Ellipsis)
+
+        # Expand an ellipsis
+        slice_list = []
+        for sl in slobj:
+            if sl is Ellipsis:
+                for i in range(ndim - len(slobj) + 1):
+                    slice_list.append(slice(None, None))
+            else:
+                slice_list.append(sl)
+
+        fullslice = True
+
+        # Process the parallel axis. Calculate the correct index for the
+        # containing rank, and set None on all others.
+        if isinstance(slice_list[self.axis], int):
+            index = slice_list[self.axis] - self.offset
+            slice_list[self.axis] = None if (index < 0 or index >= local_length) else index
+            fullslice = False
+
+        # If it's a slice, then resolve any offsets
+        # If any of start or stop is defined then mark that this is not a complete slice
+        # Also mark if there is any actual data on this rank
+        elif isinstance(slice_list[self.axis], slice):
+            s = slice_list[self.axis]
+            start = s.start
+            stop = s.stop
+            step = s.step
+
+            # Check if start is defined, and modify slice
+            if start is not None:
+                start = start if start >= 0 else start + self.length  # Resolve negative indices
+                fullslice = False
+                start = start - self.offset
+            else:
+                start = 0
+
+            # Check if stop is defined and modify slice
+            if stop is not None:
+                stop = stop if stop >= 0 else stop + self.length  # Resolve negative indices
+                fullslice = False
+                stop = stop - self.offset
+            else:
+                stop = local_length
+
+            # If step is defined we don't need to adjust this, but it's no longer a complete slice
+            if step is not None:
+                fullslice = False
+
+            # If there is no data on this node place None on the parallel axis
+            if start >= local_length or stop < 0:
+                slice_list[self.axis] = None
+            else:
+                # Normalise the indices and create slice
+                start = max(min(start, local_length), 0)
+                stop = max(min(stop, local_length), 0)
+                slice_list[self.axis] = slice(start, stop, step)
+
+        return tuple(slice_list), fullslice
+
+    def __getitem__(self, slobj):
+
+        # Resolve the slice object
+        slobj, is_fullslice = self._resolve_slice(slobj)
+
+        # If not a full slice, return a numpy array (or None)
+        if not is_fullslice:
+
+            # If the parallel axis has a None, that means there is no data on this rank
+            if slobj[self.axis] is None:
+                return None
+            else:
+                return self.array[slobj].view(np.ndarray)
+
+        else:
+            # Return an MPIArray view
+            arr = self.array[slobj]
+            return MPIArray.wrap(arr, axis=self.axis, comm=self.array._comm)
+
+    def __setitem__(self, slobj, value):
+
+        slobj, is_fullslice = self._resolve_slice(slobj)
+
+        if slobj[self.axis] is None:
+            return
+        self.array[slobj] = value
+
+
 class MPIArray(np.ndarray):
     """A numpy array like object which is distributed across multiple processes.
 
@@ -137,6 +248,10 @@ class MPIArray(np.ndarray):
         arr._comm = comm
 
         return arr
+
+    @property
+    def global_slice(self):
+        return _global_resolver(self)
 
     @classmethod
     def wrap(cls, array, axis, comm=None):

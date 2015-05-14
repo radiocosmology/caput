@@ -1,3 +1,9 @@
+"""Tests of MPI Array functionality.
+
+Designed to be run as an MPI job with four processes like::
+
+    $ mpirun -np 4 python test_mpidataset.py
+"""
 import os
 import unittest
 
@@ -149,39 +155,160 @@ class TestMPIAray(unittest.TestCase):
         # Check axis
         assert arr2.axis == 0
 
+    def test_global_getslice(self):
 
-class TestMPIDataset(unittest.TestCase):
+        rank = mpiutil.rank
+        size = mpiutil.size
 
-    def test_dataset(self):
 
-        fname = 'testdset.hdf5'
+        darr = mpidataset.MPIArray((size*5, 20), axis=0)
 
-        if mpiutil.rank0:
-            if os.path.exists(fname):
-                os.remove(fname)
+        # Initialise the distributed array
+        for li, gi in darr.enumerate(axis=0):
+            darr[li] = 10*(10*rank+li) + np.arange(20)
 
-        mpiutil.barrier()
 
-        class TestDataset(mpidataset.MPIDataset):
-            _common = {'a': None}
-            _distributed = {'b': None}
+        # Construct numpy array which should be equivalent to the global array
+        whole_array = 10*(10*np.arange(4.0)[:, np.newaxis]+np.arange(5.0)[np.newaxis, :]).flatten()[:, np.newaxis] + np.arange(20)[np.newaxis, :]
 
-        td1 = TestDataset()
-        td1.common['a'] = np.arange(12)
-        td1.attrs['message'] = 'meh'
+        # Extract the section for each rank distributed along axis=0
+        local_array = whole_array[(rank*5):((rank+1)*5)]
 
-        gshape = (19, 17)
-        ds = mpidataset.MPIArray(gshape, dtype=np.float64)
-        ds[:] = np.random.standard_normal(ds.local_shape)
+        # Extract the correct section for each rank distributed along axis=0
+        local_array_T = whole_array[:, (rank*5):((rank+1)*5)]
 
-        td1.distributed['b'] = ds
-        td1.to_hdf5(fname)
 
-        td2 = TestDataset.from_hdf5(fname)
+        # Check that these are the same
+        assert (local_array == darr).all()
 
-        assert (td1['a'] == td2['a']).all()
-        assert (td1['b'] == td2['b']).all()
-        assert (td1.attrs['message'] == td2.attrs['message'])
+
+        # Check a simple slice on the non-parallel axis
+        arr = darr.global_slice[:, 3:5]
+        res = local_array[:, 3:5]
+
+        assert isinstance(arr, mpidataset.MPIArray)
+        assert (arr == res).all()
+
+
+        # Check a single element extracted from the non-parallel axis
+        arr = darr.global_slice[:, 3]
+        res = local_array[:, 3]
+        assert (arr == res).all()
+
+
+        # Check a slice on the parallel axis
+        arr = darr.global_slice[:7, 3:5]
+
+        res = { 0 : local_array[:, 3:5],
+                1 : local_array[:2, 3:5],
+                2 : None,
+                3 : None }
+
+        assert arr == res[rank] if arr is None else (arr == res[rank]).all()
+
+
+        # Check a single element from the parallel axis
+        arr = darr.global_slice[7, 3:5]
+
+        res = { 0 : None,
+                1 : local_array[2, 3:5],
+                2 : None,
+                3 : None }
+
+        assert arr == res[rank] if arr is None else (arr == res[rank]).all()
+
+
+        # Check a slice on the redistributed parallel axis
+        darr_T = darr.redistribute(axis=1)
+        arr = darr_T.global_slice[3:5, :7]
+
+        res = { 0 : local_array_T[3:5, :],
+                1 : local_array_T[3:5, :2],
+                2 : None,
+                3 : None }
+
+        assert arr == res[rank] if arr is None else (arr == res[rank]).all()
+
+    def test_global_setslice(self):
+
+        rank = mpiutil.rank
+        size = mpiutil.size
+
+
+        darr = mpidataset.MPIArray((size*5, 20), axis=0)
+
+        # Initialise the distributed array
+        for li, gi in darr.enumerate(axis=0):
+            darr[li] = 10*(10*rank+li) + np.arange(20)
+
+
+        # Construct numpy array which should be equivalent to the global array
+        whole_array = 10*(10*np.arange(4.0)[:, np.newaxis]+np.arange(5.0)[np.newaxis, :]).flatten()[:, np.newaxis] + np.arange(20)[np.newaxis, :]
+
+        # Extract the section for each rank distributed along axis=0
+        local_array = whole_array[(rank*5):((rank+1)*5)]
+        # Set slice
+
+        # Check a simple assignment to a slice along the non-parallel axis
+        darr.global_slice[:, 6] = -2.0
+        local_array[:, 6] = -2.0
+
+        assert (darr == local_array).all()
+
+
+        # Check a partial assignment along the parallel axis
+        darr.global_slice[7:, 7:9] = -3.0
+        whole_array[7:, 7:9] = -3.0
+
+        assert (darr == local_array).all()
+
+
+        # Check assignment of a single index on the parallel axis
+        darr.global_slice[6] = np.arange(20.0)
+        whole_array[6] = np.arange(20.0)
+
+        assert (darr == local_array).all()
+
+        # Check copy of one column into the other
+        darr.global_slice[:, 8] = darr.global_slice[:, 9]
+        whole_array[:, 8] = whole_array[:, 9]
+
+        assert (darr == local_array).all()
+
+
+#
+# class TestMPIDataset(unittest.TestCase):
+#
+#     def test_dataset(self):
+#
+#         fname = 'testdset.hdf5'
+#
+#         if mpiutil.rank0:
+#             if os.path.exists(fname):
+#                 os.remove(fname)
+#
+#         mpiutil.barrier()
+#
+#         class TestDataset(mpidataset.MPIDataset):
+#             _common = {'a': None}
+#             _distributed = {'b': None}
+#
+#         td1 = TestDataset()
+#         td1.common['a'] = np.arange(12)
+#         td1.attrs['message'] = 'meh'
+#
+#         gshape = (19, 17)
+#         ds = mpidataset.MPIArray(gshape, dtype=np.float64)
+#         ds[:] = np.random.standard_normal(ds.local_shape)
+#
+#         td1.distributed['b'] = ds
+#         td1.to_hdf5(fname)
+#
+#         td2 = TestDataset.from_hdf5(fname)
+#
+#         assert (td1['a'] == td2['a']).all()
+#         assert (td1['b'] == td2['b']).all()
+#         assert (td1.attrs['message'] == td2.attrs['message'])
 
 
 if __name__ == '__main__':

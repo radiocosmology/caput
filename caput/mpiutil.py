@@ -45,24 +45,24 @@ try:
 
     _comm = MPI.COMM_WORLD
     world = _comm
-    
+
     rank = _comm.Get_rank()
     size = _comm.Get_size()
 
-    if rank:
+    if _comm is not None:
         print "MPI process %i of %i." % (rank, size)
 
     rank0 = True if rank == 0 else False
 
-    sys_excepthook = sys.excepthook 
-    
-    def mpi_excepthook(type, value, traceback): 
-        sys_excepthook(type, value, traceback) 
+    sys_excepthook = sys.excepthook
+
+    def mpi_excepthook(type, value, traceback):
+        sys_excepthook(type, value, traceback)
         MPI.COMM_WORLD.Abort(1)
 
-    sys.excepthook = mpi_excepthook 
-    
-    
+    sys.excepthook = mpi_excepthook
+
+
 except ImportError:
     warnings.warn("Warning: mpi4py not installed.")
 
@@ -81,7 +81,7 @@ def mpirange(*args):
     """An MPI aware version of `range`, each process gets its own sub section.
     """
     full_list = range(*args)
-    
+
     #if alternate:
     return partition_list_alternate(full_list, rank, size)
     #else:
@@ -314,13 +314,13 @@ def transpose_blocks(row_array, shape, comm=None):
 
     # Iterate over all processes row wise
     for ir in range(comm.size):
-                
+
         # Get the start and end of each set of rows
         sir, eir = sar[ir], ear[ir]
 
         # Iterate over all processes column wise
         for ic in range(comm.size):
-                    
+
             # Get the start and end of each set of columns
             sic, eic = sac[ic], eac[ic]
 
@@ -499,5 +499,3 @@ def parallel_rows_write_hdf5(fname, dsetname, local_data, shape, comm=None):
     nc = np.prod(shape[1:])
 
     lock_and_write_buffer(local_data, fname, offset + sr * nc, lr * nc)
-
-
