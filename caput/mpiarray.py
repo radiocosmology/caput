@@ -46,6 +46,60 @@ Fourier transforming each of these two axes of the distributed array::
     # Perform the lag transform on the frequency direction.
     darr4 = MPIArray.wrap(np.fft.irfft(darr3, axis=0), axis=1)
 
+Global Slicing
+==============
+
+The :class:`MPIArray` also supports slicing with the global index using the
+:attribute:`MPIArray.global_slice` property. This can be used for both fetching
+and assignment with global indices, supporting the basic slicing notation of
+`numpy`.
+
+Its behaviour changes depending on the exact slice it gets:
+
+- A full slice (`:`) along the parallel axis returns an :class:`MPIArray` on
+  fetching, and accepts an :class:`MPIArray` on assignment.
+- A partial slice (`:`) returns and accepts a numpy array on the rank holding
+  the data, and :obj:`None` on other ranks.
+
+It's important to note that it never communicates data between ranks. It only
+ever operates on data held on the current rank.
+
+Example
+-------
+
+Here is an example of this in action::
+
+    import numpy as np
+    from caput import mpiarray, mpiutil
+
+    arr = mpiarray.MPIArray((mpiutil.size, 3), dtype=np.float64)
+    arr[:] = 0.0
+
+    for ri in range(mpiutil.size):
+        if ri == mpiutil.rank:
+            print ri, arr
+        mpiutil.barrier()
+
+    # Use a global index to assign to the array
+    arr.global_slice[3] = 17
+
+    # Fetch a view of the whole array with a full slice
+    arr2 = arr.global_slice[:, 2]
+
+    # This should be the third column of the array
+    for ri in range(mpiutil.size):
+        if ri == mpiutil.rank:
+            print ri, arr2
+        mpiutil.barrier()
+
+    # Fetch a view of the whole array with a partial slice
+    arr3 = arr.global_slice[:2, 2]
+
+    # The final two ranks should be None
+    for ri in range(mpiutil.size):
+        if ri == mpiutil.rank:
+            print ri, arr3
+        mpiutil.barrier()
 """
 import numpy as np
 
@@ -184,6 +238,8 @@ class MPIArray(np.ndarray):
     local_offset : tuple
         Offset into global array. This is equivalent to the global-index of
         the [0, 0, ...] element of the local section.
+    global_slice : object
+        Return an objects that presents a view of the array with global slicing.
 
     Methods
     -------

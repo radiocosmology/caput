@@ -15,6 +15,13 @@ level data container is provided that utilizes these classes along with the
 :mod:`h5py` to provide data that is transparently stored either in memory or on
 disk.
 
+This also allows the creation and use of :mod:`memh5` objects which can hold
+data distributed over a number of MPI processes. These
+:class:`MemDatasetDistributed` datasets hold :class:`mpiarray.MPIArray` objects
+and can be written to, and loaded from disk like normal :class:`memh5` objects.
+Support for this must be explicitly enabled in the root group at creation with
+the `distributed=True` flag.
+
 
 Basic Classes
 =============
