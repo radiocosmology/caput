@@ -61,7 +61,8 @@ import weakref
 import numpy as np
 import h5py
 
-from .mpiarray import MPIArray
+from . import mpiutil
+from . import mpiarray
 
 
 # Basic Classes
@@ -387,7 +388,7 @@ class MemGroup(ro_dict):
         dtype = np.dtype(dtype)
 
         # Create distributed dataset if data is an MPIArray
-        if isinstance(data, MPIArray):
+        if isinstance(data, mpiarray.MPIArray):
             distributed = True
 
         # Enforce that distributed datasets can only exist in distributed memh5 groups.
@@ -402,7 +403,7 @@ class MemGroup(ro_dict):
             if distributed:
 
                 # Ensure we are creating from an MPIArray
-                if not isinstance(data, MPIArray):
+                if not isinstance(data, mpiarray.MPIArray):
                     raise TypeError('Can only create distributed dataset from MPIArray.')
 
                 # Ensure that we are distributing over the same communicator
@@ -662,14 +663,14 @@ class MemDatasetDistributed(MemDataset):
     def __init__(self, shape, dtype, axis=0, comm=None):
         MemDataset.__init__(self)
 
-        self._data = MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
+        self._data = mpiarray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
 
     @classmethod
     def from_mpi_array(cls, data):
         dset = cls.__new__(cls)
         MemDataset.__init__(dset)
 
-        if not isinstance(data, MPIArray):
+        if not isinstance(data, mpiarray.MPIArray):
             raise TypeError("Object must be a numpy array (or subclass).")
 
         dset._data = data
@@ -1377,7 +1378,7 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
                 if ('__memh5_distributed_dset' in item.attrs) and item.attrs['__memh5_distributed_dset']:
 
                     # Read from file into MPIArray
-                    pdata = MPIArray.from_hdf5(f, key, comm=comm)
+                    pdata = mpiarray.MPIArray.from_hdf5(f, key, comm=comm)
 
                     # Create dataset from MPIArray
                     dset = memgroup.create_dataset(key, data=pdata, distributed=True)

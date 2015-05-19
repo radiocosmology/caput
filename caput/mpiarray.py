@@ -48,7 +48,6 @@ Fourier transforming each of these two axes of the distributed array::
 
 """
 import numpy as np
-from mpi4py import MPI
 
 from caput import mpiutil
 
@@ -219,8 +218,11 @@ class MPIArray(np.ndarray):
 
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
 
+        if mpiutil.world is None:
+            raise RuntimeError('There is no mpi4py installation. Aborting.')
+
         if comm is None:
-            comm = MPI.COMM_WORLD
+            comm = mpiutil.world
 
         # Determine local section of distributed axis
         local_num, local_start, local_end = mpiutil.split_local(global_shape[axis], comm=comm)
@@ -272,8 +274,10 @@ class MPIArray(np.ndarray):
             An MPIArray view of the input.
         """
 
+        from mpi4py import MPI
+
         if comm is None:
-            comm = MPI.COMM_WORLD
+            comm = mpiutil.world
 
         # Get axis length, both locally, and globally
         axlen = array.shape[axis]
