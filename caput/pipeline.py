@@ -1258,7 +1258,7 @@ def _import_class(class_path):
     module_path = '.'.join(path_split[:-1])
     class_name = path_split[-1]
     if module_path:
-        m = __import__(modul_path)
+        m = __import__(module_path)
         for comp in path_split[1:]:
             m = getattr(m, comp)
         task_cls = m

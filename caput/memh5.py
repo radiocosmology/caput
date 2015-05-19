@@ -822,6 +822,10 @@ class MemDiskGroup(collections.Mapping):
 
         self._data = data_group
 
+    def _finish_setup(self):
+        """Finish the class setup *after* importing from a file."""
+        pass
+
     def __del__(self):
         """Closes file if on disk and if file was opened on initialization."""
         if self.ondisk and self._toclose:
@@ -910,7 +914,32 @@ class MemDiskGroup(collections.Mapping):
             data = h5py.File(filename, **kwargs)
             toclose = True
 
-        self = cls(data, distributed=distributed, comm=comm)
+        # Look for a hint as to the sub class we should return, this should be
+        # in the attributes of the root.
+        if '__memh5_subclass' in data.attrs:
+            from .pipeline import _import_class
+
+            clspath = data.attrs['__memh5_subclass']
+
+            # Try and get a reference to the requested class (warn if we cannot find it)
+            try:
+                cls = _import_class(clspath)
+            except ImportError, KeyError:
+                warnings.warn('Could not import memh5 subclass %s' % clspath)
+
+            # Check that is is a subclass of MemDiskGroup
+            if not issubclass(cls, MemDiskGroup):
+                raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
+
+        # Create an instance of requested class
+        self = cls.__new__(cls)
+
+        # Perform the MemDiskGroup path of the initialisation
+        MemDiskGroup.__init__(self, data, distributed=distributed, comm=comm)
+
+        # ... skip the class initialisation, and use a special method
+        self._finish_setup()
+
         self._toclose = toclose
         return self
 
@@ -1016,6 +1045,13 @@ class MemDiskGroup(collections.Mapping):
     def save(self, filename, **kwargs):
         """Save data to hdf5 file."""
 
+        # Write out a hint as to what the class of this object is, do this by
+        # inserting it into the attributes before saving out.
+        if '__memh5_subclass' not in self.attrs:
+            clspath = self.__class__.__module__ + '.' + self.__class__.__name__
+
+            self.attrs['__memh5_subclass'] = clspath
+
         if isinstance(self._data, h5py.File):
             with h5py.File(filename, **kwargs) as f:
                 deep_group_copy(self._data, f)
@@ -1058,8 +1094,8 @@ class BasicCont(MemDiskGroup):
 
     """
 
-    def __init__(self, data_group=None):
-        MemDiskGroup.__init__(self, data_group)
+    def __init__(self, *args, **kwargs):
+        MemDiskGroup.__init__(self, *args, **kwargs)
         # Initialize new groups only if writable.
         if self._data.file.mode == 'r+':
             self._data.require_group(u'history')
@@ -1146,6 +1182,7 @@ class BasicCont(MemDiskGroup):
         history_group.create_group(name)
         for key, value in history.items():
             history_group[name].attrs[key] = value
+
 
 
 # Utilities

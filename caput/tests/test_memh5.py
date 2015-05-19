@@ -56,16 +56,16 @@ class TestGroup(unittest.TestCase):
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""
 
+    fname = 'tmp_test_memh5.h5'
+
     def setUp(self):
-        self.fname = 'tmp_test_memh5.h5'
-        f = h5py.File(self.fname)
-        l1 = f.create_group('level1')
-        l2 = l1.create_group('level2')
-        d1 = l1.create_dataset('large', data=np.arange(100))
-        f.attrs['a'] = 5
-        d1.attrs['b'] = 6
-        l2.attrs['small'] = np.arange(3)
-        f.close()
+        with h5py.File(self.fname) as f:
+            l1 = f.create_group('level1')
+            l2 = l1.create_group('level2')
+            d1 = l1.create_dataset('large', data=np.arange(100))
+            f.attrs['a'] = 5
+            d1.attrs['b'] = 6
+            l2.attrs['small'] = np.arange(3)
 
     def assertGroupsEqual(self, a, b):
         self.assertEqual(a.keys(), b.keys())
@@ -122,6 +122,33 @@ class TestH5Files(unittest.TestCase):
         dm = gm.create_dataset('new', np.arange(5))
         self.assertTrue(np.all(f['/level1/level2/level3/new'][:]
                                == m['/level1/level2/level3/new'][:]))
+
+    def tearDown(self):
+        file_names = glob.glob(self.fname + '*')
+        for fname in file_names:
+            os.remove(fname)
+
+
+class TempSubClass(memh5.MemDiskGroup):
+    pass
+
+
+class TestMemDiskGroup(unittest.TestCase):
+
+    fname = 'temp_mdg.h5'
+
+    def test_io(self):
+
+        # Save a subclass of MemDiskGroup
+        tsc = TempSubClass()
+        tsc.create_dataset('dset', data=np.arange(10))
+        tsc.save('temp_mdg.h5')
+
+        # Load it from disk
+        tsc2 = memh5.MemDiskGroup.from_file('temp_mdg.h5')
+
+        # Check that is is recreated with the correct type
+        self.assertIsInstance(tsc2, TempSubClass)
 
     def tearDown(self):
         file_names = glob.glob(self.fname + '*')

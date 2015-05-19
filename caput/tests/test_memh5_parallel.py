@@ -10,11 +10,14 @@ import h5py
 from caput import memh5, mpidataset, mpiutil
 
 
+rank, size = mpiutil.rank, mpiutil.size
+
 class TestMemGroupDistributed(unittest.TestCase):
     """Unit tests for MemGroup."""
 
+    fname = 'tmp_test_memh5_distributed.h5'
+
     def test_create_dataset(self):
-        rank, size = mpiutil.rank, mpiutil.size
 
         global_data = np.arange(size*5*10, dtype=np.float32)
         local_data = global_data.reshape(size, -1, 10)[rank]
@@ -40,7 +43,6 @@ class TestMemGroupDistributed(unittest.TestCase):
         self.assertEqual(d_array_T.local_shape, g['data2'].local_shape)
 
     def test_io(self):
-        rank, size = mpiutil.rank, mpiutil.size
 
         # Create distributed memh5 object
         g = memh5.MemGroup(distributed=True)
@@ -59,10 +61,10 @@ class TestMemGroupDistributed(unittest.TestCase):
         # Create nested groups
         g.create_group('hello/world')
 
-        g.to_hdf5('temp_parallel.h5')
+        g.to_hdf5(self.fname)
 
         # Test that the HDF5 file has the correct structure
-        with h5py.File('temp_parallel.h5', 'r') as f:
+        with h5py.File(self.fname, 'r') as f:
 
             # Test that the file attributes are correct
             self.assertTrue(f['parallel_data'].attrs['rank'] == 0)
@@ -80,7 +82,7 @@ class TestMemGroupDistributed(unittest.TestCase):
             self.assertIn('world', f['hello'])
 
         # Test that the read in group has the same structure as the original
-        g2 = memh5.MemGroup.from_hdf5('temp_parallel.h5', distributed=True)
+        g2 = memh5.MemGroup.from_hdf5(self.fname, distributed=True)
 
         # Check that the parallel data is still the same
         self.assertTrue((g2['parallel_data'][:] == g['parallel_data'][:]).all())
@@ -96,10 +98,16 @@ class TestMemGroupDistributed(unittest.TestCase):
         self.assertTrue(g2['parallel_data'].attrs['rank'] == 0)
         self.assertTrue(g2['serial_data'].attrs['rank'] == 0)
 
+    def tearDown(self):
+        if rank == 0:
+            file_names = glob.glob(self.fname + '*')
+            for fname in file_names:
+                os.remove(fname)
+
 
 class TestMemDiskGroupDistributed(unittest.TestCase):
 
-    fname = 'temp_parallel_dg.h5'
+    fname = 'tmp_parallel_dg.h5'
 
     def test_misc(self):
 
@@ -124,6 +132,13 @@ class TestMemDiskGroupDistributed(unittest.TestCase):
         with h5py.File(self.fname, 'r') as f:
 
             self.assertRaises(ValueError, memh5.MemDiskGroup, data_group=f, distributed=True)
+
+    def tearDown(self):
+
+        if rank == 0:
+            file_names = glob.glob(self.fname + '*')
+            for fname in file_names:
+                os.remove(fname)
 
 if __name__ == '__main__':
     unittest.main()
