@@ -7,7 +7,7 @@ import glob
 import numpy as np
 import h5py
 
-from caput import memh5, mpidataset, mpiutil
+from caput import memh5, mpiarray, mpiutil
 
 
 rank, size = mpiutil.rank, mpiutil.size
@@ -21,7 +21,7 @@ class TestMemGroupDistributed(unittest.TestCase):
 
         global_data = np.arange(size*5*10, dtype=np.float32)
         local_data = global_data.reshape(size, -1, 10)[rank]
-        d_array = mpidataset.MPIArray.wrap(local_data, axis=0)
+        d_array = mpiarray.MPIArray.wrap(local_data, axis=0)
         d_array_T = d_array.redistribute(axis=1)
 
         # Check that we must specify in advance if the dataset is distributed

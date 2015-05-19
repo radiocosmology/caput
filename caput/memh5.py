@@ -61,7 +61,7 @@ import weakref
 import numpy as np
 import h5py
 
-from .mpidataset import MPIArray
+from .mpiarray import MPIArray
 
 
 # Basic Classes
