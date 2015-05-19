@@ -10,7 +10,7 @@ import h5py
 from caput import memh5, mpidataset, mpiutil
 
 
-class TestDistributed(unittest.TestCase):
+class TestMemGroupDistributed(unittest.TestCase):
     """Unit tests for MemGroup."""
 
     def test_create_dataset(self):
@@ -95,6 +95,35 @@ class TestDistributed(unittest.TestCase):
         # Check the attributes
         self.assertTrue(g2['parallel_data'].attrs['rank'] == 0)
         self.assertTrue(g2['serial_data'].attrs['rank'] == 0)
+
+
+class TestMemDiskGroupDistributed(unittest.TestCase):
+
+    fname = 'temp_parallel_dg.h5'
+
+    def test_misc(self):
+
+        dg = memh5.MemDiskGroup(distributed=True)
+
+        pdset = dg.create_dataset('parallel_data', shape=(10,), dtype=np.float64, distributed=True, distributed_axis=0)
+        pdset[:] = dg._data._comm.rank
+        # Test successfully added
+        self.assertIn('parallel_data', dg)
+
+        dg.save(self.fname)
+
+        dg2 = memh5.MemDiskGroup.from_file(self.fname, distributed=True)
+
+        # Test successful load
+        self.assertIn('parallel_data', dg2)
+        self.assertTrue((dg['parallel_data'][:] == dg2['parallel_data'][:]).all())
+
+        self.assertRaises(NotImplementedError, dg.to_disk, self.fname)
+
+        # Test refusal to base off a h5py object when distributed
+        with h5py.File(self.fname, 'r') as f:
+
+            self.assertRaises(ValueError, memh5.MemDiskGroup, data_group=f, distributed=True)
 
 if __name__ == '__main__':
     unittest.main()
