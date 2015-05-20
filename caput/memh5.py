@@ -283,7 +283,7 @@ class MemGroup(ro_dict):
         """
 
         if not self._distributed:
-            with h5py.File(filename, 'w', **kwargs) as f:
+            with h5py.File(filename, **kwargs) as f:
                 deep_group_copy(self, f)
         else:
             _distributed_group_to_hdf5(self, filename, **kwargs)
@@ -915,7 +915,18 @@ class MemDiskGroup(collections.Mapping):
         constructor if *f* is a filename and silently ignored otherwise.
 
         """
-        if not ondisk:
+
+        # For non-distributed files we allow filename to be an h5py.File
+        # instance for compatibility with old code.
+        if isinstance(filename, h5py.File) and ondisk:
+            data = filename
+            toclose = False
+        elif not ondisk:
+
+            # Again, a compatibility hack
+            if isinstance(filename, h5py.File):
+                filename = filename.filename
+
             data = MemGroup.from_hdf5(filename, distributed=distributed, comm=comm, **kwargs)
             toclose = False
         else:
@@ -1023,7 +1034,7 @@ class MemDiskGroup(collections.Mapping):
         if isinstance(self._data, MemGroup):
             return self
         else:
-            return self.__class__.from_file(self._data, distributed=self._distributed, comm=self._comm)
+            return self.__class__.from_file(self._data)  #, distributed=self._distributed, comm=self._comm)
 
     def to_disk(self, filename, **kwargs):
         """Return a version of this data that lives on disk."""
@@ -1285,6 +1296,11 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
 
     comm = group._comm
 
+    # Create a copy of the kwargs with no mode argument so that we can override it
+    kwargs_nomode = kwargs.copy()
+    if 'mode' in kwargs:
+        del kwargs_nomode['mode']
+
     # Create group (or file)
     if comm.rank == 0:
 
@@ -1323,7 +1339,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     # Write out common datasets, and the attributes on distributed datasets
     if comm.rank == 0:
 
-        with h5py.File(fname, 'r+', **kwargs) as f:
+        with h5py.File(fname, 'r+', **kwargs_nomode) as f:
 
             for key, entry in group.iteritems():
 

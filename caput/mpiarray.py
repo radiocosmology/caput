@@ -499,7 +499,7 @@ class MPIArray(np.ndarray):
 
         if self._comm.rank == 0:
 
-            with h5py.File(filename, 'a') as fh:
+            with h5py.File(filename, 'r+') as fh:
                 if dataset in fh:
                     raise Exception("Dataset should not exist.")
 
