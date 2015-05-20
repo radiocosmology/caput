@@ -38,8 +38,8 @@ class TestMemGroupDistributed(unittest.TestCase):
 
         # Create an empty array with a specified shape
         g.create_dataset('data2', shape=(size*5, 10), dtype=np.float64, distributed=True, distributed_axis=1)
-        self.assertTrue(np.allclose(d_array, g['data']))
-        self.assertTrue(np.allclose(d_array_T, g['data_T']))
+        self.assertTrue(np.allclose(d_array, g['data'][:]))
+        self.assertTrue(np.allclose(d_array_T, g['data_T'][:]))
         self.assertEqual(d_array_T.local_shape, g['data2'].local_shape)
 
     def test_io(self):
