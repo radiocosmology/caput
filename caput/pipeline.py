@@ -92,9 +92,9 @@ early tasks in a pipeline chain. The following is an example of a pair of tasks
 that are designed to operate in this manner.
 
 >>> class GetEggs(TaskBase):
-...     
+...
 ...     eggs = config.Property(proptype=list)
-...     
+...
 ...     def __init__(self):
 ...         self.i = 0
 ...
@@ -112,9 +112,9 @@ that are designed to operate in this manner.
 ...         print "Finished GetEggs."
 
 >>> class CookEggs(TaskBase):
-...     
+...
 ...     style = config.Property(proptype=str)
-...     
+...
 ...     def setup(self):
 ...         print "Setting up CookEggs."
 ...
@@ -147,17 +147,17 @@ an example of a pipeline configuration:
 ...         -   type:   GetEggs
 ...             params: eggs_params
 ...             out:    egg
-...           
+...
 ...         -   type:   CookEggs
 ...             params: cook_params
 ...             in:     egg
-...           
+...
 ... eggs_params:
 ...     eggs: ['green', 'duck', 'ostrich']
 ...
 ... cook_params:
 ...     style: 'fried'
-...           
+...
 ... '''
 
 Here the 'pipeline' section contains parameters that pertain to the pipeline as
@@ -222,7 +222,7 @@ If the above rules seem somewhat opaque, consider the following example which
 illustrates these rules in a pipeline with a slightly more non-trivial flow.
 
 >>> class DoNothing(TaskBase):
-...     
+...
 ...     def setup(self):
 ...         print "Setting up DoNothing."
 ...
@@ -239,15 +239,15 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 ...         -   type:   GetEggs
 ...             params: eggs_params
 ...             out:    egg
-...           
+...
 ...         -   type:   CookEggs
 ...             params: cook_params
 ...             in:     egg
-...           
+...
 ...         -   type:   DoNothing
 ...             params: no_params
 ...             in:     non_existent_data_product
-...           
+...
 ...         -   type:   PrintEggs
 ...             params: eggs_params
 ...
@@ -335,26 +335,26 @@ local_tasks = {}
 
 class PipelineConfigError(Exception):
     """Raised when there is an error setting up a pipeline."""
-    
+
     pass
 
 
 class PipelineRuntimeError(Exception):
     """Raised when there is a pipeline related error at runtime."""
-    
+
     pass
 
 
 class PipelineStopIteration(Exception):
     """This stops the iteration of `next()` in pipeline tasks.
-    
+
     Pipeline tasks should raise this excetions in the `next()` method to stop
     the iteration of the task and to proceed to `finish()`.
-    
+
     Note that if `next()` recieves input data as an argument, it is not
     required to ever raise this exception.  The pipeline will proceed to
     `finish()` once the input data has run out.
-    
+
     """
 
     pass
@@ -362,13 +362,13 @@ class PipelineStopIteration(Exception):
 
 class _PipelineMissingData(Exception):
     """Used for flow control when input data is yet to be produced."""
-    
+
     pass
 
 
 class _PipelineFinished(Exception):
     """Raised by tasks that have been completed."""
-    
+
     pass
 
 
@@ -377,23 +377,23 @@ class _PipelineFinished(Exception):
 
 class Manager(config.Reader):
     """Pipeline manager for setting up and running pipeline tasks.
-    
+
     The manager is in charge of initializing all pipeline tasks, setting them
     up by providing the appropriate parameters, then executing the methods of
     the each task in the appropriate order. It also handles intermediate data
     products and ensuring that the correct products are passed between tasks.
 
     """
-    
+
     logging = config.Property(default='warning', proptype=str)
     multiprocessing = config.Property(default=1, proptype=int)
     cluster = config.Property(default={}, proptype=dict)
     tasks = config.Property(default=[], proptype=list)
-    
+
     @classmethod
     def from_yaml_file(cls, file_name):
         """Initialize the pipeline from a YAML configuration file.
-        
+
         Parameters
         ----------
         file_name: string
@@ -411,7 +411,7 @@ class Manager(config.Reader):
     @classmethod
     def from_yaml_str(cls, yaml_doc):
         """Initialize the pipeline from a YAML configuration string.
-        
+
         Parameters
         ----------
         yaml_doc: string
@@ -430,12 +430,12 @@ class Manager(config.Reader):
 
     def run(self):
         """Main driver method for the pipeline.
-        
+
         This function initializes all pipeline tasks and runs the pipeline
         through to completion.
 
         """
-        
+
         # Set logging level.
         numeric_level = getattr(logging, self.logging.upper(), None)
         if not isinstance(numeric_level, int):
@@ -738,18 +738,18 @@ class TaskBase(config.Reader):
         self._in_keys = in_
         self._in = [Queue.Queue() for i in range(n_in)]
         self._out_keys = out
-    
+
     def _pipeline_advance_state(self):
         """Advance this pipeline task to the next stage.
-        
+
         The task stages are 'setup', 'next', 'finish' or 'raise'.  This
         method sets the state of the task, advancing it to the next stage.
 
         Also performs some clean up tasks and checks associated with changing
         stages.
-        
+
         """
-        
+
         if not hasattr(self, "_pipeline_state"):
             self._pipeline_state = "setup"
         elif self._pipeline_state == "setup":
@@ -778,13 +778,13 @@ class TaskBase(config.Reader):
 
     def _pipeline_next(self):
         """Execute the next stage of the pipeline.
-        
+
         Execute `setup()`, `next()`, `finish()` or raise `PipelineFinished`
         depending on the state of the task.  Advance the state to the next
         stage if applicable.
 
         """
-        
+
         if self._pipeline_state == "setup":
             # Check if we have all the required input data.
             for req in self._requires:
@@ -827,12 +827,12 @@ class TaskBase(config.Reader):
 
     def _pipeline_inspect_queue_product(self, keys, products):
         """Inspect data products and queue them as inputs if applicable.
-        
+
         Compare a list of data products keys to the keys expected by this task
         as inputs to `setup()` ('requires') and `next()` ('in').  If there is a
         match, store the corresponding data product to be used in the next
         invocation of these methods.
-        
+
         """
 
         n_keys = len(keys)
@@ -878,20 +878,20 @@ class _OneAndOne(TaskBase):
     `SingleBase` and `IterBase`.
 
     """
-    
+
     input_root = config.Property(default='None', proptype=str)
     output_root = config.Property(default='None', proptype=str)
 
     def process(self, input):
         """Override this method with your data processing task.
         """
-        
+
         output = input
         return output
 
     def __init__(self):
         """Checks inputs and outputs and stuff."""
-        
+
         # Inspect the `process` method to see how many arguments it takes.
         pro_argspec = inspect.getargspec(self.process)
         n_args = len(pro_argspec.args) - 1
@@ -926,7 +926,7 @@ class _OneAndOne(TaskBase):
 
     def read_process_write(self, input, input_filename, output_filename):
         """Reads input, executes any processing and writes output."""
-        
+
         # Read input if needed.
         if input is None and not self._no_input:
             if input_filename is None:
@@ -962,7 +962,7 @@ class _OneAndOne(TaskBase):
         """Override to implement reading inputs from disk."""
 
         raise NotImplementedError()
-    
+
     def cast_input(self, input):
         """Override to support accepting pipeline inputs of variouse types."""
 
@@ -970,9 +970,9 @@ class _OneAndOne(TaskBase):
 
     def read_output(self, filename):
         """Override to implement reading outputs from disk.
-        
+
         Used for result cacheing.
-        
+
         """
 
         raise NotImplementedError()
@@ -1030,35 +1030,35 @@ class SingleBase(_OneAndOne):
     write_output
 
     """
-    
+
     input_filename = config.Property(default='', proptype=str)
     output_filename = config.Property(default='', proptype=str)
 
 
     def next(self, input=None):
         """Should not need to override."""
-        
+
         # This should only be called once.
         try:
             if self.done:
                 raise PipelineStopIteration()
         except AttributeError:
             self.done = True
-        
+
         if input:
             input = self.cast_input(input)
-        return self.read_process_write(input, self.input_filename, 
+        return self.read_process_write(input, self.input_filename,
                                        self.output_filename)
 
 
 class IterBase(_OneAndOne):
     """Base class for iterating tasks with at most one input and one output.
-    
+
     Tasks inheriting from this class should override :meth:`process` and
     optionally :meth:`setup`, :meth:`finish`, :meth:`read_input`,
     :meth:`write_output` and :meth:`cast_input`. They should not override
     :meth:`next`.
-    
+
     If the value of :attr:`input_root` is anything other than the string "None"
     then the input will be read (using :meth:`read_input`) from the file
     ``self.input_root + self.file_middles[i] + self.input_ext``.  If the
@@ -1103,11 +1103,11 @@ class IterBase(_OneAndOne):
     write_output
 
     """
-    
+
     file_middles = config.Property(default=[], proptype=list)
     input_ext = config.Property(default='', proptype=str)
     output_ext = config.Property(default='', proptype=str)
-    
+
     def __init__(self):
         _OneAndOne.__init__(self)
         self.iteration = 0
@@ -1131,7 +1131,7 @@ class IterBase(_OneAndOne):
             middle = self.file_middles[self.iteration]
             input_filename = middle + self.input_ext
             output_filename = middle + self.output_ext
-        
+
         if input:
             input = self.cast_input(input)
         output = self.read_process_write(input, input_filename,
@@ -1148,38 +1148,38 @@ class H5IOMixin(object):
 
     Provides the methods `read_input`, `read_output` and `write_output` for
     hdf5 data.
-    
+
     """
-    
+
     # TODO, implement reading on disk (i.e. no copy to memory).
     #ondisk = config.Property(default=False, proptype=bool)
-        
+
     def read_input(self, filename):
         """Method for reading hdf5 input."""
-        
+
         from caput import memh5
         return memh5.MemGroup.from_hdf5(filename, mode='r')
 
     def read_output(self, filename):
         """Method for reading hdf5 output (from caches)."""
-        
+
         # Replicate code from read_input in case read_input is overridden.
         from caput import memh5
         return memh5.MemGroup.from_hdf5(filename, mode='r')
 
     def write_output(self, filename, output):
         """Method for writing hdf5 output.
-        
+
         `output` to be written must be either a `memh5.MemGroup` or an
         `h5py.Group` (which include `hdf5.File` objects). In the latter case
         the buffer is flushed if `filename` points to the same file and a copy
         is made otherwise.
 
         """
-        
+
         from caput import memh5
         import h5py
-        
+
         # Ensure parent directory is present.
         dirname = path.dirname(filename)
         if not path.isdir(dirname):
@@ -1255,10 +1255,10 @@ def _format_product_keys(spec, name):
 def _import_class(class_path):
     """Import class dynamically from a string."""
     path_split = class_path.split('.')
-    modul_path = '.'.join(path_split[:-1])
+    module_path = '.'.join(path_split[:-1])
     class_name = path_split[-1]
-    if modul_path:
-        m = __import__(modul_path)
+    if module_path:
+        m = __import__(module_path)
         for comp in path_split[1:]:
             m = getattr(m, comp)
         task_cls = m

@@ -15,6 +15,13 @@ level data container is provided that utilizes these classes along with the
 :mod:`h5py` to provide data that is transparently stored either in memory or on
 disk.
 
+This also allows the creation and use of :mod:`memh5` objects which can hold
+data distributed over a number of MPI processes. These
+:class:`MemDatasetDistributed` datasets hold :class:`mpiarray.MPIArray` objects
+and can be written to, and loaded from disk like normal :class:`memh5` objects.
+Support for this must be explicitly enabled in the root group at creation with
+the `distributed=True` flag.
+
 
 Basic Classes
 =============
@@ -25,7 +32,8 @@ Basic Classes
     ro_dict
     MemGroup
     MemAttrs
-    MemDataset
+    MemDatasetCommon
+    MemDatasetDistributed
 
 
 High Level Container
@@ -59,6 +67,9 @@ import weakref
 
 import numpy as np
 import h5py
+
+from . import mpiutil
+from . import mpiarray
 
 
 # Basic Classes
@@ -105,6 +116,13 @@ class MemGroup(ro_dict):
     object, since the distinction between a file and a group for in-memory data
     is moot.
 
+    Parameters
+    ----------
+    distributed : boolean, optional
+        Allow memh5 object to hold distributed datasets.
+    comm : MPI.Comm, optional
+        MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
+
     Attributes
     ----------
     attrs
@@ -122,10 +140,9 @@ class MemGroup(ro_dict):
     require_group
     create_dataset
     require_dataset
-
     """
 
-    def __init__(self):
+    def __init__(self, distributed=False, comm=None):
         ro_dict.__init__(self)
         self._attrs = MemAttrs()
         # Set the following assuming we are the root group. If not, the method
@@ -136,6 +153,16 @@ class MemGroup(ro_dict):
         self._root = weakref.proxy(self)
         self._parent = weakref.proxy(self)
         self._name = ''
+
+        # Set params for distributed datasets, comm is only needed if distributed=True
+        self._distributed = distributed
+        self._comm = None
+
+        # If distributed set the communicator it is using
+        if self._distributed:
+            from mpi4py import MPI
+
+            self._comm = comm if comm is not None else MPI.COMM_WORLD
 
     def __getitem__(self, key):
         """Implement '/' for accessing nested groups."""
@@ -162,7 +189,6 @@ class MemGroup(ro_dict):
         attrs : MemAttrs
 
         """
-
         return self._attrs
 
     @property
@@ -197,52 +223,88 @@ class MemGroup(ro_dict):
         """Create a new instance by deep copying an existing group.
 
         Agnostic as to whether the group to be copyed is a `MemGroup` or an
-        `h5py.Group` (which includes `hdf5.File` objects). 
+        `h5py.Group` (which includes `hdf5.File` objects).
 
         """
 
-        self = cls()
-        deep_group_copy(group, self)
-        return self
+        if isinstance(grp, MemGroup):
+            self = cls()
+            deep_group_copy(group, self)
+            return self
+        else:
+            return cls.from_hdf5(group)
 
     @classmethod
-    def from_hdf5(cls, f, **kwargs):
+    def from_hdf5(cls, filename, distributed=False, hints=True, comm=None, **kwargs):
         """Create a new instance by copying from an hdf5 group.
 
-        This is the same as `from_group` except that an hdf5 filename is
-        accepted.  Any keyword arguments are passed on to the constructor for
-        `h5py.File`.
+        Any keyword arguments are passed on to the constructor for `h5py.File`.
 
+        Parameters
+        ----------
+        filename : string
+            Name of file to load.
+        distributed : boolean, optional
+            Whether to load file in distributed mode.
+        hints : boolean, optional
+            If in distributed mode use hints to determine whether datasets are
+            distributed or not.
+        comm : MPI.Comm, optional
+            MPI communicator to distributed over. If :obj:`None` use
+            :obj:`MPI.COMM_WORLD`.
+
+        Returns
+        -------
+        group : memh5.Group
+            Root group of loaded file.
         """
 
-        f, to_close = get_h5py_File(f, **kwargs)
-        self = cls.from_group(f)
-        if to_close:
-            f.close()
+        if not distributed or not hints:
+            with h5py.File(filename, **kwargs) as f:
+                self = cls(distributed=distributed, comm=comm)
+                deep_group_copy(f, self)
+        else:
+            self = _distributed_group_from_hdf5(filename, comm=comm, hints=hints)
+
         return self
 
-    def to_hdf5(self, f, **kwargs):
+    def to_hdf5(self, filename, hints=True, **kwargs):
         """Replicate object on disk in an hdf5 file.
 
         Any keyword arguments are passed on to the constructor for `h5py.File`.
 
+        Parameters
+        ----------
+        filename : str
+            File to save into.
+        hints : boolean, optional
+            Whether to write hints into the file that described whether datasets
+            are distributed, or not.
         """
 
-        f, opened = get_h5py_File(f, **kwargs)
-        deep_group_copy(self, f)
-        return f
+        if not self._distributed:
+            with h5py.File(filename, **kwargs) as f:
+                deep_group_copy(self, f)
+        else:
+            _distributed_group_to_hdf5(self, filename, **kwargs)
 
     def create_group(self, key):
+
         # Corner case if empty key.
         if not key:
             msg = "Empty group names not allowed."
             raise ValueError(msg)
+
+        # If distributed, synchronise to ensure that we create group collectively
+        if self._distributed:
+            self._comm.Barrier()
+
         if not '/' in key:
             # Create group directly.
             try:
                 self[key]
             except KeyError:
-                out = MemGroup()
+                out = MemGroup(distributed=self._distributed, comm=self._comm)
                 out._root = self._root  # Should already be a weakref
                 out._parent = weakref.proxy(self)  # Must use weakref to avoid reference cycles
                 out._name = key
@@ -276,10 +338,37 @@ class MemGroup(ro_dict):
             return g
 
     def create_dataset(self, name, shape=None, dtype=None, data=None,
-                       **kwargs):
+                       distributed=False, distributed_axis=None, comm=None, **kwargs):
         """Create a new dataset.
 
+        Parameters
+        ----------
+        name : string
+            Dataset name.
+        shape : tuple, optional
+            Shape tuple. This gives the global shape for a distributed dataset.
+        dtype : np.dtype, optional
+            Numpy datatype of the dataset.
+        data : np.ndarray or MPIArray, optional
+            Data array to initialise from. Uses a view of the original where possible.
+        distributed : boolean, optional
+            Create a distributed dataset or not.
+        distributed_axis : int, optional
+            Axis to distribute the data over. If specified with initialisation
+            data this will cause create a copy with the correct distribution.
+
+        Returns
+        -------
+        dset : memh5.MemDataset
         """
+
+        # For the moment raise an Exception if we try to use absolute paths
+        if name[0] == '/':
+            raise ValueError('Dataset creation does not support absolute paths (%s)' % name)
+
+        # If distributed, synchronise to ensure that we create group collectively
+        if self._distributed:
+            self._comm.Barrier()
 
         if kwargs:
             msg = ("No extra keyword arguments accepted, this is not an hdf5"
@@ -287,40 +376,97 @@ class MemGroup(ro_dict):
             raise TypeError(msg)
             # XXX In future could accept extra arguments and use them if
             # writing to disk.
-        if not data is None:
+
+        # If data is set, copy out params from it.
+        if data is not None:
             if shape is None:
                 shape = data.shape
             if dtype is None:
                 dtype = data.dtype
+
         # Otherwise shape is required.
         if shape is None:
             raise ValueError('shape must be provided.')
         # Default dtype is float.
         if dtype is None:
             dtype = np.float64
+
         # Convert to numpy dtype.
         dtype = np.dtype(dtype)
-        if (not data is None and shape == data.shape
-            and dtype is data.dtype and hasattr(data, 'view')):
-            new_dataset = data.view(MemDataset)
+
+        # Create distributed dataset if data is an MPIArray
+        if isinstance(data, mpiarray.MPIArray):
+            distributed = True
+
+        # Enforce that distributed datasets can only exist in distributed memh5 groups.
+        if not self._distributed and distributed:
+            raise RuntimeError('Cannot create a distributed dataset in a non-distributed group.')
+
+        # If data is set (and consistent with shape/type), initialise the numpy array from it.
+        if (data is not None and shape == data.shape
+           and dtype is data.dtype and hasattr(data, 'view')):
+
+            # Create parallel array if requested
+            if distributed:
+
+                # Ensure we are creating from an MPIArray
+                if not isinstance(data, mpiarray.MPIArray):
+                    raise TypeError('Can only create distributed dataset from MPIArray.')
+
+                # Ensure that we are distributing over the same communicator
+                if data._comm != self._comm:
+                    raise RuntimeError('MPI communicator of array must match that of memh5 group.')
+
+                # If the distributed_axis is specified ensure the data is distributed along it.
+                if distributed_axis is not None:
+                    data = data.redistribute(axis=distributed_axis)
+
+                # Create distributed dataset
+                new_dataset = MemDatasetDistributed.from_mpi_array(data)
+            else:
+                # Create common dataset
+                new_dataset = MemDatasetCommon.from_numpy_array(data)
+
+        # Otherwise create an empty array and copy into it (if needed)
         else:
             # Just copy the data.
-            new_dataset = np.empty(shape=shape,
-                                   dtype=dtype).view(MemDataset)
-            if not data is None:
+            if distributed:
+
+                # If comm is not set, default to MPI.COMM_WORLD
+                if comm is None:
+                    from mpi4py import MPI
+                    comm = MPI.COMM_WORLD
+
+                # Ensure that distributed_axis is set.
+                if distributed_axis is None:
+                    raise RuntimeError('Distributed axis must be specified when creating dataset.')
+
+                new_dataset = MemDatasetDistributed(shape=shape, dtype=dtype, axis=distributed_axis)
+            else:
+                new_dataset = MemDatasetCommon(shape=shape, dtype=dtype)
+
+            if data is not None:
                 new_dataset[...] = data[...]
+
+        # Add new dataset to group
         self._dict[name] = new_dataset
-        # Some subset of the h5py interface.
+
+        # Set the properties of the new dataset
         new_dataset._name = name
         new_dataset._parent = weakref.proxy(self)  # Must use weakref to avoid reference cycles
         new_dataset._root = self.file  # This should already be a weakref
+
         return new_dataset
 
-    def require_dataset(self, shape, dtype):
+    def require_dataset(self, key, shape, dtype, **kwargs):
+        """Require a dataset to exist, create if it doesn't.
+
+        Distributed dataset arguments are passed straight through to create_dataset.
+        """
         try:
             d = self[key]
         except KeyError:
-            return self.create_dataset(key, shape=shape, dtype=dtype)
+            return self.create_dataset(key, shape=shape, dtype=dtype, **kwargs)
         if isinstance(g, MemGroup):
             msg = "Entry '%s' exists and is not a Dataset." % key
             raise TypeError(msg)
@@ -338,12 +484,8 @@ class MemAttrs(dict):
     pass
 
 
-class MemDataset(np.ndarray):
-    """In memory implementation of the ``h5py.Dataset`` class.
-
-    Numpy array mocked up to look like an hdf5 dataset.  This just allows a
-    numpy array to carry around ab `attrs` dictionary as a stand-in for hdf5
-    attributes.
+class MemDataset(object):
+    """Base class for an in memory implementation of the ``h5py.Dataset`` class.
 
     Attributes
     ----------
@@ -354,11 +496,11 @@ class MemDataset(np.ndarray):
 
     """
 
-    def __array_finalize__(self, obj):
-        self._attrs = MemAttrs(getattr(obj, 'attrs', {}))
-        self._parent = ''
+    def __init__(self):
+        self._attrs = MemAttrs()
+        self._parent = None
         self._name = ''
-        self._root = ''
+        self._root = None
 
     @property
     def attrs(self):
@@ -404,6 +546,199 @@ class MemDataset(np.ndarray):
         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
         raise NotImplementedError(msg)
 
+    @property
+    def shape(self):
+        raise NotImplementedError("Not implmemented in base class.")
+
+    @property
+    def dtype(self):
+        raise NotImplementedError("Not implmemented in base class.")
+
+    def __getitem__(self, obj):
+        raise NotImplementedError("Not implmemented in base class.")
+
+    def __setitem__(self, obj, val):
+        raise NotImplementedError("Not implmemented in base class.")
+
+    def __len__(self):
+        raise NotImplementedError("Not implmemented in base class.")
+
+
+class MemDatasetCommon(MemDataset):
+    """In memory implementation of the ``h5py.Dataset`` class.
+
+    Encapsulates a numpy array mocked up to look like an hdf5 dataset. Similar
+    to h5py datasets, this implements slicing like a numpy array but as it is
+    not actually a many operations won't work (e.g. ufuncs).
+
+    Parameters
+    ----------
+    shape : tuple
+        Shape of array to initialise.
+    dtype : numpy dtype
+        Type of array to create.
+
+    Attributes
+    ----------
+    shape
+    dtype
+
+    Methods
+    -------
+    from_numpy_array
+    """
+
+    def __init__(self, shape, dtype):
+        MemDataset.__init__(self)
+
+        self._data = np.zeros(shape, dtype)
+
+    @classmethod
+    def from_numpy_array(cls, data):
+        """Initialise from a numpy array.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Array to initialise from.
+
+        Returns
+        -------
+        dset : MemDatasetCommon
+            Dataset encapsulating the numpy array.
+        """
+        dset = cls.__new__(cls)
+        MemDataset.__init__(dset)
+
+        if not isinstance(data, np.ndarray):
+            raise TypeError("Object must be a numpy array (or subclass).")
+
+        dset._data = data
+        return dset
+
+    @property
+    def shape(self):
+        return self._data.shape
+
+    @property
+    def dtype(self):
+        return self._data.dtype
+
+    def __getitem__(self, obj):
+        return self._data[obj]
+
+    def __setitem__(self, obj, val):
+        self._data[obj] = val
+
+    def __len__(self):
+        return len(self._data)
+
+    def __iter__(self):
+        # This needs to be implemented to stop craziness happening when doing
+        # np.array(dset)
+        return self._data.__iter__()
+
+    def __repr__(self):
+        return "<memh5 common dataset %s: shape %s, type \"%s\">" % (repr(self._name), repr(self.shape), repr(self.dtype))
+
+
+class MemDatasetDistributed(MemDataset):
+    """Parallel, in-memory implementation of the ``h5py.Dataset`` class.
+
+    Encapsulates an :class:`MPIArray`mocked up to look like an `h5py` dataset.
+    Similar to h5py datasets, this implements slicing like a numpy array but as
+    it is not actually a many operations won't work (e.g. ufuncs).
+
+    Parameters
+    ----------
+    shape : tuple
+        Shape of array to initialise. This is the *global* shape.
+    dtype : numpy dtype
+        Type of array to create.
+    axis : int, optional
+        Index of axis to distribute the array over.
+    comm : MPI.Comm, optional
+        MPI communicator to distribute over. If :obj:`None` use
+        :obj:`MPI.COMM_WORLD`.
+
+    Attributes
+    ----------
+    shape
+    dtype
+    """
+
+    def __init__(self, shape, dtype, axis=0, comm=None):
+        MemDataset.__init__(self)
+
+        self._data = mpiarray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
+
+    @classmethod
+    def from_mpi_array(cls, data):
+        dset = cls.__new__(cls)
+        MemDataset.__init__(dset)
+
+        if not isinstance(data, mpiarray.MPIArray):
+            raise TypeError("Object must be a numpy array (or subclass).")
+
+        dset._data = data
+        return dset
+
+    @property
+    def shape(self):
+        return self.local_shape
+
+    @property
+    def global_shape(self):
+        return self._data.global_shape
+
+    @property
+    def local_shape(self):
+        return self._data.local_shape
+
+    @property
+    def local_offset(self):
+        return self._data.local_offset
+
+    @property
+    def dtype(self):
+        return self._data.dtype
+
+    @property
+    def distributed_axis(self):
+        return self._data.axis
+
+    @property
+    def comm(self):
+        return self._data._comm
+
+    def redistribute(self, axis):
+        """Change the axis that the dataset is distributed over.
+
+        Parameters
+        ----------
+        axis : integer
+            Axis to distribute over.
+        """
+        self._data = self._data.redistribute(axis=axis)
+
+    def __getitem__(self, obj):
+        return self._data.global_slice[obj]
+
+    def __setitem__(self, obj, val):
+        self._data.global_slice[obj] = val
+
+    def __iter__(self):
+        # This needs to be implemented to stop craziness happening when doing
+        # np.array(dset)
+        return self._data.__iter__()
+
+    def __len__(self):
+        return len(self._data)
+
+    def __repr__(self):
+        return ("<memh5 distributed dataset %s: global_shape %s, dist_axis %s, type \"%s\">"
+                % (repr(self._name), repr(self.shape), repr(self.distributed_axis), repr(self.dtype)))
+
 
 # Higher Level Data Containers
 # ----------------------------
@@ -421,12 +756,22 @@ class MemDiskGroup(collections.Mapping):
     more specialized data containers which can subclass this class.  A basic
     but useful example is provided in :class:`BasicCont`.
 
+    This class also supports the same distributed features as :class:`MemGroup`,
+    but only when wrapping that class. Attempting to create a distributed object
+    wrapping a :class:`h5py.File` object will raise an exception. For similar
+    reasons, :meth:`MemDiskGroup.to_disk` will not work, however,
+    :meth:`MemDiskGroup.save` will work fine.
+
     Parameters
     ----------
     data_group : :class:`h5py.Group`, :class:`MemGroup` or string, optional
         Underlying :mod:`h5py` like data container where data will be stored.
         If a string, open a h5py file with that name. If not
         provided a new :class:`MemGroup` instance will be created.
+    distributed : boolean, optional
+        Allow the container to hold distributed datasets.
+    comm : MPI.Comm, optional
+        MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
 
     Attributes
     ----------
@@ -453,12 +798,41 @@ class MemDiskGroup(collections.Mapping):
 
     """
 
-    def __init__(self, data_group=None):
+    # Default initialisation
+    _data = None
+
+    def __init__(self, data_group=None, distributed=False, comm=None):
+
+        # If data group is not set, initialise a new MemGroup
         if data_group is None:
-            data_group = MemGroup()
+            data_group = MemGroup(distributed=distributed, comm=comm)
+
+        # If it is a MemDiskGroup then initialise a shallow copy
+        elif isinstance(data_group, MemDiskGroup):
+            data_group = data_group._data
+        # Otherwise, presume it is an HDF5 file
         else:
             data_group, self._toclose = get_h5py_File(data_group)
+
+        if distributed and isinstance(data_group, h5py.File):
+            raise ValueError('Distributed MemDiskGroup cannot be created around h5py objects.')
+
+        # Check the distribution settings
+        if isinstance(data_group, MemGroup):
+
+            # Check parallel distribution is the same
+            if distributed != data_group._distributed:
+                raise ValueError('Cannot create MemDiskGroup with different distributed setting to MemGroup to wrap.')
+
+            # Check parallel distribution is the same
+            if distributed and comm and comm != data_group._comm:
+                raise ValueError('Cannot create MemDiskGroup with different MPI communicator to MemGroup to wrap.')
+
         self._data = data_group
+
+    def _finish_setup(self):
+        """Finish the class setup *after* importing from a file."""
+        pass
 
     def __del__(self):
         """Closes file if on disk and if file was opened on initialization."""
@@ -518,12 +892,12 @@ class MemDiskGroup(collections.Mapping):
     @property
     def ondisk(self):
         """Whether the data is stored on disk as opposed to in memory."""
-        return not isinstance(self._data, MemGroup)
+        return isinstance(self._data, h5py.File)
 
     ## For creating new instances. ##
 
     @classmethod
-    def from_file(cls, f, ondisk=False, **kwargs):
+    def from_file(cls, filename, ondisk=False, distributed=False, comm=None, **kwargs):
         """Create data object from analysis hdf5 file, store in memory or on disk.
 
         If *ondisk* is True, do not load into memory but store data in h5py objects
@@ -531,9 +905,8 @@ class MemDiskGroup(collections.Mapping):
 
         Parameters
         ----------
-        f : filename or h5py.File object
-            File with the hdf5 data. File must be compatible with analysis hdf5
-            format. For loading acquisition format data see `from_acq_h5`.
+        filename : string
+            File with the hdf5 data. File must be compatible with memh5 objects.
         ondisk : bool
             Whether the data should be kept in the file on disk or should be copied
             into memory.
@@ -543,16 +916,50 @@ class MemDiskGroup(collections.Mapping):
 
         """
 
-        f, opened = get_h5py_File(f, **kwargs)
+
         if not ondisk:
-            data = MemGroup.from_group(f)
-            if opened:
-                f.close()
+            # For non-distributed files we allow filename to be an h5py.File
+            # instance for compatibility with old code.
+            if isinstance(filename, h5py.File):
+                filename = filename.filename
+
+            data = MemGroup.from_hdf5(filename, distributed=distributed, comm=comm, mode='r', **kwargs)
             toclose = False
         else:
-            data = f
-            toclose = opened
-        self = cls(data)
+            # Again, a compatibility hack
+            if isinstance(filename, h5py.File):
+                data = filename
+                toclose = False
+            else:
+                data = h5py.File(filename, **kwargs)
+                toclose = True
+
+        # Look for a hint as to the sub class we should return, this should be
+        # in the attributes of the root.
+        if '__memh5_subclass' in data.attrs:
+            from .pipeline import _import_class
+
+            clspath = data.attrs['__memh5_subclass']
+
+            # Try and get a reference to the requested class (warn if we cannot find it)
+            try:
+                cls = _import_class(clspath)
+            except ImportError, KeyError:
+                warnings.warn('Could not import memh5 subclass %s' % clspath)
+
+            # Check that is is a subclass of MemDiskGroup
+            if not issubclass(cls, MemDiskGroup):
+                raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
+
+        # Create an instance of requested class
+        self = cls.__new__(cls)
+
+        # Perform the MemDiskGroup path of the initialisation
+        MemDiskGroup.__init__(self, data, distributed=distributed, comm=comm)
+
+        # ... skip the class initialisation, and use a special method
+        self._finish_setup()
+
         self._toclose = toclose
         return self
 
@@ -596,18 +1003,12 @@ class MemDiskGroup(collections.Mapping):
         """
         return True
 
-    def create_dataset(self, name, shape=None, dtype=None, data=None,
-                       attrs=None, **kwargs):
+    def create_dataset(self, name, *args, **kwargs):
         if not self.dataset_name_allowed(name):
             msg = "Dataset name %s not allowed." % name
             raise ValueError(msg)
-        new_dataset = self._data.create_dataset(name, shape, dtype, data,
-                                                **kwargs)
-        # Copy over the attributes.  XXX Get rid of this?  Incompatible with
-        # h5py interface.
-        if attrs:
-            for key, value in attrs.iteritems():
-                new_dataset.attrs[key] = value
+        new_dataset = self._data.create_dataset(name, *args, **kwargs)
+
         return new_dataset
 
     def require_dataset(self, key, *args, **kwargs):
@@ -634,17 +1035,20 @@ class MemDiskGroup(collections.Mapping):
         if isinstance(self._data, MemGroup):
             return self
         else:
-            return self.__class__.from_file(self._data)
+            return self.__class__.from_file(self._data)  #, distributed=self._distributed, comm=self._comm)
 
-    def to_disk(self, h5_file, **kwargs):
+    def to_disk(self, filename, **kwargs):
         """Return a version of this data that lives on disk."""
 
         if not isinstance(self._data, MemGroup):
             msg = ("This data already lives on disk.  Copying to new file"
                    " anyway.")
             warnings.warn(msg)
-        self.save(h5_file)
-        return self.__class__.from_file(h5_file, ondisk=True, **kwargs)
+        elif self._data._distributed:
+            raise NotImplementedError("Cannot run to_disk on a distributed object. Try running save instead.")
+
+        self.save(filename)
+        return self.__class__.from_file(filename, ondisk=True, **kwargs)
 
     def close(self):
         """Close underlying hdf5 file if on disk."""
@@ -658,13 +1062,21 @@ class MemDiskGroup(collections.Mapping):
         if self.ondisk:
             self._data.flush()
 
-    def save(self, f, **kwargs):
+    def save(self, filename, **kwargs):
         """Save data to hdf5 file."""
 
-        f, opened = get_h5py_File(f, **kwargs)
-        deep_group_copy(self._data, f)
-        if opened:
-            f.close()
+        # Write out a hint as to what the class of this object is, do this by
+        # inserting it into the attributes before saving out.
+        if '__memh5_subclass' not in self.attrs:
+            clspath = self.__class__.__module__ + '.' + self.__class__.__name__
+
+            self.attrs['__memh5_subclass'] = clspath
+
+        if isinstance(self._data, h5py.File):
+            with h5py.File(filename, **kwargs) as f:
+                deep_group_copy(self._data, f)
+        else:
+            self._data.to_hdf5(filename, **kwargs)
 
 
 class BasicCont(MemDiskGroup):
@@ -702,8 +1114,8 @@ class BasicCont(MemDiskGroup):
 
     """
 
-    def __init__(self, data_group=None):
-        MemDiskGroup.__init__(self, data_group)
+    def __init__(self, *args, **kwargs):
+        MemDiskGroup.__init__(self, *args, **kwargs)
         # Initialize new groups only if writable.
         if self._data.file.mode == 'r+':
             self._data.require_group(u'history')
@@ -792,6 +1204,7 @@ class BasicCont(MemDiskGroup):
             history_group[name].attrs[key] = value
 
 
+
 # Utilities
 # ---------
 
@@ -808,18 +1221,18 @@ def attrs2dict(attrs):
 
 def is_group(obj):
     """Check if the object is a Group, which includes File objects.
-    
+
     In most cases, if it isn't a Group it's a Dataset, so this can be used to
     check for Datasets as well.
 
     """
-    
+
     return hasattr(obj, 'create_group')
 
 
 def get_h5py_File(f, **kwargs):
     """Checks if input is an `h5py.File` or filename and returns the former.
-    
+
     Parameters
     ----------
     f : h5py Group or filename string
@@ -834,7 +1247,7 @@ def get_h5py_File(f, **kwargs):
         Whether the a file was opened or not (i.e. was already open).
 
     """
-    
+
     # Figure out if F is a file or a filename, and whether the file should be
     # closed.
     if is_group(f):
@@ -862,14 +1275,158 @@ def copyattrs(a1, a2):
 
 def deep_group_copy(g1, g2):
     """Copy full data tree from one group to another."""
-    
+
     copyattrs(g1.attrs, g2.attrs)
     for key, entry in g1.iteritems():
         if is_group(entry):
             g2.create_group(key)
             deep_group_copy(entry, g2[key])
         else:
-            g2.create_dataset(key, shape=entry.shape, dtype=entry.dtype, 
+            g2.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
                     data=entry)
             copyattrs(entry.attrs, g2[key].attrs)
 
+
+
+def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
+    """Private routine to copy full data tree from distributed memh5 object into an
+    HDF5 file."""
+
+    if not group._distributed:
+        raise RuntimeError('This should only run on distributed datasets.')
+
+    comm = group._comm
+
+    # Create a copy of the kwargs with no mode argument so that we can override it
+    kwargs_nomode = kwargs.copy()
+    if 'mode' in kwargs:
+        del kwargs_nomode['mode']
+
+    # Create group (or file)
+    if comm.rank == 0:
+
+        # If this is the root group, create the file and copy the file level
+        # attrs
+        if group.name == '/':
+            with h5py.File(fname, 'w', **kwargs) as f:
+                copyattrs(group.attrs, f.attrs)
+
+                if hints:
+                    f.attrs['__memh5_distributed_file'] = True
+
+        # Create this group and copy attrs
+        else:
+            with h5py.File(fname, 'r+', **kwargs) as f:
+                g = f.create_group(group.name)
+                copyattrs(group.attrs, g.attrs)
+
+    comm.Barrier()
+
+    # Write out groups and distributed datasets, these operations must be done collectively
+    for key, entry in group.iteritems():
+
+        # Groups are written out by recursing
+        if is_group(entry):
+            _distributed_group_to_hdf5(entry, fname, **kwargs)
+
+        # Write out distributed datasets (only the data, the attributes are written below)
+        elif isinstance(entry, MemDatasetDistributed):
+            arr = entry._data
+
+            arr.to_hdf5(fname, entry.name)
+
+        comm.Barrier()
+
+    # Write out common datasets, and the attributes on distributed datasets
+    if comm.rank == 0:
+
+        with h5py.File(fname, 'r+', **kwargs_nomode) as f:
+
+            for key, entry in group.iteritems():
+
+                # Write out common datasets and copy their attrs
+                if isinstance(entry, MemDatasetCommon):
+                    dset = f.create_dataset(entry.name, data=entry._data)
+                    copyattrs(entry.attrs, dset.attrs)
+
+                    if hints:
+                        dset.attrs['__memh5_distributed_dset'] = False
+
+                # Copy the attributes over for a distributed dataset
+                elif isinstance(entry, MemDatasetDistributed):
+
+                    if entry.name not in f:
+                        raise RuntimeError('Distributed dataset should already have been created.')
+
+                    copyattrs(entry.attrs, f[entry.name].attrs)
+
+                    if hints:
+                        f[entry.name].attrs['__memh5_distributed_dset'] = True
+
+    comm.Barrier()
+
+
+def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
+    """Private routine to restore full tree from an HDF5 file into a distributed memh5 object."""
+
+    # Create root group
+    group = MemGroup(distributed=True, comm=comm)
+    comm = group._comm
+
+    # == Create some internal functions for doing the read ==
+    # Copy over attributes with a broadcast from rank = 0
+    def _copy_attrs_bcast(h5item, memitem):
+        attr_dict = None
+        if comm.rank == 0:
+            attr_dict = { k: v for k, v in h5item.attrs.items() }
+        attr_dict = comm.bcast(attr_dict, root=0)
+        copyattrs(attr_dict, memitem.attrs)
+
+    # Function to perform a recursive clone of the tree structure
+    def _copy_from_file(h5group, memgroup):
+
+        # Copy over attributes
+        _copy_attrs_bcast(h5group, memgroup)
+
+        for key, item in h5group.items():
+
+            # If group, create the entry and the recurse into it
+            if is_group(item):
+                new_group = memgroup.create_group(key)
+                _copy_from_file(item, new_group)
+
+            # If dataset, create dataset
+            else:
+
+                # Check if we are in a distributed dataset
+                if ('__memh5_distributed_dset' in item.attrs) and item.attrs['__memh5_distributed_dset']:
+
+                    # Read from file into MPIArray
+                    pdata = mpiarray.MPIArray.from_hdf5(f, key, comm=comm)
+
+                    # Create dataset from MPIArray
+                    dset = memgroup.create_dataset(key, data=pdata, distributed=True)
+                else:
+
+                    # Read common data onto rank zero and broadcast
+                    cdata = None
+                    if comm.rank == 0:
+                        cdata = item[:]
+                    cdata = comm.bcast(cdata, root=0)
+
+                    # Create dataset from array
+                    dset = memgroup.create_dataset(key, data=cdata, distributed=False)
+
+                # Copy attributes over into dataset
+                _copy_attrs_bcast(item, dset)
+
+    # Open file on all ranks
+    with h5py.File(fname, 'r') as f:
+
+        # Start recursive file read
+        _copy_from_file(f, group)
+
+    # Final synchronisation
+    comm.Barrier()
+
+    return group
