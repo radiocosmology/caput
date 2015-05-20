@@ -916,22 +916,23 @@ class MemDiskGroup(collections.Mapping):
 
         """
 
-        # For non-distributed files we allow filename to be an h5py.File
-        # instance for compatibility with old code.
-        if isinstance(filename, h5py.File) and ondisk:
-            data = filename
-            toclose = False
-        elif not ondisk:
 
-            # Again, a compatibility hack
+        if not ondisk:
+            # For non-distributed files we allow filename to be an h5py.File
+            # instance for compatibility with old code.
             if isinstance(filename, h5py.File):
                 filename = filename.filename
 
-            data = MemGroup.from_hdf5(filename, distributed=distributed, comm=comm, **kwargs)
+            data = MemGroup.from_hdf5(filename, distributed=distributed, comm=comm, mode='r', **kwargs)
             toclose = False
         else:
-            data = h5py.File(filename, **kwargs)
-            toclose = True
+            # Again, a compatibility hack
+            if isinstance(filename, h5py.File):
+                data = filename
+                toclose = False
+            else:
+                data = h5py.File(filename, **kwargs)
+                toclose = True
 
         # Look for a hint as to the sub class we should return, this should be
         # in the attributes of the root.
