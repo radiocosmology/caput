@@ -42,6 +42,9 @@ class TestMemGroupDistributed(unittest.TestCase):
         self.assertTrue(np.allclose(d_array_T, g['data_T'][:]))
         self.assertEqual(d_array_T.local_shape, g['data2'].local_shape)
 
+        # Test global indexing
+        self.assertTrue((g['data'][rank*5] == local_data[0]).all())
+
     def test_io(self):
 
         # Create distributed memh5 object
