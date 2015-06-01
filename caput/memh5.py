@@ -685,7 +685,7 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def shape(self):
-        return self.local_shape
+        return self.global_shape
 
     @property
     def global_shape(self):
@@ -737,7 +737,7 @@ class MemDatasetDistributed(MemDataset):
 
     def __repr__(self):
         return ("<memh5 distributed dataset %s: global_shape %s, dist_axis %s, type \"%s\">"
-                % (repr(self._name), repr(self.shape), repr(self.distributed_axis), repr(self.dtype)))
+                % (repr(self._name), repr(self.global_shape), repr(self.distributed_axis), repr(self.dtype)))
 
 
 # Higher Level Data Containers
@@ -1202,6 +1202,72 @@ class BasicCont(MemDiskGroup):
         history_group.create_group(name)
         for key, value in history.items():
             history_group[name].attrs[key] = value
+
+    def redistribute(self, dist_axis):
+        """Redistribute parallel datasets along a specified axis.
+
+        Parameters
+        ----------
+        dist_axis : int, string, or list of
+            The axis can be specified by an integer index (positive or
+            negative), or by a string label which must correspond to an entry in
+            the `axis` attribute on the dataset. If a list is supplied, each
+            entry is tried in turn, which allows different datasets to be
+            redistributed along differently labelled axes.
+        """
+
+        if not isinstance(dist_axis, (list, tuple)):
+            dist_axis = [dist_axis]
+
+        # Worker routine to crawl the tree and redistribute any parallel datasets
+        def _tree_crawl(group):
+
+            for name, item in group.items():
+
+                # Recurse into subgroups
+                if isinstance(item, MemGroup):
+                    _tree_crawl(item)
+
+                # Okay, we've found a distributed dataset, let's try and redistribute it
+                if isinstance(item, MemDatasetDistributed):
+
+                    naxis = len(item.shape)
+
+                    for axis in dist_axis:
+
+                        # Try processing if this is a string
+                        if isinstance(axis, basestring):
+                            if 'axis' in item.attrs and axis in item.attrs['axis']:
+                                axis = np.argwhere(item.attrs['axis'] == axis)[0, 0]
+                            else:
+                                continue
+
+                        # Process if axis is an integer
+                        elif isinstance(axis, int):
+
+                            # Deal with negative axis index
+                            if axis < 0:
+                                axis = naxis + axis
+
+                        # Check axis is within bounds
+                        if axis >= naxis:
+                            continue
+
+                        # Excellent, found a matching axis, time to redistribute
+                        item.redistribute(axis)
+                        break
+
+                    # Note that this clause is on the FOR.
+                    else:
+                        # If we are here we didn't find a matching axis, emit a warning
+                        if group.comm.rank == 0:
+                            warnings.warn(('Could not find an axis (out of %s)'
+                                            + 'to distributed dataset %s over.') % (str(dist_axis), name))
+
+        _tree_crawl(self._data)
+
+
+
 
 
 

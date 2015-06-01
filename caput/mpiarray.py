@@ -386,6 +386,17 @@ class MPIArray(np.ndarray):
         if self.axis == axis:
             return self
 
+        # Test to see if the datatype is one understood by MPI, this can
+        # probably be fixed up at somepoint by creating a datatype of the right
+        # number of bytes
+        try:
+            mpiutil.typemap(self.dtype)
+        except KeyError:
+            if self.comm.rank == 0:
+                import warnings
+                warnings.warn('Cannot redistribute array of compound datatypes. Sorry!!')
+            return self
+
         # Construct the list of the axes to swap around
         axlist_f = list(range(len(self.shape)))
 

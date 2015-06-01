@@ -49,8 +49,8 @@ try:
     rank = _comm.Get_rank()
     size = _comm.Get_size()
 
-    if _comm is not None:
-        print "MPI process %i of %i." % (rank, size)
+    if _comm is not None and size > 1:
+        print "Starting MPI rank=%i [size=%i]" % (rank, size)
 
     rank0 = True if rank == 0 else False
 
