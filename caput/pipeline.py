@@ -1200,6 +1200,58 @@ class H5IOMixin(object):
                 out_copy.to_hdf5(filename, mode='w')
 
 
+class BasicContMixin(object):
+    """Provides IO for BasicCont objects in pipeline tasks.
+
+    As a mixin, this must be combined (using multiple inheritance) with a
+    subclass of `TaskBase`, providing the full task API.
+
+    Provides the methods `read_input`, `read_output` and `write_output` for
+    BasicCont data which gets written to HDF5 files.
+
+    """
+
+    # TODO, implement reading on disk (i.e. no copy to memory).
+    #ondisk = config.Property(default=False, proptype=bool)
+
+    # Private setting for reading of inputs, should be overriden in sub class.
+    _distributed = False
+    _comm = None
+
+    def read_input(self, filename):
+        """Method for reading hdf5 input."""
+
+        from caput import memh5
+        return memh5.BasicCont.from_file(filename, distributed=self._distributed, comm=self._comm)
+
+    def read_output(self, filename):
+        """Method for reading hdf5 output (from caches)."""
+
+        # Replicate code from read_input in case read_input is overridden.
+        from caput import memh5
+        return memh5.BasicCont.from_file(filename, distributed=self._distributed, comm=self._comm)
+
+    def write_output(self, filename, output):
+        """Method for writing hdf5 output.
+
+        `output` to be written must be either a :class:`memh5.BasicCont` object.
+        """
+
+        from caput import memh5
+        import h5py
+
+        # Ensure parent directory is present.
+        dirname = path.dirname(filename)
+        if not path.isdir(dirname):
+            os.makedirs(dirname)
+        # Cases for `output` object type.
+        if not isinstance(output, memh5.BasicCont):
+            raise RuntimeError('Object to write out is not an instance of memh5.BasicCont')
+
+        # Already in memory.
+        output.save(filename)
+
+
 class SingleH5Base(H5IOMixin, SingleBase):
     """Base class for tasks with hdf5 input and output.
 
