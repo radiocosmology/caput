@@ -205,7 +205,12 @@ class _global_resolver(object):
         else:
             # Return an MPIArray view
             arr = self.array[slobj]
-            return MPIArray.wrap(arr, axis=self.axis, comm=self.array._comm)
+
+            # Figure out which is the distributed axis after the slicing, by
+            # removing slice axes which are just ints from the mapping
+            dist_axis = [index for index, sl in enumerate(slobj) if not isinstance(sl, int)].index(self.axis)
+
+            return MPIArray.wrap(arr, axis=dist_axis, comm=self.array._comm)
 
     def __setitem__(self, slobj, value):
 
@@ -493,7 +498,7 @@ class MPIArray(np.ndarray):
 
         return dist_arr
 
-    def to_hdf5(self, filename, dataset):
+    def to_hdf5(self, filename, dataset, create=False):
         """Parallel write into a contiguous HDF5 dataset.
 
         Parameters
@@ -510,7 +515,7 @@ class MPIArray(np.ndarray):
 
         if self._comm.rank == 0:
 
-            with h5py.File(filename, 'r+') as fh:
+            with h5py.File(filename, 'a' if create else 'r+') as fh:
                 if dataset in fh:
                     raise Exception("Dataset should not exist.")
 
