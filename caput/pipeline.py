@@ -31,9 +31,9 @@ Task base classes
    SingleBase
    IterBase
    H5IOMixin
+   BasicContMixin
    SingleH5Base
    IterH5Base
-
 
 Examples
 ========
