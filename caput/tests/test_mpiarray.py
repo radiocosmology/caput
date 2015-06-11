@@ -2,14 +2,14 @@
 
 Designed to be run as an MPI job with four processes like::
 
-    $ mpirun -np 4 python test_mpidataset.py
+    $ mpirun -np 4 python test_mpiarray.py
 """
 import os
 import unittest
 
 import numpy as np
 
-from caput import mpiutil, mpidataset
+from caput import mpiutil, mpiarray
 
 
 
@@ -17,7 +17,7 @@ class TestMPIAray(unittest.TestCase):
 
     def test_construction(self):
 
-        arr = mpidataset.MPIArray((10, 11), axis=1)
+        arr = mpiarray.MPIArray((10, 11), axis=1)
 
         l, s, e = mpiutil.split_local(11)
 
@@ -40,7 +40,7 @@ class TestMPIAray(unittest.TestCase):
         l1, s1, e1 = mpiutil.split_local(14)
         l2, s2, e2 = mpiutil.split_local(4)
 
-        arr = mpidataset.MPIArray(gshape, axis=1, dtype=np.int64)
+        arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
         arr[:] = garr[:, s0:e0]
 
         arr2 = arr.redistribute(axis=3)
@@ -51,15 +51,15 @@ class TestMPIAray(unittest.TestCase):
 
     def test_wrap(self):
 
-        ds = mpidataset.MPIArray((10, 17))
+        ds = mpiarray.MPIArray((10, 17))
 
         df = np.fft.rfft(ds, axis=1)
 
         assert type(df) == np.ndarray
 
-        da = mpidataset.MPIArray.wrap(df, axis=0)
+        da = mpiarray.MPIArray.wrap(df, axis=0)
 
-        assert type(da) == mpidataset.MPIArray
+        assert type(da) == mpiarray.MPIArray
         assert da.global_shape == (10, 9)
 
         l0, s0, e0 = mpiutil.split_local(10)
@@ -70,7 +70,7 @@ class TestMPIAray(unittest.TestCase):
             df = df[:-1]
 
         with self.assertRaises(Exception):
-            mpidataset.MPIArray.wrap(df, axis=0)
+            mpiarray.MPIArray.wrap(df, axis=0)
 
     def test_io(self):
 
@@ -79,19 +79,21 @@ class TestMPIAray(unittest.TestCase):
         # Cleanup directories
         fname = 'testdset.hdf5'
 
-        if os.path.exists(fname):
+        if mpiutil.rank0 and os.path.exists(fname):
             os.remove(fname)
+
+        mpiutil.barrier()
 
         gshape = (19, 17)
 
-        ds = mpidataset.MPIArray(gshape, dtype=np.int64)
+        ds = mpiarray.MPIArray(gshape, dtype=np.int64)
 
         ga = np.arange(np.prod(gshape)).reshape(gshape)
 
         l0, s0, e0 = mpiutil.split_local(gshape[0])
         ds[:] = ga[s0:e0]
 
-        ds.redistribute(axis=1).to_hdf5(fname, 'testds')
+        ds.redistribute(axis=1).to_hdf5(fname, 'testds', create=True)
 
         if mpiutil.rank0:
 
@@ -101,7 +103,7 @@ class TestMPIAray(unittest.TestCase):
 
                 assert (h5ds == ga).all()
 
-        ds2 = mpidataset.MPIArray.from_hdf5(fname, 'testds')
+        ds2 = mpiarray.MPIArray.from_hdf5(fname, 'testds')
 
         assert (ds2 == ds).all()
 
@@ -111,12 +113,12 @@ class TestMPIAray(unittest.TestCase):
 
         l0, s0, e0 = mpiutil.split_local(11)
 
-        arr = mpidataset.MPIArray(gshape, axis=1, dtype=np.int64)
+        arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
 
         arr2 = arr.transpose((1, 3, 0, 2))
 
         # Check type
-        assert isinstance(arr2, mpidataset.MPIArray)
+        assert isinstance(arr2, mpiarray.MPIArray)
 
         # Check global shape
         assert arr2.global_shape == (11, 14, 1, 2)
@@ -136,12 +138,12 @@ class TestMPIAray(unittest.TestCase):
 
         l0, s0, e0 = mpiutil.split_local(11)
 
-        arr = mpidataset.MPIArray(gshape, axis=1, dtype=np.int64)
+        arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
 
         arr2 = arr.reshape((None, 28))
 
         # Check type
-        assert isinstance(arr2, mpidataset.MPIArray)
+        assert isinstance(arr2, mpiarray.MPIArray)
 
         # Check global shape
         assert arr2.global_shape == (11, 28)
@@ -161,7 +163,7 @@ class TestMPIAray(unittest.TestCase):
         size = mpiutil.size
 
 
-        darr = mpidataset.MPIArray((size*5, 20), axis=0)
+        darr = mpiarray.MPIArray((size*5, 20), axis=0)
 
         # Initialise the distributed array
         for li, gi in darr.enumerate(axis=0):
@@ -186,7 +188,7 @@ class TestMPIAray(unittest.TestCase):
         arr = darr.global_slice[:, 3:5]
         res = local_array[:, 3:5]
 
-        assert isinstance(arr, mpidataset.MPIArray)
+        assert isinstance(arr, mpiarray.MPIArray)
         assert (arr == res).all()
 
 
@@ -229,13 +231,20 @@ class TestMPIAray(unittest.TestCase):
 
         assert arr == res[rank] if arr is None else (arr == res[rank]).all()
 
+        # Check a slice that removes an axis
+        darr = mpiarray.MPIArray((10, 20, size*5), axis=2)
+        dslice = darr.global_slice[:, 0, :]
+
+        assert dslice.global_shape == (10, size*5)
+        assert dslice.local_shape == (10, 5)
+
     def test_global_setslice(self):
 
         rank = mpiutil.rank
         size = mpiutil.size
 
 
-        darr = mpidataset.MPIArray((size*5, 20), axis=0)
+        darr = mpiarray.MPIArray((size*5, 20), axis=0)
 
         # Initialise the distributed array
         for li, gi in darr.enumerate(axis=0):
@@ -277,7 +286,7 @@ class TestMPIAray(unittest.TestCase):
 
 
 #
-# class TestMPIDataset(unittest.TestCase):
+# class Testmpiarray(unittest.TestCase):
 #
 #     def test_dataset(self):
 #
@@ -289,7 +298,7 @@ class TestMPIAray(unittest.TestCase):
 #
 #         mpiutil.barrier()
 #
-#         class TestDataset(mpidataset.MPIDataset):
+#         class TestDataset(mpiarray.mpiarray):
 #             _common = {'a': None}
 #             _distributed = {'b': None}
 #
@@ -298,7 +307,7 @@ class TestMPIAray(unittest.TestCase):
 #         td1.attrs['message'] = 'meh'
 #
 #         gshape = (19, 17)
-#         ds = mpidataset.MPIArray(gshape, dtype=np.float64)
+#         ds = mpiarray.MPIArray(gshape, dtype=np.float64)
 #         ds[:] = np.random.standard_normal(ds.local_shape)
 #
 #         td1.distributed['b'] = ds
