@@ -238,6 +238,21 @@ class TestMPIAray(unittest.TestCase):
         assert dslice.global_shape == (10, size*5)
         assert dslice.local_shape == (10, 5)
 
+        # Check ellipsis and slice at the end
+        darr = mpiarray.MPIArray((size*5, 20, 10), axis=0)
+        dslice = darr.global_slice[..., 4:9]
+
+        assert dslice.global_shape == (size*5, 20, 5)
+        assert dslice.local_shape == (5, 20, 5)
+
+        # Check slice that goes off the end of the axis
+        darr = mpiarray.MPIArray((size, 136, 2048), axis=0)
+        dslice = darr.global_slice[..., 2007:2087]
+
+        assert dslice.global_shape == (4, 136, 41)
+        assert dslice.local_shape == (1, 136, 41)
+
+
     def test_global_setslice(self):
 
         rank = mpiutil.rank
