@@ -664,7 +664,12 @@ class MemDatasetDistributed(MemDataset):
     Attributes
     ----------
     shape
+    global_shape
+    local_shape
+    local_offset
     dtype
+    comm
+    distributed_axis
     """
 
     def __init__(self, shape, dtype, axis=0, comm=None):
@@ -1237,6 +1242,7 @@ class BasicCont(MemDiskGroup):
 
                         # Try processing if this is a string
                         if isinstance(axis, basestring):
+                            print axis, item.attrs, item.attrs['axis']
                             if 'axis' in item.attrs and axis in item.attrs['axis']:
                                 axis = np.argwhere(item.attrs['axis'] == axis)[0, 0]
                             else:

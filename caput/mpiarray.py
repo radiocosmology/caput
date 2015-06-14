@@ -130,6 +130,10 @@ class _global_resolver(object):
         if isinstance(slobj, int) or isinstance(slobj, slice):
             slobj = (slobj, Ellipsis)
 
+        # Add an ellipsis if length of slice object is too short
+        if isinstance(slobj, tuple) and len(slobj) < ndim and Ellipsis not in slobj:
+            slobj = slobj + (Ellipsis,)
+
         # Expand an ellipsis
         slice_list = []
         for sl in slobj:

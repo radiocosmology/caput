@@ -1242,7 +1242,7 @@ class BasicContMixin(object):
 
         # Ensure parent directory is present.
         dirname = path.dirname(filename)
-        if not path.isdir(dirname):
+        if dirname != '' and not path.isdir(dirname):
             os.makedirs(dirname)
         # Cases for `output` object type.
         if not isinstance(output, memh5.BasicCont):
