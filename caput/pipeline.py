@@ -488,7 +488,9 @@ class Manager(config.Reader):
                         # `out` must be a length 1 sequence.
                         pass
                 elif len(out_keys) != len(out):
-                    raise PipelineRuntimeError()
+                    msg = ('Found unexpected number of outputs in %s (got %i expected %i)' %
+                           (task.__class__.__name__, len(out), len(out_keys)))
+                    raise PipelineRuntimeError(msg)
                 keys = str(out_keys)
                 msg = "%s produced output data product with keys %s."
                 msg = msg % (task.__class__.__name__, keys)

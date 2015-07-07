@@ -68,7 +68,6 @@ import weakref
 import numpy as np
 import h5py
 
-from . import mpiutil
 from . import mpiarray
 
 
@@ -218,6 +217,12 @@ class MemGroup(ro_dict):
         """
         return 'r+'
 
+    @property
+    def comm(self):
+        """Reference to the MPI communicator.
+        """
+        return self._comm
+
     @classmethod
     def from_group(cls, group):
         """Create a new instance by deep copying an existing group.
@@ -227,7 +232,7 @@ class MemGroup(ro_dict):
 
         """
 
-        if isinstance(grp, MemGroup):
+        if isinstance(group, MemGroup):
             self = cls()
             deep_group_copy(group, self)
             return self
@@ -299,7 +304,7 @@ class MemGroup(ro_dict):
         if self._distributed:
             self._comm.Barrier()
 
-        if not '/' in key:
+        if '/' not in key:
             # Create group directly.
             try:
                 self[key]
@@ -338,7 +343,7 @@ class MemGroup(ro_dict):
             return g
 
     def create_dataset(self, name, shape=None, dtype=None, data=None,
-                       distributed=False, distributed_axis=None, comm=None, **kwargs):
+                       distributed=False, distributed_axis=None, **kwargs):
         """Create a new dataset.
 
         Parameters
@@ -432,16 +437,12 @@ class MemGroup(ro_dict):
             # Just copy the data.
             if distributed:
 
-                # If comm is not set, default to MPI.COMM_WORLD
-                if comm is None:
-                    from mpi4py import MPI
-                    comm = MPI.COMM_WORLD
-
                 # Ensure that distributed_axis is set.
                 if distributed_axis is None:
                     raise RuntimeError('Distributed axis must be specified when creating dataset.')
 
-                new_dataset = MemDatasetDistributed(shape=shape, dtype=dtype, axis=distributed_axis)
+                new_dataset = MemDatasetDistributed(shape=shape, dtype=dtype,
+                                                    axis=distributed_axis, comm=self._comm)
             else:
                 new_dataset = MemDatasetCommon(shape=shape, dtype=dtype)
 
@@ -467,7 +468,7 @@ class MemGroup(ro_dict):
             d = self[key]
         except KeyError:
             return self.create_dataset(key, shape=shape, dtype=dtype, **kwargs)
-        if isinstance(g, MemGroup):
+        if isinstance(d, MemGroup):
             msg = "Entry '%s' exists and is not a Dataset." % key
             raise TypeError(msg)
         else:
@@ -876,7 +877,7 @@ class MemDiskGroup(collections.Mapping):
     # TODO, something similar to __getitem__(), restricting names,
     # for len() and __iter__().
 
-    ## The main interface ##
+    # The main interface #
 
     @property
     def attrs(self):
@@ -895,11 +896,15 @@ class MemDiskGroup(collections.Mapping):
         return self._data.file
 
     @property
+    def comm(self):
+        return self._data._comm
+
+    @property
     def ondisk(self):
         """Whether the data is stored on disk as opposed to in memory."""
         return isinstance(self._data, h5py.File)
 
-    ## For creating new instances. ##
+    # For creating new instances. #
 
     @classmethod
     def from_file(cls, filename, ondisk=False, distributed=False, comm=None, **kwargs):
@@ -920,7 +925,6 @@ class MemDiskGroup(collections.Mapping):
         constructor if *f* is a filename and silently ignored otherwise.
 
         """
-
 
         if not ondisk:
             # For non-distributed files we allow filename to be an h5py.File
@@ -949,7 +953,7 @@ class MemDiskGroup(collections.Mapping):
             # Try and get a reference to the requested class (warn if we cannot find it)
             try:
                 cls = _import_class(clspath)
-            except ImportError, KeyError:
+            except (ImportError, KeyError):
                 warnings.warn('Could not import memh5 subclass %s' % clspath)
 
             # Check that is is a subclass of MemDiskGroup
@@ -968,7 +972,7 @@ class MemDiskGroup(collections.Mapping):
         self._toclose = toclose
         return self
 
-    ## Methods for manipulating and building the class. ##
+    # Methods for manipulating and building the class. #
 
     def group_name_allowed(self, name):
         """Used by subclasses to restrict creation of and access to groups.
@@ -1040,7 +1044,7 @@ class MemDiskGroup(collections.Mapping):
         if isinstance(self._data, MemGroup):
             return self
         else:
-            return self.__class__.from_file(self._data)  #, distributed=self._distributed, comm=self._comm)
+            return self.__class__.from_file(self._data)
 
     def to_disk(self, filename, **kwargs):
         """Return a version of this data that lives on disk."""
@@ -1125,7 +1129,7 @@ class BasicCont(MemDiskGroup):
         if self._data.file.mode == 'r+':
             self._data.require_group(u'history')
             self._data.require_group(u'index_map')
-            if not 'order' in self._data['history'].attrs.keys():
+            if 'order' not in self._data['history'].attrs.keys():
                 self._data['history'].attrs[u'order'] = '[]'
 
     @property
@@ -1242,7 +1246,6 @@ class BasicCont(MemDiskGroup):
 
                         # Try processing if this is a string
                         if isinstance(axis, basestring):
-                            print axis, item.attrs, item.attrs['axis']
                             if 'axis' in item.attrs and axis in item.attrs['axis']:
                                 axis = np.argwhere(item.attrs['axis'] == axis)[0, 0]
                             else:
@@ -1271,10 +1274,6 @@ class BasicCont(MemDiskGroup):
                                             + 'to distributed dataset %s over.') % (str(dist_axis), name))
 
         _tree_crawl(self._data)
-
-
-
-
 
 
 # Utilities

@@ -22,7 +22,7 @@ Fourier transforming each of these two axes of the distributed array::
     import numpy as np
     from mpi4py import MPI
 
-    from mpidataset import MPIArray
+    from mpiarray import MPIArray
 
     nfreq = 32
     nprod = 2
@@ -570,7 +570,7 @@ class MPIArray(np.ndarray):
 
         return tdata
 
-    def reshape(self, shape):
+    def reshape(self, *shape):
         """Reshape the array.
 
         Must not attempt to reshape the distributed axis. That axis must be
@@ -586,6 +586,9 @@ class MPIArray(np.ndarray):
         array : MPIArray
             Reshaped MPIArray as a view of the original data.
         """
+
+        if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
+            shape = tuple(shape[0])
 
         # Find which axis is distributed
         list_shape = list(shape)
