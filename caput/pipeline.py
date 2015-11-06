@@ -315,6 +315,7 @@ import Queue
 import logging
 import os
 from os import path
+import warnings
 
 import yaml
 
@@ -730,7 +731,7 @@ class TaskBase(config.Reader):
             raise PipelineConfigError(msg)
         if (n_in > len(next_argspec.args) - 1
             and next_argspec.varargs is None):
-            msg = ("Got too many 'requires' keys. Expected at most %d and"
+            msg = ("Got too many 'in' keys. Expected at most %d and"
                    " got %d." % (len(next_argspec.args) - 1, n_in))
             raise PipelineConfigError(msg)
         # Now that all data product keys have been verified to be valid, store
@@ -761,14 +762,14 @@ class TaskBase(config.Reader):
         elif self._pipeline_state == "next":
             # Make sure input queues are empty then delete them so no more data
             # can be queued.
-            for in_ in self._in:
+            for in_, in_key in zip(self._in, self._in_keys):
                 if not in_.empty():
                     # XXX Clean up.
-                    print "Something left:"
-                    print in_.get()
-                    msg = ("Task finished iterating `next()` but input queues"
-                           " aren't empty.")
-                    raise PipelineRuntimeError(msg)
+                    print "Something left: %i" % in_.qsize()
+
+                    msg = "Task finished %s iterating `next()` but input queue \'%s\' isn't empty." % (self.__class__.__name__, in_key)
+                    warnings.warn(msg)
+
             self._in = None
             self._pipeline_state = "finish"
         elif self._pipeline_state == "finish":

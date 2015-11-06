@@ -1364,7 +1364,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     HDF5 file."""
 
     if not group._distributed:
-        raise RuntimeError('This should only run on distributed datasets.')
+        raise RuntimeError('This should only run on distributed datasets [%s].' % group.name)
 
     comm = group._comm
 

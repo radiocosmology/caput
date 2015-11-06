@@ -615,3 +615,12 @@ class MPIArray(np.ndarray):
         rdata._local_offset = tuple(local_offset)
 
         return rdata
+
+    def copy(self):
+        """Return a copy of the MPIArray.
+
+        Returns
+        -------
+        arr_copy : MPIArray
+        """
+        return MPIArray.wrap(self.view(np.ndarray).copy(), axis=self.axis, comm=self.comm)
