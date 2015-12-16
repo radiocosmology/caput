@@ -367,9 +367,19 @@ class MemGroup(ro_dict):
         dset : memh5.MemDataset
         """
 
-        # For the moment raise an Exception if we try to use absolute paths
-        if name[0] == '/':
-            raise ValueError('Dataset creation does not support absolute paths (%s)' % name)
+        if '/' in name:
+            parts = name.split('/')
+            name = parts[-1]
+            # Corner case of name = '/dataset_name'.
+            if len(parts) == 2 and not parts[0]:
+                group_name = '/'
+            else:
+                group_name = '/'.join(parts[:-1])
+            g = self.require_group(group_name)
+            self = g    # XXX Is this really okay?
+
+        if not name:
+            raise ValueError('Empty dataset names not allowed.')
 
         # If distributed, synchronise to ensure that we create group collectively
         if self._distributed:

@@ -52,6 +52,16 @@ class TestGroup(unittest.TestCase):
         gd = g['/a/b/c/d/']
         self.assertEqual(gd.name, '/a/b/c/d')
 
+    def test_recursive_create_dataset(self):
+        g = memh5.MemGroup()
+        data = np.arange(10)
+        g.create_dataset('a/ra', data=data)
+        self.assertTrue(memh5.is_group(g['a']))
+        self.assertTrue(np.all(g['a/ra'] == data))
+        g['a'].create_dataset('/ra', data=data)
+        print g.keys()
+        self.assertTrue(np.all(g['ra'] == data))
+
 
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""
