@@ -10,6 +10,8 @@ addons:
             - openmpi-bin
 install:
     - "pip install -r requirements.txt"
-    - "python setup.py install"
-script: "cd ~; nosetests caput"
+    - "python setup.py develop"
+script:
+    - "cd ~; nosetests caput"
+    #- "cd ~; mpirun -np 4 nosetests caput"
 

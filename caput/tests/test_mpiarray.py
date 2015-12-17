@@ -198,39 +198,40 @@ class TestMPIAray(unittest.TestCase):
         res = local_array[:, 3]
         assert (arr == res).all()
 
+        # These tests denpend on the size being at least 2.
+        if size > 1:
+            # Check a slice on the parallel axis
+            arr = darr.global_slice[:7, 3:5]
 
-        # Check a slice on the parallel axis
-        arr = darr.global_slice[:7, 3:5]
+            res = { 0 : local_array[:, 3:5],
+                    1 : local_array[:2, 3:5],
+                    2 : None,
+                    3 : None }
 
-        res = { 0 : local_array[:, 3:5],
-                1 : local_array[:2, 3:5],
-                2 : None,
-                3 : None }
-
-        assert arr == res[rank] if arr is None else (arr == res[rank]).all()
-
-
-        # Check a single element from the parallel axis
-        arr = darr.global_slice[7, 3:5]
-
-        res = { 0 : None,
-                1 : local_array[2, 3:5],
-                2 : None,
-                3 : None }
-
-        assert arr == res[rank] if arr is None else (arr == res[rank]).all()
+            assert arr == res[rank] if arr is None else (arr == res[rank]).all()
 
 
-        # Check a slice on the redistributed parallel axis
-        darr_T = darr.redistribute(axis=1)
-        arr = darr_T.global_slice[3:5, :7]
+            # Check a single element from the parallel axis
+            arr = darr.global_slice[7, 3:5]
 
-        res = { 0 : local_array_T[3:5, :],
-                1 : local_array_T[3:5, :2],
-                2 : None,
-                3 : None }
+            res = { 0 : None,
+                    1 : local_array[2, 3:5],
+                    2 : None,
+                    3 : None }
 
-        assert arr == res[rank] if arr is None else np.array_equal(arr, res[rank])
+            assert arr == res[rank] if arr is None else (arr == res[rank]).all()
+
+
+            # Check a slice on the redistributed parallel axis
+            darr_T = darr.redistribute(axis=1)
+            arr = darr_T.global_slice[3:5, :7]
+
+            res = { 0 : local_array_T[3:5, :],
+                    1 : local_array_T[3:5, :2],
+                    2 : None,
+                    3 : None }
+
+            assert arr == res[rank] if arr is None else (arr == res[rank]).all()
 
         # Check a slice that removes an axis
         darr = mpiarray.MPIArray((10, 20, size*5), axis=2)
@@ -250,7 +251,7 @@ class TestMPIAray(unittest.TestCase):
         darr = mpiarray.MPIArray((size, 136, 2048), axis=0)
         dslice = darr.global_slice[..., 2007:2087]
 
-        assert dslice.global_shape == (4, 136, 41)
+        assert dslice.global_shape == (size, 136, 41)
         assert dslice.local_shape == (1, 136, 41)
 
 
