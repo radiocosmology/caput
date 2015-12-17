@@ -117,9 +117,9 @@ class TestH5Files(unittest.TestCase):
         self.assertEqual(set(f.keys()), set(m['/level1']['/'].keys()))
         self.assertTrue(np.all(f['/level1/large'][:] == m['/level1/large']))
         gf = f.create_group('/level1/level2/level3/')
-        df = gf.create_dataset('new', np.arange(5))
+        df = gf.create_dataset('new', data=np.arange(5))
         gm = m.create_group('/level1/level2/level3/')
-        dm = gm.create_dataset('new', np.arange(5))
+        dm = gm.create_dataset('new', data=np.arange(5))
         self.assertTrue(np.all(f['/level1/level2/level3/new'][:]
                                == m['/level1/level2/level3/new'][:]))
 
