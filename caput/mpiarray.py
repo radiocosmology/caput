@@ -22,7 +22,7 @@ Fourier transforming each of these two axes of the distributed array::
     import numpy as np
     from mpi4py import MPI
 
-    from mpiarray import MPIArray
+    from caput.mpiarray import MPIArray
 
     nfreq = 32
     nprod = 2

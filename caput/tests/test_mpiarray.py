@@ -68,9 +68,10 @@ class TestMPIAray(unittest.TestCase):
 
         if mpiutil.rank0:
             df = df[:-1]
-
-        with self.assertRaises(Exception):
-            mpiarray.MPIArray.wrap(df, axis=0)
+        
+        if mpiutil.size > 1:
+            with self.assertRaises(Exception):
+                mpiarray.MPIArray.wrap(df, axis=0)
 
     def test_io(self):
 
@@ -229,7 +230,7 @@ class TestMPIAray(unittest.TestCase):
                 2 : None,
                 3 : None }
 
-        assert arr == res[rank] if arr is None else (arr == res[rank]).all()
+        assert arr == res[rank] if arr is None else np.array_equal(arr, res[rank])
 
         # Check a slice that removes an axis
         darr = mpiarray.MPIArray((10, 20, size*5), axis=2)
