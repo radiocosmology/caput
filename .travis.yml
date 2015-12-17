@@ -13,5 +13,6 @@ install:
     - "python setup.py develop"
 script:
     - "cd ~; nosetests caput"
-    #- "cd ~; mpirun -np 4 nosetests caput"
+    - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
+    - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"
 
