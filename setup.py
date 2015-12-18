@@ -6,7 +6,7 @@ setup(
     version = 0.1,
     packages = ['caput', 'caput.tests'],
     scripts=['scripts/caput-pipeline'],
-    install_requires = ['numpy', 'h5py', 'mpi4py'],
+    install_requires = ['numpy', 'h5py', 'mpi4py', 'PyYAML'],
 
     # metadata for upload to PyPI
     author = "Kiyo Masui, J. Richard Shaw",
