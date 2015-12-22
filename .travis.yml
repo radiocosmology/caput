@@ -10,7 +10,7 @@ addons:
             - openmpi-bin
 install:
     - "pip install -r requirements.txt"
-    - "python setup.py develop"
+    - "pip install -e .[mpi]"
 script:
     - "cd ~; nosetests caput"
     - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"

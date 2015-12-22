@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 import os
 
 
-REQUIRES = ['numpy', 'h5py', 'mpi4py', 'PyYAML']
+REQUIRES = ['numpy', 'h5py', 'PyYAML']
 
 # Don't install requirements if on ReadTheDocs build system.
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
@@ -17,6 +17,9 @@ setup(
     packages = ['caput', 'caput.tests'],
     scripts=['scripts/caput-pipeline'],
     install_requires=requires,
+    extras_require = {
+        'mpi':  ['mpi4py>=1.3'],
+        },
 
     # metadata for upload to PyPI
     author = "Kiyo Masui, J. Richard Shaw",
