@@ -5,8 +5,8 @@ Module for making in-memory mock-ups of :mod:`h5py` objects.
 
 It is sometimes usefull to have a consistent API for data that is independent
 of whether that data lives on disk or in memory. :mod:`h5py` provides this to a
-certain extent, having :class:`Dataset`` objects that act very much like
-:mod:`numpy` arrays. mod:`memh5` extends this, providing an in-memory
+certain extent, having :class:`Dataset` objects that act very much like
+:mod:`numpy` arrays. :mod:`memh5` extends this, providing an in-memory
 containers, analogous to :class:`h5py.Group` and :class:`h5py.Attribute` and
 :class:`h5py.Dataset` objects.
 
@@ -32,6 +32,7 @@ Basic Classes
     ro_dict
     MemGroup
     MemAttrs
+    MemDataset
     MemDatasetCommon
     MemDatasetDistributed
 
@@ -501,6 +502,9 @@ class MemAttrs(dict):
 class MemDataset(object):
     """Base class for an in memory implementation of the ``h5py.Dataset`` class.
 
+    This is only an abstract base class. Use :class:`MemDatasetCommon` or
+    :class:`MemDatasetDistributed`.
+
     Attributes
     ----------
     attrs
@@ -581,9 +585,10 @@ class MemDataset(object):
 class MemDatasetCommon(MemDataset):
     """In memory implementation of the ``h5py.Dataset`` class.
 
-    Encapsulates a numpy array mocked up to look like an hdf5 dataset. Similar
-    to h5py datasets, this implements slicing like a numpy array but as it is
-    not actually a many operations won't work (e.g. ufuncs).
+    Inherits from :class:`MemDataset`. Encapsulates a numpy array mocked up to
+    look like an hdf5 dataset. Similar to h5py datasets, this implements
+    slicing like a numpy array but as it is not actually a many operations
+    won't work (e.g. ufuncs).
 
     Parameters
     ----------
@@ -600,6 +605,7 @@ class MemDatasetCommon(MemDataset):
     Methods
     -------
     from_numpy_array
+
     """
 
     def __init__(self, shape, dtype):
@@ -659,9 +665,10 @@ class MemDatasetCommon(MemDataset):
 class MemDatasetDistributed(MemDataset):
     """Parallel, in-memory implementation of the ``h5py.Dataset`` class.
 
-    Encapsulates an :class:`MPIArray`mocked up to look like an `h5py` dataset.
-    Similar to h5py datasets, this implements slicing like a numpy array but as
-    it is not actually a many operations won't work (e.g. ufuncs).
+    Inherits from :class:`MemDataset`. Encapsulates an :class:`MPIArray` mocked
+    up to look like an `h5py` dataset.  Similar to h5py datasets, this
+    implements slicing like a numpy array but as it is not actually a many
+    operations won't work (e.g. ufuncs).
 
     Parameters
     ----------
@@ -684,6 +691,7 @@ class MemDatasetDistributed(MemDataset):
     dtype
     comm
     distributed_axis
+
     """
 
     def __init__(self, shape, dtype, axis=0, comm=None):

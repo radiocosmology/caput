@@ -16,32 +16,21 @@ import sys, os
 # Check if we are on readthedocs
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 
+import sys
+
 # Mock up modules missing on readthedocs.
-class Mock(object):
-
-    __all__ = []
-
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __call__(self, *args, **kwargs):
-        return Mock()
-
+from mock import Mock as MagicMock
+class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
-        if name in ('__file__', '__path__'):
-            return '/dev/null'
-        elif name[0] == name[0].upper():
-            mockType = type(name, (), {})
-            mockType.__module__ = __name__
-            return mockType
-        else:
             return Mock()
 
-MOCK_MODULES = ['h5py']
+# Do not mock up mpi4py. This is an "extra", and docs bbuild without it.
+#MOCK_MODULES = ['h5py', 'mpi4py']
+MOCK_MODULES = ['h5py',]
 if on_rtd:
-    for mod_name in MOCK_MODULES:
-        sys.modules[mod_name] = Mock()
+    sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+
 
 
 # If extensions (or modules to document with autodoc) are in another directory,

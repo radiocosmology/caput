@@ -1,9 +1,7 @@
 """
-=============================================
-MPI Distributed Array (:mod:`caput.mpiarray`)
-=============================================
+An array class for containing MPI distributed array.
 
-An array class for containing MPI distributed data.
+.. currentmodule:: caput.mpiarray
 
 Classes
 =======
@@ -100,7 +98,9 @@ Here is an example of this in action::
         if ri == mpiutil.rank:
             print ri, arr3
         mpiutil.barrier()
+
 """
+
 import numpy as np
 
 from caput import mpiutil

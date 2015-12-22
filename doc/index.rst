@@ -15,6 +15,7 @@ Packages
    config
    pipeline
    mpiutil
+   mpiarray
 
 Indices and tables
 ==================
