@@ -160,7 +160,11 @@ def typemap(dtype):
     mpitype : MPI.Datatype
         The MPI.Datatype.
     """
-    return MPI.__TypeDict__[np.dtype(dtype).char]
+    # Need to try both as the name of the typedoct changed in mpi4py 2.0
+    try:
+        return MPI.__TypeDict__[np.dtype(dtype).char]
+    except AttributeError:
+        return MPI._typedict[np.dtype(dtype).char]
 
 
 def split_m(n, m):
