@@ -11,7 +11,9 @@ addons:
 install:
     - "pip install -r requirements.txt"
     - "pip install -e .[mpi]"
+    - "pip install -r doc/requirements.txt"
 script:
+    - "sphinx-build -b html doc/ doc/_build/html"
     - "cd ~; nosetests caput"
     - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
     - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"

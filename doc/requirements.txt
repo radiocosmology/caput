@@ -1,7 +1,9 @@
 Sphinx==1.2.2
 sphinx-rtd-theme==0.1.5
 numpydoc==0.4
+# funcsigs required by mock, which apparently does not have its dependancies
+# setup correctly.
+funcsigs
 mock
 PyYAML
 numpy
-scipy
