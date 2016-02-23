@@ -960,6 +960,8 @@ class MemDiskGroup(collections.Mapping):
             if isinstance(filename, h5py.File):
                 data = filename
                 toclose = False
+                # XXX Verify there are no extra kwargs is empty. This may break
+                # things though.
             else:
                 data = h5py.File(filename, **kwargs)
                 toclose = True
@@ -1114,7 +1116,7 @@ class BasicCont(MemDiskGroup):
 
     Inherits from :class:`MemDiskGroup`.
 
-    Basic one-level data container that allows any number of data sets in the
+    Basic one-level data container that allows any number of datasets in the
     root group but no nesting. Data history tracking (in
     :attr:`BasicCont.history`) and array axis interpretation (in
     :attr:`BasicCont.index_map`) is also provided.
