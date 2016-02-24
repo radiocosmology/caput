@@ -48,8 +48,8 @@ class TOData(memh5.BasicCont):
         ----------
 
         Accepts any parameter for :func:`concatenate` (which controls the
-        concatenation) or this classes constructor (which controls the
-        initialization of each file). By default, each file is opend with
+        concatenation) or this class's constructor (which controls the
+        initialization of each file). By default, each file is opened with
         `ondisk=True` and `mode='r'`.
 
         """
@@ -60,7 +60,7 @@ class TOData(memh5.BasicCont):
             kwargs['ondisk'] = True
 
         files = ensure_file_list(files)
-        files = [cls(f, **kwargs) for f in files]
+        files = [cls.from_file(f, **kwargs) for f in files]
 
         return concatenate(
                 files,
@@ -111,7 +111,7 @@ class Reader(object):
         if isinstance(files, str):
             files = sorted(glob.glob(files))
 
-        data_empty = concatenate(files, datasets=())
+        data_empty = data_class.from_files(files, datasets=())
 
         # Fetch all meta data.
         time = data_empty.time

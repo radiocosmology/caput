@@ -983,11 +983,13 @@ class MemDiskGroup(collections.Mapping):
             if not issubclass(cls, MemDiskGroup):
                 raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
 
+        self = cls(data, distributed=distributed, comm=comm)
+
         # Create an instance of requested class
-        self = cls.__new__(cls)
+        #self = cls.__new__(cls)
 
         # Perform the MemDiskGroup path of the initialisation
-        MemDiskGroup.__init__(self, data, distributed=distributed, comm=comm)
+        #MemDiskGroup.__init__(self, data, distributed=distributed, comm=comm)
 
         # ... skip the class initialisation, and use a special method
         self._finish_setup()
@@ -1347,7 +1349,7 @@ def get_h5py_File(f, **kwargs):
     if is_group(f):
         opened = False
         #if kwargs:
-        #    msg = "Got some keywork arguments but File is alrady open."
+        #    msg = "Got some keyword arguments but File is alrady open."
         #    warnings.warn(msg)
     else:
         opened = True
