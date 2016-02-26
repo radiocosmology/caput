@@ -39,8 +39,12 @@ class TOData(memh5.BasicCont):
 
     time_axes = ('time',)
 
+    @property
+    def time(self):
+        return self.index_map['time']
+
     @classmethod
-    def from_files(cls, files, data_group=None, start=None, stop=None,
+    def from_mult_files(cls, files, data_group=None, start=None, stop=None,
                    datasets=None, dataset_filter=None, **kwargs):
         """Create new data object by concatenating a series of objects.
 
@@ -111,11 +115,15 @@ class Reader(object):
         if isinstance(files, str):
             files = sorted(glob.glob(files))
 
-        data_empty = data_class.from_files(files, datasets=())
+        data_empty = self.data_class.from_mult_files(files, datasets=())
+        self._data_empty = data_empty
 
         # Fetch all meta data.
-        time = data_empty.time
-        datasets = _get_dataset_names(files[0])
+        time = np.copy(data_empty.time)
+        first_file, toclose = memh5.get_h5py_File(files[0])
+        datasets = _copy_non_time_data(first_file)
+        if toclose:
+            first_file.close()
 
         # Set the metadata attributes.
         self._files = tuple(files)
@@ -134,7 +142,7 @@ class Reader(object):
     @property
     def time(self):
         """Time bin centres in data files."""
-        return self._time.copy()
+        return self._time
 
     @property
     def datasets(self):
@@ -213,8 +221,30 @@ class Reader(object):
             stop = self.time_sel[1]
         self.time_sel = (start, stop)
 
-    def read(self, out_group):
-        pass
+    def read(self, out_group=None):
+        """Read the selected data.
+
+        Parameters
+        ----------
+        out_group : `h5py.Group`, hdf5 filename or `memh5.Group`
+            Underlying hdf5 like container that will store the data for the
+            BaseData instance.
+
+        Returns
+        -------
+        data : :class:`TOData`
+            Data read from :attr:`~Reader.files` based on the selections made
+            by user.
+
+        """
+
+        return self.data_class.from_mult_files(
+                self.files,
+                data_group=out_group,
+                start=self.time_sel[0],
+                stop=self.time_sel[1],
+                datasets=self.dataset_sel,
+                )
 
 
 
@@ -303,13 +333,10 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             out.create_index_map(axis, index_map)
 
     all_dataset_names = _copy_non_time_data(data_list, out)
-    all_dataset_names = [n[1:] if n[0] == '/' else n for n in all_dataset_names]
     if datasets is None:
         dataset_names = all_dataset_names
     else:
         dataset_names = datasets
-
-    # XXX cant reference data.datasets or data.flags
 
     current_concat_index_start = { axis : 0 for axis in concatenation_axes}
     # Now loop over the list and copy the data.
@@ -329,9 +356,9 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                     current_concat_index_n[axis])
             out.index_map[axis][out_slice] = data.index_map[axis][in_slice]
         # Now copy over the datasets and flags.
-        datasets_and_flags = {'flags/' + k : v for k, v in data.flags.items()}
-        datasets_and_flags.update(data.datasets)
-        for name, dataset in datasets_and_flags.items():
+        this_dataset_names = _copy_non_time_data(data)
+        for name in this_dataset_names:
+            dataset = data[name]
             if name not in dataset_names:
                 continue
             attrs = dataset.attrs
@@ -355,9 +382,9 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             axis_rate = 1
             # If this is the first piece of data, initialize the output
             # dataset.
-            out_keys = ['flags/' + n for n in  out.flags.keys()]
-            out_keys += out.datasets.keys()
-            if name not in out_keys:
+            #out_keys = ['flags/' + n for n in  out.flags.keys()]
+            #out_keys += out.datasets.keys()
+            if name not in out:
                 shape = dataset.shape
                 dtype = dataset.dtype
                 full_shape = shape[:-1] + ((stop[axis] - start[axis]) * \
@@ -365,7 +392,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 new_dset = out.create_dataset(name, shape=full_shape,
                                               dtype=dtype)
                 memh5.copyattrs(attrs, new_dset.attrs)
-            out_dset = out._data[name]
+            out_dset = out[name]
             in_slice, out_slice = _get_in_out_slice(
                     start[axis] * axis_rate,
                     stop[axis] * axis_rate,
@@ -418,33 +445,44 @@ def ensure_file_list(files):
     return files
 
 
-def _copy_non_time_data(data, out, to_dataset_names=None):
+def _copy_non_time_data(data, out=None, to_dataset_names=None):
+    """Crawl data copying everything but time-ordered datasets to out.
 
-    if to_dataset_names is None:
+    Return list of all time-order dataset names. Leading '/' is stripped off.
+
+    If *out* is `None` do not copy.
+
+    """
+
+    if not to_dataset_names:
         to_dataset_names = []
 
     if isinstance(data, list):
         # XXX Do something more sophisticated here when/if we aren't getting all
         # our non-time dependant information from the first entry.
-        data = data[0]._data
-        out = out._data
+        data = data[0]
 
-    memh5.copyattrs(data.attrs, out.attrs)
+    if out is not None:
+        memh5.copyattrs(data.attrs, out.attrs)
     for key, entry in data.iteritems():
         if key == 'index_map':
             # XXX exclude index map.
             continue
         if memh5.is_group(entry):
-            sub_out = out.require_group(key)
+            if out is not None:
+                sub_out = out.require_group(key)
+            else:
+                sub_out = None
             _copy_non_time_data(entry, sub_out, to_dataset_names)
         else:
-            # XXX 'time'
+            # XXX 'time' (set(time_axes).intersection(entry.attrs['axis'])
             if 'axis' in entry.attrs and 'time' in entry.attrs['axis']:
                 to_dataset_names.append(entry.name)
-            else:
+            elif out is not None:
                 out.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
                     data=entry)
                 memh5.copyattrs(entry.attrs, g2[key].attrs)
+    to_dataset_names = [n[1:] if n[0] == '/' else n for n in to_dataset_names]
     return to_dataset_names
 
 
