@@ -41,7 +41,7 @@ class TOData(memh5.BasicCont):
 
     @property
     def time(self):
-        return self.index_map['time']
+        return self.index_map['time'][:]
 
     @classmethod
     def from_mult_files(cls, files, data_group=None, start=None, stop=None,
@@ -74,6 +74,16 @@ class TOData(memh5.BasicCont):
                 datasets=datasets,
                 dataset_filter=dataset_filter,
                 )
+
+    @staticmethod
+    def convert_time(time):
+        """Overload to provide support for multiple time formats.
+
+        Method accepts scalar times in supported formats and converts them
+        to the same format as ``self.time``.
+
+        """
+        return time
 
 
 class Reader(object):
@@ -204,18 +214,14 @@ class Reader(object):
             of :attr:`~Reader.time_sel`.  Default leaves it unchanged.
 
         """
-        try:
-            from .ephemeris import ensure_unix
-        except ValueError:
-            from ephemeris import ensure_unix
 
         if not start_time is None:
-            start_time = ensure_unix(start_time)
+            start_time = self.data_class.convert_time(start_time)
             start = np.where(self.time >= start_time)[0][0]
         else:
             start = self.time_sel[0]
         if not stop_time is None:
-            stop_time = ensure_unix(stop_time)
+            stop_time = self.data_class.convert_time(stop_time)
             stop = np.where(self.time < stop_time)[0][-1] + 1
         else:
             stop = self.time_sel[1]

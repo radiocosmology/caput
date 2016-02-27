@@ -66,10 +66,7 @@ class TestConcatenation(unittest.TestCase):
 
         self.assertTrue(np.all(data['dset1']
             == data.index_map['chan'][:,None] * data.index_map['time']))
-        self.assertTrue(np.all(data['dset2'] == data.index_map['time']))
-
-
-
+        self.assertTrue(np.all(data['dset2'][:] == data.index_map['time']))
 
 
 
