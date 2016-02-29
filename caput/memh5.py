@@ -799,6 +799,10 @@ class MemDiskGroup(collections.Mapping):
         Allow the container to hold distributed datasets.
     comm : MPI.Comm, optional
         MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
+    detect_subclass: boolean, optional
+        If *data_group* is specified, whether to inspect for a
+        '__memh5_subclass' attribute which specifies a subclass to return.
+
 
     Attributes
     ----------
@@ -828,34 +832,60 @@ class MemDiskGroup(collections.Mapping):
     # Default initialisation
     _data = None
 
-    def __init__(self, data_group=None, distributed=False, comm=None):
 
+    def __new__(cls, data_group=None, distributed=False, comm=None,
+                detect_subclass=True):
+        toclose = False
         # If data group is not set, initialise a new MemGroup
         if data_group is None:
             data_group = MemGroup(distributed=distributed, comm=comm)
-
         # If it is a MemDiskGroup then initialise a shallow copy
         elif isinstance(data_group, MemDiskGroup):
             data_group = data_group._data
-        # Otherwise, presume it is an HDF5 file
+        # Otherwise, presume it is an HDF5 Group-like object (which includes
+        # MemGroup and h5py.Group).
         else:
-            data_group, self._toclose = get_h5py_File(data_group)
+            data_group, toclose = get_h5py_File(data_group)
 
-        if distributed and isinstance(data_group, h5py.File):
+        if distributed and isinstance(data_group, h5py.Group):
             raise ValueError('Distributed MemDiskGroup cannot be created around h5py objects.')
-
         # Check the distribution settings
-        if isinstance(data_group, MemGroup):
-
+        elif distributed:
             # Check parallel distribution is the same
-            if distributed != data_group._distributed:
+            if not data_group._distributed:
                 raise ValueError('Cannot create MemDiskGroup with different distributed setting to MemGroup to wrap.')
-
             # Check parallel distribution is the same
-            if distributed and comm and comm != data_group._comm:
+            if comm and comm != data_group._comm:
                 raise ValueError('Cannot create MemDiskGroup with different MPI communicator to MemGroup to wrap.')
 
+        # Look for a hint as to the sub class we should return, this should be
+        # in the attributes of the root.
+        new_cls = cls
+        if detect_subclass and '__memh5_subclass' in data_group.attrs:
+            from .pipeline import _import_class
+
+            clspath = data_group.attrs['__memh5_subclass']
+
+            # Try and get a reference to the requested class (warn if we cannot find it)
+            try:
+                new_cls = _import_class(clspath)
+            except (ImportError, KeyError):
+                warnings.warn('Could not import memh5 subclass %s' % clspath)
+
+            # Check that is is a subclass of MemDiskGroup
+            if not issubclass(cls, MemDiskGroup):
+                raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
+
+        self = super(MemDiskGroup, new_cls).__new__(new_cls)
         self._data = data_group
+        self._toclose = toclose
+        return self
+
+    def __init__(self, data_group=None, distributed=False, comm=None,
+                 detect_subclass=True):
+        # Just strips off arguments used in __new__
+        super(MemDiskGroup, self).__init__(self)
+
 
     def _finish_setup(self):
         """Finish the class setup *after* importing from a file."""
@@ -928,64 +958,53 @@ class MemDiskGroup(collections.Mapping):
     # For creating new instances. #
 
     @classmethod
-    def from_file(cls, filename, ondisk=False, distributed=False, comm=None, **kwargs):
+    def from_file(cls, file_, ondisk=False, distributed=False, comm=None,
+                  detect_subclass=True, **kwargs):
         """Create data object from analysis hdf5 file, store in memory or on disk.
 
         If *ondisk* is True, do not load into memory but store data in h5py objects
-        that remain associated with the file on disk.
+        that remain associated with the file on disk. This is almost identical
+        to the default constructor, when providing a file as the *data_group*
+        object, however provides more flexibility when opening the file through
+        the additional keyword arguments.
 
         Parameters
         ----------
-        filename : string
+        file_ : string or :class:`h5py.Group` object
             File with the hdf5 data. File must be compatible with memh5 objects.
         ondisk : bool
-            Whether the data should be kept in the file on disk or should be copied
+            Whether the data should be stored in-place in *file_* or should be copied
             into memory.
-
-        Any additional keyword arguments are passed to :class:`h5py.File`
-        constructor if *f* is a filename and silently ignored otherwise.
+        distributed : boolean, optional
+            Allow the container to hold distributed datasets.
+        comm : MPI.Comm, optional
+            MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
+        detect_subclass: boolean, optional
+            If *data_group* is specified, whether to inspect for a
+            '__memh5_subclass' attribute which specifies a subclass to return.
+        **kwargs : any other arguments
+            Any additional keyword arguments are passed to :class:`h5py.File`'s
+            constructor if *file_* is a filename and silently ignored otherwise.
 
         """
 
         if not ondisk:
-            # For non-distributed files we allow filename to be an h5py.File
-            # instance for compatibility with old code.
-            if isinstance(filename, h5py.File):
-                filename = filename.filename
+            if isinstance(file_, h5py.Group):
+                file_ = file_.filename
 
-            data = MemGroup.from_hdf5(filename, distributed=distributed, comm=comm, mode='r', **kwargs)
+            data = MemGroup.from_hdf5(file_, distributed=distributed, comm=comm, mode='r', **kwargs)
             toclose = False
         else:
             # Again, a compatibility hack
-            if isinstance(filename, h5py.File):
-                data = filename
+            if is_group(file_):
+                data = file_
                 toclose = False
             else:
-                data = h5py.File(filename, **kwargs)
+                data = h5py.File(file_, **kwargs)
                 toclose = True
 
-        # Look for a hint as to the sub class we should return, this should be
-        # in the attributes of the root.
-        if '__memh5_subclass' in data.attrs:
-            from .pipeline import _import_class
-
-            clspath = data.attrs['__memh5_subclass']
-
-            # Try and get a reference to the requested class (warn if we cannot find it)
-            try:
-                cls = _import_class(clspath)
-            except (ImportError, KeyError):
-                warnings.warn('Could not import memh5 subclass %s' % clspath)
-
-            # Check that is is a subclass of MemDiskGroup
-            if not issubclass(cls, MemDiskGroup):
-                raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
-
-        # Create an instance of requested class
-        self = cls.__new__(cls)
-
-        # Perform the MemDiskGroup path of the initialisation
-        MemDiskGroup.__init__(self, data, distributed=distributed, comm=comm)
+        self = cls(data, distributed=distributed, comm=comm,
+                   detect_subclass=detect_subclass)
 
         # ... skip the class initialisation, and use a special method
         self._finish_setup()
@@ -1114,7 +1133,7 @@ class BasicCont(MemDiskGroup):
 
     Inherits from :class:`MemDiskGroup`.
 
-    Basic one-level data container that allows any number of data sets in the
+    Basic one-level data container that allows any number of datasets in the
     root group but no nesting. Data history tracking (in
     :attr:`BasicCont.history`) and array axis interpretation (in
     :attr:`BasicCont.index_map`) is also provided.
@@ -1145,7 +1164,7 @@ class BasicCont(MemDiskGroup):
     """
 
     def __init__(self, *args, **kwargs):
-        MemDiskGroup.__init__(self, *args, **kwargs)
+        super(BasicCont,self).__init__(*args, **kwargs)
         # Initialize new groups only if writable.
         if self._data.file.mode == 'r+':
             self._data.require_group(u'history')
@@ -1345,7 +1364,7 @@ def get_h5py_File(f, **kwargs):
     if is_group(f):
         opened = False
         #if kwargs:
-        #    msg = "Got some keywork arguments but File is alrady open."
+        #    msg = "Got some keyword arguments but File is alrady open."
         #    warnings.warn(msg)
     else:
         opened = True
