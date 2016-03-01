@@ -65,6 +65,7 @@ import sys
 import collections
 import warnings
 import weakref
+import posixpath
 
 import numpy as np
 import h5py
@@ -74,6 +75,8 @@ from . import mpiarray
 
 # Basic Classes
 # -------------
+
+
 
 class ro_dict(collections.Mapping):
     """A dict that is read-only to the user.
@@ -109,7 +112,106 @@ class ro_dict(collections.Mapping):
         return self._dict.__iter__()
 
 
-class MemGroup(ro_dict):
+class _Storage(dict):
+
+    def __init__(self, **kwargs):
+        super(_Storage, self).__init__(**kwargs)
+        self._attrs = MemAttrs()
+
+    @property
+    def attrs(self):
+        return self._attrs
+
+
+class _StorageRoot(_Storage):
+
+    def __init__(self, distributed=False, comm=None):
+        super(_StorageRoot, self).__init__()
+        self._distributed = distributed
+        self._comm = None
+
+        # If distributed set the communicator it is using
+        if self.distributed:
+            from mpi4py import MPI
+            self._comm = comm if comm is not None else MPI.COMM_WORLD
+
+    @property
+    def comm(self):
+        return self._comm
+
+    @property
+    def distributed(self):
+        return self._distributed
+
+    def walk_tree(self, start_path, path):
+        """Hierarchical look-up and ath resolution.
+
+        Guaranteed to return an absolute path name and entry.
+
+        """
+
+        if not posixpath.isabs(start_path):
+            raise ValueError('Starting point must be an absolute path.')
+
+        # If not handed an absolute path, add our name.
+        abs_path = posixpath.join(start_path, path)
+
+        path_parts = abs_path.split('/')
+        # Strip out any empty key parts.  Takes care of '//', trailing '/', and
+        # removes leading '/'.
+        path_parts = [p for p in path_parts if p]
+
+        abs_path = '/'
+
+        # Crawl the tree.
+        out = self
+        for part in path_parts:
+            abs_path = posixpath.join(abs_path, part)
+            out = out[part]
+        return abs_path, out
+
+
+class MemAttrs(dict):
+    """In memory implementation of the ``h5py.AttributeManager``.
+
+    Currently just a normal dictionary.
+
+    """
+
+    pass
+
+
+class MemObjMixin(object):
+    """Mixen represents the identity of any memh5 object."""
+
+    #call_back_group = None
+
+    def __init__(self, storage_root=None, name=''):
+        self._storage_root = storage_root
+        if storage_root is not None and not posixpath.isabs(name):
+            # Should never happen, so this is mostly for debugging.
+            raise ValueError("Must be given an absolute path.")
+        self._name = name
+        super(MemObjMixin, self).__init__()
+
+    @property
+    def name(self):
+        """String giving the full path to this group."""
+        return self._name
+
+    @property
+    def parent(self):
+        """Parent :class:`MemGroup` that contains this group."""
+        parent_name, myname = posixpath.split(self.name)
+        return MemGroup._from_storage_root(self._storage_root, parent_name)
+
+    @property
+    def file(self):
+        """Not a file at all but the top most :class:`MemGroup` of the tree."""
+        return MemGroup._from_storage_root(self._storage_root, '/')
+
+
+class MemGroup(MemObjMixin, collections.Mapping):
     """In memory implementation of the :class:`h5py.Group`.
 
     This class doubles as the memory implementation of :class:`h5py.File`,
@@ -140,45 +242,14 @@ class MemGroup(ro_dict):
     require_group
     create_dataset
     require_dataset
+
     """
 
     def __init__(self, distributed=False, comm=None):
-        ro_dict.__init__(self)
-        self._attrs = MemAttrs()
-        # Set the following assuming we are the root group. If not, the method
-        # that created us will reset.
-
-        # Both _root and _parent need to be weakrefs, otherwise we will end up
-        # generating reference cycles which can end up leaking memory
-        self._root = weakref.proxy(self)
-        self._parent = weakref.proxy(self)
-        self._name = ''
-
-        # Set params for distributed datasets, comm is only needed if distributed=True
-        self._distributed = distributed
-        self._comm = None
-
-        # If distributed set the communicator it is using
-        if self._distributed:
-            from mpi4py import MPI
-
-            self._comm = comm if comm is not None else MPI.COMM_WORLD
-
-    def __getitem__(self, key):
-        """Implement '/' for accessing nested groups."""
-        if not key:
-            return self
-        # If this is an absolute path, index from the root group.
-        if key[0] == '/':
-            return self._root[key[1:]]
-        key_parts = key.split('/')
-        # Strip out any empty key parts.  Takes care of '//' and trailing '/'.
-        key_parts = [p for p in key_parts if p]
-        if len(key_parts) == 1:
-            return ro_dict.__getitem__(self, key_parts[0])
-        else:
-            # Enter the first level and call __getitem__ recursively.
-            return self[key_parts[0]]['/'.join(key_parts[1:])]
+        # Default constructor is only used to create the root group.
+        storage_root = _StorageRoot(distributed=distributed, comm=comm)
+        name = '/'
+        super(MemGroup, self).__init__(storage_root, name)
 
     @property
     def attrs(self):
@@ -189,25 +260,39 @@ class MemGroup(ro_dict):
         attrs : MemAttrs
 
         """
-        return self._attrs
+        return self._get_storage().attrs
 
-    @property
-    def parent(self):
-        """Parent :class:`MemGroup` that contains this group."""
-        return self._parent
+    @classmethod
+    def _from_storage_root(cls, storage_root, name):
+        self = super(MemGroup, cls).__new__(cls)
+        super(MemGroup, self).__init__(storage_root, name)
+        return self
 
-    @property
-    def name(self):
-        """String giving the full path to this group."""
-        if self.parent is self._root:
-            return '/' + self._name
+
+    def _get_storage(self):
+        name, out = self._storage_root.walk_tree('/', self.name)
+        return out
+
+    def __getitem__(self, key):
+        """Implement '/' for accessing nested groups."""
+
+        key, out = self._storage_root.walk_tree(self.name, key)
+
+        # Cast the output.
+        if isinstance(out, MemDataset):
+            return out
         else:
-            return self.parent.name + '/' + self._name
+            # Out is a dictionary, so return a group.
+            return MemGroup._from_storage_root(self._storage_root, key)
 
-    @property
-    def file(self):
-        """Not a file at all but the top most :class:`MemGroup` of the tree."""
-        return self._root
+    def __len__(self):
+        return len(self._get_storage())
+
+    def __iter__(self):
+        keys = self._get_storage().keys()
+        for key in keys:
+            yield key
+
 
     @property
     def mode(self):
@@ -222,7 +307,11 @@ class MemGroup(ro_dict):
     def comm(self):
         """Reference to the MPI communicator.
         """
-        return self._comm
+        return self._storage_root._comm
+
+    @property
+    def _distributed(self):
+        return self._storage_root._distributed
 
     @classmethod
     def from_group(cls, group):
@@ -296,41 +385,43 @@ class MemGroup(ro_dict):
 
     def create_group(self, key):
 
-        # Corner case if empty key.
-        if not key:
+        # Figure out starting point.
+        if posixpath.isabs(key):
+            parent_name = '/'
+        else:
+            parent_name = self.name
+
+        # Break paths to create into separate group names.
+        path_parts = key.split('/')
+        # Strip out any empty key parts.  Takes care of '//', trailing '/', and
+        # removes leading '/'.
+        path_parts = [p for p in path_parts if p]
+
+        # Corner case of empty key.
+        if not path_parts:
             msg = "Empty group names not allowed."
             raise ValueError(msg)
 
         # If distributed, synchronise to ensure that we create group collectively
         if self._distributed:
-            self._comm.Barrier()
+            self.comm.Barrier()
 
-        if '/' not in key:
-            # Create group directly.
+        path_parts = [''] + path_parts
+        # In this loop, exception guaranteed not to be raised on first
+        # iteration, since we know that `parent_name + ''` exists.
+        for part in path_parts:
             try:
-                self[key]
+                parent_name, parent_storage = self._storage_root.walk_tree(parent_name, part)
             except KeyError:
-                out = MemGroup(distributed=self._distributed, comm=self._comm)
-                out._root = self._root  # Should already be a weakref
-                out._parent = weakref.proxy(self)  # Must use weakref to avoid reference cycles
-                out._name = key
-                self._dict[key] = out
-                return out
-            else:
-                msg = "Item '%s' already exists." % key
-                raise ValueError(msg)
-        else:
-            # Recursively create groups.
-            key_parts = key.split('/')
-            # strip off trailing '/' if present.
-            if not key_parts[-1]:
-                key_parts = key_parts[:-1]
-            # Corner case of '/group_name':
-            if len(key_parts) == 2 and not key_parts[0]:
-                g = self._root
-            else:
-                g = self.require_group('/'.join(key_parts[:-1]))
-            return g.create_group(key_parts[-1])
+                parent_storage[part] = _Storage()
+                parent_name = posixpath.join(parent_name, part)
+                parent_storage = parent_storage[part]
+            if not isinstance(parent_storage, _Storage):
+                raise ValueError('Entry %s exists and is not a Group.'
+                                 % parent_name)
+
+        # Underlying storage has been created. Return the group object.
+        return self[key]
 
     def require_group(self, key):
         try:
@@ -366,27 +457,16 @@ class MemGroup(ro_dict):
         Returns
         -------
         dset : memh5.MemDataset
+
         """
 
-        if '/' in name:
-            parts = name.split('/')
-            name = parts[-1]
-            # Corner case of name = '/dataset_name'.
-            if len(parts) == 2 and not parts[0]:
-                group_name = '/'
-            else:
-                group_name = '/'.join(parts[:-1])
-            g = self.require_group(group_name)
-            dataset_parent = g
-        else:
-            dataset_parent = self
-
-        if not name:
-            raise ValueError('Empty dataset names not allowed.')
+        parent_name, name = posixpath.split(posixpath.join(self.name, name))
+        self.require_group(parent_name)
+        parent_name, parent_storage = self._storage_root.walk_tree('/', parent_name)
 
         # If distributed, synchronise to ensure that we create group collectively
-        if dataset_parent._distributed:
-            dataset_parent._comm.Barrier()
+        if self._distributed:
+            self.comm.Barrier()
 
         if kwargs:
             msg = ("No extra keyword arguments accepted, this is not an hdf5"
@@ -417,7 +497,7 @@ class MemGroup(ro_dict):
             distributed = True
 
         # Enforce that distributed datasets can only exist in distributed memh5 groups.
-        if not dataset_parent._distributed and distributed:
+        if not self._distributed and distributed:
             raise RuntimeError('Cannot create a distributed dataset in a non-distributed group.')
 
         # If data is set (and consistent with shape/type), initialise the numpy array from it.
@@ -432,7 +512,7 @@ class MemGroup(ro_dict):
                     raise TypeError('Can only create distributed dataset from MPIArray.')
 
                 # Ensure that we are distributing over the same communicator
-                if data._comm != dataset_parent._comm:
+                if data._comm != self.comm:
                     raise RuntimeError('MPI communicator of array must match that of memh5 group.')
 
                 # If the distributed_axis is specified ensure the data is distributed along it.
@@ -456,7 +536,7 @@ class MemGroup(ro_dict):
 
                 new_dataset = MemDatasetDistributed(shape=shape, dtype=dtype,
                                                     axis=distributed_axis,
-                                                    comm=dataset_parent._comm)
+                                                    comm=self.comm)
             else:
                 new_dataset = MemDatasetCommon(shape=shape, dtype=dtype)
 
@@ -464,13 +544,11 @@ class MemGroup(ro_dict):
                 new_dataset[...] = data[...]
 
         # Add new dataset to group
-        dataset_parent._dict[name] = new_dataset
+        parent_storage[name] = new_dataset
 
         # Set the properties of the new dataset
-        new_dataset._name = name
-        new_dataset._parent = weakref.proxy(dataset_parent)  # Must use weakref to avoid reference cycles
-        new_dataset._root = dataset_parent.file  # This should already be a weakref
-
+        new_dataset._name = posixpath.join(parent_name, name)
+        new_dataset._storage_root = self._storage_root
         return new_dataset
 
     def require_dataset(self, key, shape, dtype, **kwargs):
@@ -489,17 +567,7 @@ class MemGroup(ro_dict):
             return d
 
 
-class MemAttrs(dict):
-    """In memory implementation of the ``h5py.AttributeManager``.
-
-    Currently just a normal dictionary.
-
-    """
-
-    pass
-
-
-class MemDataset(object):
+class MemDataset(MemObjMixin):
     """Base class for an in memory implementation of the ``h5py.Dataset`` class.
 
     This is only an abstract base class. Use :class:`MemDatasetCommon` or
@@ -514,11 +582,9 @@ class MemDataset(object):
 
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super(MemDataset, self).__init__(**kwargs)
         self._attrs = MemAttrs()
-        self._parent = None
-        self._name = ''
-        self._root = None
 
     @property
     def attrs(self):
@@ -529,35 +595,8 @@ class MemDataset(object):
         attrs : MemAttrs
 
         """
-
         return self._attrs
 
-    @property
-    def parent(self):
-        """Parent :class:`MemGroup` that contains this dataset."""
-        return self._parent
-
-    @property
-    def name(self):
-        """String giving the full path to this dataset."""
-        if self.parent is self._root:
-            return '/' + self._name
-        else:
-            return self.parent.name + '/' + self._name
-
-    @property
-    def file(self):
-        """Not a file at all but the top most :class:`MemGroup` of the tree."""
-        return self._root
-
-    @property
-    def mode(self):
-        """String indicating if group is readonly ("r") or read-write ("r+").
-
-        :class:`MemGroup`s are always read-write.
-
-        """
-        return 'r+'
 
     def resize(self):
         # h5py datasets reshape() is different from numpy reshape.
@@ -609,7 +648,7 @@ class MemDatasetCommon(MemDataset):
     """
 
     def __init__(self, shape, dtype):
-        MemDataset.__init__(self)
+        super(MemDatasetCommon, self).__init__()
 
         self._data = np.zeros(shape, dtype)
 
@@ -627,14 +666,19 @@ class MemDatasetCommon(MemDataset):
         dset : MemDatasetCommon
             Dataset encapsulating the numpy array.
         """
-        dset = cls.__new__(cls)
-        MemDataset.__init__(dset)
 
         if not isinstance(data, np.ndarray):
             raise TypeError("Object must be a numpy array (or subclass).")
 
+        dset = cls.__new__(cls)
+        super(MemDatasetCommon, dset).__init__()
+
         dset._data = data
         return dset
+
+    @property
+    def comm(self):
+        return None
 
     @property
     def shape(self):
@@ -695,7 +739,7 @@ class MemDatasetDistributed(MemDataset):
     """
 
     def __init__(self, shape, dtype, axis=0, comm=None):
-        MemDataset.__init__(self)
+        super(MemDatasetDistributed, self).__init__()
 
         self._data = mpiarray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
 
@@ -1380,8 +1424,10 @@ def get_h5py_File(f, **kwargs):
 def copyattrs(a1, a2):
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
+    print 'a1', a1
     for key, value in a1.iteritems():
         a2[key] = value
+    print 'a2', a2
 
 
 def deep_group_copy(g1, g2):
@@ -1398,7 +1444,6 @@ def deep_group_copy(g1, g2):
             copyattrs(entry.attrs, g2[key].attrs)
 
 
-
 def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     """Private routine to copy full data tree from distributed memh5 object into an
     HDF5 file."""
@@ -1406,7 +1451,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     if not group._distributed:
         raise RuntimeError('This should only run on distributed datasets [%s].' % group.name)
 
-    comm = group._comm
+    comm = group.comm
 
     # Create a copy of the kwargs with no mode argument so that we can override it
     kwargs_nomode = kwargs.copy()
@@ -1482,7 +1527,7 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
 
     # Create root group
     group = MemGroup(distributed=True, comm=comm)
-    comm = group._comm
+    comm = group.comm
 
     # == Create some internal functions for doing the read ==
     # Copy over attributes with a broadcast from rank = 0

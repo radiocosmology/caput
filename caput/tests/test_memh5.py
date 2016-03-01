@@ -31,8 +31,8 @@ class TestGroup(unittest.TestCase):
         root = memh5.MemGroup()
         l1 = root.create_group('level1')
         l2 = l1.require_group('level2')
-        self.assertTrue(root['level1'] is l1)
-        self.assertTrue(root['level1/level2'] is l2)
+        self.assertTrue(root['level1'] == l1)
+        self.assertTrue(root['level1/level2'] == l2)
         self.assertEqual(root['level1/level2'].name, '/level1/level2')
 
     def test_create_dataset(self):

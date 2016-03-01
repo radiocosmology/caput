@@ -117,7 +117,7 @@ class TestMemDiskGroupDistributed(unittest.TestCase):
         dg = memh5.MemDiskGroup(distributed=True)
 
         pdset = dg.create_dataset('parallel_data', shape=(10,), dtype=np.float64, distributed=True, distributed_axis=0)
-        pdset[:] = dg._data._comm.rank
+        pdset[:] = dg._data.comm.rank
         # Test successfully added
         self.assertIn('parallel_data', dg)
 
