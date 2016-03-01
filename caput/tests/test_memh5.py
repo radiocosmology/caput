@@ -57,10 +57,10 @@ class TestGroup(unittest.TestCase):
         data = np.arange(10)
         g.create_dataset('a/ra', data=data)
         self.assertTrue(memh5.is_group(g['a']))
-        self.assertTrue(np.all(g['a/ra'] == data))
+        self.assertTrue(np.all(g['a/ra'][:] == data))
         g['a'].create_dataset('/ra', data=data)
         print g.keys()
-        self.assertTrue(np.all(g['ra'] == data))
+        self.assertTrue(np.all(g['ra'][:] == data))
 
 
 class TestH5Files(unittest.TestCase):

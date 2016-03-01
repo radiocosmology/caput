@@ -40,7 +40,7 @@ class TestConcatenation(unittest.TestCase):
     def test_from_files(self):
 
         data = tod.TOData.from_mult_files(self.todlist)
-        self.assertTrue(np.all(data['dset1']
+        self.assertTrue(np.all(data['dset1'][:]
             == data.index_map['chan'][:,None] * data.index_map['time']))
         self.assertEqual(data['dset1'].shape, (self.nchan, self.ntime))
 
@@ -52,7 +52,7 @@ class TestConcatenation(unittest.TestCase):
 
         data = reader.read()
 
-        self.assertTrue(np.all(data['dset1']
+        self.assertTrue(np.all(data['dset1'][:]
             == data.index_map['chan'][:,None] * data.index_map['time']))
         self.assertEqual(data['dset1'].shape, (self.nchan, 80))
         self.assertEqual(data.keys(), ['dset1'])
@@ -64,7 +64,7 @@ class TestConcatenation(unittest.TestCase):
 
         data = reader.read()
 
-        self.assertTrue(np.all(data['dset1']
+        self.assertTrue(np.all(data['dset1'][:]
             == data.index_map['chan'][:,None] * data.index_map['time']))
         self.assertTrue(np.all(data['dset2'][:] == data.index_map['time']))
 

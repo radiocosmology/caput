@@ -113,6 +113,9 @@ class ro_dict(collections.Mapping):
 
 
 class _Storage(dict):
+    """Underlying container that provides storage backing for in-memory groups.
+
+    """
 
     def __init__(self, **kwargs):
         super(_Storage, self).__init__(**kwargs)
@@ -124,6 +127,9 @@ class _Storage(dict):
 
 
 class _StorageRoot(_Storage):
+    """Root level of the storage tree.
+
+    """
 
     def __init__(self, distributed=False, comm=None):
         super(_StorageRoot, self).__init__()
@@ -144,9 +150,10 @@ class _StorageRoot(_Storage):
         return self._distributed
 
     def walk_tree(self, start_path, path):
-        """Hierarchical look-up and ath resolution.
+        """Hierarchical look-up and path resolution.
 
-        Guaranteed to return an absolute path name and entry.
+        Always returns an absolute path name that is properly formated as
+        well as the entry to that path.
 
         """
 
@@ -182,7 +189,7 @@ class MemAttrs(dict):
 
 
 class MemObjMixin(object):
-    """Mixen represents the identity of any memh5 object."""
+    """Mixin represents the identity of any memh5 object."""
 
     #call_back_group = None
 
@@ -196,7 +203,7 @@ class MemObjMixin(object):
 
     @property
     def name(self):
-        """String giving the full path to this group."""
+        """String giving the full path to this entry."""
         return self._name
 
     @property
@@ -209,6 +216,15 @@ class MemObjMixin(object):
     def file(self):
         """Not a file at all but the top most :class:`MemGroup` of the tree."""
         return MemGroup._from_storage_root(self._storage_root, '/')
+
+    def __eq__(self, other):
+        if hasattr(other, '_storage_root') and hasattr(other, 'name'):
+            return ((self._storage_root is other._storage_root)
+                    and (self.name == other.name))
+        return False
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
 
 
 class MemGroup(MemObjMixin, collections.Mapping):
@@ -384,6 +400,7 @@ class MemGroup(MemObjMixin, collections.Mapping):
             _distributed_group_to_hdf5(self, filename, **kwargs)
 
     def create_group(self, key):
+        """Create a group within the storage tree."""
 
         # Figure out starting point.
         if posixpath.isabs(key):
@@ -512,7 +529,7 @@ class MemGroup(MemObjMixin, collections.Mapping):
                     raise TypeError('Can only create distributed dataset from MPIArray.')
 
                 # Ensure that we are distributing over the same communicator
-                if data._comm != self.comm:
+                if data.comm != self.comm:
                     raise RuntimeError('MPI communicator of array must match that of memh5 group.')
 
                 # If the distributed_axis is specified ensure the data is distributed along it.
@@ -899,7 +916,7 @@ class MemDiskGroup(collections.Mapping):
             if not data_group._distributed:
                 raise ValueError('Cannot create MemDiskGroup with different distributed setting to MemGroup to wrap.')
             # Check parallel distribution is the same
-            if comm and comm != data_group._comm:
+            if comm and comm != data_group.comm:
                 raise ValueError('Cannot create MemDiskGroup with different MPI communicator to MemGroup to wrap.')
 
         # Look for a hint as to the sub class we should return, this should be
@@ -936,7 +953,7 @@ class MemDiskGroup(collections.Mapping):
         pass
 
     def __del__(self):
-        """Closes file if on disk and if file was opened on initialization."""
+        """Closes file if on disk if file was opened on initialization."""
         if self.ondisk and self._toclose:
             self._data.close()
 
@@ -992,7 +1009,7 @@ class MemDiskGroup(collections.Mapping):
 
     @property
     def comm(self):
-        return self._data._comm
+        return self._data.comm
 
     @property
     def ondisk(self):
@@ -1424,10 +1441,8 @@ def get_h5py_File(f, **kwargs):
 def copyattrs(a1, a2):
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
-    print 'a1', a1
     for key, value in a1.iteritems():
         a2[key] = value
-    print 'a2', a2
 
 
 def deep_group_copy(g1, g2):
