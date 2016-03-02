@@ -939,6 +939,7 @@ class MemDiskGroup(collections.Mapping):
 
         self = super(MemDiskGroup, new_cls).__new__(new_cls)
         self._data = data_group
+        self._name = data_group.name
         self._toclose = toclose
         return self
 
@@ -947,6 +948,15 @@ class MemDiskGroup(collections.Mapping):
         # Just strips off arguments used in __new__
         super(MemDiskGroup, self).__init__(self)
 
+    @classmethod
+    def _from_group(cls, data_group, name):
+        """For internal creation of new objects from an exiting one."""
+        self = super(MemDiskGroup, cls).__new__(cls)
+        self.__init__()
+        self._data = data_group
+        self._name = name
+        self._toclose = False
+        return self
 
     def _finish_setup(self):
         """Finish the class setup *after* importing from a file."""
@@ -958,18 +968,19 @@ class MemDiskGroup(collections.Mapping):
             self._data.close()
 
     def __getitem__(self, key):
-        value = self._data[key]
+        path = posixpath.join(self.name, key)
+        value = self._data[path]
         if is_group(value):
-            if self.group_name_allowed(key):
-                return value
+            if self.group_name_allowed(path):
+                return self.__class__._from_group(self._data, path)
             else:
-                msg = "Access to group %s not allowed." % key
+                msg = "Access to group %s not allowed." % path
                 raise KeyError(msg)
         else:
-            if self.dataset_name_allowed(key):
+            if self.dataset_name_allowed(path):
                 return value
             else:
-                msg = "Access to dataset %s not allowed." % key
+                msg = "Access to dataset %s not allowed." % path
                 raise KeyError(msg)
 
     def __len__(self):
@@ -979,33 +990,32 @@ class MemDiskGroup(collections.Mapping):
         return n
 
     def __iter__(self):
-        for key, value in self._data.items():
-            if ((is_group(value) and self.group_name_allowed(key))
-                or (not is_group(value) and self.dataset_name_allowed(key))):
+        for key, value in self._data[self.name].items():
+            path = posixpath.join(self.name, key)
+            if ((is_group(value) and self.group_name_allowed(path))
+                or (not is_group(value) and self.dataset_name_allowed(path))):
                 yield key
             else:
                 continue
-
-    # TODO, something similar to __getitem__(), restricting names,
-    # for len() and __iter__().
 
     # The main interface #
 
     @property
     def attrs(self):
-        return self._data.attrs
+        return self._data[self.name].attrs
 
     @property
     def name(self):
-        return self._data.name
+        return self._name
 
     @property
     def parent(self):
-        return self._data.parent
+        parent_path, key = posixpath.split(self.name)
+        return self.__class__._from_group(self._data, parent_path)
 
     @property
     def file(self):
-        return self._data.file
+        return self.__class__._from_group(self._data, '/')
 
     @property
     def comm(self):
@@ -1086,6 +1096,11 @@ class MemDiskGroup(collections.Mapping):
         layout of the data container can implement this method instead of
         re-implementing the above mentioned methods.
 
+        Parameters
+        ----------
+        name: string
+            Absolute path to proposed group.
+
         Returns
         -------
         allowed : bool
@@ -1105,6 +1120,11 @@ class MemDiskGroup(collections.Mapping):
         layout of the data container can implement this method instead of
         re-implementing the above mentioned methods.
 
+        Parameters
+        ----------
+        name: string
+            Absolute path to proposed dataset.
+
         Returns
         -------
         allowed : bool
@@ -1114,30 +1134,37 @@ class MemDiskGroup(collections.Mapping):
         return True
 
     def create_dataset(self, name, *args, **kwargs):
-        if not self.dataset_name_allowed(name):
-            msg = "Dataset name %s not allowed." % name
+        path = posixpath.join(self.name, name)
+        if not self.dataset_name_allowed(path):
+            msg = "Dataset name %s not allowed." % path
             raise ValueError(msg)
-        new_dataset = self._data.create_dataset(name, *args, **kwargs)
+        new_dataset = self._data.create_dataset(path, *args, **kwargs)
 
         return new_dataset
 
-    def require_dataset(self, key, *args, **kwargs):
-        if not self.dataset_name_allowed(key):
-            msg = "Dataset name %s not allowed." % key
+    def require_dataset(self, name, *args, **kwargs):
+        path = posixpath.join(self.name, name)
+        if not self.dataset_name_allowed(path):
+            msg = "Dataset name %s not allowed." % path
             raise ValueError(msg)
-        return self._data.require_dataset(key, *args, **kwargs)
+        return self._data.require_dataset(path, *args, **kwargs)
 
-    def create_group(self, key):
-        if not self.group_name_allowed(key):
-            msg = "Group name %s not allowed." % key
+    def create_group(self, name):
+        path = posixpath.join(self.name, name)
+        if not self.group_name_allowed(path):
+            msg = "Group name %s not allowed." % path
             raise ValueError(msg)
-        return self._data.create_group(key)
+        self._data.create_group(path)
+        return self.__class__._from_group(self._data, path)
 
-    def require_group(self, key):
-        if not self.group_name_allowed(key):
-            msg = "Group name %s not allowed." % key
+    def require_group(self, name):
+        path = posixpath.join(self.name, name)
+        if not self.group_name_allowed(path):
+            msg = "Group name %s not allowed." % path
             raise ValueError(msg)
-        return self._data.require_group(key)
+        self._data.require_group(path)
+        return self.__class__._from_group(self._data, path)
+
 
     def to_memory(self):
         """Return a version of this data that lives in memory."""
@@ -1285,10 +1312,12 @@ class BasicCont(MemDiskGroup):
     def dataset_name_allowed(self, name):
         """Datasets may only be created and accessed in the root level group.
 
-        Returns ``True`` is *name* contains no '/' characters.
+        Returns ``True`` is *name* is a path in the root group i.e. '/dataset'.
 
         """
-        return False if '/' in name else True
+
+        parent_name, name = posixpath.split(name)
+        return True if parent_name == '/' else False
 
     def create_index_map(self, axis_name, index_map):
         """Create a new index map.
