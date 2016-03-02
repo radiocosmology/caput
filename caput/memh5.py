@@ -149,33 +149,24 @@ class _StorageRoot(_Storage):
     def distributed(self):
         return self._distributed
 
-    def walk_tree(self, start_path, path):
-        """Hierarchical look-up and path resolution.
+    def __getitem__(self, key):
+        """Implements Hierarchical path lookup."""
 
-        Always returns an absolute path name that is properly formated as
-        well as the entry to that path.
+        if '/' not in key:
+            return super(_StorageRoot, self).__getitem__(key)
 
-        """
+        # Format and split the path.
+        key = format_abs_path(key)
+        if key == '/':
+            return self
 
-        if not posixpath.isabs(start_path):
-            raise ValueError('Starting point must be an absolute path.')
+        path_parts = key.split('/')[1:]
 
-        # If not handed an absolute path, add our name.
-        abs_path = posixpath.join(start_path, path)
-
-        path_parts = abs_path.split('/')
-        # Strip out any empty key parts.  Takes care of '//', trailing '/', and
-        # removes leading '/'.
-        path_parts = [p for p in path_parts if p]
-
-        abs_path = '/'
-
-        # Crawl the tree.
+        # Crawl the path.
         out = self
         for part in path_parts:
-            abs_path = posixpath.join(abs_path, part)
             out = out[part]
-        return abs_path, out
+        return out
 
 
 class MemAttrs(dict):
@@ -188,18 +179,22 @@ class MemAttrs(dict):
     pass
 
 
-class MemObjMixin(object):
+class _MemObjMixin(object):
     """Mixin represents the identity of any memh5 object."""
 
-    #call_back_group = None
+    @property
+    def _group_class(self):
+        return None
 
+    # Here I have to implement __new__ not __init__ since MemDiskGroup
+    # implements new and messes with parameters.
     def __init__(self, storage_root=None, name=''):
+        super(_MemObjMixin, self).__init__()
         self._storage_root = storage_root
         if storage_root is not None and not posixpath.isabs(name):
             # Should never happen, so this is mostly for debugging.
             raise ValueError("Must be given an absolute path.")
         self._name = name
-        super(MemObjMixin, self).__init__()
 
     @property
     def name(self):
@@ -210,12 +205,12 @@ class MemObjMixin(object):
     def parent(self):
         """Parent :class:`MemGroup` that contains this group."""
         parent_name, myname = posixpath.split(self.name)
-        return MemGroup._from_storage_root(self._storage_root, parent_name)
+        return self._group_class._from_storage_root(self._storage_root, parent_name)
 
     @property
     def file(self):
         """Not a file at all but the top most :class:`MemGroup` of the tree."""
-        return MemGroup._from_storage_root(self._storage_root, '/')
+        return self._group_class._from_storage_root(self._storage_root, '/')
 
     def __eq__(self, other):
         if hasattr(other, '_storage_root') and hasattr(other, 'name'):
@@ -227,7 +222,92 @@ class MemObjMixin(object):
         return not self.__eq__(other)
 
 
-class MemGroup(MemObjMixin, collections.Mapping):
+class _GroupInterface(_MemObjMixin, collections.Mapping):
+
+    @property
+    def _group_class(self):
+        return self.__class__
+
+    @property
+    def comm(self):
+        """Reference to the MPI communicator.
+        """
+        return self._storage_root._comm
+
+    @property
+    def _distributed(self):
+        return self._storage_root._distributed
+
+    @property
+    def attrs(self):
+        """Attributes attached to this object.
+
+        Returns
+        -------
+        attrs : MemAttrs
+
+        """
+        return self._get_storage().attrs
+
+    @classmethod
+    def _from_storage_root(cls, storage_root, name):
+        self = super(_GroupInterface, cls).__new__(cls, storage_root, name)
+        super(_GroupInterface, self).__init__(storage_root, name)
+        return self
+
+    def _get_storage(self):
+        return self._storage_root[self.name]
+
+    def __getitem__(self, key):
+        """Implement '/' for accessing nested groups."""
+
+        path = format_abs_path(posixpath.join(self.name, key))
+        out = self._storage_root[path]
+
+        # Cast the output.
+        if is_group(out) or isinstance(out, _Storage):
+            # Group like.
+            return self._group_class._from_storage_root(self._storage_root, path)
+        else:
+            # A dataset
+            return out
+
+    def __len__(self):
+        return len(self._get_storage())
+
+    def __iter__(self):
+        keys = self._get_storage().keys()
+        for key in keys:
+            yield key
+
+    def require_dataset(self, key, shape, dtype, **kwargs):
+        """Require a dataset to exist, create if it doesn't.
+
+        Distributed dataset arguments are passed straight through to create_dataset.
+        """
+        try:
+            d = self[key]
+        except KeyError:
+            return self.create_dataset(key, shape=shape, dtype=dtype, **kwargs)
+        if is_group(d):
+            msg = "Entry '%s' exists and is not a Dataset." % key
+            raise TypeError(msg)
+        else:
+            return d
+
+    def require_group(self, key):
+        try:
+            g = self[key]
+        except KeyError:
+            return self.create_group(key)
+        if not is_group(g):
+            msg = "Entry '%s' exists and is not a Group." % key
+            raise TypeError(msg)
+        else:
+            return g
+
+
+class MemGroup(_GroupInterface):
     """In memory implementation of the :class:`h5py.Group`.
 
     This class doubles as the memory implementation of :class:`h5py.File`,
@@ -268,49 +348,6 @@ class MemGroup(MemObjMixin, collections.Mapping):
         super(MemGroup, self).__init__(storage_root, name)
 
     @property
-    def attrs(self):
-        """Attributes attached to this object.
-
-        Returns
-        -------
-        attrs : MemAttrs
-
-        """
-        return self._get_storage().attrs
-
-    @classmethod
-    def _from_storage_root(cls, storage_root, name):
-        self = super(MemGroup, cls).__new__(cls)
-        super(MemGroup, self).__init__(storage_root, name)
-        return self
-
-
-    def _get_storage(self):
-        name, out = self._storage_root.walk_tree('/', self.name)
-        return out
-
-    def __getitem__(self, key):
-        """Implement '/' for accessing nested groups."""
-
-        key, out = self._storage_root.walk_tree(self.name, key)
-
-        # Cast the output.
-        if isinstance(out, MemDataset):
-            return out
-        else:
-            # Out is a dictionary, so return a group.
-            return MemGroup._from_storage_root(self._storage_root, key)
-
-    def __len__(self):
-        return len(self._get_storage())
-
-    def __iter__(self):
-        keys = self._get_storage().keys()
-        for key in keys:
-            yield key
-
-
-    @property
     def mode(self):
         """String indicating if group is readonly ("r") or read-write ("r+").
 
@@ -319,15 +356,6 @@ class MemGroup(MemObjMixin, collections.Mapping):
         """
         return 'r+'
 
-    @property
-    def comm(self):
-        """Reference to the MPI communicator.
-        """
-        return self._storage_root._comm
-
-    @property
-    def _distributed(self):
-        return self._storage_root._distributed
 
     @classmethod
     def from_group(cls, group):
@@ -402,33 +430,26 @@ class MemGroup(MemObjMixin, collections.Mapping):
     def create_group(self, key):
         """Create a group within the storage tree."""
 
-        # Figure out starting point.
-        if posixpath.isabs(key):
-            parent_name = '/'
+        path = format_abs_path(posixpath.join(self.name, key))
+        try:
+            self[key]
+        except KeyError:
+            pass
         else:
-            parent_name = self.name
-
-        # Break paths to create into separate group names.
-        path_parts = key.split('/')
-        # Strip out any empty key parts.  Takes care of '//', trailing '/', and
-        # removes leading '/'.
-        path_parts = [p for p in path_parts if p]
-
-        # Corner case of empty key.
-        if not path_parts:
-            msg = "Empty group names not allowed."
-            raise ValueError(msg)
+            raise ValueError('Entry %s exists.' % key)
 
         # If distributed, synchronise to ensure that we create group collectively
         if self._distributed:
             self.comm.Barrier()
 
-        path_parts = [''] + path_parts
+        parent_name = '/'
+        path_parts = path.split('/')
         # In this loop, exception guaranteed not to be raised on first
         # iteration, since we know that `parent_name + ''` exists.
         for part in path_parts:
             try:
-                parent_name, parent_storage = self._storage_root.walk_tree(parent_name, part)
+                parent_name = posixpath.join(parent_name, part)
+                parent_storage = self._storage_root[parent_name]
             except KeyError:
                 parent_storage[part] = _Storage()
                 parent_name = posixpath.join(parent_name, part)
@@ -440,16 +461,6 @@ class MemGroup(MemObjMixin, collections.Mapping):
         # Underlying storage has been created. Return the group object.
         return self[key]
 
-    def require_group(self, key):
-        try:
-            g = self[key]
-        except KeyError:
-            return self.create_group(key)
-        if not isinstance(g, MemGroup):
-            msg = "Entry '%s' exists and is not a Group." % key
-            raise TypeError(msg)
-        else:
-            return g
 
     def create_dataset(self, name, shape=None, dtype=None, data=None,
                        distributed=False, distributed_axis=None, **kwargs):
@@ -478,8 +489,8 @@ class MemGroup(MemObjMixin, collections.Mapping):
         """
 
         parent_name, name = posixpath.split(posixpath.join(self.name, name))
-        self.require_group(parent_name)
-        parent_name, parent_storage = self._storage_root.walk_tree('/', parent_name)
+        parent_name = format_abs_path(parent_name)
+        parent_storage = self.require_group(parent_name)._get_storage()
 
         # If distributed, synchronise to ensure that we create group collectively
         if self._distributed:
@@ -568,23 +579,8 @@ class MemGroup(MemObjMixin, collections.Mapping):
         new_dataset._storage_root = self._storage_root
         return new_dataset
 
-    def require_dataset(self, key, shape, dtype, **kwargs):
-        """Require a dataset to exist, create if it doesn't.
 
-        Distributed dataset arguments are passed straight through to create_dataset.
-        """
-        try:
-            d = self[key]
-        except KeyError:
-            return self.create_dataset(key, shape=shape, dtype=dtype, **kwargs)
-        if isinstance(d, MemGroup):
-            msg = "Entry '%s' exists and is not a Dataset." % key
-            raise TypeError(msg)
-        else:
-            return d
-
-
-class MemDataset(MemObjMixin):
+class MemDataset(_MemObjMixin):
     """Base class for an in memory implementation of the ``h5py.Dataset`` class.
 
     This is only an abstract base class. Use :class:`MemDatasetCommon` or
@@ -831,7 +827,7 @@ class MemDatasetDistributed(MemDataset):
 # Higher Level Data Containers
 # ----------------------------
 
-class MemDiskGroup(collections.Mapping):
+class MemDiskGroup(_GroupInterface):
     """Container whose data may either be stored on disk or in memory.
 
     This container is intended to have the same basic API :class:`h5py.Group`
@@ -890,9 +886,6 @@ class MemDiskGroup(collections.Mapping):
 
     """
 
-    # Default initialisation
-    _data = None
-
 
     def __new__(cls, data_group=None, distributed=False, comm=None,
                 detect_subclass=True):
@@ -933,30 +926,26 @@ class MemDiskGroup(collections.Mapping):
             except (ImportError, KeyError):
                 warnings.warn('Could not import memh5 subclass %s' % clspath)
 
-            # Check that is is a subclass of MemDiskGroup
+            # Check that it is a subclass of MemDiskGroup
             if not issubclass(cls, MemDiskGroup):
                 raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
 
-        self = super(MemDiskGroup, new_cls).__new__(new_cls)
-        self._data = data_group
-        self._name = data_group.name
+        self = super(MemDiskGroup, new_cls).__new__(new_cls, storage_root=data_group,
+                name=data_group.name)
         self._toclose = toclose
+        self._tmp_data_group = data_group
         return self
 
     def __init__(self, data_group=None, distributed=False, comm=None,
                  detect_subclass=True):
-        # Just strips off arguments used in __new__
-        super(MemDiskGroup, self).__init__(self)
+        data_group = self._tmp_data_group
+        del self._tmp_data_group
+        super(MemDiskGroup, self).__init__(data_group, data_group.name)
 
-    @classmethod
-    def _from_group(cls, data_group, name):
-        """For internal creation of new objects from an exiting one."""
-        self = super(MemDiskGroup, cls).__new__(cls)
-        self.__init__()
-        self._data = data_group
-        self._name = name
-        self._toclose = False
-        return self
+    @property
+    def _data(self):
+        """_data was renamed to _storage_root. This added for compatibility."""
+        return self._storage_root
 
     def _finish_setup(self):
         """Finish the class setup *after* importing from a file."""
@@ -964,24 +953,21 @@ class MemDiskGroup(collections.Mapping):
 
     def __del__(self):
         """Closes file if on disk if file was opened on initialization."""
-        if self.ondisk and self._toclose:
+        if self.ondisk and hasattr(self, '_toclose') and self._toclose:
             self._data.close()
 
     def __getitem__(self, key):
-        path = posixpath.join(self.name, key)
-        value = self._data[path]
+        value = super(MemDiskGroup, self).__getitem__(key)
+        path = value.name
         if is_group(value):
-            if self.group_name_allowed(path):
-                return self.__class__._from_group(self._data, path)
-            else:
+            if not self.group_name_allowed(path):
                 msg = "Access to group %s not allowed." % path
                 raise KeyError(msg)
         else:
-            if self.dataset_name_allowed(path):
-                return value
-            else:
+            if not self.dataset_name_allowed(path):
                 msg = "Access to dataset %s not allowed." % path
                 raise KeyError(msg)
+        return value
 
     def __len__(self):
         n = 0
@@ -990,36 +976,13 @@ class MemDiskGroup(collections.Mapping):
         return n
 
     def __iter__(self):
-        for key, value in self._data[self.name].items():
-            path = posixpath.join(self.name, key)
-            if ((is_group(value) and self.group_name_allowed(path))
-                or (not is_group(value) and self.dataset_name_allowed(path))):
-                yield key
-            else:
+        for key in super(MemDiskGroup, self).__iter__():
+            try:
+                value = self[key]
+            except KeyError:
+                # This key name is not allowed (see __getitem__)
                 continue
-
-    # The main interface #
-
-    @property
-    def attrs(self):
-        return self._data[self.name].attrs
-
-    @property
-    def name(self):
-        return self._name
-
-    @property
-    def parent(self):
-        parent_path, key = posixpath.split(self.name)
-        return self.__class__._from_group(self._data, parent_path)
-
-    @property
-    def file(self):
-        return self.__class__._from_group(self._data, '/')
-
-    @property
-    def comm(self):
-        return self._data.comm
+            yield key
 
     @property
     def ondisk(self):
@@ -1142,29 +1105,13 @@ class MemDiskGroup(collections.Mapping):
 
         return new_dataset
 
-    def require_dataset(self, name, *args, **kwargs):
-        path = posixpath.join(self.name, name)
-        if not self.dataset_name_allowed(path):
-            msg = "Dataset name %s not allowed." % path
-            raise ValueError(msg)
-        return self._data.require_dataset(path, *args, **kwargs)
-
     def create_group(self, name):
         path = posixpath.join(self.name, name)
         if not self.group_name_allowed(path):
             msg = "Group name %s not allowed." % path
             raise ValueError(msg)
         self._data.create_group(path)
-        return self.__class__._from_group(self._data, path)
-
-    def require_group(self, name):
-        path = posixpath.join(self.name, name)
-        if not self.group_name_allowed(path):
-            msg = "Group name %s not allowed." % path
-            raise ValueError(msg)
-        self._data.require_group(path)
-        return self.__class__._from_group(self._data, path)
-
+        return self._group_class._from_storage_root(self._data, path)
 
     def to_memory(self):
         """Return a version of this data that lives in memory."""
@@ -1486,6 +1433,21 @@ def deep_group_copy(g1, g2):
             g2.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
                     data=entry)
             copyattrs(entry.attrs, g2[key].attrs)
+
+
+def format_abs_path(path):
+    if not posixpath.isabs(path):
+        raise ValueError("Absolute path must be provided.")
+
+    path_parts = path.split('/')
+    # Strip out any empty key parts.  Takes care of '//', trailing '/', and
+    # removes leading '/'.
+    path_parts = [p for p in path_parts if p]
+
+    out = '/'
+    for p in path_parts:
+        out = posixpath.join(out, p)
+    return out
 
 
 def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
