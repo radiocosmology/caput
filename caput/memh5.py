@@ -180,7 +180,12 @@ class MemAttrs(dict):
 
 
 class _MemObjMixin(object):
-    """Mixin represents the identity of any memh5 object."""
+    """Mixin represents the identity of an in-memory h5py-like object.
+
+    Implement a few attributes that all memh5 objects have, such as `parent`,
+    and `file`.
+
+    """
 
     @property
     def _group_class(self):
@@ -222,7 +227,13 @@ class _MemObjMixin(object):
         return not self.__eq__(other)
 
 
-class _GroupInterface(_MemObjMixin, collections.Mapping):
+class _BaseGroup(_MemObjMixin, collections.Mapping):
+    """Implement the majority of the Group interface.
+
+    Subclasses must setup the underlying storage in thier constructors, as well
+    as implement `create_group` and `create_dataset`.
+
+    """
 
     @property
     def _group_class(self):
@@ -251,8 +262,8 @@ class _GroupInterface(_MemObjMixin, collections.Mapping):
 
     @classmethod
     def _from_storage_root(cls, storage_root, name):
-        self = super(_GroupInterface, cls).__new__(cls, storage_root, name)
-        super(_GroupInterface, self).__init__(storage_root, name)
+        self = super(_BaseGroup, cls).__new__(cls, storage_root, name)
+        super(_BaseGroup, self).__init__(storage_root, name)
         return self
 
     def _get_storage(self):
@@ -271,6 +282,14 @@ class _GroupInterface(_MemObjMixin, collections.Mapping):
         else:
             # A dataset
             return out
+
+    def __delitem__(self, key):
+        if key not in self.keys():
+            raise KeyError("Key %s not present." % key)
+        path = posixpath.join(self.name, key)
+        parent_path, name = posixpath.split(path)
+        parent = self._storage_root[parent_path]
+        del parent[name]
 
     def __len__(self):
         return len(self._get_storage())
@@ -307,7 +326,7 @@ class _GroupInterface(_MemObjMixin, collections.Mapping):
             return g
 
 
-class MemGroup(_GroupInterface):
+class MemGroup(_BaseGroup):
     """In memory implementation of the :class:`h5py.Group`.
 
     This class doubles as the memory implementation of :class:`h5py.File`,
@@ -827,7 +846,7 @@ class MemDatasetDistributed(MemDataset):
 # Higher Level Data Containers
 # ----------------------------
 
-class MemDiskGroup(_GroupInterface):
+class MemDiskGroup(_BaseGroup):
     """Container whose data may either be stored on disk or in memory.
 
     This container is intended to have the same basic API :class:`h5py.Group`
@@ -872,6 +891,7 @@ class MemDiskGroup(_GroupInterface):
     Methods
     -------
     __getitem__
+    __delitem__
     from_file
     dataset_name_allowed
     group_name_allowed
@@ -933,6 +953,7 @@ class MemDiskGroup(_GroupInterface):
         self = super(MemDiskGroup, new_cls).__new__(new_cls, storage_root=data_group,
                 name=data_group.name)
         self._toclose = toclose
+        # Store this for use in __init__
         self._tmp_data_group = data_group
         return self
 
@@ -1194,6 +1215,7 @@ class BasicCont(MemDiskGroup):
     group_name_allowed
     dataset_name_allowed
     create_index_map
+    del_index_map
     add_history
 
     """
@@ -1249,7 +1271,7 @@ class BasicCont(MemDiskGroup):
 
         out = {}
         for name, value in self._data['index_map'].iteritems():
-            out[name] = value
+            out[name] = value[:]
         return ro_dict(out)
 
     def group_name_allowed(self, name):
@@ -1272,6 +1294,9 @@ class BasicCont(MemDiskGroup):
         """
 
         self._data['index_map'].create_dataset(axis_name, data=index_map)
+
+    def del_index_map(self, axis_name):
+        del self._data['index_map'][axis_name]
 
     def add_history(self, name, history=None):
         """Create a new history entry."""
@@ -1436,6 +1461,7 @@ def deep_group_copy(g1, g2):
 
 
 def format_abs_path(path):
+    """Return absolute path string, formated without any extra '/'s."""
     if not posixpath.isabs(path):
         raise ValueError("Absolute path must be provided.")
 
