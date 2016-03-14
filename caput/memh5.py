@@ -1275,7 +1275,7 @@ class BasicCont(MemDiskGroup):
 
     @property
     def index_map(self):
-        """Stores represent ions of the axes of datasets.
+        """Stores representions of the axes of datasets.
 
         The index map contains arrays used to interpret the axes of the
         various datasets. For instance, the 'time', 'prod' and 'freq' axes of

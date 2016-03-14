@@ -36,11 +36,34 @@ from . import memh5
 
 
 class TOData(memh5.BasicCont):
+    """Time ordered data.
+
+    Inherits from :class:`caput.memh5.BasicCont`. A data container in with all
+    the functionality of its base class but with the concept of a time axis
+    which can be concatenated over. Currently the time axis must be the fastest
+    varying axis is present.
+
+    Attributes
+    ----------
+    time
+
+    Methods
+    -------
+    from_mult_files
+    convert_time
+
+    """
 
     time_axes = ('time',)
 
     @property
     def time(self):
+        """Representation of the "time" axis.
+
+        The value of ``self.index_map['time']``.
+
+        """
+
         return self.index_map['time'][:]
 
     @classmethod
@@ -83,14 +106,12 @@ class TOData(memh5.BasicCont):
         to the same format as ``self.time``.
 
         """
+
         return time
 
 
 class Reader(object):
-    """Provides high level reading of CHIME data.
-
-    You do not want to use this class, but rather one of its inherited classes
-    (:class:`CorrReader`, :class:`HKReader`, :class:`WeatherReader`).
+    """Provides high level reading of time ordered data.
 
     Parses and stores meta-data from file headers allowing for the
     interpretation and selection of the data without reading it all from disk.
@@ -114,10 +135,9 @@ class Reader(object):
 
     """
 
-    # Controls the assotiation between Reader classes and data classes.
+    # Controls the association between Reader classes and data classes.
     # Override with subclass of TOData.
     data_class = TOData
-
 
     def __init__(self, files):
 
@@ -169,6 +189,7 @@ class Reader(object):
             Start and stop indices for reading along the time axis.
 
         """
+
         return self._time_sel
 
     @time_sel.setter
@@ -204,14 +225,18 @@ class Reader(object):
         The times from the samples selected will have bin centre timestamps
         that are bracketed by the given *start_time* and *stop_time*.
 
+        Parameter time should be in the same format as :attr:`TOData.time`, and
+        mush be comparable through standard comparison operator (``<``, ``>=``,
+        etc.). Conversion using :meth:`TOData.convert_time` is attempted.
+
         Parameters
         ----------
-        start_time : float or :class:`datetime.datetime`
-            If a float, this is a Unix/POSIX time. Afftect the first element of
-            :attr:`~Reader.time_sel`.  Default leaves it unchanged.
-        stop_time : float or :class:`datetime.datetime`
-            If a float, this is a Unix/POSIX time. Afftect the second element
-            of :attr:`~Reader.time_sel`.  Default leaves it unchanged.
+        start_time : scalar time
+            Affects the first element of :attr:`~Reader.time_sel`.  Default
+            leaves it unchanged.
+        stop_time : scalar time
+            Affects the second element of :attr:`~Reader.time_sel`.  Default
+            leaves it unchanged.
 
         """
 
@@ -253,8 +278,6 @@ class Reader(object):
                 )
 
 
-
-
 def concatenate(data_list, out_group=None, start=None, stop=None,
                 datasets=None, dataset_filter=None):
     """Concatenate data along the time axis.
@@ -265,16 +288,16 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     Currently only 'time' axis concatenation is supported, and it must be the
     fastest varying index.
 
-    All attributes, calibration information and history information is copied
+    All attributes, history, and other non-time-dependant information is copied
     from the first item.
 
     Parameters
     ----------
-    data_list : list of :class:`TOData`. These are assumed to be identicle in
+    data_list : list of :class:`TOData`. These are assumed to be identical in
             every way except along the axes representing time, over which they
             are concatenated. All other data and attributes are simply copied
             from the first entry of the list.
-    data_group : `h5py.Group`, hdf5 filename or `memh5.Group`
+    out_group : `h5py.Group`, hdf5 filename or `memh5.Group`
             Underlying hdf5 like container that will store the data for the
             BaseData instance.
     start : int or dict with keys ``data_list[0].time_axes``
