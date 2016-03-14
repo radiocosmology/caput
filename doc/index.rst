@@ -16,6 +16,7 @@ Packages
    pipeline
    mpiutil
    mpiarray
+   tod
 
 Indices and tables
 ==================

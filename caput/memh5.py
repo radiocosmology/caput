@@ -3,7 +3,7 @@ Module for making in-memory mock-ups of :mod:`h5py` objects.
 
 .. currentmodule:: caput.memh5
 
-It is sometimes usefull to have a consistent API for data that is independent
+It is sometimes useful to have a consistent API for data that is independent
 of whether that data lives on disk or in memory. :mod:`h5py` provides this to a
 certain extent, having :class:`Dataset` objects that act very much like
 :mod:`numpy` arrays. :mod:`memh5` extends this, providing an in-memory
@@ -269,10 +269,14 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
     def _get_storage(self):
         return self._storage_root[self.name]
 
-    def __getitem__(self, key):
-        """Implement '/' for accessing nested groups."""
+    def __getitem__(self, name):
+        """Retrieve an object.
 
-        path = format_abs_path(posixpath.join(self.name, key))
+        The *name* may be a relative or absolute path
+
+        """
+
+        path = format_abs_path(posixpath.join(self.name, name))
         out = self._storage_root[path]
 
         # Cast the output.
@@ -283,10 +287,11 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
             # A dataset
             return out
 
-    def __delitem__(self, key):
-        if key not in self.keys():
-            raise KeyError("Key %s not present." % key)
-        path = posixpath.join(self.name, key)
+    def __delitem__(self, name):
+        """Delete item from group."""
+        if name not in self.keys():
+            raise KeyError("Key %s not present." % name)
+        path = posixpath.join(self.name, name)
         parent_path, name = posixpath.split(path)
         parent = self._storage_root[parent_path]
         del parent[name]
@@ -299,28 +304,30 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
         for key in keys:
             yield key
 
-    def require_dataset(self, key, shape, dtype, **kwargs):
+    def require_dataset(self, name, shape, dtype, **kwargs):
         """Require a dataset to exist, create if it doesn't.
 
-        Distributed dataset arguments are passed straight through to create_dataset.
+        All arguments are passed through to create_dataset.
+
         """
         try:
-            d = self[key]
+            d = self[name]
         except KeyError:
-            return self.create_dataset(key, shape=shape, dtype=dtype, **kwargs)
+            return self.create_dataset(name, shape=shape, dtype=dtype, **kwargs)
         if is_group(d):
-            msg = "Entry '%s' exists and is not a Dataset." % key
+            msg = "Entry '%s' exists and is not a Dataset." % name
             raise TypeError(msg)
         else:
             return d
 
-    def require_group(self, key):
+    def require_group(self, name):
+        """Require a group to exist, create if it doesn't."""
         try:
-            g = self[key]
+            g = self[name]
         except KeyError:
-            return self.create_group(key)
+            return self.create_group(name)
         if not is_group(g):
-            msg = "Entry '%s' exists and is not a Group." % key
+            msg = "Entry '%s' exists and is not a Group." % name
             raise TypeError(msg)
         else:
             return g
@@ -446,16 +453,16 @@ class MemGroup(_BaseGroup):
         else:
             _distributed_group_to_hdf5(self, filename, **kwargs)
 
-    def create_group(self, key):
+    def create_group(self, name):
         """Create a group within the storage tree."""
 
-        path = format_abs_path(posixpath.join(self.name, key))
+        path = format_abs_path(posixpath.join(self.name, name))
         try:
-            self[key]
+            self[name]
         except KeyError:
             pass
         else:
-            raise ValueError('Entry %s exists.' % key)
+            raise ValueError('Entry %s exists.' % name)
 
         # If distributed, synchronise to ensure that we create group collectively
         if self._distributed:
@@ -478,7 +485,7 @@ class MemGroup(_BaseGroup):
                                  % parent_name)
 
         # Underlying storage has been created. Return the group object.
-        return self[key]
+        return self[name]
 
 
     def create_dataset(self, name, shape=None, dtype=None, data=None,
@@ -851,7 +858,7 @@ class MemDiskGroup(_BaseGroup):
 
     This container is intended to have the same basic API :class:`h5py.Group`
     and :class:`MemGroup` but whose underlying data could live either on disk
-    in the former or in memory in the later.
+    or in memory.
 
     Aside from providing a few convenience methods, this class isn't that
     useful by itself. It is almost as easy to use :class:`h5py.Group`
@@ -896,6 +903,7 @@ class MemDiskGroup(_BaseGroup):
     dataset_name_allowed
     group_name_allowed
     create_dataset
+    require_dataset
     create_group
     require_group
     to_memory
@@ -977,8 +985,14 @@ class MemDiskGroup(_BaseGroup):
         if self.ondisk and hasattr(self, '_toclose') and self._toclose:
             self._data.close()
 
-    def __getitem__(self, key):
-        value = super(MemDiskGroup, self).__getitem__(key)
+    def __getitem__(self, name):
+        """Retrieve an object.
+
+        The *name* may be a relative or absolute path
+
+        """
+
+        value = super(MemDiskGroup, self).__getitem__(name)
         path = value.name
         if is_group(value):
             if not self.group_name_allowed(path):
@@ -1088,7 +1102,7 @@ class MemDiskGroup(_BaseGroup):
         Returns
         -------
         allowed : bool
-            ``True``.
+            ``True``
 
         """
         return True
@@ -1112,12 +1126,20 @@ class MemDiskGroup(_BaseGroup):
         Returns
         -------
         allowed : bool
-            ``True``.
+            ``True``
 
         """
         return True
 
     def create_dataset(self, name, *args, **kwargs):
+        """Create and return a new dataset.
+
+        All parameters are passed through to the :meth:`create_dataset` method of
+        the underlying storage, whether it be an :class:`h5py.Group` or a
+        :class:`MemGroup`.
+
+        """
+
         path = posixpath.join(self.name, name)
         if not self.dataset_name_allowed(path):
             msg = "Dataset name %s not allowed." % path
@@ -1127,6 +1149,8 @@ class MemDiskGroup(_BaseGroup):
         return new_dataset
 
     def create_group(self, name):
+        """Create and return a new group."""
+
         path = posixpath.join(self.name, name)
         if not self.group_name_allowed(path):
             msg = "Group name %s not allowed." % path
@@ -1200,10 +1224,7 @@ class BasicCont(MemDiskGroup):
 
     Parameters
     ----------
-    data_group : :class:`h5py.Group`, :class:`MemGroup` or string, optional
-        Underlying :mod:`h5py` like data container where data will be stored.
-        If a string, open an h5py file with that name. If not
-        provided a new :class:`MemGroup` instance will be created.
+    Parameters are passed through to the base class constructor.
 
     Attributes
     ----------
@@ -1217,6 +1238,7 @@ class BasicCont(MemDiskGroup):
     create_index_map
     del_index_map
     add_history
+    redistribute
 
     """
 
@@ -1256,7 +1278,7 @@ class BasicCont(MemDiskGroup):
         """Stores representions of the axes of datasets.
 
         The index map contains arrays used to interpret the axes of the
-        variouse datasets. For instance, the 'time', 'prod' and 'freq' axes of
+        various datasets. For instance, the 'time', 'prod' and 'freq' axes of
         the visibilities are described in the index map.
 
         Do not try to add a new index_map by assigning to an item of this
@@ -1296,6 +1318,7 @@ class BasicCont(MemDiskGroup):
         self._data['index_map'].create_dataset(axis_name, data=index_map)
 
     def del_index_map(self, axis_name):
+        """Delete an index map."""
         del self._data['index_map'][axis_name]
 
     def add_history(self, name, history=None):
@@ -1325,6 +1348,7 @@ class BasicCont(MemDiskGroup):
             the `axis` attribute on the dataset. If a list is supplied, each
             entry is tried in turn, which allows different datasets to be
             redistributed along differently labelled axes.
+
         """
 
         if not isinstance(dist_axis, (list, tuple)):
