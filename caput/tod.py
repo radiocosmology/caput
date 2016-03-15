@@ -142,7 +142,7 @@ class Reader(object):
     def __init__(self, files):
 
         # If files is a filename, or pattern, turn into list of files.
-        if isinstance(files, str):
+        if isinstance(files, basestring):
             files = sorted(glob.glob(files))
 
         data_empty = self.data_class.from_mult_files(files, datasets=())
@@ -350,7 +350,8 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     # Choose return class and initialize the object.
     out = first_data.__class__(out_group)
 
-    # Resolve the index maps.
+    # Resolve the index maps. XXX Shouldn't be nessisary after fix to
+    # _copy_non_time_data.
     for axis, index_map in first_data.index_map.items():
         if axis in concatenation_axes:
             # Initialize the dataset.
