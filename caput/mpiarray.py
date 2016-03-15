@@ -1,9 +1,7 @@
 """
-=============================================
-MPI Distributed Array (:mod:`caput.mpiarray`)
-=============================================
+An array class for containing MPI distributed array.
 
-An array class for containing MPI distributed data.
+.. currentmodule:: caput.mpiarray
 
 Classes
 =======
@@ -22,7 +20,7 @@ Fourier transforming each of these two axes of the distributed array::
     import numpy as np
     from mpi4py import MPI
 
-    from mpiarray import MPIArray
+    from caput.mpiarray import MPIArray
 
     nfreq = 32
     nprod = 2
@@ -100,7 +98,9 @@ Here is an example of this in action::
         if ri == mpiutil.rank:
             print ri, arr3
         mpiutil.barrier()
+
 """
+
 import numpy as np
 
 from caput import mpiutil

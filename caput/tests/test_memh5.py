@@ -52,6 +52,16 @@ class TestGroup(unittest.TestCase):
         gd = g['/a/b/c/d/']
         self.assertEqual(gd.name, '/a/b/c/d')
 
+    def test_recursive_create_dataset(self):
+        g = memh5.MemGroup()
+        data = np.arange(10)
+        g.create_dataset('a/ra', data=data)
+        self.assertTrue(memh5.is_group(g['a']))
+        self.assertTrue(np.all(g['a/ra'] == data))
+        g['a'].create_dataset('/ra', data=data)
+        print g.keys()
+        self.assertTrue(np.all(g['ra'] == data))
+
 
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""
@@ -117,9 +127,9 @@ class TestH5Files(unittest.TestCase):
         self.assertEqual(set(f.keys()), set(m['/level1']['/'].keys()))
         self.assertTrue(np.all(f['/level1/large'][:] == m['/level1/large']))
         gf = f.create_group('/level1/level2/level3/')
-        df = gf.create_dataset('new', np.arange(5))
+        df = gf.create_dataset('new', data=np.arange(5))
         gm = m.create_group('/level1/level2/level3/')
-        dm = gm.create_dataset('new', np.arange(5))
+        dm = gm.create_dataset('new', data=np.arange(5))
         self.assertTrue(np.all(f['/level1/level2/level3/new'][:]
                                == m['/level1/level2/level3/new'][:]))
 

@@ -5,8 +5,8 @@ Module for making in-memory mock-ups of :mod:`h5py` objects.
 
 It is sometimes usefull to have a consistent API for data that is independent
 of whether that data lives on disk or in memory. :mod:`h5py` provides this to a
-certain extent, having :class:`Dataset`` objects that act very much like
-:mod:`numpy` arrays. mod:`memh5` extends this, providing an in-memory
+certain extent, having :class:`Dataset` objects that act very much like
+:mod:`numpy` arrays. :mod:`memh5` extends this, providing an in-memory
 containers, analogous to :class:`h5py.Group` and :class:`h5py.Attribute` and
 :class:`h5py.Dataset` objects.
 
@@ -32,6 +32,7 @@ Basic Classes
     ro_dict
     MemGroup
     MemAttrs
+    MemDataset
     MemDatasetCommon
     MemDatasetDistributed
 
@@ -367,13 +368,25 @@ class MemGroup(ro_dict):
         dset : memh5.MemDataset
         """
 
-        # For the moment raise an Exception if we try to use absolute paths
-        if name[0] == '/':
-            raise ValueError('Dataset creation does not support absolute paths (%s)' % name)
+        if '/' in name:
+            parts = name.split('/')
+            name = parts[-1]
+            # Corner case of name = '/dataset_name'.
+            if len(parts) == 2 and not parts[0]:
+                group_name = '/'
+            else:
+                group_name = '/'.join(parts[:-1])
+            g = self.require_group(group_name)
+            dataset_parent = g
+        else:
+            dataset_parent = self
+
+        if not name:
+            raise ValueError('Empty dataset names not allowed.')
 
         # If distributed, synchronise to ensure that we create group collectively
-        if self._distributed:
-            self._comm.Barrier()
+        if dataset_parent._distributed:
+            dataset_parent._comm.Barrier()
 
         if kwargs:
             msg = ("No extra keyword arguments accepted, this is not an hdf5"
@@ -404,7 +417,7 @@ class MemGroup(ro_dict):
             distributed = True
 
         # Enforce that distributed datasets can only exist in distributed memh5 groups.
-        if not self._distributed and distributed:
+        if not dataset_parent._distributed and distributed:
             raise RuntimeError('Cannot create a distributed dataset in a non-distributed group.')
 
         # If data is set (and consistent with shape/type), initialise the numpy array from it.
@@ -419,7 +432,7 @@ class MemGroup(ro_dict):
                     raise TypeError('Can only create distributed dataset from MPIArray.')
 
                 # Ensure that we are distributing over the same communicator
-                if data._comm != self._comm:
+                if data._comm != dataset_parent._comm:
                     raise RuntimeError('MPI communicator of array must match that of memh5 group.')
 
                 # If the distributed_axis is specified ensure the data is distributed along it.
@@ -442,7 +455,8 @@ class MemGroup(ro_dict):
                     raise RuntimeError('Distributed axis must be specified when creating dataset.')
 
                 new_dataset = MemDatasetDistributed(shape=shape, dtype=dtype,
-                                                    axis=distributed_axis, comm=self._comm)
+                                                    axis=distributed_axis,
+                                                    comm=dataset_parent._comm)
             else:
                 new_dataset = MemDatasetCommon(shape=shape, dtype=dtype)
 
@@ -450,12 +464,12 @@ class MemGroup(ro_dict):
                 new_dataset[...] = data[...]
 
         # Add new dataset to group
-        self._dict[name] = new_dataset
+        dataset_parent._dict[name] = new_dataset
 
         # Set the properties of the new dataset
         new_dataset._name = name
-        new_dataset._parent = weakref.proxy(self)  # Must use weakref to avoid reference cycles
-        new_dataset._root = self.file  # This should already be a weakref
+        new_dataset._parent = weakref.proxy(dataset_parent)  # Must use weakref to avoid reference cycles
+        new_dataset._root = dataset_parent.file  # This should already be a weakref
 
         return new_dataset
 
@@ -487,6 +501,9 @@ class MemAttrs(dict):
 
 class MemDataset(object):
     """Base class for an in memory implementation of the ``h5py.Dataset`` class.
+
+    This is only an abstract base class. Use :class:`MemDatasetCommon` or
+    :class:`MemDatasetDistributed`.
 
     Attributes
     ----------
@@ -568,9 +585,10 @@ class MemDataset(object):
 class MemDatasetCommon(MemDataset):
     """In memory implementation of the ``h5py.Dataset`` class.
 
-    Encapsulates a numpy array mocked up to look like an hdf5 dataset. Similar
-    to h5py datasets, this implements slicing like a numpy array but as it is
-    not actually a many operations won't work (e.g. ufuncs).
+    Inherits from :class:`MemDataset`. Encapsulates a numpy array mocked up to
+    look like an hdf5 dataset. Similar to h5py datasets, this implements
+    slicing like a numpy array but as it is not actually a many operations
+    won't work (e.g. ufuncs).
 
     Parameters
     ----------
@@ -587,6 +605,7 @@ class MemDatasetCommon(MemDataset):
     Methods
     -------
     from_numpy_array
+
     """
 
     def __init__(self, shape, dtype):
@@ -646,9 +665,10 @@ class MemDatasetCommon(MemDataset):
 class MemDatasetDistributed(MemDataset):
     """Parallel, in-memory implementation of the ``h5py.Dataset`` class.
 
-    Encapsulates an :class:`MPIArray`mocked up to look like an `h5py` dataset.
-    Similar to h5py datasets, this implements slicing like a numpy array but as
-    it is not actually a many operations won't work (e.g. ufuncs).
+    Inherits from :class:`MemDataset`. Encapsulates an :class:`MPIArray` mocked
+    up to look like an `h5py` dataset.  Similar to h5py datasets, this
+    implements slicing like a numpy array but as it is not actually a many
+    operations won't work (e.g. ufuncs).
 
     Parameters
     ----------
@@ -671,6 +691,7 @@ class MemDatasetDistributed(MemDataset):
     dtype
     comm
     distributed_axis
+
     """
 
     def __init__(self, shape, dtype, axis=0, comm=None):
