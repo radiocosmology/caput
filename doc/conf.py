@@ -11,7 +11,7 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
+import sys, os, re
 
 # Check if we are on readthedocs
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
@@ -47,7 +47,27 @@ if on_rtd:
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 # 'numpydoc' does not ship with sphinx. To get it use `pip install numpydoc`.
 extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath', 'sphinx.ext.mathjax',
-              'numpydoc', 'sphinx.ext.autosummary', 'sphinx.ext.viewcode']
+              'numpydoc', 'sphinx.ext.autosummary', 'sphinx.ext.viewcode',
+              'sphinx.ext.intersphinx']
+
+
+intersphinx_mapping = {'h5py': ('http://docs.h5py.org/en/latest/', None)}
+intersphinx_cache_limit = 1
+
+# This autodoc preprocessor replaces tokens like :class:`h5py.Dataset` with
+# :class:`h5py.Dataset <Dataset>`, as this is how h5py intersphinx domains are
+# set up.
+def process_docstring(app, what, name, obj, options, lines):
+    for ii in range(len(lines)):
+        lines[ii] = re.sub(
+                r':([a-z]*):`h5py\.([a-zA-Z_\.]*)`',
+                r':\1:`h5py.\2 <h5py:\2>`',
+                lines[ii],
+                )
+
+def setup(app):
+    app.connect('autodoc-process-docstring', process_docstring)
+
 
 numpydoc_show_class_members = False
 import glob
