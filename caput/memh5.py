@@ -170,7 +170,7 @@ class _StorageRoot(_Storage):
 
 
 class MemAttrs(dict):
-    """In memory implementation of the ``h5py.AttributeManager``.
+    """In memory implementation of the :class:`h5py.AttributeManager`.
 
     Currently just a normal dictionary.
 
