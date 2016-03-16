@@ -5,9 +5,9 @@ Module for making in-memory mock-ups of :mod:`h5py` objects.
 
 It is sometimes useful to have a consistent API for data that is independent
 of whether that data lives on disk or in memory. :mod:`h5py` provides this to a
-certain extent, having :class:`Dataset` objects that act very much like
+certain extent, having :class:`h5py.Dataset` objects that act very much like
 :mod:`numpy` arrays. :mod:`memh5` extends this, providing an in-memory
-containers, analogous to :class:`h5py.Group` and :class:`h5py.Attribute` and
+containers, analogous to :class:`h5py.Group`, :class:`h5py.AttributeManager` and
 :class:`h5py.Dataset` objects.
 
 In addition to these basic classes that copy the :mod:`h5py` API, A higher
@@ -17,10 +17,10 @@ disk.
 
 This also allows the creation and use of :mod:`memh5` objects which can hold
 data distributed over a number of MPI processes. These
-:class:`MemDatasetDistributed` datasets hold :class:`mpiarray.MPIArray` objects
-and can be written to, and loaded from disk like normal :class:`memh5` objects.
-Support for this must be explicitly enabled in the root group at creation with
-the `distributed=True` flag.
+:class:`MemDatasetDistributed` datasets hold :class:`caput.mpiarray.MPIArray`
+objects and can be written to, and loaded from disk like normal :class:`memh5`
+objects.  Support for this must be explicitly enabled in the root group at
+creation with the `distributed=True` flag.
 
 
 Basic Classes
@@ -170,7 +170,7 @@ class _StorageRoot(_Storage):
 
 
 class MemAttrs(dict):
-    """In memory implementation of the ``h5py.AttributeManager``.
+    """In memory implementation of the :class:`h5py.AttributeManager`.
 
     Currently just a normal dictionary.
 
@@ -607,7 +607,7 @@ class MemGroup(_BaseGroup):
 
 
 class MemDataset(_MemObjMixin):
-    """Base class for an in memory implementation of the ``h5py.Dataset`` class.
+    """Base class for an in memory implementation of :class:`h5py.Dataset`.
 
     This is only an abstract base class. Use :class:`MemDatasetCommon` or
     :class:`MemDatasetDistributed`.
@@ -661,7 +661,7 @@ class MemDataset(_MemObjMixin):
 
 
 class MemDatasetCommon(MemDataset):
-    """In memory implementation of the ``h5py.Dataset`` class.
+    """In memory implementation of :class:`h5py.Dataset`.
 
     Inherits from :class:`MemDataset`. Encapsulates a numpy array mocked up to
     look like an hdf5 dataset. Similar to h5py datasets, this implements
@@ -746,7 +746,7 @@ class MemDatasetCommon(MemDataset):
 
 
 class MemDatasetDistributed(MemDataset):
-    """Parallel, in-memory implementation of the ``h5py.Dataset`` class.
+    """Parallel, in-memory implementation of :class:`h5py.Dataset`.
 
     Inherits from :class:`MemDataset`. Encapsulates an :class:`MPIArray` mocked
     up to look like an `h5py` dataset.  Similar to h5py datasets, this
@@ -1434,7 +1434,7 @@ def get_h5py_File(f, **kwargs):
     ----------
     f : h5py Group or filename string
     **kwargs : all keyword arguments
-        Passed to `h5py.File` constructor. If `f` is already an open file,
+        Passed to :class:`h5py.File` constructor. If `f` is already an open file,
         silently ignores all keywords.
 
     Returns
