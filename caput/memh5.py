@@ -3,11 +3,11 @@ Module for making in-memory mock-ups of :mod:`h5py` objects.
 
 .. currentmodule:: caput.memh5
 
-It is sometimes usefull to have a consistent API for data that is independent
+It is sometimes useful to have a consistent API for data that is independent
 of whether that data lives on disk or in memory. :mod:`h5py` provides this to a
-certain extent, having :class:`Dataset` objects that act very much like
+certain extent, having :class:`h5py.Dataset` objects that act very much like
 :mod:`numpy` arrays. :mod:`memh5` extends this, providing an in-memory
-containers, analogous to :class:`h5py.Group` and :class:`h5py.Attribute` and
+containers, analogous to :class:`h5py.Group`, :class:`h5py.AttributeManager` and
 :class:`h5py.Dataset` objects.
 
 In addition to these basic classes that copy the :mod:`h5py` API, A higher
@@ -17,10 +17,10 @@ disk.
 
 This also allows the creation and use of :mod:`memh5` objects which can hold
 data distributed over a number of MPI processes. These
-:class:`MemDatasetDistributed` datasets hold :class:`mpiarray.MPIArray` objects
-and can be written to, and loaded from disk like normal :class:`memh5` objects.
-Support for this must be explicitly enabled in the root group at creation with
-the `distributed=True` flag.
+:class:`MemDatasetDistributed` datasets hold :class:`caput.mpiarray.MPIArray`
+objects and can be written to, and loaded from disk like normal :class:`memh5`
+objects.  Support for this must be explicitly enabled in the root group at
+creation with the `distributed=True` flag.
 
 
 Basic Classes
@@ -65,6 +65,7 @@ import sys
 import collections
 import warnings
 import weakref
+import posixpath
 
 import numpy as np
 import h5py
@@ -74,6 +75,8 @@ from . import mpiarray
 
 # Basic Classes
 # -------------
+
+
 
 class ro_dict(collections.Mapping):
     """A dict that is read-only to the user.
@@ -109,7 +112,228 @@ class ro_dict(collections.Mapping):
         return self._dict.__iter__()
 
 
-class MemGroup(ro_dict):
+class _Storage(dict):
+    """Underlying container that provides storage backing for in-memory groups.
+
+    """
+
+    def __init__(self, **kwargs):
+        super(_Storage, self).__init__(**kwargs)
+        self._attrs = MemAttrs()
+
+    @property
+    def attrs(self):
+        return self._attrs
+
+
+class _StorageRoot(_Storage):
+    """Root level of the storage tree.
+
+    """
+
+    def __init__(self, distributed=False, comm=None):
+        super(_StorageRoot, self).__init__()
+        self._distributed = distributed
+        self._comm = None
+
+        # If distributed set the communicator it is using
+        if self.distributed:
+            from mpi4py import MPI
+            self._comm = comm if comm is not None else MPI.COMM_WORLD
+
+    @property
+    def comm(self):
+        return self._comm
+
+    @property
+    def distributed(self):
+        return self._distributed
+
+    def __getitem__(self, key):
+        """Implements Hierarchical path lookup."""
+
+        if '/' not in key:
+            return super(_StorageRoot, self).__getitem__(key)
+
+        # Format and split the path.
+        key = format_abs_path(key)
+        if key == '/':
+            return self
+
+        path_parts = key.split('/')[1:]
+
+        # Crawl the path.
+        out = self
+        for part in path_parts:
+            out = out[part]
+        return out
+
+
+class MemAttrs(dict):
+    """In memory implementation of the :class:`h5py.AttributeManager`.
+
+    Currently just a normal dictionary.
+
+    """
+
+    pass
+
+
+class _MemObjMixin(object):
+    """Mixin represents the identity of an in-memory h5py-like object.
+
+    Implement a few attributes that all memh5 objects have, such as `parent`,
+    and `file`.
+
+    """
+
+    @property
+    def _group_class(self):
+        return None
+
+    # Here I have to implement __new__ not __init__ since MemDiskGroup
+    # implements new and messes with parameters.
+    def __init__(self, storage_root=None, name=''):
+        super(_MemObjMixin, self).__init__()
+        self._storage_root = storage_root
+        if storage_root is not None and not posixpath.isabs(name):
+            # Should never happen, so this is mostly for debugging.
+            raise ValueError("Must be given an absolute path.")
+        self._name = name
+
+    @property
+    def name(self):
+        """String giving the full path to this entry."""
+        return self._name
+
+    @property
+    def parent(self):
+        """Parent :class:`MemGroup` that contains this group."""
+        parent_name, myname = posixpath.split(self.name)
+        return self._group_class._from_storage_root(self._storage_root, parent_name)
+
+    @property
+    def file(self):
+        """Not a file at all but the top most :class:`MemGroup` of the tree."""
+        return self._group_class._from_storage_root(self._storage_root, '/')
+
+    def __eq__(self, other):
+        if hasattr(other, '_storage_root') and hasattr(other, 'name'):
+            return ((self._storage_root is other._storage_root)
+                    and (self.name == other.name))
+        return False
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
+
+
+class _BaseGroup(_MemObjMixin, collections.Mapping):
+    """Implement the majority of the Group interface.
+
+    Subclasses must setup the underlying storage in thier constructors, as well
+    as implement `create_group` and `create_dataset`.
+
+    """
+
+    @property
+    def _group_class(self):
+        return self.__class__
+
+    @property
+    def comm(self):
+        """Reference to the MPI communicator.
+        """
+        return self._storage_root._comm
+
+    @property
+    def _distributed(self):
+        return self._storage_root._distributed
+
+    @property
+    def attrs(self):
+        """Attributes attached to this object.
+
+        Returns
+        -------
+        attrs : MemAttrs
+
+        """
+        return self._get_storage().attrs
+
+    @classmethod
+    def _from_storage_root(cls, storage_root, name):
+        self = super(_BaseGroup, cls).__new__(cls, storage_root, name)
+        super(_BaseGroup, self).__init__(storage_root, name)
+        return self
+
+    def _get_storage(self):
+        return self._storage_root[self.name]
+
+    def __getitem__(self, name):
+        """Retrieve an object.
+
+        The *name* may be a relative or absolute path
+
+        """
+
+        path = format_abs_path(posixpath.join(self.name, name))
+        out = self._storage_root[path]
+
+        # Cast the output.
+        if is_group(out) or isinstance(out, _Storage):
+            # Group like.
+            return self._group_class._from_storage_root(self._storage_root, path)
+        else:
+            # A dataset
+            return out
+
+    def __delitem__(self, name):
+        """Delete item from group."""
+        if name not in self.keys():
+            raise KeyError("Key %s not present." % name)
+        path = posixpath.join(self.name, name)
+        parent_path, name = posixpath.split(path)
+        parent = self._storage_root[parent_path]
+        del parent[name]
+
+    def __len__(self):
+        return len(self._get_storage())
+
+    def __iter__(self):
+        keys = self._get_storage().keys()
+        for key in keys:
+            yield key
+
+    def require_dataset(self, name, shape, dtype, **kwargs):
+        """Require a dataset to exist, create if it doesn't.
+
+        All arguments are passed through to create_dataset.
+
+        """
+        try:
+            d = self[name]
+        except KeyError:
+            return self.create_dataset(name, shape=shape, dtype=dtype, **kwargs)
+        if is_group(d):
+            msg = "Entry '%s' exists and is not a Dataset." % name
+            raise TypeError(msg)
+        else:
+            return d
+
+    def require_group(self, name):
+        """Require a group to exist, create if it doesn't."""
+        try:
+            g = self[name]
+        except KeyError:
+            return self.create_group(name)
+        if not is_group(g):
+            msg = "Entry '%s' exists and is not a Group." % name
+            raise TypeError(msg)
+        else:
+            return g
+
+
+class MemGroup(_BaseGroup):
     """In memory implementation of the :class:`h5py.Group`.
 
     This class doubles as the memory implementation of :class:`h5py.File`,
@@ -140,74 +364,14 @@ class MemGroup(ro_dict):
     require_group
     create_dataset
     require_dataset
+
     """
 
     def __init__(self, distributed=False, comm=None):
-        ro_dict.__init__(self)
-        self._attrs = MemAttrs()
-        # Set the following assuming we are the root group. If not, the method
-        # that created us will reset.
-
-        # Both _root and _parent need to be weakrefs, otherwise we will end up
-        # generating reference cycles which can end up leaking memory
-        self._root = weakref.proxy(self)
-        self._parent = weakref.proxy(self)
-        self._name = ''
-
-        # Set params for distributed datasets, comm is only needed if distributed=True
-        self._distributed = distributed
-        self._comm = None
-
-        # If distributed set the communicator it is using
-        if self._distributed:
-            from mpi4py import MPI
-
-            self._comm = comm if comm is not None else MPI.COMM_WORLD
-
-    def __getitem__(self, key):
-        """Implement '/' for accessing nested groups."""
-        if not key:
-            return self
-        # If this is an absolute path, index from the root group.
-        if key[0] == '/':
-            return self._root[key[1:]]
-        key_parts = key.split('/')
-        # Strip out any empty key parts.  Takes care of '//' and trailing '/'.
-        key_parts = [p for p in key_parts if p]
-        if len(key_parts) == 1:
-            return ro_dict.__getitem__(self, key_parts[0])
-        else:
-            # Enter the first level and call __getitem__ recursively.
-            return self[key_parts[0]]['/'.join(key_parts[1:])]
-
-    @property
-    def attrs(self):
-        """Attributes attached to this object.
-
-        Returns
-        -------
-        attrs : MemAttrs
-
-        """
-        return self._attrs
-
-    @property
-    def parent(self):
-        """Parent :class:`MemGroup` that contains this group."""
-        return self._parent
-
-    @property
-    def name(self):
-        """String giving the full path to this group."""
-        if self.parent is self._root:
-            return '/' + self._name
-        else:
-            return self.parent.name + '/' + self._name
-
-    @property
-    def file(self):
-        """Not a file at all but the top most :class:`MemGroup` of the tree."""
-        return self._root
+        # Default constructor is only used to create the root group.
+        storage_root = _StorageRoot(distributed=distributed, comm=comm)
+        name = '/'
+        super(MemGroup, self).__init__(storage_root, name)
 
     @property
     def mode(self):
@@ -218,11 +382,6 @@ class MemGroup(ro_dict):
         """
         return 'r+'
 
-    @property
-    def comm(self):
-        """Reference to the MPI communicator.
-        """
-        return self._comm
 
     @classmethod
     def from_group(cls, group):
@@ -294,54 +453,40 @@ class MemGroup(ro_dict):
         else:
             _distributed_group_to_hdf5(self, filename, **kwargs)
 
-    def create_group(self, key):
+    def create_group(self, name):
+        """Create a group within the storage tree."""
 
-        # Corner case if empty key.
-        if not key:
-            msg = "Empty group names not allowed."
-            raise ValueError(msg)
+        path = format_abs_path(posixpath.join(self.name, name))
+        try:
+            self[name]
+        except KeyError:
+            pass
+        else:
+            raise ValueError('Entry %s exists.' % name)
 
         # If distributed, synchronise to ensure that we create group collectively
         if self._distributed:
-            self._comm.Barrier()
+            self.comm.Barrier()
 
-        if '/' not in key:
-            # Create group directly.
+        parent_name = '/'
+        path_parts = path.split('/')
+        # In this loop, exception guaranteed not to be raised on first
+        # iteration, since we know that `parent_name + ''` exists.
+        for part in path_parts:
             try:
-                self[key]
+                parent_name = posixpath.join(parent_name, part)
+                parent_storage = self._storage_root[parent_name]
             except KeyError:
-                out = MemGroup(distributed=self._distributed, comm=self._comm)
-                out._root = self._root  # Should already be a weakref
-                out._parent = weakref.proxy(self)  # Must use weakref to avoid reference cycles
-                out._name = key
-                self._dict[key] = out
-                return out
-            else:
-                msg = "Item '%s' already exists." % key
-                raise ValueError(msg)
-        else:
-            # Recursively create groups.
-            key_parts = key.split('/')
-            # strip off trailing '/' if present.
-            if not key_parts[-1]:
-                key_parts = key_parts[:-1]
-            # Corner case of '/group_name':
-            if len(key_parts) == 2 and not key_parts[0]:
-                g = self._root
-            else:
-                g = self.require_group('/'.join(key_parts[:-1]))
-            return g.create_group(key_parts[-1])
+                parent_storage[part] = _Storage()
+                parent_name = posixpath.join(parent_name, part)
+                parent_storage = parent_storage[part]
+            if not isinstance(parent_storage, _Storage):
+                raise ValueError('Entry %s exists and is not a Group.'
+                                 % parent_name)
 
-    def require_group(self, key):
-        try:
-            g = self[key]
-        except KeyError:
-            return self.create_group(key)
-        if not isinstance(g, MemGroup):
-            msg = "Entry '%s' exists and is not a Group." % key
-            raise TypeError(msg)
-        else:
-            return g
+        # Underlying storage has been created. Return the group object.
+        return self[name]
+
 
     def create_dataset(self, name, shape=None, dtype=None, data=None,
                        distributed=False, distributed_axis=None, **kwargs):
@@ -366,27 +511,16 @@ class MemGroup(ro_dict):
         Returns
         -------
         dset : memh5.MemDataset
+
         """
 
-        if '/' in name:
-            parts = name.split('/')
-            name = parts[-1]
-            # Corner case of name = '/dataset_name'.
-            if len(parts) == 2 and not parts[0]:
-                group_name = '/'
-            else:
-                group_name = '/'.join(parts[:-1])
-            g = self.require_group(group_name)
-            dataset_parent = g
-        else:
-            dataset_parent = self
-
-        if not name:
-            raise ValueError('Empty dataset names not allowed.')
+        parent_name, name = posixpath.split(posixpath.join(self.name, name))
+        parent_name = format_abs_path(parent_name)
+        parent_storage = self.require_group(parent_name)._get_storage()
 
         # If distributed, synchronise to ensure that we create group collectively
-        if dataset_parent._distributed:
-            dataset_parent._comm.Barrier()
+        if self._distributed:
+            self.comm.Barrier()
 
         if kwargs:
             msg = ("No extra keyword arguments accepted, this is not an hdf5"
@@ -417,7 +551,7 @@ class MemGroup(ro_dict):
             distributed = True
 
         # Enforce that distributed datasets can only exist in distributed memh5 groups.
-        if not dataset_parent._distributed and distributed:
+        if not self._distributed and distributed:
             raise RuntimeError('Cannot create a distributed dataset in a non-distributed group.')
 
         # If data is set (and consistent with shape/type), initialise the numpy array from it.
@@ -432,7 +566,7 @@ class MemGroup(ro_dict):
                     raise TypeError('Can only create distributed dataset from MPIArray.')
 
                 # Ensure that we are distributing over the same communicator
-                if data._comm != dataset_parent._comm:
+                if data.comm != self.comm:
                     raise RuntimeError('MPI communicator of array must match that of memh5 group.')
 
                 # If the distributed_axis is specified ensure the data is distributed along it.
@@ -456,7 +590,7 @@ class MemGroup(ro_dict):
 
                 new_dataset = MemDatasetDistributed(shape=shape, dtype=dtype,
                                                     axis=distributed_axis,
-                                                    comm=dataset_parent._comm)
+                                                    comm=self.comm)
             else:
                 new_dataset = MemDatasetCommon(shape=shape, dtype=dtype)
 
@@ -464,43 +598,16 @@ class MemGroup(ro_dict):
                 new_dataset[...] = data[...]
 
         # Add new dataset to group
-        dataset_parent._dict[name] = new_dataset
+        parent_storage[name] = new_dataset
 
         # Set the properties of the new dataset
-        new_dataset._name = name
-        new_dataset._parent = weakref.proxy(dataset_parent)  # Must use weakref to avoid reference cycles
-        new_dataset._root = dataset_parent.file  # This should already be a weakref
-
+        new_dataset._name = posixpath.join(parent_name, name)
+        new_dataset._storage_root = self._storage_root
         return new_dataset
 
-    def require_dataset(self, key, shape, dtype, **kwargs):
-        """Require a dataset to exist, create if it doesn't.
 
-        Distributed dataset arguments are passed straight through to create_dataset.
-        """
-        try:
-            d = self[key]
-        except KeyError:
-            return self.create_dataset(key, shape=shape, dtype=dtype, **kwargs)
-        if isinstance(d, MemGroup):
-            msg = "Entry '%s' exists and is not a Dataset." % key
-            raise TypeError(msg)
-        else:
-            return d
-
-
-class MemAttrs(dict):
-    """In memory implementation of the ``h5py.AttributeManager``.
-
-    Currently just a normal dictionary.
-
-    """
-
-    pass
-
-
-class MemDataset(object):
-    """Base class for an in memory implementation of the ``h5py.Dataset`` class.
+class MemDataset(_MemObjMixin):
+    """Base class for an in memory implementation of :class:`h5py.Dataset`.
 
     This is only an abstract base class. Use :class:`MemDatasetCommon` or
     :class:`MemDatasetDistributed`.
@@ -514,11 +621,9 @@ class MemDataset(object):
 
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
+        super(MemDataset, self).__init__(**kwargs)
         self._attrs = MemAttrs()
-        self._parent = None
-        self._name = ''
-        self._root = None
 
     @property
     def attrs(self):
@@ -529,35 +634,8 @@ class MemDataset(object):
         attrs : MemAttrs
 
         """
-
         return self._attrs
 
-    @property
-    def parent(self):
-        """Parent :class:`MemGroup` that contains this dataset."""
-        return self._parent
-
-    @property
-    def name(self):
-        """String giving the full path to this dataset."""
-        if self.parent is self._root:
-            return '/' + self._name
-        else:
-            return self.parent.name + '/' + self._name
-
-    @property
-    def file(self):
-        """Not a file at all but the top most :class:`MemGroup` of the tree."""
-        return self._root
-
-    @property
-    def mode(self):
-        """String indicating if group is readonly ("r") or read-write ("r+").
-
-        :class:`MemGroup`s are always read-write.
-
-        """
-        return 'r+'
 
     def resize(self):
         # h5py datasets reshape() is different from numpy reshape.
@@ -583,7 +661,7 @@ class MemDataset(object):
 
 
 class MemDatasetCommon(MemDataset):
-    """In memory implementation of the ``h5py.Dataset`` class.
+    """In memory implementation of :class:`h5py.Dataset`.
 
     Inherits from :class:`MemDataset`. Encapsulates a numpy array mocked up to
     look like an hdf5 dataset. Similar to h5py datasets, this implements
@@ -609,7 +687,7 @@ class MemDatasetCommon(MemDataset):
     """
 
     def __init__(self, shape, dtype):
-        MemDataset.__init__(self)
+        super(MemDatasetCommon, self).__init__()
 
         self._data = np.zeros(shape, dtype)
 
@@ -627,14 +705,19 @@ class MemDatasetCommon(MemDataset):
         dset : MemDatasetCommon
             Dataset encapsulating the numpy array.
         """
-        dset = cls.__new__(cls)
-        MemDataset.__init__(dset)
 
         if not isinstance(data, np.ndarray):
             raise TypeError("Object must be a numpy array (or subclass).")
 
+        dset = cls.__new__(cls)
+        super(MemDatasetCommon, dset).__init__()
+
         dset._data = data
         return dset
+
+    @property
+    def comm(self):
+        return None
 
     @property
     def shape(self):
@@ -663,7 +746,7 @@ class MemDatasetCommon(MemDataset):
 
 
 class MemDatasetDistributed(MemDataset):
-    """Parallel, in-memory implementation of the ``h5py.Dataset`` class.
+    """Parallel, in-memory implementation of :class:`h5py.Dataset`.
 
     Inherits from :class:`MemDataset`. Encapsulates an :class:`MPIArray` mocked
     up to look like an `h5py` dataset.  Similar to h5py datasets, this
@@ -695,7 +778,7 @@ class MemDatasetDistributed(MemDataset):
     """
 
     def __init__(self, shape, dtype, axis=0, comm=None):
-        MemDataset.__init__(self)
+        super(MemDatasetDistributed, self).__init__()
 
         self._data = mpiarray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
 
@@ -770,12 +853,12 @@ class MemDatasetDistributed(MemDataset):
 # Higher Level Data Containers
 # ----------------------------
 
-class MemDiskGroup(collections.Mapping):
+class MemDiskGroup(_BaseGroup):
     """Container whose data may either be stored on disk or in memory.
 
     This container is intended to have the same basic API :class:`h5py.Group`
     and :class:`MemGroup` but whose underlying data could live either on disk
-    in the former or in memory in the later.
+    or in memory.
 
     Aside from providing a few convenience methods, this class isn't that
     useful by itself. It is almost as easy to use :class:`h5py.Group`
@@ -799,6 +882,10 @@ class MemDiskGroup(collections.Mapping):
         Allow the container to hold distributed datasets.
     comm : MPI.Comm, optional
         MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
+    detect_subclass: boolean, optional
+        If *data_group* is specified, whether to inspect for a
+        '__memh5_subclass' attribute which specifies a subclass to return.
+
 
     Attributes
     ----------
@@ -811,10 +898,12 @@ class MemDiskGroup(collections.Mapping):
     Methods
     -------
     __getitem__
+    __delitem__
     from_file
     dataset_name_allowed
     group_name_allowed
     create_dataset
+    require_dataset
     create_group
     require_group
     to_memory
@@ -825,61 +914,95 @@ class MemDiskGroup(collections.Mapping):
 
     """
 
-    # Default initialisation
-    _data = None
 
-    def __init__(self, data_group=None, distributed=False, comm=None):
-
+    def __new__(cls, data_group=None, distributed=False, comm=None,
+                detect_subclass=True):
+        toclose = False
         # If data group is not set, initialise a new MemGroup
         if data_group is None:
             data_group = MemGroup(distributed=distributed, comm=comm)
-
         # If it is a MemDiskGroup then initialise a shallow copy
         elif isinstance(data_group, MemDiskGroup):
             data_group = data_group._data
-        # Otherwise, presume it is an HDF5 file
+        # Otherwise, presume it is an HDF5 Group-like object (which includes
+        # MemGroup and h5py.Group).
         else:
-            data_group, self._toclose = get_h5py_File(data_group)
+            data_group, toclose = get_h5py_File(data_group)
 
-        if distributed and isinstance(data_group, h5py.File):
+        if distributed and isinstance(data_group, h5py.Group):
             raise ValueError('Distributed MemDiskGroup cannot be created around h5py objects.')
-
         # Check the distribution settings
-        if isinstance(data_group, MemGroup):
-
+        elif distributed:
             # Check parallel distribution is the same
-            if distributed != data_group._distributed:
+            if not data_group._distributed:
                 raise ValueError('Cannot create MemDiskGroup with different distributed setting to MemGroup to wrap.')
-
             # Check parallel distribution is the same
-            if distributed and comm and comm != data_group._comm:
+            if comm and comm != data_group.comm:
                 raise ValueError('Cannot create MemDiskGroup with different MPI communicator to MemGroup to wrap.')
 
-        self._data = data_group
+        # Look for a hint as to the sub class we should return, this should be
+        # in the attributes of the root.
+        new_cls = cls
+        if detect_subclass and '__memh5_subclass' in data_group.attrs:
+            from .pipeline import _import_class
+
+            clspath = data_group.attrs['__memh5_subclass']
+
+            # Try and get a reference to the requested class (warn if we cannot find it)
+            try:
+                new_cls = _import_class(clspath)
+            except (ImportError, KeyError):
+                warnings.warn('Could not import memh5 subclass %s' % clspath)
+
+            # Check that it is a subclass of MemDiskGroup
+            if not issubclass(cls, MemDiskGroup):
+                raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
+
+        self = super(MemDiskGroup, new_cls).__new__(new_cls, storage_root=data_group,
+                name=data_group.name)
+        self._toclose = toclose
+        # Store this for use in __init__
+        self._tmp_data_group = data_group
+        return self
+
+    def __init__(self, data_group=None, distributed=False, comm=None,
+                 detect_subclass=True):
+        data_group = self._tmp_data_group
+        del self._tmp_data_group
+        super(MemDiskGroup, self).__init__(data_group, data_group.name)
+
+    @property
+    def _data(self):
+        """_data was renamed to _storage_root. This added for compatibility."""
+        return self._storage_root
 
     def _finish_setup(self):
         """Finish the class setup *after* importing from a file."""
         pass
 
     def __del__(self):
-        """Closes file if on disk and if file was opened on initialization."""
-        if self.ondisk and self._toclose:
+        """Closes file if on disk if file was opened on initialization."""
+        if self.ondisk and hasattr(self, '_toclose') and self._toclose:
             self._data.close()
 
-    def __getitem__(self, key):
-        value = self._data[key]
+    def __getitem__(self, name):
+        """Retrieve an object.
+
+        The *name* may be a relative or absolute path
+
+        """
+
+        value = super(MemDiskGroup, self).__getitem__(name)
+        path = value.name
         if is_group(value):
-            if self.group_name_allowed(key):
-                return value
-            else:
-                msg = "Access to group %s not allowed." % key
+            if not self.group_name_allowed(path):
+                msg = "Access to group %s not allowed." % path
                 raise KeyError(msg)
         else:
-            if self.dataset_name_allowed(key):
-                return value
-            else:
-                msg = "Access to dataset %s not allowed." % key
+            if not self.dataset_name_allowed(path):
+                msg = "Access to dataset %s not allowed." % path
                 raise KeyError(msg)
+        return value
 
     def __len__(self):
         n = 0
@@ -888,37 +1011,13 @@ class MemDiskGroup(collections.Mapping):
         return n
 
     def __iter__(self):
-        for key, value in self._data.items():
-            if ((is_group(value) and self.group_name_allowed(key))
-                or (not is_group(value) and self.dataset_name_allowed(key))):
-                yield key
-            else:
+        for key in super(MemDiskGroup, self).__iter__():
+            try:
+                value = self[key]
+            except KeyError:
+                # This key name is not allowed (see __getitem__)
                 continue
-
-    # TODO, something similar to __getitem__(), restricting names,
-    # for len() and __iter__().
-
-    # The main interface #
-
-    @property
-    def attrs(self):
-        return self._data.attrs
-
-    @property
-    def name(self):
-        return self._data.name
-
-    @property
-    def parent(self):
-        return self._data.parent
-
-    @property
-    def file(self):
-        return self._data.file
-
-    @property
-    def comm(self):
-        return self._data._comm
+            yield key
 
     @property
     def ondisk(self):
@@ -928,64 +1027,53 @@ class MemDiskGroup(collections.Mapping):
     # For creating new instances. #
 
     @classmethod
-    def from_file(cls, filename, ondisk=False, distributed=False, comm=None, **kwargs):
+    def from_file(cls, file_, ondisk=False, distributed=False, comm=None,
+                  detect_subclass=True, **kwargs):
         """Create data object from analysis hdf5 file, store in memory or on disk.
 
         If *ondisk* is True, do not load into memory but store data in h5py objects
-        that remain associated with the file on disk.
+        that remain associated with the file on disk. This is almost identical
+        to the default constructor, when providing a file as the *data_group*
+        object, however provides more flexibility when opening the file through
+        the additional keyword arguments.
 
         Parameters
         ----------
-        filename : string
+        file_ : string or :class:`h5py.Group` object
             File with the hdf5 data. File must be compatible with memh5 objects.
         ondisk : bool
-            Whether the data should be kept in the file on disk or should be copied
+            Whether the data should be stored in-place in *file_* or should be copied
             into memory.
-
-        Any additional keyword arguments are passed to :class:`h5py.File`
-        constructor if *f* is a filename and silently ignored otherwise.
+        distributed : boolean, optional
+            Allow the container to hold distributed datasets.
+        comm : MPI.Comm, optional
+            MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
+        detect_subclass: boolean, optional
+            If *data_group* is specified, whether to inspect for a
+            '__memh5_subclass' attribute which specifies a subclass to return.
+        **kwargs : any other arguments
+            Any additional keyword arguments are passed to :class:`h5py.File`'s
+            constructor if *file_* is a filename and silently ignored otherwise.
 
         """
 
         if not ondisk:
-            # For non-distributed files we allow filename to be an h5py.File
-            # instance for compatibility with old code.
-            if isinstance(filename, h5py.File):
-                filename = filename.filename
+            if isinstance(file_, h5py.Group):
+                file_ = file_.filename
 
-            data = MemGroup.from_hdf5(filename, distributed=distributed, comm=comm, mode='r', **kwargs)
+            data = MemGroup.from_hdf5(file_, distributed=distributed, comm=comm, mode='r', **kwargs)
             toclose = False
         else:
             # Again, a compatibility hack
-            if isinstance(filename, h5py.File):
-                data = filename
+            if is_group(file_):
+                data = file_
                 toclose = False
             else:
-                data = h5py.File(filename, **kwargs)
+                data = h5py.File(file_, **kwargs)
                 toclose = True
 
-        # Look for a hint as to the sub class we should return, this should be
-        # in the attributes of the root.
-        if '__memh5_subclass' in data.attrs:
-            from .pipeline import _import_class
-
-            clspath = data.attrs['__memh5_subclass']
-
-            # Try and get a reference to the requested class (warn if we cannot find it)
-            try:
-                cls = _import_class(clspath)
-            except (ImportError, KeyError):
-                warnings.warn('Could not import memh5 subclass %s' % clspath)
-
-            # Check that is is a subclass of MemDiskGroup
-            if not issubclass(cls, MemDiskGroup):
-                raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
-
-        # Create an instance of requested class
-        self = cls.__new__(cls)
-
-        # Perform the MemDiskGroup path of the initialisation
-        MemDiskGroup.__init__(self, data, distributed=distributed, comm=comm)
+        self = cls(data, distributed=distributed, comm=comm,
+                   detect_subclass=detect_subclass)
 
         # ... skip the class initialisation, and use a special method
         self._finish_setup()
@@ -1006,10 +1094,15 @@ class MemDiskGroup(collections.Mapping):
         layout of the data container can implement this method instead of
         re-implementing the above mentioned methods.
 
+        Parameters
+        ----------
+        name: string
+            Absolute path to proposed group.
+
         Returns
         -------
         allowed : bool
-            ``True``.
+            ``True``
 
         """
         return True
@@ -1025,39 +1118,45 @@ class MemDiskGroup(collections.Mapping):
         layout of the data container can implement this method instead of
         re-implementing the above mentioned methods.
 
+        Parameters
+        ----------
+        name: string
+            Absolute path to proposed dataset.
+
         Returns
         -------
         allowed : bool
-            ``True``.
+            ``True``
 
         """
         return True
 
     def create_dataset(self, name, *args, **kwargs):
-        if not self.dataset_name_allowed(name):
-            msg = "Dataset name %s not allowed." % name
+        """Create and return a new dataset.
+
+        All parameters are passed through to the :meth:`create_dataset` method of
+        the underlying storage, whether it be an :class:`h5py.Group` or a
+        :class:`MemGroup`.
+
+        """
+
+        path = posixpath.join(self.name, name)
+        if not self.dataset_name_allowed(path):
+            msg = "Dataset name %s not allowed." % path
             raise ValueError(msg)
-        new_dataset = self._data.create_dataset(name, *args, **kwargs)
+        new_dataset = self._data.create_dataset(path, *args, **kwargs)
 
         return new_dataset
 
-    def require_dataset(self, key, *args, **kwargs):
-        if not self.dataset_name_allowed(key):
-            msg = "Dataset name %s not allowed." % key
-            raise ValueError(msg)
-        return self._data.require_dataset(key, *args, **kwargs)
+    def create_group(self, name):
+        """Create and return a new group."""
 
-    def create_group(self, key):
-        if not self.group_name_allowed(key):
-            msg = "Group name %s not allowed." % key
+        path = posixpath.join(self.name, name)
+        if not self.group_name_allowed(path):
+            msg = "Group name %s not allowed." % path
             raise ValueError(msg)
-        return self._data.create_group(key)
-
-    def require_group(self, key):
-        if not self.group_name_allowed(key):
-            msg = "Group name %s not allowed." % key
-            raise ValueError(msg)
-        return self._data.require_group(key)
+        self._data.create_group(path)
+        return self._group_class._from_storage_root(self._data, path)
 
     def to_memory(self):
         """Return a version of this data that lives in memory."""
@@ -1114,7 +1213,7 @@ class BasicCont(MemDiskGroup):
 
     Inherits from :class:`MemDiskGroup`.
 
-    Basic one-level data container that allows any number of data sets in the
+    Basic one-level data container that allows any number of datasets in the
     root group but no nesting. Data history tracking (in
     :attr:`BasicCont.history`) and array axis interpretation (in
     :attr:`BasicCont.index_map`) is also provided.
@@ -1125,10 +1224,7 @@ class BasicCont(MemDiskGroup):
 
     Parameters
     ----------
-    data_group : :class:`h5py.Group`, :class:`MemGroup` or string, optional
-        Underlying :mod:`h5py` like data container where data will be stored.
-        If a string, open an h5py file with that name. If not
-        provided a new :class:`MemGroup` instance will be created.
+    Parameters are passed through to the base class constructor.
 
     Attributes
     ----------
@@ -1140,12 +1236,14 @@ class BasicCont(MemDiskGroup):
     group_name_allowed
     dataset_name_allowed
     create_index_map
+    del_index_map
     add_history
+    redistribute
 
     """
 
     def __init__(self, *args, **kwargs):
-        MemDiskGroup.__init__(self, *args, **kwargs)
+        super(BasicCont,self).__init__(*args, **kwargs)
         # Initialize new groups only if writable.
         if self._data.file.mode == 'r+':
             self._data.require_group(u'history')
@@ -1180,7 +1278,7 @@ class BasicCont(MemDiskGroup):
         """Stores representions of the axes of datasets.
 
         The index map contains arrays used to interpret the axes of the
-        variouse datasets. For instance, the 'time', 'prod' and 'freq' axes of
+        various datasets. For instance, the 'time', 'prod' and 'freq' axes of
         the visibilities are described in the index map.
 
         Do not try to add a new index_map by assigning to an item of this
@@ -1195,7 +1293,7 @@ class BasicCont(MemDiskGroup):
 
         out = {}
         for name, value in self._data['index_map'].iteritems():
-            out[name] = value
+            out[name] = value[:]
         return ro_dict(out)
 
     def group_name_allowed(self, name):
@@ -1205,10 +1303,12 @@ class BasicCont(MemDiskGroup):
     def dataset_name_allowed(self, name):
         """Datasets may only be created and accessed in the root level group.
 
-        Returns ``True`` is *name* contains no '/' characters.
+        Returns ``True`` is *name* is a path in the root group i.e. '/dataset'.
 
         """
-        return False if '/' in name else True
+
+        parent_name, name = posixpath.split(name)
+        return True if parent_name == '/' else False
 
     def create_index_map(self, axis_name, index_map):
         """Create a new index map.
@@ -1216,6 +1316,10 @@ class BasicCont(MemDiskGroup):
         """
 
         self._data['index_map'].create_dataset(axis_name, data=index_map)
+
+    def del_index_map(self, axis_name):
+        """Delete an index map."""
+        del self._data['index_map'][axis_name]
 
     def add_history(self, name, history=None):
         """Create a new history entry."""
@@ -1244,6 +1348,7 @@ class BasicCont(MemDiskGroup):
             the `axis` attribute on the dataset. If a list is supplied, each
             entry is tried in turn, which allows different datasets to be
             redistributed along differently labelled axes.
+
         """
 
         if not isinstance(dist_axis, (list, tuple)):
@@ -1329,7 +1434,7 @@ def get_h5py_File(f, **kwargs):
     ----------
     f : h5py Group or filename string
     **kwargs : all keyword arguments
-        Passed to `h5py.File` constructor. If `f` is already an open file,
+        Passed to :class:`h5py.File` constructor. If `f` is already an open file,
         silently ignores all keywords.
 
     Returns
@@ -1345,7 +1450,7 @@ def get_h5py_File(f, **kwargs):
     if is_group(f):
         opened = False
         #if kwargs:
-        #    msg = "Got some keywork arguments but File is alrady open."
+        #    msg = "Got some keyword arguments but File is alrady open."
         #    warnings.warn(msg)
     else:
         opened = True
@@ -1379,6 +1484,21 @@ def deep_group_copy(g1, g2):
             copyattrs(entry.attrs, g2[key].attrs)
 
 
+def format_abs_path(path):
+    """Return absolute path string, formated without any extra '/'s."""
+    if not posixpath.isabs(path):
+        raise ValueError("Absolute path must be provided.")
+
+    path_parts = path.split('/')
+    # Strip out any empty key parts.  Takes care of '//', trailing '/', and
+    # removes leading '/'.
+    path_parts = [p for p in path_parts if p]
+
+    out = '/'
+    for p in path_parts:
+        out = posixpath.join(out, p)
+    return out
+
 
 def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     """Private routine to copy full data tree from distributed memh5 object into an
@@ -1387,7 +1507,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     if not group._distributed:
         raise RuntimeError('This should only run on distributed datasets [%s].' % group.name)
 
-    comm = group._comm
+    comm = group.comm
 
     # Create a copy of the kwargs with no mode argument so that we can override it
     kwargs_nomode = kwargs.copy()
@@ -1463,7 +1583,7 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
 
     # Create root group
     group = MemGroup(distributed=True, comm=comm)
-    comm = group._comm
+    comm = group.comm
 
     # == Create some internal functions for doing the read ==
     # Copy over attributes with a broadcast from rank = 0

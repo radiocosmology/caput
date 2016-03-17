@@ -31,8 +31,8 @@ class TestGroup(unittest.TestCase):
         root = memh5.MemGroup()
         l1 = root.create_group('level1')
         l2 = l1.require_group('level2')
-        self.assertTrue(root['level1'] is l1)
-        self.assertTrue(root['level1/level2'] is l2)
+        self.assertTrue(root['level1'] == l1)
+        self.assertTrue(root['level1/level2'] == l2)
         self.assertEqual(root['level1/level2'].name, '/level1/level2')
 
     def test_create_dataset(self):
@@ -57,10 +57,10 @@ class TestGroup(unittest.TestCase):
         data = np.arange(10)
         g.create_dataset('a/ra', data=data)
         self.assertTrue(memh5.is_group(g['a']))
-        self.assertTrue(np.all(g['a/ra'] == data))
+        self.assertTrue(np.all(g['a/ra'][:] == data))
         g['a'].create_dataset('/ra', data=data)
         print g.keys()
-        self.assertTrue(np.all(g['ra'] == data))
+        self.assertTrue(np.all(g['ra'][:] == data))
 
 
 class TestH5Files(unittest.TestCase):

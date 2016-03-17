@@ -1,6 +1,8 @@
 from setuptools import setup, find_packages
 import os
 
+from caput import __version__
+
 
 REQUIRES = ['numpy', 'h5py', 'PyYAML']
 
@@ -13,7 +15,7 @@ else:
 
 setup(
     name = 'caput',
-    version = 0.1,
+    version = __version__,
     packages = ['caput', 'caput.tests'],
     scripts=['scripts/caput-pipeline'],
     install_requires=requires,
