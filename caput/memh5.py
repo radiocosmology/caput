@@ -1037,6 +1037,8 @@ class MemDiskGroup(_BaseGroup):
         object, however provides more flexibility when opening the file through
         the additional keyword arguments.
 
+        This does *not* call `__init__` on the subclass when restoring.
+
         Parameters
         ----------
         file_ : string or :class:`h5py.Group` object
@@ -1072,8 +1074,13 @@ class MemDiskGroup(_BaseGroup):
                 data = h5py.File(file_, **kwargs)
                 toclose = True
 
-        self = cls(data, distributed=distributed, comm=comm,
-                   detect_subclass=detect_subclass)
+        # Here we explicitly avoid calling __init__ on any derived class. Like
+        # with a pickle we want to restore the saved state only.
+        self = cls.__new__(cls, data, distributed=distributed, comm=comm,
+                           detect_subclass=detect_subclass)
+
+        MemDiskGroup.__init__(self, data, distributed=distributed, comm=comm,
+                              detect_subclass=detect_subclass)
 
         # ... skip the class initialisation, and use a special method
         self._finish_setup()
