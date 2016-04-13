@@ -243,11 +243,11 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
     def comm(self):
         """Reference to the MPI communicator.
         """
-        return self._storage_root._comm
+        return self._storage_root.comm
 
     @property
-    def _distributed(self):
-        return self._storage_root._distributed
+    def distributed(self):
+        return self._storage_root.distributed
 
     @property
     def attrs(self):
@@ -447,7 +447,7 @@ class MemGroup(_BaseGroup):
             are distributed, or not.
         """
 
-        if not self._distributed:
+        if not self.distributed:
             with h5py.File(filename, **kwargs) as f:
                 deep_group_copy(self, f)
         else:
@@ -465,7 +465,7 @@ class MemGroup(_BaseGroup):
             raise ValueError('Entry %s exists.' % name)
 
         # If distributed, synchronise to ensure that we create group collectively
-        if self._distributed:
+        if self.distributed:
             self.comm.Barrier()
 
         parent_name = '/'
@@ -519,7 +519,7 @@ class MemGroup(_BaseGroup):
         parent_storage = self.require_group(parent_name)._get_storage()
 
         # If distributed, synchronise to ensure that we create group collectively
-        if self._distributed:
+        if self.distributed:
             self.comm.Barrier()
 
         if kwargs:
@@ -551,7 +551,7 @@ class MemGroup(_BaseGroup):
             distributed = True
 
         # Enforce that distributed datasets can only exist in distributed memh5 groups.
-        if not self._distributed and distributed:
+        if not self.distributed and distributed:
             raise RuntimeError('Cannot create a distributed dataset in a non-distributed group.')
 
         # If data is set (and consistent with shape/type), initialise the numpy array from it.
@@ -914,16 +914,16 @@ class MemDiskGroup(_BaseGroup):
 
     """
 
+    def __init__(self, data_group=None, distributed=False, comm=None):
 
-    def __new__(cls, data_group=None, distributed=False, comm=None,
-                detect_subclass=True):
         toclose = False
+
         # If data group is not set, initialise a new MemGroup
         if data_group is None:
             data_group = MemGroup(distributed=distributed, comm=comm)
         # If it is a MemDiskGroup then initialise a shallow copy
         elif isinstance(data_group, MemDiskGroup):
-            data_group = data_group._data
+            data_group = data_group._storage_root
         # Otherwise, presume it is an HDF5 Group-like object (which includes
         # MemGroup and h5py.Group).
         else:
@@ -934,11 +934,35 @@ class MemDiskGroup(_BaseGroup):
         # Check the distribution settings
         elif distributed:
             # Check parallel distribution is the same
-            if not data_group._distributed:
+            if not data_group.distributed:
                 raise ValueError('Cannot create MemDiskGroup with different distributed setting to MemGroup to wrap.')
-            # Check parallel distribution is the same
+            # Check parallel communicator is the same
             if comm and comm != data_group.comm:
                 raise ValueError('Cannot create MemDiskGroup with different MPI communicator to MemGroup to wrap.')
+
+        self._toclose = toclose
+        super(MemDiskGroup, self).__init__(storage_root=data_group, name=data_group.name)
+
+    @classmethod
+    def from_group(cls, data_group=None, detect_subclass=True):
+        """Create data object from a given group.
+
+        This wraps the given group object, optionally returning the correct
+        subclass. This does *not* call `__init__` on the subclass when
+        this happens.
+
+        Parameters
+        ----------
+        data_group : :class:`h5py.Group`, :class:`MemGroup` or string, optional
+            :mod:`h5py` like data containerto wrap.
+        detect_subclass: boolean, optional
+            If *data_group* is specified, whether to inspect for a
+            '__memh5_subclass' attribute which specifies a subclass to return.
+
+        Returns
+        -------
+        grp : MemDiskGroup
+        """
 
         # Look for a hint as to the sub class we should return, this should be
         # in the attributes of the root.
@@ -958,18 +982,10 @@ class MemDiskGroup(_BaseGroup):
             if not issubclass(cls, MemDiskGroup):
                 raise RuntimeError('Requested type (%s) is not an instance of memh5.MemDiskGroup.' % clspath)
 
-        self = super(MemDiskGroup, new_cls).__new__(new_cls, storage_root=data_group,
-                name=data_group.name)
-        self._toclose = toclose
-        # Store this for use in __init__
-        self._tmp_data_group = data_group
-        return self
+        self = new_cls.__new__(new_cls)
+        MemDiskGroup.__init__(self, data_group=data_group)
 
-    def __init__(self, data_group=None, distributed=False, comm=None,
-                 detect_subclass=True):
-        data_group = self._tmp_data_group
-        del self._tmp_data_group
-        super(MemDiskGroup, self).__init__(data_group, data_group.name)
+        return self
 
     @property
     def _data(self):
@@ -983,7 +999,7 @@ class MemDiskGroup(_BaseGroup):
     def __del__(self):
         """Closes file if on disk if file was opened on initialization."""
         if self.ondisk and hasattr(self, '_toclose') and self._toclose:
-            self._data.close()
+            self._storage_root.close()
 
     def __getitem__(self, name):
         """Retrieve an object.
@@ -1022,7 +1038,7 @@ class MemDiskGroup(_BaseGroup):
     @property
     def ondisk(self):
         """Whether the data is stored on disk as opposed to in memory."""
-        return isinstance(self._data, h5py.File)
+        return hasattr(self, '_storage_root') and isinstance(self._storage_root, h5py.File)
 
     # For creating new instances. #
 
@@ -1056,7 +1072,6 @@ class MemDiskGroup(_BaseGroup):
         **kwargs : any other arguments
             Any additional keyword arguments are passed to :class:`h5py.File`'s
             constructor if *file_* is a filename and silently ignored otherwise.
-
         """
 
         if not ondisk:
@@ -1076,11 +1091,7 @@ class MemDiskGroup(_BaseGroup):
 
         # Here we explicitly avoid calling __init__ on any derived class. Like
         # with a pickle we want to restore the saved state only.
-        self = cls.__new__(cls, data, distributed=distributed, comm=comm,
-                           detect_subclass=detect_subclass)
-
-        MemDiskGroup.__init__(self, data, distributed=distributed, comm=comm,
-                              detect_subclass=detect_subclass)
+        self = cls.from_group(data_group=data)
 
         # ... skip the class initialisation, and use a special method
         self._finish_setup()
@@ -1180,7 +1191,7 @@ class MemDiskGroup(_BaseGroup):
             msg = ("This data already lives on disk.  Copying to new file"
                    " anyway.")
             warnings.warn(msg)
-        elif self._data._distributed:
+        elif self._data.distributed:
             raise NotImplementedError("Cannot run to_disk on a distributed object. Try running save instead.")
 
         self.save(filename)
@@ -1511,7 +1522,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     """Private routine to copy full data tree from distributed memh5 object into an
     HDF5 file."""
 
-    if not group._distributed:
+    if not group.distributed:
         raise RuntimeError('This should only run on distributed datasets [%s].' % group.name)
 
     comm = group.comm
