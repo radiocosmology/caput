@@ -108,6 +108,9 @@ class TestMPIAray(unittest.TestCase):
 
         assert (ds2 == ds).all()
 
+        if mpiutil.rank0 and os.path.exists(fname):
+            os.remove(fname)
+
     def test_transpose(self):
 
         gshape = (1, 11, 2, 14)
