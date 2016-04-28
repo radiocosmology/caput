@@ -169,6 +169,13 @@ def bcast(data, root=0, comm=_comm):
         return data
 
 
+def allreduce(sendobj, op=None, comm=_comm):
+    if comm is not None and comm.size > 1:
+        return comm.allreduce(sendobj, op=(op or MPI.SUM))
+    else:
+        return sendobj
+
+
 # def Gatherv(sendbuf, recvbuf, root=0, comm=_comm):
 #     if comm is not None and comm.size > 1:
 #         comm.Gatherv(sendbuf, recvbuf, root=root)
