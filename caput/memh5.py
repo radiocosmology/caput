@@ -69,6 +69,7 @@ import posixpath
 import numpy as np
 import h5py
 
+from . import mpiutil
 from . import mpiarray
 
 
@@ -132,13 +133,18 @@ class _StorageRoot(_Storage):
 
     def __init__(self, distributed=False, comm=None):
         super(_StorageRoot, self).__init__()
-        self._distributed = distributed
-        self._comm = None
 
-        # If distributed set the communicator it is using
-        if self.distributed:
-            from mpi4py import MPI
-            self._comm = comm if comm is not None else MPI.COMM_WORLD
+        if comm is None:
+            comm = mpiutil.world
+
+        self._comm = comm
+
+        if self._comm is None:
+            if distributed:
+                warnings.warn('Cannot not be in distributed mode when there is no MPI communicator!!')
+            self._distributed = False
+        else:
+            self._distributed = distributed
 
     @property
     def comm(self):
@@ -423,6 +429,14 @@ class MemGroup(_BaseGroup):
             Root group of loaded file.
         """
 
+        if comm is None:
+            comm = mpiutil.world
+
+        if comm is None:
+            if distributed:
+                warnings.warn('Cannot load file in distributed mode when there is no MPI communicator!!')
+            distributed = False
+
         if not distributed or not hints:
             with h5py.File(filename, **kwargs) as f:
                 self = cls(distributed=distributed, comm=comm)
@@ -521,6 +535,11 @@ class MemGroup(_BaseGroup):
         if self.distributed:
             self.comm.Barrier()
 
+        if self.comm is None:
+            if distributed:
+                warnings.warn('Cannot create distributed dataset when there is no MPI communicator!!')
+            distributed = False
+
         if kwargs:
             msg = ("No extra keyword arguments accepted, this is not an hdf5"
                    " object but a memory object mocked up to look like one.")
@@ -546,7 +565,7 @@ class MemGroup(_BaseGroup):
         dtype = np.dtype(dtype)
 
         # Create distributed dataset if data is an MPIArray
-        if isinstance(data, mpiarray.MPIArray):
+        if isinstance(data, mpiarray.MPIArray) and data.comm is not None:
             distributed = True
 
         # Enforce that distributed datasets can only exist in distributed memh5 groups.
@@ -916,6 +935,16 @@ class MemDiskGroup(_BaseGroup):
     def __init__(self, data_group=None, distributed=False, comm=None):
 
         toclose = False
+
+        if comm is None:
+            comm = mpiutil.world
+
+        if comm is None:
+            if distributed:
+                warnings.warn('Cannot create distributed MemDiskGroup when there is no MPI communicator!!')
+            distributed = False
+        else:
+            distributed = distributed
 
         # If data group is not set, initialise a new MemGroup
         if data_group is None:

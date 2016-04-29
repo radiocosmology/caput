@@ -10,6 +10,7 @@ import h5py
 from caput import memh5, mpiarray, mpiutil
 
 
+comm = mpiutil.world
 rank, size = mpiutil.rank, mpiutil.size
 
 class TestMemGroupDistributed(unittest.TestCase):
@@ -26,7 +27,8 @@ class TestMemGroupDistributed(unittest.TestCase):
 
         # Check that we must specify in advance if the dataset is distributed
         g = memh5.MemGroup()
-        self.assertRaises(RuntimeError, g.create_dataset, 'data', data=d_array)
+        if comm is not None:
+            self.assertRaises(RuntimeError, g.create_dataset, 'data', data=d_array)
 
         g = memh5.MemGroup(distributed=True)
 
@@ -40,7 +42,8 @@ class TestMemGroupDistributed(unittest.TestCase):
         g.create_dataset('data2', shape=(size*5, 10), dtype=np.float64, distributed=True, distributed_axis=1)
         self.assertTrue(np.allclose(d_array, g['data'][:]))
         self.assertTrue(np.allclose(d_array_T, g['data_T'][:]))
-        self.assertEqual(d_array_T.local_shape, g['data2'].local_shape)
+        if comm is not None:
+            self.assertEqual(d_array_T.local_shape, g['data2'].local_shape)
 
         # Test global indexing
         self.assertTrue((g['data'][rank*5] == local_data[0]).all())
@@ -117,7 +120,8 @@ class TestMemDiskGroupDistributed(unittest.TestCase):
         dg = memh5.MemDiskGroup(distributed=True)
 
         pdset = dg.create_dataset('parallel_data', shape=(10,), dtype=np.float64, distributed=True, distributed_axis=0)
-        pdset[:] = dg._data.comm.rank
+        # pdset[:] = dg._data.comm.rank
+        pdset[:] = rank
         # Test successfully added
         self.assertIn('parallel_data', dg)
 
@@ -129,12 +133,13 @@ class TestMemDiskGroupDistributed(unittest.TestCase):
         self.assertIn('parallel_data', dg2)
         self.assertTrue((dg['parallel_data'][:] == dg2['parallel_data'][:]).all())
 
-        self.assertRaises(NotImplementedError, dg.to_disk, self.fname)
+        # self.assertRaises(NotImplementedError, dg.to_disk, self.fname)
 
         # Test refusal to base off a h5py object when distributed
         from caput import mpiutil
         with h5py.File(self.fname, 'r') as f:
-            self.assertRaises(ValueError, memh5.MemDiskGroup, data_group=f, distributed=True)
+            if comm is not None:
+                self.assertRaises(ValueError, memh5.MemDiskGroup, data_group=f, distributed=True)
         mpiutil.barrier()
 
     def tearDown(self):
