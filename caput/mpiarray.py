@@ -396,7 +396,7 @@ class MPIArray(np.ndarray):
         """
 
         # Check to see if this is the current distributed axis
-        if self.axis == axis:
+        if self.axis == axis or self.comm is None:
             return self
 
         # Test to see if the datatype is one understood by MPI, this can
