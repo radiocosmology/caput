@@ -511,7 +511,7 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
             elif out is not None:
                 out.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
                     data=entry)
-                memh5.copyattrs(entry.attrs, g2[key].attrs)
+                memh5.copyattrs(entry.attrs, out[key].attrs)
     to_dataset_names = [n[1:] if n[0] == '/' else n for n in to_dataset_names]
     return to_dataset_names
 
