@@ -595,7 +595,7 @@ class MemGroup(_BaseGroup):
                 new_dataset = MemDatasetCommon(shape=shape, dtype=dtype)
 
             if data is not None:
-                new_dataset[...] = data[...]
+                new_dataset[:] = data[:]
 
         # Add new dataset to group
         parent_storage[name] = new_dataset
