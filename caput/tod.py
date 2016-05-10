@@ -31,6 +31,7 @@ Functions
 import glob
 
 import numpy as np
+import h5py
 
 from . import memh5
 
@@ -68,7 +69,7 @@ class TOData(memh5.BasicCont):
 
     @classmethod
     def from_mult_files(cls, files, data_group=None, start=None, stop=None,
-                   datasets=None, dataset_filter=None, **kwargs):
+                        datasets=None, dataset_filter=None, **kwargs):
         """Create new data object by concatenating a series of objects.
 
         Parameters
@@ -81,9 +82,9 @@ class TOData(memh5.BasicCont):
 
         """
 
-        if not 'mode' in kwargs:
+        if 'mode' not in kwargs:
             kwargs['mode'] = 'r'
-        if not 'ondisk' in kwargs:
+        if 'ondisk' not in kwargs:
             kwargs['ondisk'] = True
 
         files = ensure_file_list(files)
@@ -160,8 +161,8 @@ class Reader(object):
         self._time = time
         self._datasets = datasets
         # Set the default selections of the data.
-        self.time_sel = (0, len(self.time))
-        self.dataset_sel = datasets
+        self._time_sel = (0, len(self.time))
+        self._dataset_sel = datasets
 
 
     @property
@@ -320,7 +321,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     """
 
     if dataset_filter is None:
-        dataset_filter = lambda d : d
+        dataset_filter = lambda d: d
 
     # Inspect first entry in the list to get constant parts..
     first_data = data_list[0]
@@ -328,27 +329,35 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
 
     # Ensure *start* and *stop* are mappings.
     if not hasattr(start, '__getitem__'):
-        start = { axis : start for axis in concatenation_axes }
+        start = {axis : start for axis in concatenation_axes}
     if not hasattr(stop, '__getitem__'):
-        stop = { axis : stop for axis in concatenation_axes }
-
-    if concatenation_axes != ('time',):
-        print concatenation_axes
-        raise NotImplementedError("Generalized concatenation not working yet.")
+        stop = {axis : stop for axis in concatenation_axes}
 
     # Get the length of all axes for which we are concatenating.
-    concat_index_lengths = { axis : 0 for axis in concatenation_axes }
+    concat_index_lengths = {axis : 0 for axis in concatenation_axes}
     for data in data_list:
         for index_name in concatenation_axes:
+            if index_name not in data.index_map.keys():
+                continue
             concat_index_lengths[index_name] += len(data.index_map[index_name])
 
     # Get real start and stop indexes.
     for axis in concatenation_axes:
-        start[axis], stop[axis] = _start_stop_inds(start.get(axis, None),
-                stop.get(axis, None), concat_index_lengths[axis])
+        start[axis], stop[axis] = _start_stop_inds(
+                start.get(axis, None),
+                stop.get(axis, None),
+                concat_index_lengths[axis],
+                )
+
+    if first_data.distributed is not isinstance(out_group, h5py.Group):
+        distributed = True
+        comm = first_data.comm
+    else:
+        distributed = False
+        comm = None
 
     # Choose return class and initialize the object.
-    out = first_data.__class__(out_group)
+    out = first_data.__class__(out_group, distributed=distributed, comm=comm)
 
     # Resolve the index maps. XXX Shouldn't be nessisary after fix to
     # _copy_non_time_data.
@@ -356,8 +365,10 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
         if axis in concatenation_axes:
             # Initialize the dataset.
             dtype = index_map.dtype
-            out.create_index_map(axis,
-                    np.empty(shape=(stop[axis] - start[axis],), dtype=dtype))
+            out.create_index_map(
+                    axis,
+                    np.empty(shape=(stop[axis] - start[axis],), dtype=dtype),
+                    )
         else:
             # Just copy it.
             out.create_index_map(axis, index_map)
@@ -368,22 +379,24 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     else:
         dataset_names = datasets
 
-    current_concat_index_start = { axis : 0 for axis in concatenation_axes}
+    current_concat_index_start = {axis : 0 for axis in concatenation_axes}
     # Now loop over the list and copy the data.
     for data in data_list:
         # Get the concatenation axis lengths for this BaseData.
-        current_concat_index_n = { axis : len(data.index_map[axis]) for axis in
-                                   concatenation_axes }
+        current_concat_index_n = {axis : len(data.index_map[axis]) for axis in
+                                  concatenation_axes}
         # Start with the index_map.
         for axis in concatenation_axes:
             axis_finished = current_concat_index_start[axis] >= stop[axis]
             axis_not_started = (current_concat_index_start[axis]
                                 + current_concat_index_n[axis] <= start[axis])
-            if (axis_finished or axis_not_started):
+            if axis_finished or axis_not_started:
                 continue
-            in_slice, out_slice = _get_in_out_slice(start[axis], stop[axis],
+            in_slice, out_slice = _get_in_out_slice(
+                    start[axis], stop[axis],
                     current_concat_index_start[axis],
-                    current_concat_index_n[axis])
+                    current_concat_index_n[axis],
+                    )
             out.index_map[axis][out_slice] = data.index_map[axis][in_slice]
         # Now copy over the datasets and flags.
         this_dataset_names = _copy_non_time_data(data)
@@ -406,7 +419,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             axis_finished = current_concat_index_start[axis] >= stop[axis]
             axis_not_started = (current_concat_index_start[axis]
                                 + current_concat_index_n[axis] <= start[axis])
-            if (axis_finished or axis_not_started):
+            if axis_finished or axis_not_started:
                 continue
             # Place holder for eventual implementation of 'axis_rate' attribute.
             axis_rate = 1
@@ -419,8 +432,18 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 dtype = dataset.dtype
                 full_shape = shape[:-1] + ((stop[axis] - start[axis]) * \
                              axis_rate,)
-                new_dset = out.create_dataset(name, shape=full_shape,
-                                              dtype=dtype)
+                if (distributed
+                        and isinstance(dataset, memh5.MemDatasetDistributed)):
+                    new_dset = out.create_dataset(
+                            name,
+                            shape=full_shape,
+                            dtype=dtype,
+                            distributed=True,
+                            distributed_axis=data.distributed_axis,
+                            )
+                else:
+                    new_dset = out.create_dataset(name, shape=full_shape,
+                                                  dtype=dtype)
                 memh5.copyattrs(attrs, new_dset.attrs)
             out_dset = out[name]
             in_slice, out_slice = _get_in_out_slice(
@@ -433,7 +456,8 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             # numpy treat differently.
             out_dtype = out_dset.dtype
             if (out_dtype.kind == 'V' and not out_dtype.fields
-                and out_dtype.shape and isinstance(out_dset, h5py.Dataset)):
+                        and out_dtype.shape
+                        and isinstance(out_dset, h5py.Dataset)):
                 #index_pairs = zip(range(dataset.shape[-1])[in_slice],
                 #                  range(out_dset.shape[-1])[out_slice])
                 # Drop down to low level interface. I think this is only
@@ -441,14 +465,14 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 from h5py import h5t
                 from h5py._hl import selections
                 mtype = h5t.py_create(out_dtype)
-                mdata = dataset[...,in_slice].copy().flat[:]
+                mdata = dataset[..., in_slice].copy().flat[:]
                 mspace = selections.SimpleSelection(
                         (mdata.size // out_dtype.itemsize,)).id
                 fspace = selections.select(out_dset.shape, out_slice,
-                                          out_dset.id).id
+                                           out_dset.id).id
                 out_dset.id.write(mspace, fspace, mdata, mtype)
             else:
-                out_dset[...,out_slice] = dataset[...,in_slice]
+                out_dset[..., out_slice] = dataset[..., in_slice]
         # Increment the start indexes for the next item of the list.
         for axis in current_concat_index_start.keys():
             current_concat_index_start[axis] += current_concat_index_n[axis]
@@ -518,22 +542,22 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
 
 # XXX andata still calls these.
 
-def _start_stop_inds(start, stop, n):
+def _start_stop_inds(start, stop, ntime):
     if start is None:
         start = 0
     elif start < 0:
-        start = n + start
+        start = ntime + start
     if stop is None:
-        stop = n
+        stop = ntime
     elif stop < 0:
-        stop = n + stop
-    elif stop > n:
-        stop = n
+        stop = ntime + stop
+    elif stop > ntime:
+        stop = ntime
     return start, stop
 
 
-def _get_in_out_slice(start, stop, current, n):
-        out_slice = np.s_[max(0, current - start):current - start + n]
-        in_slice = np.s_[max(0, start - current):min(n, stop - current)]
-        return in_slice, out_slice
+def _get_in_out_slice(start, stop, current, ntime):
+    out_slice = np.s_[max(0, current - start):current - start + ntime]
+    in_slice = np.s_[max(0, start - current):min(ntime, stop - current)]
+    return in_slice, out_slice
 
