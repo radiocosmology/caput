@@ -349,7 +349,8 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 concat_index_lengths[axis],
                 )
 
-    if first_data.distributed is not isinstance(out_group, h5py.Group):
+    print first_data.__class__
+    if first_data.distributed and not isinstance(out_group, h5py.Group):
         distributed = True
         comm = first_data.comm
     else:
@@ -383,8 +384,8 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     # Now loop over the list and copy the data.
     for data in data_list:
         # Get the concatenation axis lengths for this BaseData.
-        current_concat_index_n = {axis : len(data.index_map[axis]) for axis in
-                                  concatenation_axes}
+        current_concat_index_n = {axis : len(data.index_map.get(axis, []))
+                for axis in concatenation_axes}
         # Start with the index_map.
         for axis in concatenation_axes:
             axis_finished = current_concat_index_start[axis] >= stop[axis]
