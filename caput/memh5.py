@@ -64,7 +64,6 @@ Utility Functions
 import sys
 import collections
 import warnings
-import weakref
 import posixpath
 
 import numpy as np
@@ -243,12 +242,12 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
     def comm(self):
         """Reference to the MPI communicator.
         """
-        return self._storage_root.comm
+        return getattr(self._storage_root, 'comm', None)
 
     @property
     def distributed(self):
-        return self._storage_root.distributed
-
+        return getattr(self._storage_root, 'distributed', False)
+       
     @property
     def attrs(self):
         """Attributes attached to this object.
