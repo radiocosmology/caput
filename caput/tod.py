@@ -349,7 +349,6 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 concat_index_lengths[axis],
                 )
 
-    print first_data.__class__
     if first_data.distributed and not isinstance(out_group, h5py.Group):
         distributed = True
         comm = first_data.comm
