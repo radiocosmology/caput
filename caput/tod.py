@@ -439,7 +439,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                             shape=full_shape,
                             dtype=dtype,
                             distributed=True,
-                            distributed_axis=data.distributed_axis,
+                            distributed_axis=dataset.distributed_axis,
                             )
                 else:
                     new_dset = out.create_dataset(name, shape=full_shape,
@@ -560,4 +560,3 @@ def _get_in_out_slice(start, stop, current, ntime):
     out_slice = np.s_[max(0, current - start):current - start + ntime]
     in_slice = np.s_[max(0, start - current):min(ntime, stop - current)]
     return in_slice, out_slice
-
