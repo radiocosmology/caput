@@ -101,6 +101,8 @@ Here is an example of this in action::
 
 """
 
+import os
+import time
 import numpy as np
 
 from caput import mpiutil
@@ -489,8 +491,10 @@ class MPIArray(np.ndarray):
 
         if type(f) == str:
             fh = h5py.File(f, 'r')
+            to_close = True
         elif type(f) == h5py.File:
             fh = f
+            to_close = False
         else:
             raise Exception("Did not receive a h5py.File or filename")
 
@@ -503,6 +507,9 @@ class MPIArray(np.ndarray):
         end = start + dist_arr.local_shape[0]
 
         dist_arr[:] = dset[start:end]
+
+        if to_close:
+            fh.close()
 
         return dist_arr
 
@@ -529,6 +536,10 @@ class MPIArray(np.ndarray):
 
                 fh.create_dataset(dataset, self.global_shape, dtype=self.dtype)
                 fh[dataset][:] = np.array(0.0).astype(self.dtype)
+
+        # wait until all processes see the created file
+        while not os.path.exists(filename):
+            time.sleep(1)
 
         # self._comm.Barrier()
         mpiutil.barrier(comm=self.comm)
