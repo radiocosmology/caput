@@ -518,12 +518,7 @@ class Manager(config.Reader):
             task_cls = local_tasks[task_path]
         else:
             try:
-                try:
-                    task_cls = _import_class(task_path)
-                except (ImportError, KeyError):
-                    # XXX reminant from when this was part of ch_analysis.
-                    # Leave for now as it's harmless and used in ch_analysis.
-                    task_cls = _import_class('ch_analysis.pipeline.' + task_path)
+                task_cls = _import_class(task_path)
             except Exception as e:
                 e_str = e.__class__.__name__
                 e_str += ': ' + str(e)
