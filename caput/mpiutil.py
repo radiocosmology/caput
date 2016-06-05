@@ -124,12 +124,27 @@ def close(aprocs):
 
 def partition_list(full_list, i, n, method='con'):
     """Partition a list into `n` pieces. Return the `i`th partition."""
+
+    def _partition(N, n, i):
+        ### If partiion `N` numbers into `n` pieces,
+        ### return the start and stop of the `i`th piece
+        base = (N / n)
+        rem = N % n
+        num_lst = rem * [base+1] + (n - rem) * [base]
+        cum_num_lst = np.cumsum([0] + num_lst)
+
+        return cum_num_lst[i], cum_num_lst[i+1]
+
+    N = len(full_list)
+    start, stop = _partition(N, n, i)
+
     if method == 'con':
-        return np.array_split(full_list, n)[i].tolist()
+        return full_list[start:stop]
     elif method == 'alt':
         return full_list[i::n]
     elif method == 'rand':
-        return np.array_split(numpy.random.shuffle(full_list), n)[i].tolist()
+        choices = np.random.permutation(N)[start:stop]
+        return [ full_list[i] for i in choices ]
     else:
         raise ValueError('Unknown partition method %s' % method)
 
