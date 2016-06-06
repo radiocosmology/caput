@@ -284,6 +284,11 @@ class MPIArray(np.ndarray):
         return self._local_offset
 
     @property
+    def local_array(self):
+        """The local section as a numpy array."""
+        return self.view(np.ndarray)
+
+    @property
     def comm(self):
         return self._comm
 
