@@ -695,6 +695,8 @@ class MemDatasetCommon(MemDataset):
 
     Attributes
     ----------
+    data
+    local_data
     shape
     dtype
 
@@ -736,6 +738,14 @@ class MemDatasetCommon(MemDataset):
     @property
     def comm(self):
         return None
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def local_data(self):
+        return self._data
 
     @property
     def shape(self):
@@ -785,6 +795,8 @@ class MemDatasetDistributed(MemDataset):
 
     Attributes
     ----------
+    data
+    local_data
     shape
     global_shape
     local_shape
@@ -811,6 +823,14 @@ class MemDatasetDistributed(MemDataset):
         dset._data = data
         return dset
 
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def local_data(self):
+        return self._data.local_array
+    
     @property
     def shape(self):
         return self.global_shape
