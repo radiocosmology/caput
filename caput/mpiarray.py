@@ -253,6 +253,8 @@ class MPIArray(np.ndarray):
     local_offset : tuple
         Offset into global array. This is equivalent to the global-index of
         the [0, 0, ...] element of the local section.
+    local_array : np.ndarray
+        The view of the local numpy array.
     global_slice : object
         Return an objects that presents a view of the array with global slicing.
 
@@ -285,7 +287,6 @@ class MPIArray(np.ndarray):
 
     @property
     def local_array(self):
-        """The local section as a numpy array."""
         return self.view(np.ndarray)
 
     @property
