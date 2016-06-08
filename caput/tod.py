@@ -529,10 +529,11 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
                 sub_out = None
             _copy_non_time_data(entry, sub_out, to_dataset_names)
         else:
-            # XXX 'time' (set(time_axes).intersection(entry.attrs['axis'])
-            if 'axis' in entry.attrs and 'time' in entry.attrs['axis']:
+            # Check if any axis is a 'time' axis
+            if 'axis' in entry.attrs and len(set(data.time_axes).intersection(entry.attrs['axis'])):
                 to_dataset_names.append(entry.name)
             elif out is not None:
+                print entry.name, entry.shape
                 out.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
                     data=entry)
                 memh5.copyattrs(entry.attrs, out[key].attrs)
