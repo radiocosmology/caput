@@ -101,6 +101,8 @@ Here is an example of this in action::
 
 """
 
+import os
+import time
 import numpy as np
 
 from caput import mpiutil
@@ -251,6 +253,8 @@ class MPIArray(np.ndarray):
     local_offset : tuple
         Offset into global array. This is equivalent to the global-index of
         the [0, 0, ...] element of the local section.
+    local_array : np.ndarray
+        The view of the local numpy array.
     global_slice : object
         Return an objects that presents a view of the array with global slicing.
 
@@ -282,13 +286,17 @@ class MPIArray(np.ndarray):
         return self._local_offset
 
     @property
+    def local_array(self):
+        return self.view(np.ndarray)
+
+    @property
     def comm(self):
         return self._comm
 
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
 
-        if mpiutil.world is None:
-            raise RuntimeError('There is no mpi4py installation. Aborting.')
+        # if mpiutil.world is None:
+        #     raise RuntimeError('There is no mpi4py installation. Aborting.')
 
         if comm is None:
             comm = mpiutil.world
@@ -343,21 +351,21 @@ class MPIArray(np.ndarray):
             An MPIArray view of the input.
         """
 
-        from mpi4py import MPI
+        # from mpi4py import MPI
 
         if comm is None:
             comm = mpiutil.world
 
         # Get axis length, both locally, and globally
         axlen = array.shape[axis]
-        totallen = comm.allreduce(axlen)
+        totallen = mpiutil.allreduce(axlen, comm=comm)
 
         # Figure out what the distributed layout should be
         local_num, local_start, local_end = mpiutil.split_local(totallen, comm=comm)
 
         # Check the local layout is consistent with what we expect, and send
         # result to all ranks
-        layout_issue = comm.allreduce(axlen != local_num, op=MPI.MAX)
+        layout_issue = mpiutil.allreduce(axlen != local_num, op=mpiutil.MAX, comm=comm)
 
         if layout_issue:
             raise Exception("Cannot wrap, distributed axis local length is incorrect.")
@@ -396,7 +404,7 @@ class MPIArray(np.ndarray):
         """
 
         # Check to see if this is the current distributed axis
-        if self.axis == axis:
+        if self.axis == axis or self.comm is None:
             return self
 
         # Test to see if the datatype is one understood by MPI, this can
@@ -405,7 +413,7 @@ class MPIArray(np.ndarray):
         try:
             mpiutil.typemap(self.dtype)
         except KeyError:
-            if self.comm.rank == 0:
+            if self.comm is None or self.comm.rank == 0:
                 import warnings
                 warnings.warn('Cannot redistribute array of compound datatypes. Sorry!!')
             return self
@@ -426,7 +434,7 @@ class MPIArray(np.ndarray):
 
         # Perform the global transpose
         tmp_gshape = (self.global_shape[self.axis],) + trans_arr.shape[1:]
-        trans_arr = mpiutil.transpose_blocks(trans_arr, tmp_gshape)
+        trans_arr = mpiutil.transpose_blocks(trans_arr, tmp_gshape, comm=self.comm)
 
         axlist_b = list(range(len(self.shape)))
         axlist_b.pop(0)
@@ -442,7 +450,7 @@ class MPIArray(np.ndarray):
         trans_arr = trans_arr.transpose(axlist_b)
 
         # Create a new MPIArray object out of the data
-        dist_arr = MPIArray(self.global_shape, axis=axis, dtype=self.dtype)
+        dist_arr = MPIArray(self.global_shape, axis=axis, dtype=self.dtype, comm=self.comm)
         dist_arr[:] = trans_arr
 
         return dist_arr
@@ -489,8 +497,10 @@ class MPIArray(np.ndarray):
 
         if type(f) == str:
             fh = h5py.File(f, 'r')
+            to_close = True
         elif type(f) == h5py.File:
             fh = f
+            to_close = False
         else:
             raise Exception("Did not receive a h5py.File or filename")
 
@@ -503,6 +513,9 @@ class MPIArray(np.ndarray):
         end = start + dist_arr.local_shape[0]
 
         dist_arr[:] = dset[start:end]
+
+        if to_close:
+            fh.close()
 
         return dist_arr
 
@@ -521,7 +534,7 @@ class MPIArray(np.ndarray):
 
         import h5py
 
-        if self._comm.rank == 0:
+        if self.comm is None or self.comm.rank == 0:
 
             with h5py.File(filename, 'a' if create else 'r+') as fh:
                 if dataset in fh:
@@ -530,16 +543,23 @@ class MPIArray(np.ndarray):
                 fh.create_dataset(dataset, self.global_shape, dtype=self.dtype)
                 fh[dataset][:] = np.array(0.0).astype(self.dtype)
 
-        self._comm.Barrier()
+        # wait until all processes see the created file
+        while not os.path.exists(filename):
+            time.sleep(1)
+
+        # self._comm.Barrier()
+        mpiutil.barrier(comm=self.comm)
 
         if self.axis == 0:
             dist_arr = self
         else:
             dist_arr = self.redistribute(axis=0)
 
-        for ri in range(dist_arr._comm.size):
+        size = 1 if self.comm is None else self.comm.size
+        for ri in range(size):
 
-            if ri == dist_arr._comm.rank:
+            rank = 0 if self.comm is None else self.comm.rank
+            if ri == rank:
                 with h5py.File(filename, 'r+') as fh:
 
                     start = dist_arr.local_offset[0]
@@ -547,7 +567,8 @@ class MPIArray(np.ndarray):
 
                     fh[dataset][start:end] = dist_arr
 
-            dist_arr._comm.Barrier()
+            # dist_arr._comm.Barrier()
+            mpiutil.barrier(comm=self.comm)
 
     def transpose(self, axes):
         """Transpose the array axes.

@@ -69,6 +69,7 @@ import posixpath
 import numpy as np
 import h5py
 
+from . import mpiutil
 from . import mpiarray
 
 
@@ -132,13 +133,18 @@ class _StorageRoot(_Storage):
 
     def __init__(self, distributed=False, comm=None):
         super(_StorageRoot, self).__init__()
-        self._distributed = distributed
-        self._comm = None
 
-        # If distributed set the communicator it is using
-        if self.distributed:
-            from mpi4py import MPI
-            self._comm = comm if comm is not None else MPI.COMM_WORLD
+        if comm is None:
+            comm = mpiutil.world
+
+        self._comm = comm
+
+        if self._comm is None:
+            if distributed:
+                warnings.warn('Cannot not be in distributed mode when there is no MPI communicator!!')
+            self._distributed = False
+        else:
+            self._distributed = distributed
 
     @property
     def comm(self):
@@ -423,6 +429,14 @@ class MemGroup(_BaseGroup):
             Root group of loaded file.
         """
 
+        if comm is None:
+            comm = mpiutil.world
+
+        if comm is None:
+            if distributed:
+                warnings.warn('Cannot load file in distributed mode when there is no MPI communicator!!')
+            distributed = False
+
         if not distributed or not hints:
             with h5py.File(filename, **kwargs) as f:
                 self = cls(distributed=distributed, comm=comm)
@@ -521,6 +535,11 @@ class MemGroup(_BaseGroup):
         if self.distributed:
             self.comm.Barrier()
 
+        if self.comm is None:
+            if distributed:
+                warnings.warn('Cannot create distributed dataset when there is no MPI communicator!!')
+            distributed = False
+
         if kwargs:
             msg = ("No extra keyword arguments accepted, this is not an hdf5"
                    " object but a memory object mocked up to look like one.")
@@ -546,7 +565,7 @@ class MemGroup(_BaseGroup):
         dtype = np.dtype(dtype)
 
         # Create distributed dataset if data is an MPIArray
-        if isinstance(data, mpiarray.MPIArray):
+        if isinstance(data, mpiarray.MPIArray) and data.comm is not None:
             distributed = True
 
         # Enforce that distributed datasets can only exist in distributed memh5 groups.
@@ -603,6 +622,79 @@ class MemGroup(_BaseGroup):
         new_dataset._name = posixpath.join(parent_name, name)
         new_dataset._storage_root = self._storage_root
         return new_dataset
+
+    def dataset_common_to_distributed(self, name, distributed_axis=0):
+        """Convert a common dataset to a distributed one.
+
+        Parameters
+        ----------
+        name : string
+            Dataset name.
+        distributed_axis : int, optional
+            Axis to distribute the data over.
+        Returns
+        -------
+        dset : memh5.MemDatasetDistributed
+
+        """
+
+        dset = self[name]
+
+        if dset.distributed:
+            warnings.warn('%s is already a distributed dataset, redistribute it along the required axis %d' % (name, distributed_axis))
+            dset.redistribute(distributed_axis)
+            return dset
+
+        dset_shape = dset.shape
+        dset_type = dset.dtype
+        dist_len = dset_shape[distributed_axis]
+        ld, sd, ed = mpiutil.split_local(dist_len, comm=self.comm)
+        md = mpiarray.MPIArray(dset_shape, axis=distributed_axis, comm=self.comm, dtype=dset_type)
+        md.local_array[:] = dset[sd:ed].copy()
+        attr_dict = {} # temporarily save attrs of this dataset
+        copyattrs(dset.attrs, attr_dict)
+        del dset
+        new_dset = self.create_dataset(name, shape=dset_shape, dtype=dset_type, data=md, distributed=True, distributed_axis=distributed_axis)
+        copyattrs(attr_dict, new_dset.attrs)
+
+        return new_dset
+
+    def dataset_distributed_to_common(self, name):
+        """Convert a distributed dataset to a common one.
+
+        Parameters
+        ----------
+        name : string
+            Dataset name.
+
+        Returns
+        -------
+        dset : memh5.MemDatasetCommon
+
+        """
+
+        dset = self[name]
+
+        if dset.common:
+            warnings.warn('%s is already a common dataset, no need to convert' % name)
+            return dset
+
+        dset_shape = dset.shape
+        dset_type = dset.dtype
+        global_array = np.zeros(dset_shape, dtype=dset_type)
+        local_start = dset.local_offset
+        nproc = 1 if self.comm is None else self.comm.size
+        # gather local distributed dataset to a global array for all procs
+        for rank in range(nproc):
+            mpiutil.gather_local(global_array, dset.local_data, local_start, root=rank, comm=self.comm)
+        attr_dict = {} # temporarily save attrs of this dataset
+        copyattrs(dset.attrs, attr_dict)
+        del dset
+        new_dset = self.create_dataset(name, data=global_array, shape=dset_shape, dtype=dset_type)
+        copyattrs(attr_dict, new_dset.attrs)
+
+        return new_dset
+
 
 
 class MemDataset(_MemObjMixin):
@@ -676,6 +768,10 @@ class MemDatasetCommon(MemDataset):
 
     Attributes
     ----------
+    common
+    distributed
+    data
+    local_data
     shape
     dtype
 
@@ -717,6 +813,22 @@ class MemDatasetCommon(MemDataset):
     @property
     def comm(self):
         return None
+
+    @property
+    def common(self):
+        return True
+
+    @property
+    def distributed(self):
+        return False
+    
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def local_data(self):
+        return self._data
 
     @property
     def shape(self):
@@ -766,6 +878,10 @@ class MemDatasetDistributed(MemDataset):
 
     Attributes
     ----------
+    common
+    distributed
+    data
+    local_data
     shape
     global_shape
     local_shape
@@ -791,6 +907,22 @@ class MemDatasetDistributed(MemDataset):
 
         dset._data = data
         return dset
+
+    @property
+    def common(self):
+        return False
+
+    @property
+    def distributed(self):
+        return True
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def local_data(self):
+        return self._data.local_array
 
     @property
     def shape(self):
@@ -916,6 +1048,16 @@ class MemDiskGroup(_BaseGroup):
     def __init__(self, data_group=None, distributed=False, comm=None):
 
         toclose = False
+
+        if comm is None:
+            comm = mpiutil.world
+
+        if comm is None:
+            if distributed:
+                warnings.warn('Cannot create distributed MemDiskGroup when there is no MPI communicator!!')
+            distributed = False
+        else:
+            distributed = distributed
 
         # If data group is not set, initialise a new MemGroup
         if data_group is None:
@@ -1164,6 +1306,44 @@ class MemDiskGroup(_BaseGroup):
         new_dataset = self._data.create_dataset(path, *args, **kwargs)
 
         return new_dataset
+
+    def dataset_common_to_distributed(self, name, distributed_axis=0):
+        """Convert a common dataset to a distributed one.
+
+        Parameters
+        ----------
+        name : string
+            Dataset name.
+        distributed_axis : int, optional
+            Axis to distribute the data over.
+        Returns
+        -------
+        dset : memh5.MemDatasetDistributed
+
+        """
+
+        if isinstance(self._data, MemGroup):
+            return self._data.dataset_common_to_distributed(name, distributed_axis)
+        else:
+            raise RuntimeError('Can not convert a h5py dataset %s to distributed' % name)
+
+    def dataset_distributed_to_common(self, name):
+        """Convert a distributed dataset to a common one.
+
+        Parameters
+        ----------
+        name : string
+            Dataset name.
+
+        Returns
+        -------
+        dset : memh5.MemDatasetCommon
+
+        """
+        if isinstance(self._data, MemGroup):
+            return self._data.dataset_distributed_to_common(name)
+        else:
+            raise RuntimeError('Can not convert a h5py dataset %s to distributed' % name)
 
     def create_group(self, name):
         """Create and return a new group."""
