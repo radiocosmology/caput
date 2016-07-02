@@ -261,6 +261,8 @@ class MPIArray(np.ndarray):
 
     Methods
     -------
+    from_numpy_array
+    to_numpy_array
     wrap
     redistribute
     enumerate
@@ -327,6 +329,60 @@ class MPIArray(np.ndarray):
     @property
     def global_slice(self):
         return _global_resolver(self)
+
+    @classmethod
+    def from_numpy_array(cls, array, axis=0, root=None, comm=None):
+        """Create a distributed MPIArray object from a numpy array.
+
+        Parameters
+        ----------
+        array : np.ndarray
+            Array from which to create a distributed MPIArray.
+        axis : integer, optimal
+            Axis over which the created MPIArray is distributed. Default 0.
+        root : interger or None, optimal
+            If None, the created MPIarray will get data from the corresponding
+            section from this process's `array` (so the `array` in all processes
+            should usually be the same), else the MPIArray will be created from
+            the `array` hold in the 'root' process. Default None.
+        comm : MPI.Comm, optional
+            The communicator over which the array is distributed. If `None`
+            (default), use `MPI.COMM_WORLD`.
+
+        Returns
+        -------
+        dist_array : MPIArray
+            An MPIArray view of the input.
+
+        """
+
+        if comm is None:
+            comm = mpiutil.world
+
+        local_array = mpiutil.scatter_array(array, axis=axis, root=root, comm=comm)
+
+        return cls.wrap(local_array, axis, comm=comm)
+
+
+    def to_numpy_array(self, root=0):
+        """Convert the distributed MPIArray to a numpy array.
+
+        Parameters
+        ----------
+        root : interger or None, optimal
+            If None, all processes will retuen the same converted numpy array,
+            otherwise only the `root` process will return the converted numpy array,
+            other process will return None. Default 0.
+
+        Returns
+        -------
+        array : np.ndarray
+            The returned numpy array.
+
+        """
+
+        return mpiutil.gather_array(self.local_array, self.axis, root, self.comm)
+
 
     @classmethod
     def wrap(cls, array, axis, comm=None):
