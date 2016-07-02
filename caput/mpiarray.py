@@ -532,7 +532,7 @@ class MPIArray(np.ndarray):
         return enumerate(range(start, end))
 
     @classmethod
-    def from_hdf5(cls, f, dataset, comm=None):
+    def from_hdf5(cls, f, dataset, axis=0, comm=None):
         """Read MPIArray from an HDF5 dataset in parallel.
 
         Parameters
@@ -541,6 +541,8 @@ class MPIArray(np.ndarray):
             File to read dataset from.
         dataset : string
             Name of dataset to read from. Must exist.
+        axis : integer, optional
+            The distributed axis of the MPIArray.
         comm : MPI.Comm
             MPI communicator to distribute over. If `None` optional, use
             `MPI.COMM_WORLD`.
@@ -564,12 +566,15 @@ class MPIArray(np.ndarray):
         dset = fh[dataset]
         gshape = dset.shape
         dtype = dset.dtype
-        dist_arr = cls(gshape, axis=0, comm=comm, dtype=dtype)
+        dist_arr = cls(gshape, axis=axis, comm=comm, dtype=dtype)
 
-        start = dist_arr.local_offset[0]
-        end = start + dist_arr.local_shape[0]
+        start = dist_arr.local_offset[axis]
+        end = start + dist_arr.local_shape[axis]
 
-        dist_arr[:] = dset[start:end]
+        slc = [ slice(0, None) ] * len(dist_arr.shape)
+        slc[axis] = slice(start, end)
+
+        dist_arr[:] = dset[tuple(slc)]
 
         if to_close:
             fh.close()
