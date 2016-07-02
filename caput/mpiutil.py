@@ -23,12 +23,16 @@ Functions
    mpirange
    barrier
    bcast
+   allreduce
    parallel_map
    typemap
    split_m
    split_all
    split_local
    gather_local
+   gather_array
+   scatter_local
+   scatter_array
    transpose_blocks
    allocate_hdf5_dataset
    lock_and_write_buffer
@@ -162,8 +166,7 @@ mpilist = partition_list_mpi
 
 
 def mpirange(*args, **kargs):
-    """An MPI aware version of `range`, each process gets its own sub section.
-    """
+    """An MPI aware version of `range`, each process gets its own sub section."""
     full_list = range(*args)
 
     method = kargs.get('method', 'con')
@@ -232,6 +235,7 @@ def parallel_map(func, glist, root=None, method='con', comm=_comm):
     -------
     results : list
         Global list of results.
+
     """
 
     # Synchronize
@@ -288,6 +292,7 @@ def typemap(dtype):
     -------
     mpitype : MPI.Datatype
         The MPI.Datatype.
+
     """
     # Need to try both as the name of the typedoct changed in mpi4py 2.0
     try:
@@ -297,8 +302,7 @@ def typemap(dtype):
 
 
 def split_m(n, m):
-    """
-    Split a range (0, n-1) into m sub-ranges of similar length
+    """Split a range (0, n-1) into m sub-ranges of similar length.
 
     Parameters
     ----------
@@ -332,8 +336,7 @@ def split_m(n, m):
 
 
 def split_all(n, comm=_comm):
-    """
-    Split a range (0, n-1) into sub-ranges for each MPI Process.
+    """Split a range (0, n-1) into sub-ranges for each MPI Process.
 
     Parameters
     ----------
@@ -354,6 +357,7 @@ def split_all(n, comm=_comm):
     See Also
     --------
     :fun:`split_m`, :fun:`split_local`
+
     """
 
     m = size if comm is None else comm.size
@@ -362,8 +366,7 @@ def split_all(n, comm=_comm):
 
 
 def split_local(n, comm=_comm):
-    """
-    Split a range (0, n-1) into sub-ranges for each MPI Process. This returns
+    """Split a range (0, n-1) into sub-ranges for each MPI Process. This returns
     the parameters only for the current rank.
 
     Parameters
@@ -385,6 +388,7 @@ def split_local(n, comm=_comm):
     See Also
     --------
     :fun:`split_all`, :fun:`split_local`
+
     """
 
     pse = split_all(n, comm=comm)
@@ -394,8 +398,7 @@ def split_local(n, comm=_comm):
 
 
 def gather_local(global_array, local_array, local_start, root=0, comm=_comm):
-    """
-    Gather data array in each process to the global array in `root` process.
+    """Gather data array in each process to the global array in `root` process.
 
     Parameters
     ----------
@@ -405,10 +408,15 @@ def gather_local(global_array, local_array, local_start, root=0, comm=_comm):
         The local array in each process to be collected to `global_array`.
     local_start : N-tuple
         The starting index of the local array to be placed in `global_array`.
-    root : integer
-        The process local array gathered to.
-    comm : MPI communicator
+    root : integer or None, optimal
+        The process local array gathered to, if None, the local array will be
+        gathered to all processes. Default is 0.
+    comm : MPI communicator, optimal
         MPI communicator that array is distributed over. Default is MPI.COMM_WORLD.
+
+    See Also
+    --------
+    :fun:`gather_array`, :fun:`scatter_local`, :fun:`scatter_array`
 
     """
 
@@ -419,30 +427,220 @@ def gather_local(global_array, local_array, local_start, root=0, comm=_comm):
         slc = [slice(s, s+n) for (s, n) in zip(local_start, local_size)]
         global_array[slc] = local_array.copy()
     else:
-        local_sizes = comm.gather(local_size, root=root)
-        local_starts = comm.gather(local_start, root=root)
         mpi_type = typemap(local_array.dtype)
 
-        # Each process should send its local sections.
-        if np.prod(local_size) > 0:
-            # send only when array is non-empty
-            sreq = comm.Isend([np.ascontiguousarray(local_array), mpi_type], dest=root, tag=0)
+        def _gather(root):
+            local_sizes = comm.gather(local_size, root=root)
+            local_starts = comm.gather(local_start, root=root)
 
-        if comm.rank == root:
-            # list of processes which have non-empty array
-            nonempty_procs = [ i for i in range(comm.size) if np.prod(local_sizes[i]) > 0 ]
-            # create newtype corresponding to the local array section in the global array
-            sub_type = [ mpi_type.Create_subarray(global_array.shape, local_sizes[i], local_starts[i]).Commit() for i in nonempty_procs ] # default order=ORDER_C
-            # Post each receive
-            reqs = [ comm.Irecv([global_array, sub_type[si]], source=sr, tag=0) for (si, sr) in enumerate(nonempty_procs) ]
+            # Each process should send its local sections.
+            if np.prod(local_size) > 0:
+                # send only when array is non-empty
+                sreq = comm.Isend([np.ascontiguousarray(local_array), mpi_type], dest=root, tag=0)
 
-            # Wait for requests to complete
-            MPI.Prequest.Waitall(reqs)
+            if comm.rank == root:
+                # list of processes which have non-empty array
+                nonempty_procs = [ i for i in range(comm.size) if np.prod(local_sizes[i]) > 0 ]
+                # create newtype corresponding to the local array section in the global array
+                sub_type = [ mpi_type.Create_subarray(global_array.shape, local_sizes[i], local_starts[i]).Commit() for i in nonempty_procs ] # default order=ORDER_C
+                # Post each receive
+                reqs = [ comm.Irecv([global_array, sub_type[si]], source=sr, tag=0) for (si, sr) in enumerate(nonempty_procs) ]
 
-        # Wait on send request. Important, as can get weird synchronisation
-        # bugs otherwise as processes exit before completing their send.
-        if np.prod(local_size) > 0:
-            sreq.Wait()
+                # Wait for requests to complete
+                MPI.Prequest.Waitall(reqs)
+
+            # Wait on send request. Important, as can get weird synchronisation
+            # bugs otherwise as processes exit before completing their send.
+            if np.prod(local_size) > 0:
+                sreq.Wait()
+
+        if root is None:
+            for rt in range(comm.size):
+                _gather(rt)
+        else:
+            _gather(root)
+
+
+def gather_array(local_array, axis=0, root=0, comm=_comm):
+    """Gather the local array in each process to the `root` process.
+
+    Parameters
+    ----------
+    local_array : np.ndarray
+        The local array which will be gathered to a global array.
+    aixs : interger, optional
+        Along which axis to gather the 'local_arrray'. Default 0.
+    root : integer or None, optimal
+        The process local array gathered to, if None, the local array will be
+        gathered to all processes. Default is 0.
+    comm : MPI communicator, optimal
+        MPI communicator that array is distributed over. Default is MPI.COMM_WORLD.
+
+    Returns
+    -------
+    global_array : np.ndarray
+        global array holding the gathered data from `local_array` if root is None,
+        else only the `root` process returns the global array, all other processes
+        return None.
+
+    See Also
+    --------
+    fun:`gather_local`, :fun:`scatter_local`, :fun:`scatter_array`
+
+    """
+
+    local_shape = local_array.shape
+    local_axis_len = local_shape[axis]
+    if comm is None:
+        local_axis_len = [local_axis_len]
+    else:
+        local_axis_len = comm.allgather(local_axis_len)
+    global_axis_len = sum(local_axis_len)
+    global_shape = list(local_shape)
+    global_shape[axis] = global_axis_len
+    global_shape = tuple(global_shape)
+    local_dtype = local_array.dtype
+
+    if comm is not None:
+        global_shapes = set(comm.allgather(global_shape))
+        if len(global_shapes) != 1:
+            raise ValueError('Local array shape is incompatible to gather')
+        else:
+            global_shape = list(global_shapes)[0]
+        local_dtypes = set(comm.allgather(local_dtype))
+        if len(local_dtypes) != 1:
+            raise ValueError('Local array dtype is incompatible to gather')
+        else:
+            local_dtype = list(local_dtypes)[0]
+
+    local_start = [0] * len(global_shape)
+    local_start[axis] = np.cumsum([0] + local_axis_len)[rank]
+    if root is None:
+        global_array = np.empty(global_shape, dtype=local_dtype)
+    else:
+        if rank == root:
+            global_array = np.empty(global_shape, dtype=local_dtype)
+        else:
+            global_array = None
+    gather_local(global_array, local_array, local_start, root=root, comm=comm)
+
+    return global_array
+
+
+def scatter_local(global_array, local_array, local_start, root=None, comm=_comm):
+    """Scatter the global array in `root` process to local array in each process.
+
+    Parameters
+    ----------
+    global_array : np.ndarray
+        The global array which will scatter its data to `local_array` in each process.
+    local_array : np.ndarray
+        The local array in each process to receive data from `global_array`.
+    local_start : N-tuple
+        The starting index of the local array to be placed in `global_array`.
+    root : integer or None, optimal
+        The process which will scatter its global array, if None, each 'local_array'
+        will get data from the corresponding section of this process's
+        'global_array' (So the 'global_array' in all processes should usually be
+        the same). Default is None.
+    comm : MPI communicator, optimal
+        MPI communicator that array is distributed over. Default is MPI.COMM_WORLD.
+
+    See Also
+    --------
+    :fun:`scatter_array`, :fun:`gather_local`, :fun:`gather_array`
+
+    """
+
+    local_size = local_array.shape
+
+    if comm is None or comm.size == 1:
+        # only one process
+        slc = [slice(s, s+n) for (s, n) in zip(local_start, local_size)]
+        local_array[:] = global_array[slc].copy()
+    else:
+        mpi_type = typemap(local_array.dtype)
+
+        def _scatter(root):
+            local_sizes = comm.gather(local_size, root=root)
+            local_starts = comm.gather(local_start, root=root)
+
+            # Each process receive its local sections.
+            if np.prod(local_size) > 0:
+                # receive only when array is non-empty
+                rreq = comm.Irecv([np.ascontiguousarray(local_array), mpi_type], source=root, tag=0)
+
+            if comm.rank == root:
+                # list of processes which have non-empty array
+                nonempty_procs = [ i for i in range(comm.size) if np.prod(local_sizes[i]) > 0 ]
+                # create newtype corresponding to the local array section in the global array
+                sub_type = [ mpi_type.Create_subarray(global_array.shape, local_sizes[i], local_starts[i]).Commit() for i in nonempty_procs ] # default order=ORDER_C
+                # Post each send
+                reqs = [ comm.Isend([global_array, sub_type[si]], dest=sr, tag=0) for (si, sr) in enumerate(nonempty_procs) ]
+
+            if np.prod(local_size) > 0:
+                rreq.Wait()
+
+            if comm.rank == root:
+                # Wait for requests to complete
+                MPI.Prequest.Waitall(reqs)
+
+        if root is None:
+            slc = [slice(s, s+n) for (s, n) in zip(local_start, local_size)]
+            local_array[:] = global_array[slc].copy()
+        else:
+            _scatter(root)
+
+
+def scatter_array(global_array, axis=0, root=None, comm=_comm):
+    """Scatter the global array in `root` process to other processes.
+
+    Parameters
+    ----------
+    global_array : np.ndarray
+        The global array which will scatter its data to other processes.
+    aixs : interger, optional
+        Along which axis to scatter the 'global_arrray'. Default 0.
+    root : integer or None, optimal
+        The process which will scatter its global array, if None, each 'local_array'
+        will get data from the corresponding section of this process's
+        'global_array' (So the 'global_array' in all processes should usually be
+        the same). Default is None.
+    comm : MPI communicator, optimal
+        MPI communicator that array is distributed over. Default is MPI.COMM_WORLD.
+
+    Returns
+    -------
+    local_array : np.ndarray
+        Local array holding the scattered data from `global_array`.
+
+    See Also
+    --------
+    :fun:`scatter_local`, :fun:`gather_local`, :fun:`gather_array`
+
+    """
+
+    if root is None:
+        global_shape = global_array.shape
+        dtype = global_array.dtype
+        axis_len = global_shape[axis]
+    else:
+        global_shape = global_array.shape if rank == root else None
+        global_shape = bcast(global_shape, root=root, comm=comm)
+        axis_len = global_shape[axis]
+        dtype = global_array.dtype if rank == root else None
+        dtype = bcast(dtype, root=root, comm=comm)
+
+    ln, ls, le = split_local(axis_len, comm=comm)
+    local_shape = list(global_shape)
+    local_shape[axis] = ln
+    local_array = np.zeros(local_shape, dtype=dtype)
+    local_start = [0] * len(global_shape)
+    local_start[axis] = ls
+
+    scatter_local(global_array, local_array, local_start, root=root, comm=comm)
+
+    return local_array
 
 
 def transpose_blocks(row_array, shape, comm=_comm):
