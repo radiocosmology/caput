@@ -508,7 +508,7 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
 
     """
 
-    if not to_dataset_names:
+    if to_dataset_names is None:
         to_dataset_names = []
 
     if isinstance(data, list):
@@ -533,7 +533,6 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
             if 'axis' in entry.attrs and len(set(data.time_axes).intersection(entry.attrs['axis'])):
                 to_dataset_names.append(entry.name)
             elif out is not None:
-                print entry.name, entry.shape
                 out.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
                     data=entry)
                 memh5.copyattrs(entry.attrs, out[key].attrs)
