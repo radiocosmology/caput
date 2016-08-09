@@ -1,9 +1,83 @@
-"""
-======================================
-Time calculations (:mod:`~caput.time`)
-======================================
+r"""
+Routines for calculation and of solar and sidereal times.
 
-A set of useful routines for calculation of solar and sidereal times.
+This module can:
+
+- Convert between Python :class:`~datetime.datetime`, UNIX times (as floats),
+  and Skyfield time objects.
+- Determine the number of leap seconds in an interval (thanks Skyfield!)
+- Calculate the Earth Rotation Angle (the successor to Sidereal Time)
+- Determine various local time standards (Local Stellar Angle and Day)
+- Generate a nice wrapper for Skyfield to ease the loading of required data.
+
+Time Utilities
+==============
+
+Time conversion routine which are location independent.
+
+.. autosummary::
+    :toctree: generated/
+
+    unix_to_skyfield_time
+    datetime_to_unix
+    unix_to_datetime
+    datetime_to_timestr
+    timestr_to_datetime
+    unix_to_era
+    era_to_unix
+    ensure_unix
+    leap_seconds_between
+    time_of_day
+    naive_datetime_to_utc
+
+
+Local Time Utilities
+====================
+
+Routines which are location specific are grouped into a location aware class.
+
+This class can be used to calculate Local Stellar Angle (LSA), and the Local
+Stellar Day (LSD). LSA is an equivalent to the Local Sidereal Time based around
+the Earth Rotation Angle instead of the Greenwich Sidereal Time. This is defined
+as:
+
+.. math::
+    \mathrm{LSA} = \theta + \lambda
+
+where :math:`\theta` is the Earth Rotation Angle, and :math:`\lambda` is the
+longitude. Local Stellar Day counts the stellar days (i.e. the number of cycles
+of LSA) that have occured since a given start epoch. This means that the
+fractional part is simply the LSA rescaled., with the integer part the number of
+stellar days elapsed since that epoch. This requires the specification of the
+start epoch, which is determined from a given UNIX time, the code simply picks
+the first time :math:`\mathrm{LSA} = 0` after this time.
+
+Note that the quantities LSA and LSD are not really used elsewhere. However, the
+concept of a Stellar Day as a length of time is well established (`IERS
+constants`_), and the Stellar Angle is an older term for the Earth Rotation
+Angle (`NFA Glossary`_).
+
+.. autosummary::
+    :toctree: generated/
+
+    Observer
+
+Skyfield Interface
+==================
+
+This module provides an interface to Skyfield which stores the required datasets
+(timescale data and an ephemeris) in a fixed location. The location is
+determined by the following (in order):
+
+- As the wrapper is initialised by passing in a ``path=<path>`` option.
+- By setting the environment variable ``CAPUT_SKYFIELD_PATH``
+- If neither of the above is set, the data is place in ``<path to caput>/caput/data/``
+
+.. autosummary::
+    :toctree: generated/
+
+    SkyfieldWrapper
+
 
 Constants
 =========
@@ -11,64 +85,54 @@ Constants
 :const:`SIDEREAL_S`
     Number of SI seconds in a sidereal second [s/sidereal s].
 
-Time Utilities
-==============
+Why not Sidereal Time?
+----------------------
 
-.. autosummary::
-    :toctree: generated/
+Sidereal time is a long established and well known quantity that is very similar
+to the Earth Rotation Angle (and the derived quantities, LSA and LSD). The
+reason we don't use that is that Sidereal Time is essentially the Earth's
+rotation measured with respect to the vernal equinox, but this quantity moves
+significantly with respect to the fixed frame due to precession of the Earth's
+pole.
 
-    unix_to_ephem_time
-    unix_to_datetime
-    ensure_unix
-    datetime_to_unix
-    datetime_to_timestr
-    timestr_to_datetime
-    leap_second_between
-    time_of_day
+The Earth Rotation Angle is measured with respect to the Celestial Intermediate
+Origin (CIO), which essentially moves the minimal amount as the Earth precesses
+to remain on the celestial equator. For experiments like CHIME which map the sky
+as a function of the Earth's rotation, this gives the minimal coordinate shifts
+when combining maps made on different days.
 
-
-Issues
-======
-
-* :func:`unix_to_ephem_time` Unix time is based on UTC and :mod:`ephem` time is
-  based on UT1.  The difference is ignored.  See `pyephem` github issue #30.
+See `USNO Circular 179`_ for more details about the CIO based coordinates.
 
 
-Notes
-=====
+Accuracy
+--------
 
-The distinctions between some of the quantities are a little subtle. Here are a
-few notes.
+Conversions between time standards (as opposed to representations of UTC) in
+this module are mostly handled by Skyfield_, which has a comprehensive and
+modern handling of the various effects. This includes leap seconds, which
+``PyEphem`` mostly ignored, just pretending that UTC and UT1 were equivalent.
 
-First, Local Sidereal Time and the transiting RA are superificially similar, but
-differ in the fact that the latter is fixed to a specific epoch. If the
-co-ordinate epoch is the time we are calculating they coincide, otherwise they
-differ because of the precession of the Earth's rotation axis. The shift in RA
-at the equator is about 0.3 arc minutes per year, but after removing this there
-is still a declination dependent variation of a similar magnitude.
 
-Local Mean Sidereal Time and Local Apparent Sidereal Time differ by the equation
-of the equinoxes. This is the nutation of the Earth's axis throughout the year.,
-which is included in the Apparent Sidereal Time. This effect is at most 1s in
-time, and so 0.25 arc minutes in angle. Here we use Local Apparent Sidereal Time
-throughout.
+Skyfield uses Julian Dates for its internal representations. For a double
+precision floating point (``np.float64``), the effective precision on
+calculations is around 30 us. A technical note discussing this further is
+available `here <http://aa.usno.navy.mil/software/novas/USNOAA-TN2011-02.pdf>`_.
+Most conversions should be accurate to around this accuracy 0.1 ms. However, the
+`era_to_unix` routine (and related routines), are accurate to only around 5 ms
+at the moment as they ignore the difference in time between the Sidereal day,
+and a complete cycle of ERA.
 
-UT1 and UTC are similar but fundamentally different time standards. UT1 is an
-astronomical time standard based on the Earth's rotation. UTC is an atomic time
-standard kept within 1s of UT1 by the addition (or subtraction) of leap seconds.
-PyEphem uses UT1 internally (though is confused about this), where as we use
-UTC. We do not correct for this which gives a maximum error of 0.25 arc minutes.
+.. _Skyfield: http://rhodesmill.org/skyfield/
 
-A more modern definition of the celestial co-ordinate system uses ICRS/ICRF and
-Earth Rotation Angle. This is now all included in AstroPy/SkyField which we should
-probably use instead of PyEphem.
+.. _`USNO Circular 179`: http://arxiv.org/abs/astro-ph/0602086
+
+.. _`NFA Glossary`: http://syrte.obspm.fr/iauWGnfa/NFA_Glossary.pdf
+
+.. _`IERS constants`: http://hpiers.obspm.fr/eop-pc/models/constants.html
 """
 
-
-import math
 from datetime import datetime
 
-import ephem
 import numpy as np
 
 from .misc import vectorize
@@ -76,6 +140,9 @@ from .misc import vectorize
 
 # Approximate number of seconds in a sidereal second.
 SIDEREAL_S = 1. / (1. + 1.0 / 365.259636)
+
+# Approximate length of a stellar second (in SI seconds)
+STELLAR_S = SIDEREAL_S + 0.0084 / (24 * 3600)
 
 
 class Observer(object):
@@ -100,21 +167,18 @@ class Observer(object):
         Latitude of observer in degrees.
     altitude : float
         Altitude of observer in metres.
-    epoch : string
-        The epoch for RA calculations. Defaults to `'2000'`. Accepts any format
-        that `PyEphem` understands.
     lsd_start_day : float
         UNIX time on the zeroth LSD. The actual zero point is the first time of
-        LST=0.0 after the `lsd_zero`.
+        `LSA = 0.0` after the `lsd_start_day`.
 
     Methods
     -------
-    unix_to_lst
-    lst_to_unix
+    unix_to_lsa
+    lsa_to_unix
     unix_to_lsd
     lsd_to_unix
     transit_RA
-    ephem_obs
+    skyfield_obs
     """
 
     latitude = 0.0
@@ -122,41 +186,42 @@ class Observer(object):
 
     altitude = 0.0
 
-    epoch = '2000'
-
     lsd_start_day = 0.0
 
-    def __init__(self, lon, lat, alt=0.0, lsd_start=None):
+    def __init__(self, lon, lat, alt=0.0, lsd_start=None, sf_wrapper=None):
 
         self.longitude = lon
         self.latitude = lat
         self.altitude = alt
+
+        self.skyfield = skyfield_wrapper if sf_wrapper is None else sf_wrapper
 
         if lsd_start is None:
             lsd_start = datetime(2000, 1, 1, 11, 58, 56)
 
         self.lsd_start_day = ensure_unix(lsd_start)
 
-    def ephem_obs(self):
-        """Create a PyEphem observer object.
+    def skyfield_obs(self):
+        """Create a Skyfield topos object for the current location.
 
         Returns
         -------
-        obs : :class:`ephem.Observer`
+        obs : :class:`skyfield.toposlib.Topos`
         """
-        obs = ephem.Observer()
-        obs.lat = math.radians(self.latitude)
-        obs.long = math.radians(self.longitude)
-        obs.elevation = self.altitude
 
-        # Could do with some validation here
-        obs.epoch = self.epoch
+        earth = self.skyfield.ephemeris['earth']
+
+        obs = earth.topos(latitude_degrees=self.latitude,
+                          longitude_degrees=self.longitude,
+                          elevation_m=self.altitude)
 
         return obs
 
-    @vectorize()
-    def unix_to_lst(self, time):
-        """Calculate the Local Apparent Sidereal Time.
+    def unix_to_lsa(self, time):
+        """Calculate the Local Stellar Angle.
+
+        This is the angle between the current meridian and the CIO, i.e. the ERA +
+        longitude.
 
         Parameters
         ----------
@@ -165,23 +230,25 @@ class Observer(object):
 
         Returns
         -------
-        lst : float
+        lsa : float
         """
 
-        obs = self.ephem_obs()
-        obs.date = unix_to_ephem_time(time)
-        return np.degrees(obs.sidereal_time())
+        era = unix_to_era(time)
 
-    lst = unix_to_lst
+        lsa = (era + self.longitude) % 360.0
 
-    def lst_to_unix(self, lst, time0):
-        """Convert a Local Apparent Sidereal Time on a given
+        return lsa
+
+    lsa = unix_to_lsa
+
+    def lsa_to_unix(self, lsa, time0):
+        """Convert a Local Stellar Angle (LSA) on a given
         day to a UNIX time.
 
         Parameters
         ----------
-        lst : scalar or np.ndarray
-            Sidereal time in degrees to convert.
+        lsa : scalar or np.ndarray
+            Local Earth Rotation Angle degrees to convert.
         time0 : scalar or np.ndarray
             An earlier time within 24 sidereal hours. For example,
             the start of the solar day of the observation.
@@ -192,11 +259,9 @@ class Observer(object):
             Corresponding UNIX time.
         """
 
-        lst0 = self.unix_to_lst(time0)
+        era = (lsa - self.longitude) % 360.0
 
-        diff_lst_sec = ((lst - lst0) % 360.0) * 240.0  # Convert from degrees in seconds (time)
-
-        return time0 + diff_lst_sec * SIDEREAL_S
+        return era_to_unix(era, time0)
 
     def lsd_zero(self):
         """Return the zero point of LSD as a UNIX time.
@@ -205,25 +270,27 @@ class Observer(object):
         -------
         lsd_zero : float
         """
-        return self.lst_to_unix(0.0, self.lsd_start_day)
+        return self.lsa_to_unix(0.0, self.lsd_start_day)
 
     def unix_to_lsd(self, time):
-        """Calculate the Local Sidereal Day corresponding to the given time.
+        """Calculate the Local Stellar Day (LSD) corresponding to the given time.
 
-        The Local Sidereal Day is the number of sidereal days that have passed
-        since 0 deg LST on the solar day 15/11/2013 (in UTC).
+        The Local Earth Rotation Day is the number of cycles of Earth Rotation
+        Angle that have passed since the specified zero epoch (including
+        fractional cycles).
 
         Parameters
         ----------
-        time :  float (UNIX time)
+        time :  float or array of
+            UNIX time
 
         Returns
         -------
-        lsd : float
+        lsd : float or array of
         """
 
-        # Get fractional part from LST
-        frac_part = self.unix_to_lst(time) / 360.0
+        # Get fractional part from LRA
+        frac_part = self.unix_to_lsa(time) / 360.0
 
         # Calculate the approximate CSD by crudely dividing the time difference by
         # the length of a sidereal day
@@ -238,18 +305,16 @@ class Observer(object):
     lsd = unix_to_lsd
 
     def lsd_to_unix(self, lsd):
-        """Calculate the UNIX time corresponding to CSD.
-
-        The CHIME Sidereal Day is the number of sidereal days that have passed
-        since RA=0, DEC=0 transited on the day 15/11/2013 (in UTC).
+        """Calculate the UNIX time corresponding to a given LSD.
 
         Parameters
         ----------
-        csd : float
+        lsd : float or array of
 
         Returns
         -------
-        time :  float (UNIX time)
+        time :  float or array of
+            UNIX time
         """
 
         # Find the approximate UNIX time
@@ -258,13 +323,12 @@ class Observer(object):
         # Shift to 12 hours before to give the start of the search period
         start_unix = approx_unix - 12 * 3600
 
-        # Get the LST from the LSD in degrees
-        lst = 360.0 * (lsd % 1.0)
+        # Get the LRA from the LSD in degrees
+        lsa = 360.0 * (lsd % 1.0)
 
         # Solve for the next transit of that RA after start_unix
-        return self.lst_to_unix(lst, start_unix)
+        return self.lsa_to_unix(lsa, start_unix)
 
-    @vectorize()
     def transit_RA(self, time):
         """Transiting RA for the observer at given Unix Time.
 
@@ -300,31 +364,45 @@ class Observer(object):
         .. _here: http://stackoverflow.com/questions/11970713
         """
 
-        # Initialize ephem location object.
-        obs = self.ephem_obs()
+        # Initialize Skyfield location object.
+        obs = self.skyfield_obs()
 
         # Want the RA at the equator, which is much less affected by the celestial
         # pole mismatch between now and J2000 epoch.
-        az = '180'
-        el = str(90 - self.latitude)
+        az = 180.0
+        el = 90.0 - self.latitude
         obs.pressure = 0
-        obs.date = unix_to_ephem_time(time)
-        ra, dec = obs.radec_of(az, el)
-        ra = math.degrees(ra)
+
+        # Save the shape for the return value and flatten
+        if hasattr(time, '__len__'):
+            time = np.array(time)
+            sh = time.shape
+            time = time.flatten()
+
+        st = unix_to_skyfield_time(time)
+        pos = obs.at(st).from_altaz(az_degrees=az, alt_degrees=el)
+        ra, dec, dist = pos.radec()  # Fetch ICRS position (effectively J2000)
+
+        ra = np.degrees(ra.radians)
+
+        # Reshape to the input shape
+        if hasattr(ra, '__len__'):
+            ra = ra.reshape(sh)
+
         return ra
 
 
-def unix_to_ephem_time(unix_time):
+def unix_to_skyfield_time(unix_time):
     """Formats the Unix time into a time that can be interpreted by ephem.
 
     Parameters
     ----------
-    unix_time : float
+    unix_time : float or array of.
         Unix/POSIX time.
 
     Returns
     -------
-    date : :class:`ephem.Date`
+    time : :class:`skyfield.timelib.Time`
 
     See Also
     --------
@@ -333,20 +411,89 @@ def unix_to_ephem_time(unix_time):
 
     """
 
-    # `ephem` documentation claims that all times are UTC, but unclear if
-    # `ephem` distinguishes between UT1 and UTC. Difference is always less than
-    # 10 arcseconds, or 0.3% of a beam width.  See pyephem github issue #30.
+    from skyfield import timelib
+    ts = skyfield_wrapper.timescale
 
-    dt = unix_to_datetime(unix_time)
+    days, seconds = divmod(unix_time, 24 * 3600.0)
 
-    # Be careful of a bug in old versions of ephem. See issue #29 on Pyephem
-    # github page.
-    date = ephem.Date(dt)
-    return date
+    # Construct Julian day and convert to calendar day
+    year, month, day = timelib.calendar_date(2440588 + days)
+
+    # Construct Skyfield time. Cheat slightly by putting all of the time of day
+    # in the `second` argument.
+    t = ts.utc(year, month, day, second=seconds)
+
+    return t
 
 
+def unix_to_era(unix_time):
+    """Calculate the Earth Rotation Angle for a given time.
+
+    The Earth Rotation Angle is the angle between the Celetial and Terrestrial
+    Intermediate origins, and is a modern replacement for the Greenwich Sidereal
+    Time.
+
+    Parameters
+    ----------
+    unix_time : float or array of.
+        Unix/POSIX time.
+
+    Returns
+    -------
+    era : float or array of
+        The Earth Rotation Angle in degrees.
+    """
+
+    from skyfield import earthlib
+
+    t = unix_to_skyfield_time(unix_time)
+
+    era = earthlib.earth_rotation_angle(t.ut1)  # in cycles
+
+    return (360.0 * era)
+
+
+def era_to_unix(era, time0):
+    """Calculate the UNIX time for a given Earth Rotation Angle.
+
+    The Earth Rotation Angle is the angle between the Celetial and Terrestrial
+    Intermediate origins, and is a modern replacement for the Greenwich Sidereal
+    Time.
+
+    This routine is accurate at about the 1 ms level.
+
+    Parameters
+    ----------
+    era : float or array of
+        The Earth Rotation Angle in degrees.
+    time0 : scalar or np.ndarray
+        An earlier time within 24 sidereal hours. For example,
+        the start of the solar day of the observation.
+
+    Returns
+    -------
+    unix_time : float or array of.
+        Unix/POSIX time.
+    """
+
+    era0 = unix_to_era(time0)
+
+    diff_era_deg = ((era - era0) % 360.0)  # Convert from degrees in seconds (time)
+
+    # Convert to time difference using the rough estimate of the Stellar second
+    # (~50 us accuracy). Could be improved with better estimate of the Stellar
+    # Second.
+    diff_time = diff_era_deg * 240.0 * STELLAR_S
+
+    # Calculate if any leap seconds occured between the search start and the final value
+    leap_seconds = leap_seconds_between(time0, time0 + diff_time)
+
+    return time0 + diff_time - leap_seconds
+
+
+@vectorize()
 def unix_to_datetime(unix_time):
-    """Converts unix time to a :class:`datetime.datetime` object.
+    """Converts unix time to a :class:`~datetime.datetime` object.
 
     Equivalent to :meth:`datetime.datetime.utcfromtimestamp`.
 
@@ -365,11 +512,14 @@ def unix_to_datetime(unix_time):
 
     """
 
-    return datetime.utcfromtimestamp(unix_time)
+    dt = datetime.utcfromtimestamp(unix_time)
+
+    return naive_datetime_to_utc(dt)
 
 
+@vectorize()
 def datetime_to_unix(dt):
-    """Converts a :class:`datetime.datetime` object to the unix time.
+    """Converts a :class:`~datetime.datetime` object to the unix time.
 
     This is the inverse of :meth:`datetime.datetime.utcfromtimestamp`.
 
@@ -388,14 +538,15 @@ def datetime_to_unix(dt):
     :meth:`datetime.datetime.utcfromtimestamp`
 
     """
-
     # Noting that this operation is ignorant of leap seconds.
-    since_epoch = dt - datetime.utcfromtimestamp(0)
+    dt = naive_datetime_to_utc(dt)
+    epoch_start = naive_datetime_to_utc(datetime.utcfromtimestamp(0))
+    since_epoch = dt - epoch_start
     return since_epoch.total_seconds()
 
 
 def datetime_to_timestr(dt):
-    """Converts a :class:`datetime.datetime` to "YYYYMMDDTHHMMSSZ" format.
+    """Converts a :class:`~datetime.datetime` to "YYYYMMDDTHHMMSSZ" format.
 
     Partial seconds are ignored.
 
@@ -418,7 +569,7 @@ def datetime_to_timestr(dt):
 
 
 def timestr_to_datetime(time_str):
-    """Converts date "YYYYMMDDTHHMMSS*" to a :class:`datetime.datetime`.
+    """Converts date "YYYYMMDDTHHMMSS*" to a :class:`~datetime.datetime`.
 
     Parameters
     ----------
@@ -438,10 +589,8 @@ def timestr_to_datetime(time_str):
     return datetime.strptime(time_str[:15], "%Y%m%dT%H%M%S")
 
 
-def leap_second_between(time_a, time_b):
-    """Determine whether a leap second occurred between two Unix times.
-
-    Not yet implemented.
+def leap_seconds_between(time_a, time_b):
+    """Determine how many leap seconds occurred between two Unix times.
 
     Parameters
     ----------
@@ -452,31 +601,104 @@ def leap_second_between(time_a, time_b):
 
     Returns
     -------
-    occurred : bool
-        If there was a leap second between *time_a* and *time_b*.
-
+    int : bool
+        The number of leap seconds between *time_a* and *time_b*.
     """
 
-    # This doesn't work because delta_t is
-    # dt_a = ephem.delta_t(unix_to_ephem_time(time_a))
-    # dt_b = ephem.delta_t(unix_to_ephem_time(time_b))
-    # print dt_a, dt_b
-    # return dt_a != dt_b
+    # Construct the elapse UNIX time
+    delta_unix = time_b - time_a
 
-    raise NotImplementedError()
+    # Construct the elapsed terrestrial time
+    tt_a = unix_to_skyfield_time(time_a).tt
+    tt_b = unix_to_skyfield_time(time_b).tt
+    delta_tt = (tt_b - tt_a) * 24.0 * 3600
+
+    # Calculate the shift in timescales which should only happen when leap
+    # seconds are added/removed
+    time_shift = delta_tt - delta_unix
+    time_shift_int = np.around(time_shift).astype(int)
+
+    # Check that the shift is an integer number of seconds. I don't know why
+    # this wouldn't be true, but if it's not it means things have gone crazy
+    if np.any(np.abs(time_shift - time_shift_int) > 0.01):
+
+        raise RuntimeError("Time shifts between TT and UTC does not seem to" +
+                           " be an integer number of seconds.")
+
+    # If the differences are close then there is no leap second
+    return time_shift_int
 
 
 def ensure_unix(time):
-    """Try and convert the input time to Unix time."""
+    """Convert the input time to Unix time format.
 
-    if isinstance(time, datetime):
+    Parameters
+    ----------
+    time : float, string, :class:`~datetime.datetime` or :class:`skyfield.timelib.Time`
+        Input time, or array of times.
+
+    Returns
+    -------
+    unix_time : float, or array of
+        Output time.
+    """
+
+    time0 = np.array(time).flatten()[0] if hasattr(time, '__len__') else time
+
+    if isinstance(time0, datetime):
         return datetime_to_unix(time)
-    elif isinstance(time, ephem.Date):
-        return datetime_to_unix(time.datetime())
-    elif isinstance(time, basestring):
+    elif isinstance(time0, basestring):
         return datetime_to_unix(timestr_to_datetime(time))
     else:
-        return float(time)
+
+        # Try and convert a Skyfield time into a UNIX time
+        # Protect the import in case Skyfield is not installed
+        try:
+            from skyfield import timelib
+
+            if isinstance(time0, timelib.Time):
+                return datetime_to_unix(time.utc_datetime())
+        except ImportError:
+            pass
+
+        # Finally try and convert into a float.
+        try:
+            return np.float64(time)
+        except TypeError:
+            raise TypeError('Could not convert %s into a UNIX time' % repr(type(time)))
+
+
+_warned_utc_datetime = False
+
+def naive_datetime_to_utc(dt):
+    """Add UTC timezone info to a naive datetime.
+
+    This only does anything if Skyfield is installed.
+
+    Parameters
+    ----------
+    dt : datetime
+
+    Returns
+    -------
+    dt : datetime
+        New datetime with `tzinfo` added.
+    """
+    try:
+        from skyfield.api import utc
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=utc)
+    except ImportError:
+        global _warned_utc_datetime
+
+        if not _warned_utc_datetime:
+            import warnings
+
+            warnings.warn('Skyfield not installed. Cannot add UTC timezone to datetime.')
+            _warned_utc_datetime = True
+
+    return dt
 
 
 @vectorize()
@@ -496,6 +718,111 @@ def time_of_day(time):
     dt = datetime.utcfromtimestamp(ensure_unix(time))
     d = dt.replace(hour=0, minute=0, second=0, microsecond=0)
     return (dt - d).total_seconds()
+
+
+class SkyfieldWrapper(object):
+    """A wrapper to help with loading Skyfield and its data.
+
+    Parameters
+    ----------
+    path : string, optional
+        Directory Skyfield should save data in. If not set data will be looked
+        for in `$CAPUT_SKYFIELD_PATH` or in `<path to caput>/caput/data`.
+    expire : bool, optional
+        Whether to expire existing data. This is `False` by default to avoid
+        unexpected filesystem/network access.
+    ephemeris : string, optional
+        The JPL ephemeris to use. Defaults to `'de421.bsp'`.
+
+    Attributes
+    ----------
+    timescale
+    ephemeris
+    load
+    path
+
+    Methods
+    -------
+    reload
+    """
+
+    def __init__(self, path=None, expire=False, ephemeris='de421.bsp'):
+
+        import os
+
+        self._ephemeris_name = ephemeris
+
+        if path is None:
+
+            if 'CAPUT_SKYFIELD_PATH' in os.environ:
+                path = os.environ['CAPUT_SKYFIELD_PATH']
+            else:
+                path = os.path.join(os.path.dirname(__file__), 'data', '')
+
+        # Defer failure if Skyfield is not available until we try to load
+        # anything
+        try:
+            from skyfield import api
+            self._load = api.Loader(path, expire=expire)
+        except ImportError:
+            pass
+
+    _load = None
+
+    @property
+    def load(self):
+        """A :class:`skyfield.iokit.Loader` object to be used in the same way as
+        `skyfield.api.load`, in case you want something other than `timescale`
+        or `ephemeris`."""
+
+        if self._load is None:
+            raise RuntimeError('Skyfield is not installed.')
+        return self._load
+
+    @property
+    def path(self):
+        """The path to the Skyfield data."""
+
+        return self.load.directory
+
+    _timescale = None
+
+    @property
+    def timescale(self):
+        """A :class:`skyfield.timelib.Timescale` object. Loaded at first call,
+        and then cached."""
+
+        if self._timescale is None:
+            self._timescale = self.load.timescale()
+        return self._timescale
+
+    _ephemeris = None
+
+    @property
+    def ephemeris(self):
+        """A Skyfield ephemeris object (:class:`skyfield.jpllib.SpiceKernel`).
+        Loaded at first call, and then cached."""
+
+        if self._ephemeris is None:
+            self._ephemeris = self.load(self._ephemeris_name)
+        return self._ephemeris
+
+    def reload(self):
+        """Reload the Skyfield data regardless of the `expire` setting.
+        """
+
+        exp_val = self.load.expire
+        self.load.expire = True
+
+        try:
+            self.timescale
+            self.ephemeris
+        finally:
+            self.load.expire = exp_val
+
+# Set up a module local Skyfield wrapper for time conversion functions in this
+# module to use.
+skyfield_wrapper = SkyfieldWrapper()
 
 
 if __name__ == "__main__":
