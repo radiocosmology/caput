@@ -84,6 +84,8 @@ Constants
 
 :const:`SIDEREAL_S`
     Number of SI seconds in a sidereal second [s/sidereal s].
+:const:`STELLAR_S`
+    Approximate number of SI seconds in a stellar second (i.e. 1/86400 of a stellar day) [s/stellar s].
 
 Why not Sidereal Time?
 ----------------------
