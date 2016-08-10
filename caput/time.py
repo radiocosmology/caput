@@ -137,6 +137,7 @@ from datetime import datetime
 
 import numpy as np
 
+from . import config
 from .misc import vectorize
 
 
@@ -183,14 +184,14 @@ class Observer(object):
     skyfield_obs
     """
 
-    latitude = 0.0
-    longitude = 0.0
+    longitude = config.float_in_range(0.0, 360.0, default=0.0)
+    latitude = config.float_in_range(-90.0, 90.0, default=0.0)
 
-    altitude = 0.0
+    altitude = config.Property(proptype=float, default=0.0)
 
-    lsd_start_day = 0.0
+    lsd_start_day = config.utc_time(default=datetime(2000, 1, 1, 11, 58, 56))
 
-    def __init__(self, lon, lat, alt=0.0, lsd_start=None, sf_wrapper=None):
+    def __init__(self, lon=0.0, lat=0.0, alt=0.0, lsd_start=None, sf_wrapper=None):
 
         self.longitude = lon
         self.latitude = lat
@@ -198,10 +199,8 @@ class Observer(object):
 
         self.skyfield = skyfield_wrapper if sf_wrapper is None else sf_wrapper
 
-        if lsd_start is None:
-            lsd_start = datetime(2000, 1, 1, 11, 58, 56)
-
-        self.lsd_start_day = ensure_unix(lsd_start)
+        if lsd_start is not None:
+            self.lsd_start_day = lsd_start
 
     def skyfield_obs(self):
         """Create a Skyfield topos object for the current location.
