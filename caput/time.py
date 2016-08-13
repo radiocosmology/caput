@@ -764,7 +764,9 @@ class SkyfieldWrapper(object):
         # anything
         try:
             from skyfield import api
-            self._load = api.Loader(path, expire=expire)
+            # Don't use expire argument until next Skyfield release (> 0.8)
+            #self._load = api.Loader(path, expire=expire)
+            self._load = api.Loader(path)
         except ImportError:
             pass
 
