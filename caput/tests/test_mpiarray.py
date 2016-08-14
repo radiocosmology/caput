@@ -108,6 +108,8 @@ class TestMPIAray(unittest.TestCase):
 
         assert (ds2 == ds).all()
 
+        mpiutil.barrier()
+
         if mpiutil.rank0 and os.path.exists(fname):
             os.remove(fname)
 
