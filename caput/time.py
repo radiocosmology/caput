@@ -184,7 +184,7 @@ class Observer(object):
     skyfield_obs
     """
 
-    longitude = config.float_in_range(0.0, 360.0, default=0.0)
+    longitude = config.float_in_range(-180.0, 180.0, default=0.0)
     latitude = config.float_in_range(-90.0, 90.0, default=0.0)
 
     altitude = config.Property(proptype=float, default=0.0)
