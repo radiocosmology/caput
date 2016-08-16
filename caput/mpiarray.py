@@ -100,6 +100,7 @@ Here is an example of this in action::
         mpiutil.barrier()
 
 """
+from __future__ import absolute_import
 
 import os
 import time

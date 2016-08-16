@@ -28,7 +28,7 @@ We then extend it to store information about a person with a pet. The
 configuration will be successfully inherited.
 
 >>> class PersonWithPet(Person):
-... 
+...
 ...     petname = Property(default='Molly', proptype=str)
 
 Let's create a couple of objects from these classes.
@@ -51,7 +51,7 @@ Now let's load the configuration from a dictionary:
 
 >>> person1.read_config(testdict)
 >>> person2.read_config(testdict)
-    
+
 Then we'll print the output to see the updated configuration:
 
 >>> print person1.name, person1.age
@@ -75,7 +75,8 @@ class Property(object):
             The initial value for the property.
         proptype : function
             The type of the property. In reality this is just a function which
-            gets called whenever we update the value: `val = proptype(newval)`
+            gets called whenever we update the value: `val = proptype(newval)`,
+            so it can be used for conversion and validation
         key : string
             The name of the dictionary key that we can fetch this value from.
             If None (default), attempt to use the attribute name from the
@@ -87,29 +88,31 @@ class Property(object):
         self.key = key
         self.propname = None
 
-
     def __get__(self, obj, objtype):
-        ## Object getter.
+        # Object getter.
         if obj is None:
             return None
 
+        # Ensure the property name has been found and set
         self._set_propname(obj)
 
+        # If the value has not been set, return the default, otherwise return the actual value.
         if self.propname not in obj.__dict__:
             return self.proptype(self.default) if self.default is not None else None
         else:
             return obj.__dict__[self.propname]
 
-
     def __set__(self, obj, val):
-        ## Object setter.
+        # Object setter.
         if obj is None:
             return None
 
+        # Ensure the property name has been found and set
         self._set_propname(obj)
 
+        # Save the value of this property onto the instance it's a descriptor
+        # for.
         obj.__dict__[self.propname] = self.proptype(val)
-
 
     def _from_config(self, obj, config):
         """Load the configuration from the supplied dictionary.
@@ -130,17 +133,19 @@ class Property(object):
         if self.key in config:
             val = self.proptype(config[self.key])
             obj.__dict__[self.propname] = val
-            #print "Setting attribute %s to %s." % (self.key, val)
-
 
     def _set_propname(self, obj):
+        # As this config.Property instance lives on the class it's in, it
+        # doesn't actually know what it's name is. We need to search the class
+        # hierarchy for this instance to pull out the name. Once we have it, set
+        # it as a local attribute so we have it again.
 
         import inspect
 
         if self.propname is None:
             for basecls in inspect.getmro(type(obj))[::-1]:
                 for propname, clsprop in basecls.__dict__.items():
-                    if isinstance(clsprop, Property) and clsprop == self:
+                    if clsprop is self:
                         self.propname = propname
 
 
@@ -187,6 +192,70 @@ class Reader(object):
         post configutation.
         """
         pass
+
+
+def utc_time(default=None):
+    """A property for representing UTC as UNIX time.
+
+    Parameters
+    ----------
+    time : `float`, `string` or :class:`~datetime.datetime`
+        These are all easy to produce from a YAML file.
+    default : `float`, `string` or :class:`~datetime.datetime`, optional
+        The optional default time.
+
+    Returns
+    -------
+    prop : Property
+        A property instance setup to parse UTC time.
+    """
+
+    def _prop(val):
+        # Include import here to get around circular import issues
+        from . import time
+        return time.ensure_unix(val)
+
+    prop = Property(proptype=_prop, default=default)
+
+    return prop
+
+
+def float_in_range(start, end, default=None):
+    """A property type that tests if its input is within the given range.
+
+    Parameters
+    ----------
+    start, end : float
+        Range to test.
+    default : `float`, optional
+        The optional default time.
+
+    Returns
+    -------
+    prop : Property
+        A property instance setup to validate an input float type.
+
+    Examples
+    --------
+    Should be used like::
+
+        class Position(object):
+
+            longitude = config.float_in_range(0.0, 360.0, default=90.0)
+    """
+
+    def _prop(val):
+
+        val = float(val)
+
+        if val < start or val > end:
+            raise ValueError('Input %f not in range [%f, %f]' % (val, start, end))
+
+        return val
+
+    prop = Property(proptype=_prop, default=default)
+
+    return prop
 
 
 if __name__ == "__main__":

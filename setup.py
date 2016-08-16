@@ -14,19 +14,20 @@ else:
     requires = REQUIRES
 
 setup(
-    name = 'caput',
-    version = __version__,
-    packages = ['caput', 'caput.tests'],
+    name='caput',
+    version=__version__,
+    packages=['caput', 'caput.tests'],
     scripts=['scripts/caput-pipeline'],
     install_requires=requires,
-    extras_require = {
-        'mpi':  ['mpi4py>=1.3'],
-        },
+    extras_require={
+        'mpi': ['mpi4py>=1.3'],
+        'skyfield': ['skyfield>=0.8']
+    },
 
     # metadata for upload to PyPI
-    author = "Kiyo Masui, J. Richard Shaw",
-    author_email = "kiyo@physics.ubc.ca",
-    description = "Cluster Astronomical Python Utilities.",
-    license = "GPL v3.0",
-    url = "http://github.com/radiocosmology/caput"
+    author="Kiyo Masui, J. Richard Shaw",
+    author_email="kiyo@physics.ubc.ca",
+    description="Cluster Astronomical Python Utilities.",
+    license="GPL v3.0",
+    url="http://github.com/radiocosmology/caput"
 )
