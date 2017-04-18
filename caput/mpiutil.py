@@ -24,6 +24,7 @@ Functions
    barrier
    bcast
    allreduce
+   gather_list
    parallel_map
    typemap
    split_m
@@ -41,6 +42,7 @@ Functions
 """
 
 import sys
+import itertools
 import warnings
 from types import ModuleType
 import numpy as np
@@ -194,22 +196,17 @@ def allreduce(sendobj, op=None, comm=_comm):
         return sendobj
 
 
-# def Gatherv(sendbuf, recvbuf, root=0, comm=_comm):
-#     if comm is not None and comm.size > 1:
-#         comm.Gatherv(sendbuf, recvbuf, root=root)
-#     else:
-#         # if they are just numpy data buffer
-#         recvbuf = sendbuf.copy()
-#         # TODO, other cases
-
-
-# def Allgatherv(sendbuf, recvbuf, comm=_comm):
-#     if comm is not None and comm.size > 1:
-#         return _comm.Allgatherv(sendbuf, recvbuf)
-#     else:
-#         # if they are just numpy data buffer
-#         recvbuf = sendbuf.copy()
-#         # TODO, other cases
+def gather_list(lst, root=None, comm=_comm):
+    """Gather the list `lst` from all processes and merge them to a new list."""
+    if comm is not None and comm.size > 1:
+        if root is None:
+            return list(itertools.chain(*comm.allgather(lst)))
+        else:
+            result = comm.gather(lst, root=root)
+            if rank == root:
+                return list(itertools.chain(*result))
+    else:
+        return lst[:]
 
 
 def parallel_map(func, glist, root=None, method='con', comm=_comm):
