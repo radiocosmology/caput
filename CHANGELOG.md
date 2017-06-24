@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning](http://semver.org/), with the exception
 that I'm using PEP440 to denote pre-releases.
 
+## [0.4.0] - 2017-06-24
+
+### Added
+
+- Added an enum type for the `caput.config`
+
+
 ## [0.3.0] - 2016-08-13
 
 ### Added

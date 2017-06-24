@@ -258,6 +258,46 @@ def float_in_range(start, end, default=None):
     return prop
 
 
+def enum(options, default=None):
+    """A property type that accepts only a set of possible values.
+
+    Parameters
+    ----------
+    options : list
+        List of allowed options.
+    default : optional
+        The optional default value.
+
+    Returns
+    -------
+    prop : Property
+        A property instance setup to validate an enum type.
+
+    Examples
+    --------
+    Should be used like::
+
+        class Project(object):
+
+            mode = enum(['forward', 'backward'], default='forward')
+    """
+
+    def _prop(val):
+
+        if val not in options:
+            raise ValueError('Input %f not in %s' % (repr(val), repr(options)))
+
+        return val
+
+    if default is not None and default not in options:
+        raise ValueError('Default value %s must be in %s (or None)' %
+                         (repr(default), repr(options)))
+
+    prop = Property(proptype=_prop, default=default)
+
+    return prop
+
+
 if __name__ == "__main__":
     import doctest
     doctest.testmod()
