@@ -209,12 +209,13 @@ class Observer(object):
         -------
         obs : :class:`skyfield.toposlib.Topos`
         """
+        from skyfield.api import Topos
 
         earth = self.skyfield.ephemeris['earth']
 
-        obs = earth.topos(latitude_degrees=self.latitude,
-                          longitude_degrees=self.longitude,
-                          elevation_m=self.altitude)
+        obs = earth + Topos(latitude_degrees=self.latitude,
+                            longitude_degrees=self.longitude,
+                            elevation_m=self.altitude)
 
         return obs
 
@@ -764,9 +765,7 @@ class SkyfieldWrapper(object):
         # anything
         try:
             from skyfield import api
-            # Don't use expire argument until next Skyfield release (> 0.8)
-            #self._load = api.Loader(path, expire=expire)
-            self._load = api.Loader(path)
+            self._load = api.Loader(path, expire=expire)
         except ImportError:
             pass
 

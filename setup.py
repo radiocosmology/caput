@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 import os
 
 from caput import __version__
@@ -21,7 +21,7 @@ setup(
     install_requires=requires,
     extras_require={
         'mpi': ['mpi4py>=1.3'],
-        'skyfield': ['skyfield>=0.8']
+        'skyfield': ['skyfield>=1.0']
     },
 
     # metadata for upload to PyPI
