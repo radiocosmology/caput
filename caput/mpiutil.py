@@ -161,7 +161,14 @@ def partition_list_mpi(full_list, method='con', comm=_comm):
         rank = comm.rank
         size = comm.size
 
-    return partition_list(full_list, rank, size, method=method)
+    if method == 'rand':
+        perm = None
+        if rank == 0:
+            perm = np.random.permutation(len(full_list))
+        choices = scatter_array(perm, root=0, comm=comm)
+        return [ full_list[i] for i in choices ]
+    else:
+        return partition_list(full_list, rank, size, method=method)
 
 # alias mpilist for partition_list_mpi for convenience
 mpilist = partition_list_mpi
