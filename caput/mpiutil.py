@@ -74,7 +74,7 @@ try:
 
 
 except ImportError:
-    warnings.warn("Warning: mpi4py not installed.")
+    warnings.warn("Warning: mpi4py not installed.", ImportWarning)
 
 
 class _close_message(object):
