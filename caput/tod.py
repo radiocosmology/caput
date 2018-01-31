@@ -29,6 +29,7 @@ Functions
 """
 
 import glob
+import inspect
 
 import numpy as np
 import h5py
@@ -308,10 +309,12 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
         this index is excluded.
     datasets : sequence of strings
         Which datasets to include.  Default is all of them.
-    dataset_filter : callable
+    dataset_filter : callable with one or two arguments
         Function for preprocessing all datasets.  Useful for changing data
-        types etc.  Should return a dataset.
-
+        types etc. Takes a dataset as an arguement and should return a
+        dataset (either h5py or memh5). Optionally may accept a second
+        argument that is slice along the time axis, which the filter should
+        apply.
 
     Returns
     -------
@@ -321,6 +324,8 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
 
     if dataset_filter is None:
         def dataset_filter(d): return d
+
+    filter_time_slice = len(inspect.getargspec(dataset_filter).args) == 2
 
     # Inspect first entry in the list to get constant parts..
     first_data = data_list[0]
@@ -404,33 +409,49 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             if name not in dataset_names:
                 continue
             attrs = dataset.attrs
-            dataset = dataset_filter(dataset)
-            if hasattr(dataset, "attrs"):
-                # Some filters modify the attributes; others return a thing
-                # without attributes. So we need to check.
-                attrs = dataset.attrs
 
-            # For now only support concatenation over minor axis.
-            for ii, a in enumerate(attrs['axis']):
+            # Figure out which axis we are concatenating over.
+            for a in attrs['axis']:
                 if a in concatenation_axes:
                     axis = a
-                    axis_ind = ii
                     break
             else:
                 msg = "Dataset %s does not have a valid concatenation axis."
                 raise ValueError(msg % name)
-
+            # Figure out where we are in that axis and how to slice it.
             axis_finished = current_concat_index_start[axis] >= stop[axis]
             axis_not_started = (current_concat_index_start[axis]
                                 + current_concat_index_n[axis] <= start[axis])
             if axis_finished or axis_not_started:
                 continue
-            # Place holder for eventual implementation.
-            axis_rate = 1
+            axis_rate = 1  # Place holder for eventual implementation.
+            in_slice, out_slice = _get_in_out_slice(
+                    start[axis] * axis_rate,
+                    stop[axis] * axis_rate,
+                    current_concat_index_start[axis] * axis_rate,
+                    current_concat_index_n[axis] * axis_rate,
+                    )
+
+            # Filter the dataset.
+            if filter_time_slice:
+                dataset = dataset_filter(dataset, in_slice)
+            else:
+                dataset = dataset_filter(dataset)
+            if hasattr(dataset, "attrs"):
+                # Some filters modify the attributes; others return a thing
+                # without attributes. So we need to check.
+                attrs = dataset.attrs
+
+            # Do this *after* the filter, in case filter changed axis order.
+            axis_ind = list(attrs['axis']).index(axis)
+
+            # Slice input data if the filter doesn't do it.
+            if not filter_time_slice:
+                in_slice = (slice(None),) * axis_ind + (in_slice,)
+                dataset = dataset[in_slice]
+
             # If this is the first piece of data, initialize the output
             # dataset.
-            # out_keys = ['flags/' + n for n in  out.flags.keys()]
-            # out_keys += out.datasets.keys()
             if name not in out:
                 shape = dataset.shape
                 dtype = dataset.dtype
@@ -450,36 +471,30 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                     new_dset = out.create_dataset(name, shape=full_shape,
                                                   dtype=dtype)
                 memh5.copyattrs(attrs, new_dset.attrs)
+
             out_dset = out[name]
-            in_slice, out_slice = _get_in_out_slice(
-                    start[axis] * axis_rate,
-                    stop[axis] * axis_rate,
-                    current_concat_index_start[axis] * axis_rate,
-                    current_concat_index_n[axis] * axis_rate,
-                    )
-            in_slice = (slice(None),) * axis_ind + (in_slice,)
             out_slice = (slice(None),) * axis_ind + (out_slice,)
-            # Awkward special case for pure subarray dtypes, which h5py and
-            # numpy treat differently.
+
+            # Copy the data in.
             out_dtype = out_dset.dtype
             if (out_dtype.kind == 'V' and not out_dtype.fields
                     and out_dtype.shape
                     and isinstance(out_dset, h5py.Dataset)):
-                # index_pairs = zip(range(dataset.shape[-1])[in_slice],
-                #                   range(out_dset.shape[-1])[out_slice])
+                # Awkward special case for pure subarray dtypes, which h5py and
+                # numpy treat differently.
                 # Drop down to low level interface. I think this is only
                 # nessisary for pretty old h5py.
                 from h5py import h5t
                 from h5py._hl import selections
                 mtype = h5t.py_create(out_dtype)
-                mdata = dataset[in_slice].copy().flat[:]
+                mdata = dataset.copy().flat[:]
                 mspace = selections.SimpleSelection(
                         (mdata.size // out_dtype.itemsize,)).id
                 fspace = selections.select(out_dset.shape, out_slice,
                                            out_dset.id).id
                 out_dset.id.write(mspace, fspace, mdata, mtype)
             else:
-                out_dset[out_slice] = dataset[in_slice]
+                out_dset[out_slice] = dataset
         # Increment the start indexes for the next item of the list.
         for axis in current_concat_index_start.keys():
             current_concat_index_start[axis] += current_concat_index_n[axis]
