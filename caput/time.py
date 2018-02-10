@@ -134,6 +134,7 @@ and a complete cycle of ERA.
 """
 
 from datetime import datetime
+import warnings
 
 import numpy as np
 
@@ -695,7 +696,6 @@ def naive_datetime_to_utc(dt):
         global _warned_utc_datetime
 
         if not _warned_utc_datetime:
-            import warnings
 
             warnings.warn('Skyfield not installed. Cannot add UTC timezone to datetime.')
             _warned_utc_datetime = True
@@ -748,7 +748,7 @@ class SkyfieldWrapper(object):
     reload
     """
 
-    def __init__(self, path=None, expire=False, ephemeris='de421.bsp'):
+    def __init__(self, path=None, expire=True, ephemeris='de421.bsp'):
 
         import os
 
@@ -795,7 +795,13 @@ class SkyfieldWrapper(object):
         and then cached."""
 
         if self._timescale is None:
-            self._timescale = self.load.timescale()
+            try:
+                self._timescale = self.load.timescale()
+            except:
+                warnings.warn("Could not update Skyfield data to more recent version. Trying existing data.")
+                self.load.expire = False
+                self._timescale = self.load.timescale()
+
         return self._timescale
 
     _ephemeris = None
@@ -806,7 +812,13 @@ class SkyfieldWrapper(object):
         Loaded at first call, and then cached."""
 
         if self._ephemeris is None:
-            self._ephemeris = self.load(self._ephemeris_name)
+            try:
+                self._ephemeris = self.load(self._ephemeris_name)
+            except:
+                warnings.warn("Could not update Skyfield data to more recent version. Trying existing data.")
+                self.load.expire = False
+                self._ephemeris = self.load(self._ephemeris_name)
+
         return self._ephemeris
 
     def reload(self):

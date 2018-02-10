@@ -13,6 +13,29 @@ if on_rtd:
 else:
     requires = REQUIRES
 
+
+# Try and install Skyfield data
+try:
+    from caput import time as ctime
+
+    # Force download of data
+    ctime.skyfield_wrapper.reload()
+
+    # Set package data to be installed alongside skyfield
+    skyfield_data = {
+        'caput': [
+            'data/Leap_Second.dat',
+            'data/de421.bsp',
+            'data/deltat.data',
+            'data/deltat.preds'
+        ]
+    }
+
+except:
+    import warnings
+    warnings.warn("Could not install additional Skyfield data.")
+    skyfield_data = None
+
 setup(
     name='caput',
     version=__version__,
@@ -20,9 +43,10 @@ setup(
     scripts=['scripts/caput-pipeline'],
     install_requires=requires,
     extras_require={
-        'mpi': ['mpi4py>=1.3'],
-        'skyfield': ['skyfield>=1.0']
+        'mpi': ['mpi4py>=1.3']
     },
+
+    package_data=skyfield_data,
 
     # metadata for upload to PyPI
     author="Kiyo Masui, J. Richard Shaw",
