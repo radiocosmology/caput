@@ -70,31 +70,31 @@ def queue(configfile, nosubmit=False):
         raise Exception('Job time is required.')
     clusterconf['time'] = conf['time']
 
-    if 'cluster' not in conf:
-        raise Exception('Cluster is required')
-    elif (conf['cluster'] == 'gpc'):
-        is_gpc = True
-        is_cedar = False
-    elif (conf['cluster'] == 'cedar'):
-        is_cedar = True
-        is_gpc = False
+    # Set queueing system w. per-cluster defaults
+    cluster_defaults = {
+        'gpc' : {'ppn': 8, 'mem': '16000M', 'queue_sys': 'pbs', 'account':None,},
+        'cedar': {'ppn': 32, 'mem': '128000M', 'queue_sys': 'slurm', 'account':'rpp-krs',}
+    }
+    if 'cluster' in conf:
+        clusterconf['queue_sys'] = conf['queue_sys'] if 'queue_sys' in conf else cluster_defaults[conf['cluster']]['queue_sys']
+        clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else cluster_defaults[conf['cluster']]['ppn']
+        clusterconf['mem'] = conf['mem'] if 'mem' in conf else cluster_defaults[conf['cluster']]['mem']
+        clusterconf['account'] = conf['account'] if 'account' in conf else cluster_defaults[conf['cluster']]['account']
     else:
-        raise Exception('Cluster name not recognized')
+        if 'queue_sys' in conf:
+            clusterconf['queue_sys'] = conf['queue_sys']
+        else:
+            clusterconf['queue_sys'] = 'pbs'
+            raise Warning('Queueing system not set, defaulting to PBS')
+        clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else 8
+        clusterconf['mem'] = conf['mem'] if 'mem' in conf else 16000M
+        clusterconf['account'] = conf['account'] if 'account' in conf else None
 
     # Set up optional PBS vars
     clusterconf['ompnum'] = conf['ompnum'] if 'ompnum' in conf else 8
     clusterconf['queue'] = conf['queue'] if 'queue' in conf else 'batch'
     clusterconf['pernode'] = conf['pernode'] if 'pernode' in conf else 1
     clusterconf['name'] = conf['name'] if 'name' in conf else 'job'
-
-    # Cedar-specific optional parameters
-    clusterconf['mem'] = conf['mem'] if 'mem' in conf else '128000M'
-    clusterconf['account'] = conf['account'] if 'account' in conf else 'rpp-krs'
-
-    if is_gpc:
-        clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else 8
-    elif is_cedar:
-        clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else 32
 
     # Set vars only needed to create script
     clusterconf['mpiproc'] = clusterconf['nodes'] * clusterconf['pernode']
@@ -112,7 +112,7 @@ def queue(configfile, nosubmit=False):
     else:
         clusterconf['venv'] = '/dev/null'
 
-    gpc_script = """#!/bin/bash
+    pbs_script = """#!/bin/bash
 #PBS -l nodes=%(nodes)i:ppn=%(ppn)i
 #PBS -q %(queue)s
 #PBS -r n
@@ -128,7 +128,7 @@ export OMP_NUM_THREADS=%(ompnum)i
 
 mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
 """
-    cedar_script = """#!/bin/bash
+    slurm_script = """#!/bin/bash
 #SBATCH --account=%(account)s
 #SBATCH --nodes=%(nodes)i
 #SBATCH --ntasks-per-node=%(ppn)i
@@ -144,10 +144,12 @@ export OMP_NUM_THREADS=%(ompnum)i
 mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
 """
 
-    if (is_gpc):
-        script = gpc_script % clusterconf
-    elif(is_cedar):
-        script = cedar_script % clusterconf
+    if clusterconf['queue_sys'] == 'pbs':
+        script = pbs_script % clusterconf
+    elif clusterconf['queue_sys'] == 'slurm':
+        script = slurm_script % clusterconf
+    else:
+        raise Exception('Specified queueing system not recognized')
 
     scriptname = pbsdir + '/jobscript.sh'
 
