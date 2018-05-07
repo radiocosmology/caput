@@ -87,7 +87,7 @@ def queue(configfile, nosubmit=False):
             clusterconf['queue_sys'] = 'pbs'
             raise Warning('Queueing system not set, defaulting to PBS')
         clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else 8
-        clusterconf['mem'] = conf['mem'] if 'mem' in conf else 16000M
+        clusterconf['mem'] = conf['mem'] if 'mem' in conf else '16000M'
         clusterconf['account'] = conf['account'] if 'account' in conf else None
 
     # Set up optional PBS vars
