@@ -75,11 +75,11 @@ def queue(configfile, nosubmit=False):
         'gpc' : {'ppn': 8, 'mem': '16000M', 'queue_sys': 'pbs', 'account':None,},
         'cedar': {'ppn': 32, 'mem': '128000M', 'queue_sys': 'slurm', 'account':'rpp-krs',}
     }
-    if 'cluster' in conf:
-        clusterconf['queue_sys'] = conf['queue_sys'] if 'queue_sys' in conf else cluster_defaults[conf['cluster']]['queue_sys']
-        clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else cluster_defaults[conf['cluster']]['ppn']
-        clusterconf['mem'] = conf['mem'] if 'mem' in conf else cluster_defaults[conf['cluster']]['mem']
-        clusterconf['account'] = conf['account'] if 'account' in conf else cluster_defaults[conf['cluster']]['account']
+    if 'system' in conf:
+        clusterconf['queue_sys'] = conf['queue_sys'] if 'queue_sys' in conf else cluster_defaults[conf['system']]['queue_sys']
+        clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else cluster_defaults[conf['system']]['ppn']
+        clusterconf['mem'] = conf['mem'] if 'mem' in conf else cluster_defaults[conf['system']]['mem']
+        clusterconf['account'] = conf['account'] if 'account' in conf else cluster_defaults[conf['system']]['account']
     else:
         if 'queue_sys' in conf:
             clusterconf['queue_sys'] = conf['queue_sys']
@@ -146,8 +146,10 @@ mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s
 
     if clusterconf['queue_sys'] == 'pbs':
         script = pbs_script % clusterconf
+        job_command = 'qsub'
     elif clusterconf['queue_sys'] == 'slurm':
         script = slurm_script % clusterconf
+        job_command = 'sbatch'
     else:
         raise Exception('Specified queueing system not recognized')
 
@@ -157,7 +159,7 @@ mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s
         f.write(script)
 
     if not nosubmit:
-        os.system('cd %s; qsub jobscript.sh' % pbsdir)
+        os.system('cd %s; %s jobscript.sh' % (pbsdir, job_command))
 
 
 if __name__ == '__main__':
