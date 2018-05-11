@@ -131,15 +131,16 @@ mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s
     slurm_script = """#!/bin/bash
 #SBATCH --account=%(account)s
 #SBATCH --nodes=%(nodes)i
-#SBATCH --ntasks-per-node=%(ppn)i
-#SBATCH --mem=%(mem)s
+#SBATCH --ntasks-per-node=%(ppn)i # number of MPI processes
+#SBATCH --cpus-per-task=%(ompnum)i # number of OpenMP processes
+#SBATCH --mem=%(mem)s # memory per node
 #SBATCH --time=%(time)s
 #SBATCH --job-name=%(name)s
 
 source %(venv)s
 
 cd %(workdir)s
-export OMP_NUM_THREADS=%(ompnum)i
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
 """
