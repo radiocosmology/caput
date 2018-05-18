@@ -73,7 +73,7 @@ def queue(configfile, nosubmit=False):
     # Set queueing system w. per-cluster defaults
     cluster_defaults = {
         'gpc' : {'ppn': 8, 'mem': '16000M', 'queue_sys': 'pbs', 'account':None,},
-        'cedar': {'ppn': 32, 'mem': '128000M', 'queue_sys': 'slurm', 'account':'rpp-krs',}
+        'cedar': {'ppn': 32, 'mem': '0', 'queue_sys': 'slurm', 'account':'rpp-krs',}
     }
     if 'system' in conf:
         clusterconf['queue_sys'] = conf['queue_sys'] if 'queue_sys' in conf else cluster_defaults[conf['system']]['queue_sys']
@@ -131,7 +131,7 @@ mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s
     slurm_script = """#!/bin/bash
 #SBATCH --account=%(account)s
 #SBATCH --nodes=%(nodes)i
-#SBATCH --ntasks-per-node=%(ppn)i # number of MPI processes
+#SBATCH --ntasks-per-node=%(pernode)i # number of MPI processes
 #SBATCH --cpus-per-task=%(ompnum)i # number of OpenMP processes
 #SBATCH --mem=%(mem)s # memory per node
 #SBATCH --time=%(time)s
