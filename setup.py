@@ -34,7 +34,7 @@ try:
 except:
     import warnings
     warnings.warn("Could not install additional Skyfield data.")
-    skyfield_data = None
+    skyfield_data = {}
 
 setup(
     name='caput',
