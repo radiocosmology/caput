@@ -385,6 +385,10 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             # Just copy it.
             out.create_index_map(axis, index_map)
 
+    # Copy over the reverse maps.
+    for axis, reverse_map in first_data.reverse_map.items():
+        out.create_reverse_map(axis, reverse_map)
+
     all_dataset_names = _copy_non_time_data(data_list, out)
     if datasets is None:
         dataset_names = all_dataset_names
@@ -548,9 +552,10 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
 
     if out is not None:
         memh5.copyattrs(data.attrs, out.attrs)
+
     for key, entry in data.items():
-        if key == 'index_map':
-            # XXX exclude index map.
+        if key in ['index_map', 'reverse_map']:
+            # XXX exclude index map and reverse map.
             continue
         if memh5.is_group(entry):
             if out is not None:
