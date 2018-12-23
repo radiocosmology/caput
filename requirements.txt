@@ -2,3 +2,4 @@ numpy
 h5py
 PyYAML
 skyfield>=1.0
+future
