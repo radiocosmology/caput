@@ -450,9 +450,8 @@ class Manager(config.Reader):
             except PipelineConfigError as e:
                 msg = "Setting up task %d caused an error - " % ii
                 msg += str(e)
-                new_e = PipelineConfigError(msg)
-                # This preserves the traceback.
-                raise new_e.__class__, new_e, sys.exc_info()[2]
+                # TODO: Py3 exception chaining
+                raise PipelineConfigError(msg)
             pipeline_tasks.append(task)
             logger.debug("Added %s to task list." % task.__class__.__name__)
         # Run the pipeline.

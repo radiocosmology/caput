@@ -253,7 +253,7 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
     @property
     def distributed(self):
         return getattr(self._storage_root, 'distributed', False)
-       
+
     @property
     def attrs(self):
         """Attributes attached to this object.
@@ -821,7 +821,7 @@ class MemDatasetCommon(MemDataset):
     @property
     def distributed(self):
         return False
-    
+
     @property
     def data(self):
         return self._data
@@ -1655,8 +1655,8 @@ def get_h5py_File(f, **kwargs):
             f = h5py.File(f, **kwargs)
         except IOError as e:
             msg = "Opening file %s caused an error: " % str(f)
-            new_e = IOError(msg + str(e))
-            raise new_e.__class__, new_e, sys.exc_info()[2]
+            # TODO: Py3 exception chaining
+            raise IOError(msg + str(e))
     return f, opened
 
 
