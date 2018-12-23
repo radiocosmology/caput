@@ -54,7 +54,7 @@ if on_rtd:
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 # 'numpydoc' does not ship with sphinx. To get it use `pip install numpydoc`.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath',
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.imgmath',
               'numpydoc', 'sphinx.ext.autosummary', 'sphinx.ext.viewcode',
               'sphinx.ext.intersphinx']
 
