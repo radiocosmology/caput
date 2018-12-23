@@ -68,6 +68,8 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
 from past.builtins import basestring
+from future.utils import raise_from
+
 import sys
 import collections
 import warnings
@@ -1663,7 +1665,7 @@ def get_h5py_File(f, **kwargs):
         except IOError as e:
             msg = "Opening file %s caused an error: " % str(f)
             # TODO: Py3 exception chaining
-            raise IOError(msg + str(e))
+            raise_from(IOError(msg + str(e)), e)
     return f, opened
 
 

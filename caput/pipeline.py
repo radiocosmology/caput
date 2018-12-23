@@ -314,11 +314,11 @@ from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
-
-
 from future import standard_library
 standard_library.install_aliases()
 from past.builtins import basestring
+from future.utils import raise_from
+
 import sys
 import inspect
 import queue
@@ -529,11 +529,9 @@ class Manager(config.Reader):
             try:
                 task_cls = _import_class(task_path)
             except Exception as e:
-                e_str = e.__class__.__name__
-                e_str += ': ' + str(e)
-                msg = "Loading task '%s' caused error - " % task_path
-                msg += e_str
-                raise PipelineConfigError(msg)
+                msg = ("Loading task '%s' caused error - %s: %s" %
+                       (task_path, e.__class__.__name__, str(e)))
+                raise_from(PipelineConfigError(msg), e)
 
         # Get the parameters and initialize the class.
         params = {}
