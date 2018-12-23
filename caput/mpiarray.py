@@ -496,10 +496,10 @@ class MPIArray(np.ndarray):
 
         import h5py
 
-        if type(f) == str:
+        if isinstance(f, basestring):
             fh = h5py.File(f, 'r')
             to_close = True
-        elif type(f) == h5py.File:
+        elif isinstance(f, h5py.File):
             fh = f
             to_close = False
         else:
