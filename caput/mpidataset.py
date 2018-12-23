@@ -48,6 +48,13 @@ Fourier transforming each of these two axes of the distributed array::
     darr4 = MPIArray.wrap(np.fft.irfft(darr3, axis=0), axis=1)
 
 """
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
+
 import os
 import collections
 import warnings

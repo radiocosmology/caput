@@ -27,7 +27,15 @@ Functions
     concatenate
 
 """
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
 
+
+from past.builtins import basestring
 import glob
 import inspect
 
@@ -341,7 +349,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     concat_index_lengths = {axis: 0 for axis in concatenation_axes}
     for data in data_list:
         for index_name in concatenation_axes:
-            if index_name not in data.index_map.keys():
+            if index_name not in data.index_map:
                 continue
             concat_index_lengths[index_name] += len(data.index_map[index_name])
 
@@ -540,7 +548,7 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
 
     if out is not None:
         memh5.copyattrs(data.attrs, out.attrs)
-    for key, entry in data.iteritems():
+    for key, entry in data.items():
         if key == 'index_map':
             # XXX exclude index map.
             continue

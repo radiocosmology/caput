@@ -60,7 +60,14 @@ Utility Functions
     deep_group_copy
 
 """
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
 
+from past.builtins import basestring
 import sys
 import collections
 import warnings
@@ -294,7 +301,7 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
 
     def __delitem__(self, name):
         """Delete item from group."""
-        if name not in self.keys():
+        if name not in self:
             raise KeyError("Key %s not present." % name)
         path = posixpath.join(self.name, name)
         parent_path, name = posixpath.split(path)
@@ -305,7 +312,7 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
         return len(self._get_storage())
 
     def __iter__(self):
-        keys = self._get_storage().keys()
+        keys = list(self._get_storage().keys())
         for key in keys:
             yield key
 
@@ -1445,7 +1452,7 @@ class BasicCont(MemDiskGroup):
         if self._data.file.mode == 'r+':
             self._data.require_group(u'history')
             self._data.require_group(u'index_map')
-            if 'order' not in self._data['history'].attrs.keys():
+            if 'order' not in self._data['history'].attrs:
                 self._data['history'].attrs[u'order'] = '[]'
 
     @property
@@ -1465,7 +1472,7 @@ class BasicCont(MemDiskGroup):
         """
 
         out = {}
-        for name, value in self._data['history'].iteritems():
+        for name, value in self._data['history'].items():
             out[name] = value.attrs
         out[u'order'] = eval(self._data['history'].attrs['order'])
         return ro_dict(out)
@@ -1489,7 +1496,7 @@ class BasicCont(MemDiskGroup):
         """
 
         out = {}
-        for name, value in self._data['index_map'].iteritems():
+        for name, value in self._data['index_map'].items():
             out[name] = value[:]
         return ro_dict(out)
 
@@ -1606,7 +1613,7 @@ def attrs2dict(attrs):
     """Safely copy an h5py attributes object to a dictionary."""
 
     out = {}
-    for key, value in attrs.iteritems():
+    for key, value in attrs.items():
         if isinstance(value, np.ndarray):
             value = value.copy()
         out[key] = value
@@ -1663,7 +1670,7 @@ def get_h5py_File(f, **kwargs):
 def copyattrs(a1, a2):
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
-    for key, value in a1.iteritems():
+    for key, value in a1.items():
         a2[key] = value
 
 
@@ -1671,7 +1678,7 @@ def deep_group_copy(g1, g2):
     """Copy full data tree from one group to another."""
 
     copyattrs(g1.attrs, g2.attrs)
-    for key, entry in g1.iteritems():
+    for key, entry in g1.items():
         if is_group(entry):
             g2.create_group(key)
             deep_group_copy(entry, g2[key])
@@ -1732,7 +1739,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     comm.Barrier()
 
     # Write out groups and distributed datasets, these operations must be done collectively
-    for key, entry in group.iteritems():
+    for key, entry in group.items():
 
         # Groups are written out by recursing
         if is_group(entry):
@@ -1751,7 +1758,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
 
         with h5py.File(fname, 'r+', **kwargs_nomode) as f:
 
-            for key, entry in group.iteritems():
+            for key, entry in group.items():
 
                 # Write out common datasets and copy their attrs
                 if isinstance(entry, MemDatasetCommon):

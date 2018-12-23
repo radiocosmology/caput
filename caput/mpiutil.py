@@ -35,6 +35,12 @@ Functions
    parallel_rows_write_hdf5
 
 """
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
 
 import sys
 import warnings
@@ -60,7 +66,7 @@ try:
     size = _comm.Get_size()
 
     if _comm is not None and size > 1:
-        print "Starting MPI rank=%i [size=%i]" % (rank, size)
+        print("Starting MPI rank=%i [size=%i]" % (rank, size))
 
     rank0 = True if rank == 0 else False
 
@@ -128,7 +134,7 @@ def partition_list(full_list, i, n, method='con'):
     def _partition(N, n, i):
         ### If partiion `N` numbers into `n` pieces,
         ### return the start and stop of the `i`th piece
-        base = (N / n)
+        base = (N // n)
         rem = N % n
         num_lst = rem * [base+1] + (n - rem) * [base]
         cum_num_lst = np.cumsum([0] + num_lst)
@@ -164,7 +170,7 @@ mpilist = partition_list_mpi
 def mpirange(*args, **kargs):
     """An MPI aware version of `range`, each process gets its own sub section.
     """
-    full_list = range(*args)
+    full_list = list(range(*args))
 
     method = kargs.get('method', 'con')
     comm = kargs.get('comm', _comm)
@@ -321,7 +327,7 @@ def split_m(n, m):
     :fun:`split_all`, :fun:`split_local`
 
     """
-    base = (n / m)
+    base = (n // m)
     rem = n % m
 
     part = base * np.ones(m, dtype=np.int) + (np.arange(m) < rem).astype(np.int)
@@ -545,7 +551,7 @@ def transpose_blocks(row_array, shape, comm=_comm):
         #    print comm.rank, ir, ic, sar[ir], ear[ir], sac[ic], eac[ic], shape
 
         if stat.error != MPI.SUCCESS:
-            print "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****" % (ir, ic, comm.rank)
+            print("**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****" % (ir, ic, comm.rank))
 
 
     #print "rank %i: Done waiting on MPI SEND" % comm.rank
@@ -564,7 +570,7 @@ def transpose_blocks(row_array, shape, comm=_comm):
         #shape, recv_buffer[sar[ir]:ear[ir]].shape, recv_buffer.dtype, row_array.dtype
 
         if stat.error != MPI.SUCCESS:
-            print "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****" % (ir, ir, comm.rank)
+            print("**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****" % (ir, ir, comm.rank))
 
     return recv_buffer.reshape(shape[:-1] + (pc,))
 

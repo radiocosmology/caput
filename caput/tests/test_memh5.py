@@ -1,4 +1,11 @@
 """Unit tests for the memh5 module."""
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
+
 
 import unittest
 import os
@@ -16,7 +23,7 @@ class TestRODict(unittest.TestCase):
         a = {'a' : 5}
         a = memh5.ro_dict(a)
         self.assertEqual(a['a'], 5)
-        self.assertEqual(a.keys(), ['a'])
+        self.assertEqual(list(a.keys()), ['a'])
         # Convoluded test to make sure you can't write to it.
         try: a['b'] = 6
         except TypeError: correct = True
@@ -59,7 +66,7 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(memh5.is_group(g['a']))
         self.assertTrue(np.all(g['a/ra'][:] == data))
         g['a'].create_dataset('/ra', data=data)
-        print g.keys()
+        print(list(g.keys()))
         self.assertTrue(np.all(g['ra'][:] == data))
 
 
@@ -78,7 +85,7 @@ class TestH5Files(unittest.TestCase):
             l2.attrs['small'] = np.arange(3)
 
     def assertGroupsEqual(self, a, b):
-        self.assertEqual(a.keys(), b.keys())
+        self.assertEqual(list(a.keys()), list(b.keys()))
         self.assertAttrsEqual(a.attrs, b.attrs)
         for key in a.keys():
             this_a = a[key]
@@ -90,7 +97,7 @@ class TestH5Files(unittest.TestCase):
                 self.assertGroupsEqual(this_a, this_b)
 
     def assertAttrsEqual(self, a, b):
-        self.assertEqual(a.keys(), b.keys())
+        self.assertEqual(list(a.keys()), list(b.keys()))
         for key in a.keys():
             this_a = a[key]
             this_b = b[key]
@@ -170,8 +177,8 @@ class TestBasicCont(unittest.TestCase):
 
     def test_access(self):
         d = memh5.BasicCont()
-        self.assertTrue('history' in d._data.keys())
-        self.assertTrue('index_map' in d._data.keys())
+        self.assertTrue('history' in d._data)
+        self.assertTrue('index_map' in d._data)
         self.assertRaises(KeyError, d.__getitem__, 'history')
         self.assertRaises(KeyError, d.__getitem__, 'index_map')
 

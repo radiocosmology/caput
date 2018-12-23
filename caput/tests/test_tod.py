@@ -1,4 +1,11 @@
 """Unit tests for the tod module."""
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
+
 
 import unittest
 
@@ -55,7 +62,7 @@ class TestConcatenation(unittest.TestCase):
         self.assertTrue(np.all(data['dset1'][:]
             == data.index_map['chan'][:,None] * data.index_map['time']))
         self.assertEqual(data['dset1'].shape, (self.nchan, 80))
-        self.assertEqual(data.keys(), ['dset1'])
+        self.assertEqual(list(data.keys()), ['dset1'])
 
     def test_reader_time_range(self):
 

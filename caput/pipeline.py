@@ -307,11 +307,21 @@ formats.
 See the documentation for these base classes for more details.
 
 """
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
 
 
+
+from future import standard_library
+standard_library.install_aliases()
+from past.builtins import basestring
 import sys
 import inspect
-import Queue
+import queue
 import logging
 import os
 from os import path
@@ -319,7 +329,7 @@ import warnings
 
 import yaml
 
-import config
+from . import config
 
 
 # Set the module logger.
@@ -513,7 +523,7 @@ class Manager(config.Reader):
         except KeyError:
             msg = "'type' not specified for task."
             raise PipelineConfigError(msg)
-        if task_path in local_tasks.keys():
+        if task_path in local_tasks:
             task_cls = local_tasks[task_path]
         else:
             try:
@@ -711,7 +721,7 @@ class TaskBase(config.Reader):
                    " got %d." % (len(setup_argspec.args) - 1, n_requires))
             raise PipelineConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
-        next_argspec = inspect.getargspec(self.next)
+        next_argspec = inspect.getargspec(self.__next__)
         # Make sure it matches `in` keys list specified in config.
         n_in = len(in_)
         try:
@@ -733,7 +743,7 @@ class TaskBase(config.Reader):
         self._requires_keys = requires
         self._requires = [None] * n_requires
         self._in_keys = in_
-        self._in = [Queue.Queue() for i in range(n_in)]
+        self._in = [queue.Queue() for i in range(n_in)]
         self._out_keys = out
 
     def _pipeline_advance_state(self):
@@ -759,7 +769,7 @@ class TaskBase(config.Reader):
             for in_, in_key in zip(self._in, self._in_keys):
                 if not in_.empty():
                     # XXX Clean up.
-                    print "Something left: %i" % in_.qsize()
+                    print("Something left: %i" % in_.qsize())
 
                     msg = "Task finished %s iterating `next()` but input queue \'%s\' isn't empty." % (self.__class__.__name__, in_key)
                     warnings.warn(msg)
