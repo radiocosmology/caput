@@ -68,7 +68,7 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
 from past.builtins import basestring
-from future.utils import raise_from
+from future.utils import raise_from, text_type
 
 import sys
 import collections
@@ -1538,7 +1538,7 @@ class BasicCont(MemDiskGroup):
         order = self.history['order']
         order = order + [name]
         history_group = self._data["history"]
-        history_group.attrs[u'order'] = str(order)
+        history_group.attrs[u'order'] = text_type(order)
         history_group.create_group(name)
         for key, value in history.items():
             history_group[name].attrs[key] = value

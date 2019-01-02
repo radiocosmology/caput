@@ -218,7 +218,7 @@ class _global_resolver(object):
         else:
 
             # Fix up slobj for axes where there is no data
-            slobj = [ slice(None, None, None) if sl is None else sl for sl in slobj ]
+            slobj = tuple(slice(None, None, None) if sl is None else sl for sl in slobj)
 
             # Return an MPIArray view
             arr = self.array[slobj]
