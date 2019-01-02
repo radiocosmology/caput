@@ -5,4 +5,4 @@ from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
-__version__ = '0.5.0'
+__version__ = '0.6.0'

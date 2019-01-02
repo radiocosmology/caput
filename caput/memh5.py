@@ -276,7 +276,7 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
 
     @classmethod
     def _from_storage_root(cls, storage_root, name):
-        self = super(_BaseGroup, cls).__new__(cls, storage_root, name)
+        self = super(_BaseGroup, cls).__new__(cls)
         super(_BaseGroup, self).__init__(storage_root, name)
         return self
 
