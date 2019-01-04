@@ -34,7 +34,7 @@ from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
-
+from future.utils import text_type
 from past.builtins import basestring
 import glob
 import inspect
@@ -419,7 +419,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             attrs = dataset.attrs
 
             # Figure out which axis we are concatenating over.
-            for a in attrs['axis']:
+            for a in memh5.bytes_to_unicode(attrs['axis']):
                 if a in concatenation_axes:
                     axis = a
                     break
@@ -451,7 +451,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 attrs = dataset.attrs
 
             # Do this *after* the filter, in case filter changed axis order.
-            axis_ind = list(attrs['axis']).index(axis)
+            axis_ind = list(memh5.bytes_to_unicode(attrs['axis'])).index(axis)
 
             # Slice input data if the filter doesn't do it.
             if not filter_time_slice:
@@ -561,7 +561,7 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
         else:
             # Check if any axis is a 'time' axis
             if ('axis' in entry.attrs and
-                    set(data.time_axes).intersection(entry.attrs['axis'])):
+                    set(data.time_axes).intersection(memh5.bytes_to_unicode(entry.attrs['axis']))):
                 to_dataset_names.append(entry.name)
             elif out is not None:
                 out.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
@@ -588,6 +588,6 @@ def _start_stop_inds(start, stop, ntime):
 
 
 def _get_in_out_slice(start, stop, current, ntime):
-    out_slice = np.s_[max(0, current - start):current - start + ntime]
+    out_slice = np.s_[max(0, current - start):min(stop - start, current - start + ntime)]
     in_slice = np.s_[max(0, start - current):min(ntime, stop - current)]
     return in_slice, out_slice

@@ -74,6 +74,7 @@ import sys
 import collections
 import warnings
 import posixpath
+from ast import literal_eval
 
 import numpy as np
 import h5py
@@ -1476,7 +1477,11 @@ class BasicCont(MemDiskGroup):
         out = {}
         for name, value in self._data['history'].items():
             out[name] = value.attrs
-        out[u'order'] = eval(self._data['history'].attrs['order'])
+
+        # TODO: this seems like a trememndous hack. I've changed it to a safer version of
+        # eval, but this should probably be removed
+        out[u'order'] = literal_eval(bytes_to_unicode(self._data['history'].attrs['order']))
+
         return ro_dict(out)
 
     @property
@@ -1672,8 +1677,21 @@ def get_h5py_File(f, **kwargs):
 def copyattrs(a1, a2):
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
+
+    def _map_attr(value):
+
+        # Any arrays of numpy type unicode strings must be transformed before being copied into HDF5
+        if isinstance(a2, h5py.AttributeManager):
+            if isinstance(value, np.ndarray) and value.dtype.kind == 'U':
+                return value.astype(h5py.special_dtype(vlen=text_type))
+            else:
+                return value
+
+        # If we are copying into memh5 ensure that any string are unicode
+        return bytes_to_unicode(value)
+
     for key, value in a1.items():
-        a2[key] = value
+        a2[key] = _map_attr(value)
 
 
 def deep_group_copy(g1, g2):
@@ -1848,3 +1866,41 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
     comm.Barrier()
 
     return group
+
+
+def bytes_to_unicode(s):
+    """Ensure that a string (or collection of) are unicode.
+
+    Any byte strings found will be transformed into unicode. Standard
+    collections are processed recursively. Numpy arrays of byte strings
+    are converted. Any other types are returned as is.
+
+    Note that as HDF5 files will often contain ASCII strings which h5py
+    converts to byte strings this will be needed even when fully
+    transitioned to Python 3.
+
+    Parameters
+    ----------
+    s : object
+        Object to convert.
+
+    Returns
+    -------
+    u : object
+        Converted object.
+    """
+
+    if isinstance(s, bytes):
+        return s.decode('utf8')
+
+    if isinstance(s, np.ndarray) and s.dtype.kind == 'S':
+        return s.astype(text_type)
+
+    if isinstance(s, (list, tuple, set)):
+        return s.__class__(bytes_to_unicode(t) for t in s)
+
+    if isinstance(s, dict):
+        return {bytes_to_unicode(k): bytes_to_unicode(v) for k, v in s.items()}
+
+    return s
+
