@@ -17,7 +17,7 @@ products = None
 def run(configfile, loglevel='INFO'):
     from caput.pipeline import Manager
     import logging
-    level = getattr(logging, loglevel)
+    level = getattr(logging, loglevel.upper())
     logging.basicConfig(level=logging.INFO)
 
     P = Manager.from_yaml_file(configfile)
