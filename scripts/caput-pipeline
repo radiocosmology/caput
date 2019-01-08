@@ -13,8 +13,12 @@ products = None
 
 
 @arg('configfile', help='Configuration file to run.')
-def run(configfile):
+@arg('--loglevel', help='Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
+def run(configfile, loglevel='INFO'):
     from caput.pipeline import Manager
+    import logging
+    level = getattr(logging, loglevel)
+    logging.basicConfig(level=logging.INFO)
 
     P = Manager.from_yaml_file(configfile)
     P.run()
