@@ -1682,6 +1682,12 @@ def copyattrs(a1, a2):
 
         # Any arrays of numpy type unicode strings must be transformed before being copied into HDF5
         if isinstance(a2, h5py.AttributeManager):
+
+            # As h5py will coerce the value to an array anyway, do it now such
+            # that the following test works
+            if isinstance(value, (tuple, list)):
+                value = np.array(value)
+
             if isinstance(value, np.ndarray) and value.dtype.kind == 'U':
                 return value.astype(h5py.special_dtype(vlen=text_type))
             else:
