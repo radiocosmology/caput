@@ -60,7 +60,12 @@ Richard 40.0
 Richard 40.0 Sooty
 
 """
-
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
 
 class Property(object):
     """Custom property descriptor that can load values from a given dict.

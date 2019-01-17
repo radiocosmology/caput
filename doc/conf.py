@@ -11,6 +11,13 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
+
 import sys, os, re
 
 # Check if we are on readthedocs
@@ -47,7 +54,7 @@ if on_rtd:
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 # 'numpydoc' does not ship with sphinx. To get it use `pip install numpydoc`.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.pngmath',
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.imgmath',
               'numpydoc', 'sphinx.ext.autosummary', 'sphinx.ext.viewcode',
               'sphinx.ext.intersphinx']
 

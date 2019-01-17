@@ -100,8 +100,14 @@ Here is an example of this in action::
         mpiutil.barrier()
 
 """
-from __future__ import absolute_import
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
 
+from past.builtins import basestring
 import os
 import time
 import numpy as np
@@ -212,7 +218,7 @@ class _global_resolver(object):
         else:
 
             # Fix up slobj for axes where there is no data
-            slobj = [ slice(None, None, None) if sl is None else sl for sl in slobj ]
+            slobj = tuple(slice(None, None, None) if sl is None else sl for sl in slobj)
 
             # Return an MPIArray view
             arr = self.array[slobj]
@@ -496,10 +502,10 @@ class MPIArray(np.ndarray):
 
         import h5py
 
-        if type(f) == str:
+        if isinstance(f, basestring):
             fh = h5py.File(f, 'r')
             to_close = True
-        elif type(f) == h5py.File:
+        elif isinstance(f, h5py.File):
             fh = f
             to_close = False
         else:

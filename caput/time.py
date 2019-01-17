@@ -132,7 +132,15 @@ and a complete cycle of ERA.
 
 .. _`IERS constants`: http://hpiers.obspm.fr/eop-pc/models/constants.html
 """
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
 
+
+from past.builtins import basestring
 from datetime import datetime
 import warnings
 
@@ -619,7 +627,7 @@ def leap_seconds_between(time_a, time_b):
     # Calculate the shift in timescales which should only happen when leap
     # seconds are added/removed
     time_shift = delta_tt - delta_unix
-    time_shift_int = np.around(time_shift).astype(int)
+    time_shift_int = np.around(time_shift).astype(np.int)
 
     # Check that the shift is an integer number of seconds. I don't know why
     # this wouldn't be true, but if it's not it means things have gone crazy

@@ -1,3 +1,12 @@
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
+
+from future.utils import bytes_to_native_str
+
 from setuptools import setup
 import os
 
@@ -23,7 +32,8 @@ try:
 
     # Set package data to be installed alongside skyfield
     skyfield_data = {
-        'caput': [
+        # TODO: Py3 remove this hack needed to work around a setuptools bug
+        bytes_to_native_str(b'caput'): [
             'data/Leap_Second.dat',
             'data/de421.bsp',
             'data/deltat.data',

@@ -1,13 +1,20 @@
 language: python
 os: linux
+sudo: required
+dist: xenial
+
 python:
     - 2.7
+    - 3.7
 addons:
     apt:
         packages:
             - libhdf5-serial-dev
             - libopenmpi-dev
             - openmpi-bin
+env:
+    - CAPUT_SKYFIELD_PATH=/home/travis
+
 install:
     - "pip install -r requirements.txt"
     - "pip install -e .[mpi]"

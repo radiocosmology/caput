@@ -60,11 +60,21 @@ Utility Functions
     deep_group_copy
 
 """
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
+
+from past.builtins import basestring
+from future.utils import raise_from, text_type
 
 import sys
 import collections
 import warnings
 import posixpath
+from ast import literal_eval
 
 import numpy as np
 import h5py
@@ -253,7 +263,7 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
     @property
     def distributed(self):
         return getattr(self._storage_root, 'distributed', False)
-       
+
     @property
     def attrs(self):
         """Attributes attached to this object.
@@ -267,7 +277,7 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
 
     @classmethod
     def _from_storage_root(cls, storage_root, name):
-        self = super(_BaseGroup, cls).__new__(cls, storage_root, name)
+        self = super(_BaseGroup, cls).__new__(cls)
         super(_BaseGroup, self).__init__(storage_root, name)
         return self
 
@@ -294,7 +304,7 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
 
     def __delitem__(self, name):
         """Delete item from group."""
-        if name not in self.keys():
+        if name not in self:
             raise KeyError("Key %s not present." % name)
         path = posixpath.join(self.name, name)
         parent_path, name = posixpath.split(path)
@@ -305,7 +315,7 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
         return len(self._get_storage())
 
     def __iter__(self):
-        keys = self._get_storage().keys()
+        keys = list(self._get_storage().keys())
         for key in keys:
             yield key
 
@@ -821,7 +831,7 @@ class MemDatasetCommon(MemDataset):
     @property
     def distributed(self):
         return False
-    
+
     @property
     def data(self):
         return self._data
@@ -1445,7 +1455,7 @@ class BasicCont(MemDiskGroup):
         if self._data.file.mode == 'r+':
             self._data.require_group(u'history')
             self._data.require_group(u'index_map')
-            if 'order' not in self._data['history'].attrs.keys():
+            if 'order' not in self._data['history'].attrs:
                 self._data['history'].attrs[u'order'] = '[]'
 
     @property
@@ -1465,9 +1475,13 @@ class BasicCont(MemDiskGroup):
         """
 
         out = {}
-        for name, value in self._data['history'].iteritems():
+        for name, value in self._data['history'].items():
             out[name] = value.attrs
-        out[u'order'] = eval(self._data['history'].attrs['order'])
+
+        # TODO: this seems like a trememndous hack. I've changed it to a safer version of
+        # eval, but this should probably be removed
+        out[u'order'] = literal_eval(bytes_to_unicode(self._data['history'].attrs['order']))
+
         return ro_dict(out)
 
     @property
@@ -1489,7 +1503,7 @@ class BasicCont(MemDiskGroup):
         """
 
         out = {}
-        for name, value in self._data['index_map'].iteritems():
+        for name, value in self._data['index_map'].items():
             out[name] = value[:]
         return ro_dict(out)
 
@@ -1529,7 +1543,7 @@ class BasicCont(MemDiskGroup):
         order = self.history['order']
         order = order + [name]
         history_group = self._data["history"]
-        history_group.attrs[u'order'] = str(order)
+        history_group.attrs[u'order'] = text_type(order)
         history_group.create_group(name)
         for key, value in history.items():
             history_group[name].attrs[key] = value
@@ -1606,7 +1620,7 @@ def attrs2dict(attrs):
     """Safely copy an h5py attributes object to a dictionary."""
 
     out = {}
-    for key, value in attrs.iteritems():
+    for key, value in attrs.items():
         if isinstance(value, np.ndarray):
             value = value.copy()
         out[key] = value
@@ -1655,23 +1669,42 @@ def get_h5py_File(f, **kwargs):
             f = h5py.File(f, **kwargs)
         except IOError as e:
             msg = "Opening file %s caused an error: " % str(f)
-            new_e = IOError(msg + str(e))
-            raise new_e.__class__, new_e, sys.exc_info()[2]
+            # TODO: Py3 exception chaining
+            raise_from(IOError(msg + str(e)), e)
     return f, opened
 
 
 def copyattrs(a1, a2):
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
-    for key, value in a1.iteritems():
-        a2[key] = value
+
+    def _map_attr(value):
+
+        # Any arrays of numpy type unicode strings must be transformed before being copied into HDF5
+        if isinstance(a2, h5py.AttributeManager):
+
+            # As h5py will coerce the value to an array anyway, do it now such
+            # that the following test works
+            if isinstance(value, (tuple, list)):
+                value = np.array(value)
+
+            if isinstance(value, np.ndarray) and value.dtype.kind == 'U':
+                return value.astype(h5py.special_dtype(vlen=text_type))
+            else:
+                return value
+
+        # If we are copying into memh5 ensure that any string are unicode
+        return bytes_to_unicode(value)
+
+    for key, value in a1.items():
+        a2[key] = _map_attr(value)
 
 
 def deep_group_copy(g1, g2):
     """Copy full data tree from one group to another."""
 
     copyattrs(g1.attrs, g2.attrs)
-    for key, entry in g1.iteritems():
+    for key, entry in g1.items():
         if is_group(entry):
             g2.create_group(key)
             deep_group_copy(entry, g2[key])
@@ -1732,7 +1765,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     comm.Barrier()
 
     # Write out groups and distributed datasets, these operations must be done collectively
-    for key, entry in group.iteritems():
+    for key, entry in group.items():
 
         # Groups are written out by recursing
         if is_group(entry):
@@ -1751,7 +1784,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
 
         with h5py.File(fname, 'r+', **kwargs_nomode) as f:
 
-            for key, entry in group.iteritems():
+            for key, entry in group.items():
 
                 # Write out common datasets and copy their attrs
                 if isinstance(entry, MemDatasetCommon):
@@ -1839,3 +1872,41 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
     comm.Barrier()
 
     return group
+
+
+def bytes_to_unicode(s):
+    """Ensure that a string (or collection of) are unicode.
+
+    Any byte strings found will be transformed into unicode. Standard
+    collections are processed recursively. Numpy arrays of byte strings
+    are converted. Any other types are returned as is.
+
+    Note that as HDF5 files will often contain ASCII strings which h5py
+    converts to byte strings this will be needed even when fully
+    transitioned to Python 3.
+
+    Parameters
+    ----------
+    s : object
+        Object to convert.
+
+    Returns
+    -------
+    u : object
+        Converted object.
+    """
+
+    if isinstance(s, bytes):
+        return s.decode('utf8')
+
+    if isinstance(s, np.ndarray) and s.dtype.kind == 'S':
+        return s.astype(text_type)
+
+    if isinstance(s, (list, tuple, set)):
+        return s.__class__(bytes_to_unicode(t) for t in s)
+
+    if isinstance(s, dict):
+        return {bytes_to_unicode(k): bytes_to_unicode(v) for k, v in s.items()}
+
+    return s
+

@@ -27,7 +27,15 @@ Functions
     concatenate
 
 """
+# === Start Python 2/3 compatibility
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+# === End Python 2/3 compatibility
 
+from future.utils import text_type
+from past.builtins import basestring
 import glob
 import inspect
 
@@ -341,7 +349,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     concat_index_lengths = {axis: 0 for axis in concatenation_axes}
     for data in data_list:
         for index_name in concatenation_axes:
-            if index_name not in data.index_map.keys():
+            if index_name not in data.index_map:
                 continue
             concat_index_lengths[index_name] += len(data.index_map[index_name])
 
@@ -411,7 +419,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             attrs = dataset.attrs
 
             # Figure out which axis we are concatenating over.
-            for a in attrs['axis']:
+            for a in memh5.bytes_to_unicode(attrs['axis']):
                 if a in concatenation_axes:
                     axis = a
                     break
@@ -443,7 +451,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 attrs = dataset.attrs
 
             # Do this *after* the filter, in case filter changed axis order.
-            axis_ind = list(attrs['axis']).index(axis)
+            axis_ind = list(memh5.bytes_to_unicode(attrs['axis'])).index(axis)
 
             # Slice input data if the filter doesn't do it.
             if not filter_time_slice:
@@ -540,7 +548,7 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
 
     if out is not None:
         memh5.copyattrs(data.attrs, out.attrs)
-    for key, entry in data.iteritems():
+    for key, entry in data.items():
         if key == 'index_map':
             # XXX exclude index map.
             continue
@@ -553,7 +561,7 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
         else:
             # Check if any axis is a 'time' axis
             if ('axis' in entry.attrs and
-                    set(data.time_axes).intersection(entry.attrs['axis'])):
+                    set(data.time_axes).intersection(memh5.bytes_to_unicode(entry.attrs['axis']))):
                 to_dataset_names.append(entry.name)
             elif out is not None:
                 out.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
@@ -580,6 +588,6 @@ def _start_stop_inds(start, stop, ntime):
 
 
 def _get_in_out_slice(start, stop, current, ntime):
-    out_slice = np.s_[max(0, current - start):current - start + ntime]
+    out_slice = np.s_[max(0, current - start):min(stop - start, current - start + ntime)]
     in_slice = np.s_[max(0, start - current):min(ntime, stop - current)]
     return in_slice, out_slice
