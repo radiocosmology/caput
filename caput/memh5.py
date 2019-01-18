@@ -1524,7 +1524,7 @@ class BasicCont(MemDiskGroup):
         """
 
         out = {}
-        for name, value in self._data['reverse_map'].iteritems():
+        for name, value in self._data['reverse_map'].items():
             out[name] = value[:]
         return ro_dict(out)
 
