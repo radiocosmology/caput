@@ -4,7 +4,8 @@ sudo: required
 dist: xenial
 
 python:
-    - 2.7
+    # Disable until we can reliably get the CI tests to run for both
+    #- 2.7
     - 3.7
 addons:
     apt:
