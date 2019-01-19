@@ -28,7 +28,10 @@ try:
     from caput import time as ctime
 
     # Force download of data
-    ctime.skyfield_wrapper.reload()
+    sf = ctime.SkyfieldWrapper(
+        ephemeris='http://e-mode.phas.ubc.ca/~jrs65/de421.bsp'
+    )
+    sf.reload()
 
     # Set package data to be installed alongside skyfield
     skyfield_data = {

@@ -719,7 +719,7 @@ class TaskBase(config.Reader):
                    " got %d." % (len(setup_argspec.args) - 1, n_requires))
             raise PipelineConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
-        next_argspec = inspect.getargspec(self.__next__)
+        next_argspec = inspect.getargspec(self.next)
         # Make sure it matches `in` keys list specified in config.
         n_in = len(in_)
         try:
