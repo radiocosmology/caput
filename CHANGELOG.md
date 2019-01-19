@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file. This
 project adheres to [Semantic Versioning](http://semver.org/), with the exception
 that I'm using PEP440 to denote pre-releases.
 
+
+## [0.6.0] - 2019-01-18
+
+### Changed
+
+- Python 3 support
+- `reverse_map` support for containers.
+
+### Fixed
+
+- Made test running more robust by downloading a self-hosted copy of the
+  ephemeris.
+
+
 ## [0.4.1] - 2017-07-18
 
 ### Fixed

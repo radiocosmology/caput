@@ -1455,6 +1455,8 @@ class BasicCont(MemDiskGroup):
         if self._data.file.mode == 'r+':
             self._data.require_group(u'history')
             self._data.require_group(u'index_map')
+            self._data.require_group(u'reverse_map')
+
             if 'order' not in self._data['history'].attrs:
                 self._data['history'].attrs[u'order'] = '[]'
 
@@ -1507,6 +1509,25 @@ class BasicCont(MemDiskGroup):
             out[name] = value[:]
         return ro_dict(out)
 
+    @property
+    def reverse_map(self):
+        """Stores the reverse map from product index to stack index.
+
+        Do not try to add a new index_map by assigning to an item of this
+        property. Use :meth:`~BasicCont.create_index_map` instead.
+
+        Returns
+        -------
+        reverse_map : read only dictionary
+            Entry is a 1D arrays used to map from product index to stack index.
+
+        """
+
+        out = {}
+        for name, value in self._data['reverse_map'].items():
+            out[name] = value[:]
+        return ro_dict(out)
+
     def group_name_allowed(self, name):
         """No groups are exposed to the user. Returns ``False``."""
         return False
@@ -1531,6 +1552,17 @@ class BasicCont(MemDiskGroup):
     def del_index_map(self, axis_name):
         """Delete an index map."""
         del self._data['index_map'][axis_name]
+
+    def create_reverse_map(self, axis_name, index_map):
+        """Create a new reverse map.
+
+        """
+
+        self._data['reverse_map'].create_dataset(axis_name, data=index_map)
+
+    def del_reverse_map(self, axis_name):
+        """Delete an index map."""
+        del self._data['reverse_map'][axis_name]
 
     def add_history(self, name, history=None):
         """Create a new history entry."""
