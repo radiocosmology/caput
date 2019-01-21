@@ -173,21 +173,39 @@ class Reader(object):
 
         return c
 
-    def read_config(self, config):
+    def read_config(self, config, compare_keys=False, use_defaults=True):
         """Set all properties in this class from the supplied config.
 
         Parameters
         ----------
         config : dict
             Dictionary of configuration values.
+        compare_keys : bool
+            If True, an exception is raised if there are unused keys in the
+            config dictionary
+        use_defaults : bool
+            If False, an exception is raised if a property is not defined by
+            the config dictionary
         """
         import inspect
-
+        
+        config_keys = [x for x in config.keys()]
+        prop_keys = []
         for basecls in inspect.getmro(type(self))[::-1]:
             for propname, clsprop in basecls.__dict__.items():
                 if isinstance(clsprop, Property):
                     clsprop._from_config(self, config)
+                    prop_keys.append(clsprop.key)             
 
+        if compare_keys:
+            if set(config_keys) - set(prop_keys):
+                raise Exception("Configuration keys [%s] do not have corresponding properties" 
+                                % ", ".join(set(config_keys) - set(prop_keys)))
+        if not use_defaults:
+            if set(prop_keys) - set(config_keys):
+                raise Exception("Property keys [%s] are not present in configuration dictionary" 
+                                % ", ".join(set(prop_keys) - set(config_keys)))
+        
         self._finalise_config()
 
     def _finalise_config(self):
