@@ -138,7 +138,7 @@ class Property(object):
         if self.key in config:
             val = self.proptype(config[self.key])
             obj.__dict__[self.propname] = val
-      
+
     def _set_propname(self, obj):
         # As this config.Property instance lives on the class it's in, it
         # doesn't actually know what it's name is. We need to search the class
@@ -198,13 +198,13 @@ class Reader(object):
                     prop_keys.append(clsprop.key)             
 
         if compare_keys:
-            if set(config_keys)-set(prop_keys):
+            if set(config_keys) - set(prop_keys):
                 raise Exception("Configuration keys [%s] do not have corresponding properties" 
-                                % ", ".join(set(config_keys)-set(prop_keys)))
+                                % ", ".join(set(config_keys) - set(prop_keys)))
         if not use_defaults:
-            if set(prop_keys)-set(config_keys):
+            if set(prop_keys) - set(config_keys):
                 raise Exception("Property keys [%s] are not present in configuration dictionary" 
-                                % ", ".join(set(prop_keys)-set(config_keys)))
+                                % ", ".join(set(prop_keys) - set(config_keys)))
         
         self._finalise_config()
 
