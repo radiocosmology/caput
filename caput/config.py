@@ -71,7 +71,7 @@ class Property(object):
     """Custom property descriptor that can load values from a given dict.
     """
 
-    def __init__(self, default=None, proptype=None, key=None):
+    def __init__(self, default=None, proptype=None, key=None, required=False):
         """Make a new property type.
 
         Parameters
@@ -86,12 +86,20 @@ class Property(object):
             The name of the dictionary key that we can fetch this value from.
             If None (default), attempt to use the attribute name from the
             class.
+        required : bool
+            If True, trying to retrieve this property without first setting
+            it will raise AttributError.  If required is True, default must
+            be None.
         """
+
+        if default is not None and required:
+            raise ValueError("default must be None if required is True")
 
         self.proptype = (lambda x: x) if proptype is None else proptype
         self.default = default
         self.key = key
         self.propname = None
+        self.required = bool(required)
 
     def __get__(self, obj, objtype):
         # Object getter.
@@ -101,11 +109,20 @@ class Property(object):
         # Ensure the property name has been found and set
         self._set_propname(obj)
 
-        # If the value has not been set, return the default, otherwise return the actual value.
-        if self.propname not in obj.__dict__:
-            return self.proptype(self.default) if self.default is not None else None
-        else:
+        if self.propname in obj.__dict__:
+            # Return the value, if it has been set
             return obj.__dict__[self.propname]
+        elif self.required:
+            # Raise an exception, if it is required but not set
+            raise AttributeError("required Property '{0}' of '{1}' "
+                    "object not initialized".format(self.propname,
+                        self.__class__.__name__))
+        elif self.default is not None:
+            # Otherwise, return the default, if provided
+            return self.prototype(self.default)
+
+        # In all other cases, return None as a last resort
+        return None
 
     def __set__(self, obj, val):
         # Object setter.
