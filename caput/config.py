@@ -119,7 +119,7 @@ class Property(object):
                         self.__class__.__name__))
         elif self.default is not None:
             # Otherwise, return the default, if provided
-            return self.prototype(self.default)
+            return self.proptype(self.default)
 
         # In all other cases, return None as a last resort
         return None
