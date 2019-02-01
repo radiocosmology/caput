@@ -1148,7 +1148,7 @@ class MemDiskGroup(_BaseGroup):
         """Finish the class setup *after* importing from a file."""
         pass
 
-    def __del__(self):
+    def close(self):
         """Closes file if on disk if file was opened on initialization."""
         if self.ondisk and hasattr(self, '_toclose') and self._toclose:
             self._storage_root.close()
