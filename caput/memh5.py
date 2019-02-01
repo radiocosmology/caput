@@ -75,6 +75,7 @@ import collections
 import warnings
 import posixpath
 from ast import literal_eval
+import weakref
 
 import numpy as np
 import h5py
@@ -630,7 +631,7 @@ class MemGroup(_BaseGroup):
 
         # Set the properties of the new dataset
         new_dataset._name = posixpath.join(parent_name, name)
-        new_dataset._storage_root = self._storage_root
+        new_dataset._storage_root = weakref.ref(self._storage_root)
         return new_dataset
 
     def dataset_common_to_distributed(self, name, distributed_axis=0):
