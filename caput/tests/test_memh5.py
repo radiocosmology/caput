@@ -183,6 +183,13 @@ class TestMemDiskGroup(unittest.TestCase):
         #self.assertIsInstance(tsc3['dset'].parent, TempSubClass)
         tsc3.close()
 
+        with memh5.MemDiskGroup.from_file(self.fname, ondisk=True) as tsc4:
+            self.assertRaises(IOError, h5py.File, self.fname, 'w')
+
+        with memh5.MemDiskGroup.from_file(self.fname, ondisk=False) as tsc4:
+            f = h5py.File(self.fname, 'w')
+            f.close()
+
     def tearDown(self):
         file_names = glob.glob(self.fname + '*')
         for fname in file_names:

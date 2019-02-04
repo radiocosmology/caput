@@ -1133,6 +1133,12 @@ class MemDiskGroup(_BaseGroup):
         self._toclose = toclose
         super(MemDiskGroup, self).__init__(storage_root=data_group, name=data_group.name)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
     @classmethod
     def from_group(cls, data_group=None, detect_subclass=True):
         """Create data object from a given group.
