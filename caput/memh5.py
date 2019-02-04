@@ -583,6 +583,10 @@ class MemGroup(_BaseGroup):
         if not self.distributed and distributed:
             raise RuntimeError('Cannot create a distributed dataset in a non-distributed group.')
 
+        # Set the properties of the new dataset
+        full_path_name = posixpath.join(parent_name, name)
+        storage_root = weakref.ref(self._storage_root)
+
         # If data is set (and consistent with shape/type), initialise the numpy array from it.
         if (data is not None and shape == data.shape
            and dtype is data.dtype and hasattr(data, 'view')):
@@ -603,10 +607,12 @@ class MemGroup(_BaseGroup):
                     data = data.redistribute(axis=distributed_axis)
 
                 # Create distributed dataset
-                new_dataset = MemDatasetDistributed.from_mpi_array(data)
+                new_dataset = MemDatasetDistributed.from_mpi_array(data, name=full_path_name,
+                                                                   storage_root=storage_root)
             else:
                 # Create common dataset
-                new_dataset = MemDatasetCommon.from_numpy_array(data)
+                new_dataset = MemDatasetCommon.from_numpy_array(data, name=full_path_name,
+                                                                storage_root=storage_root)
 
         # Otherwise create an empty array and copy into it (if needed)
         else:
@@ -617,11 +623,17 @@ class MemGroup(_BaseGroup):
                 if distributed_axis is None:
                     raise RuntimeError('Distributed axis must be specified when creating dataset.')
 
-                new_dataset = MemDatasetDistributed(shape=shape, dtype=dtype,
-                                                    axis=distributed_axis,
-                                                    comm=self.comm)
+                new_dataset = MemDatasetDistributed(
+                        shape=shape,
+                        dtype=dtype,
+                        axis=distributed_axis,
+                        comm=self.comm,
+                        name=full_path_name,
+                        storage_root=storage_root,
+                        )
             else:
-                new_dataset = MemDatasetCommon(shape=shape, dtype=dtype)
+                new_dataset = MemDatasetCommon(shape=shape, dtype=dtype, name=full_path_name,
+                                               storage_root=storage_root)
 
             if data is not None:
                 new_dataset[:] = data[:]
@@ -629,9 +641,6 @@ class MemGroup(_BaseGroup):
         # Add new dataset to group
         parent_storage[name] = new_dataset
 
-        # Set the properties of the new dataset
-        new_dataset._name = posixpath.join(parent_name, name)
-        new_dataset._storage_root = weakref.ref(self._storage_root)
         return new_dataset
 
     def dataset_common_to_distributed(self, name, distributed_axis=0):
@@ -729,6 +738,10 @@ class MemDataset(_MemObjMixin):
     parent
     file
 
+    Methods
+    -------
+    view
+
     """
 
     def __init__(self, **kwargs):
@@ -738,6 +751,13 @@ class MemDataset(_MemObjMixin):
     @property
     def _group_class(self):
         return MemGroup
+
+    def view(self):
+        cls = self.__class__
+        out = cls.__new__(cls)
+        super(MemDataset, self).__init__(name=self.name, storage_root=self.storage_root)
+        out._attrs = self._attrs
+        out._data = self._data
 
     @property
     def attrs(self):
@@ -804,13 +824,13 @@ class MemDatasetCommon(MemDataset):
 
     """
 
-    def __init__(self, shape, dtype):
-        super(MemDatasetCommon, self).__init__()
+    def __init__(self, shape, dtype, **kwargs):
+        super(MemDatasetCommon, self).__init__(**kwargs)
 
         self._data = np.zeros(shape, dtype)
 
     @classmethod
-    def from_numpy_array(cls, data):
+    def from_numpy_array(cls, data, **kwargs):
         """Initialise from a numpy array.
 
         Parameters
@@ -827,11 +847,11 @@ class MemDatasetCommon(MemDataset):
         if not isinstance(data, np.ndarray):
             raise TypeError("Object must be a numpy array (or subclass).")
 
-        dset = cls.__new__(cls)
-        super(MemDatasetCommon, dset).__init__()
+        self = cls.__new__(cls)
+        super(MemDatasetCommon, self).__init__(**kwargs)
 
-        dset._data = data
-        return dset
+        self._data = data
+        return self
 
     @property
     def comm(self):
@@ -915,21 +935,21 @@ class MemDatasetDistributed(MemDataset):
 
     """
 
-    def __init__(self, shape, dtype, axis=0, comm=None):
-        super(MemDatasetDistributed, self).__init__()
+    def __init__(self, shape, dtype, axis=0, comm=None, **kwargs):
+        super(MemDatasetDistributed, self).__init__(**kwargs)
 
         self._data = mpiarray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
 
     @classmethod
-    def from_mpi_array(cls, data):
-        dset = cls.__new__(cls)
-        MemDataset.__init__(dset)
-
+    def from_mpi_array(cls, data, **kwargs):
         if not isinstance(data, mpiarray.MPIArray):
             raise TypeError("Object must be a numpy array (or subclass).")
 
-        dset._data = data
-        return dset
+        self = cls.__new__(cls)
+        super(MemDatasetDistributed, self).__init__(**kwargs)
+
+        self._data = data
+        return self
 
     @property
     def common(self):
