@@ -66,8 +66,8 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(memh5.is_group(g['a']))
         self.assertTrue(np.all(g['a/ra'][:] == data))
         g['a'].create_dataset('/ra', data=data)
-        print(list(g.keys()))
         self.assertTrue(np.all(g['ra'][:] == data))
+        self.assertIsInstance(g['a/ra'].parent, memh5.MemGroup)
 
 
 class TestH5Files(unittest.TestCase):
@@ -159,13 +159,21 @@ class TestMemDiskGroup(unittest.TestCase):
         # Save a subclass of MemDiskGroup
         tsc = TempSubClass()
         tsc.create_dataset('dset', data=np.arange(10))
-        tsc.save('temp_mdg.h5')
+        tsc.save(self.fname)
 
         # Load it from disk
-        tsc2 = memh5.MemDiskGroup.from_file('temp_mdg.h5')
+        tsc2 = memh5.MemDiskGroup.from_file(self.fname)
+        tsc3 = memh5.MemDiskGroup.from_file(self.fname, ondisk=True)
 
         # Check that is is recreated with the correct type
         self.assertIsInstance(tsc2, TempSubClass)
+        self.assertIsInstance(tsc3, TempSubClass)
+
+        # Check that parent/etc is properly implemented.
+        # Turns out this is very hard so give up for now.
+        #self.assertIsInstance(tsc2['dset'].parent, TempSubClass)
+        #self.assertIsInstance(tsc3['dset'].parent, TempSubClass)
+        tsc3.close()
 
     def tearDown(self):
         file_names = glob.glob(self.fname + '*')

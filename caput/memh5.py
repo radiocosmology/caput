@@ -652,7 +652,8 @@ class MemGroup(_BaseGroup):
         dset = self[name]
 
         if dset.distributed:
-            warnings.warn('%s is already a distributed dataset, redistribute it along the required axis %d' % (name, distributed_axis))
+            warnings.warn('%s is already a distributed dataset, redistribute it along the required axis %d'
+                          % (name, distributed_axis))
             dset.redistribute(distributed_axis)
             return dset
 
@@ -665,7 +666,14 @@ class MemGroup(_BaseGroup):
         attr_dict = {} # temporarily save attrs of this dataset
         copyattrs(dset.attrs, attr_dict)
         del dset
-        new_dset = self.create_dataset(name, shape=dset_shape, dtype=dset_type, data=md, distributed=True, distributed_axis=distributed_axis)
+        new_dset = self.create_dataset(
+                name,
+                shape=dset_shape,
+                dtype=dset_type,
+                data=md,
+                distributed=True,
+                distributed_axis=distributed_axis,
+                )
         copyattrs(attr_dict, new_dset.attrs)
 
         return new_dset
@@ -726,6 +734,10 @@ class MemDataset(_MemObjMixin):
     def __init__(self, **kwargs):
         super(MemDataset, self).__init__(**kwargs)
         self._attrs = MemAttrs()
+
+    @property
+    def _group_class(self):
+        return MemGroup
 
     @property
     def attrs(self):
