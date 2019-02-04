@@ -75,7 +75,6 @@ import collections
 import warnings
 import posixpath
 from ast import literal_eval
-import weakref
 
 import numpy as np
 import h5py
@@ -299,8 +298,13 @@ class _BaseGroup(_MemObjMixin, collections.Mapping):
         if is_group(out) or isinstance(out, _Storage):
             # Group like.
             return self._group_class._from_storage_root(self._storage_root, path)
+        elif isinstance(out, MemDataset):
+            # Create back references for user facing mem datasets.
+            out = out.view()
+            out._storage_root = self._storage_root
+            return out
         else:
-            # A dataset
+            # H5py dataset.
             return out
 
     def __delitem__(self, name):
@@ -585,7 +589,7 @@ class MemGroup(_BaseGroup):
 
         # Set the properties of the new dataset
         full_path_name = posixpath.join(parent_name, name)
-        storage_root = weakref.ref(self._storage_root)
+        storage_root = None    # Do no store the storage root. Creates cyclic references.
 
         # If data is set (and consistent with shape/type), initialise the numpy array from it.
         if (data is not None and shape == data.shape
@@ -641,7 +645,8 @@ class MemGroup(_BaseGroup):
         # Add new dataset to group
         parent_storage[name] = new_dataset
 
-        return new_dataset
+        # Ensure __getitem__ is called.
+        return self[full_path_name]
 
     def dataset_common_to_distributed(self, name, distributed_axis=0):
         """Convert a common dataset to a distributed one.
@@ -755,9 +760,10 @@ class MemDataset(_MemObjMixin):
     def view(self):
         cls = self.__class__
         out = cls.__new__(cls)
-        super(MemDataset, self).__init__(name=self.name, storage_root=self.storage_root)
+        super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
         out._attrs = self._attrs
         out._data = self._data
+        return out
 
     @property
     def attrs(self):

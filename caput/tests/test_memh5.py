@@ -10,6 +10,7 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 import unittest
 import os
 import glob
+import gc
 
 import numpy as np
 import h5py
@@ -48,6 +49,7 @@ class TestGroup(unittest.TestCase):
         g.create_dataset('data', data=data)
         self.assertTrue(np.allclose(data, g['data']))
 
+
     def test_recursive_create(self):
         g = memh5.MemGroup()
         self.assertRaises(ValueError, g.create_group, '')
@@ -68,6 +70,12 @@ class TestGroup(unittest.TestCase):
         g['a'].create_dataset('/ra', data=data)
         self.assertTrue(np.all(g['ra'][:] == data))
         self.assertIsInstance(g['a/ra'].parent, memh5.MemGroup)
+
+        # Check that d keeps g in scope.
+        d = g['a/ra']
+        del g
+        gc.collect()
+        self.assertTrue(np.all(d.file['ra'][:] == data))
 
 
 class TestH5Files(unittest.TestCase):
