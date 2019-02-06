@@ -1296,7 +1296,7 @@ def _format_product_keys(spec, name):
         # Default to empty if not present.
         return []
     # Turn into a sequence if only one key was provided.
-    if not type(out_prod) is list:
+    if not isinstance(out_prod, list):
         # Making this a tuple instead of a list is significant.  It only
         # impacts the 'out' product key and affects how return values are
         # unpacked.
@@ -1304,7 +1304,7 @@ def _format_product_keys(spec, name):
     # Check that all the keys provided are strings.
     for prod in out_prod:
         if not isinstance(prod, basestring):
-            msg = "Data product keys must be strings."
+            msg = "Value of {} must be a string or list of strings.".format(name)
             raise PipelineConfigError(msg)
     return out_prod
 
