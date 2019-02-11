@@ -43,6 +43,7 @@ import numpy as np
 import h5py
 
 from . import memh5
+from . import mpiarray
 
 
 class TOData(memh5.BasicCont):
@@ -461,6 +462,16 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             if not filter_time_slice:
                 in_slice = (slice(None),) * axis_ind + (in_slice,)
                 dataset = dataset[in_slice]
+
+            # The time slice filter above will convert dataset from a MemDataset
+            # instance to either an MPIArray or np.ndarray (depending on if
+            # it is distributed).  Need to convert back to the appropriate
+            # subclass of MemDataset for the initialization of output dataset.
+            if not isinstance(dataset, memh5.MemDataset):
+                if distributed and isinstance(dataset, mpiarray.MPIArray):
+                    dataset = memh5.MemDatasetDistributed.from_mpi_array(dataset)
+                else:
+                    dataset = memh5.MemDatasetCommon.from_numpy_array(dataset)
 
             # If this is the first piece of data, initialize the output
             # dataset.
