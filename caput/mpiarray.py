@@ -420,44 +420,108 @@ class MPIArray(np.ndarray):
         try:
             mpiutil.typemap(self.dtype)
         except KeyError:
-            if self.comm is None or self.comm.rank == 0:
+            if self.comm.rank == 0:
                 import warnings
-                warnings.warn('Cannot redistribute array of compound datatypes. Sorry!!')
+                warnings.warn('Cannot redistribute array of compound datatypes.'
+                              ' Sorry!!')
             return self
 
-        # Construct the list of the axes to swap around
-        axlist_f = list(range(len(self.shape)))
+        # Get a view of the array
+        arr = self.view(np.ndarray)
 
-        # Remove the axes we are going to swap around
-        axlist_f.remove(self.axis)
-        axlist_f.remove(axis)
+        if self.comm.size == 1:
+            # only one process
+            if arr.shape[self.axis] == self.global_shape[self.axis]:
+                # We are working on a single node and being asked to do
+                # a trivial transpose.
+                trans_arr = arr.copy()
 
-        # Move the current dist axis to the front, and the new to the end
-        axlist_f.insert(0, self.axis)
-        axlist_f.append(axis)
-
-        # Perform a local transpose on the array to get the axes in the correct order
-        trans_arr = self.view(np.ndarray).transpose(axlist_f).copy()
-
-        # Perform the global transpose
-        tmp_gshape = (self.global_shape[self.axis],) + trans_arr.shape[1:]
-        trans_arr = mpiutil.transpose_blocks(trans_arr, tmp_gshape, comm=self.comm)
-
-        axlist_b = list(range(len(self.shape)))
-        axlist_b.pop(0)
-        last = axlist_b.pop(-1)
-        if self.axis < axis:  # This has to awkwardly depend on the order of the axes
-            axlist_b.insert(self.axis, 0)
-            axlist_b.insert(axis, last)
+            else:
+                raise ValueError(
+                    'Global shape %s is incompatible with local arrays shape %s'
+                    % (self.global_shape, self.shape))
         else:
-            axlist_b.insert(axis, last)
-            axlist_b.insert(self.axis, 0)
+            pc, sc, ec = mpiutil.split_local(arr.shape[axis], comm=self.comm)
+            par, sar, ear = mpiutil.split_all(self.global_shape[self.axis],
+                                              comm=self.comm)
+            pac, sac, eac = mpiutil.split_all(arr.shape[axis], comm=self.comm)
 
-        # Perform the local transpose to get the axes back in the correct order
-        trans_arr = trans_arr.transpose(axlist_b)
+            new_shape = np.asarray(self.global_shape)
+            new_shape[axis] = pc
+
+            requests_send = []
+            requests_recv = []
+
+            trans_arr = np.empty(new_shape, dtype=arr.dtype)
+            mpitype = mpiutil.typemap(arr.dtype)
+            buffers = list()
+
+            # Cut out the right blocks of the local array to send around
+            blocks = np.array_split(arr, np.insert(eac, 0, sac[0]), axis)[1:]
+
+            # Iterate over all processes row wise
+            for ir in range(self.comm.size):
+
+                # Iterate over all processes column wise
+                for ic in range(self.comm.size):
+
+                    # Construct a unique tag
+                    tag = ir * self.comm.size + ic
+
+                    # Send and receive the messages as non-blocking passes
+                    if self.comm.rank == ir:
+                        # Send the message
+                        request = self.comm.Isend([blocks[ic].flatten(),
+                                                   mpitype], dest=ic, tag=tag)
+
+                        requests_send.append([ir, ic, request])
+
+                    if self.comm.rank == ic:
+                        buffer_shape = np.asarray(new_shape)
+                        buffer_shape[axis] = eac[ic] - sac[ic]
+                        buffer_shape[self.axis] = ear[ir] - sar[ir]
+                        buffers.append(np.ndarray(buffer_shape, dtype=arr.dtype))
+
+                        request = self.comm.Irecv([buffers[ir], mpitype],
+                                             source=ir, tag=tag)
+                        requests_recv.append([ir, ic, request])
+
+            # Wait for all processes to have started their messages
+            self.comm.Barrier()
+
+            # For each node iterate over all sends and wait until completion
+            for ir, ic, request in requests_send:
+
+                stat = mpiutil.MPI.Status()
+
+                request.Wait(status=stat)
+
+                if stat.error != mpiutil.MPI.SUCCESS:
+                    print
+                    "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****" % (
+                    ir, ic, self.comm.rank)
+
+            self.comm.Barrier()
+
+            # For each frequency iterate over all receives and wait until
+            # completion
+            for ir, ic, request in requests_recv:
+
+                stat = mpiutil.MPI.Status()
+
+                request.Wait(status=stat)
+
+                if stat.error != mpiutil.MPI.SUCCESS:
+                    print
+                    "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****" % (
+                    ir, ir, self.comm.rank)
+
+            # Put together the blocks we received
+            np.concatenate(buffers, self.axis, trans_arr)
 
         # Create a new MPIArray object out of the data
-        dist_arr = MPIArray(self.global_shape, axis=axis, dtype=self.dtype, comm=self.comm)
+        dist_arr = MPIArray(self.global_shape, axis=axis, dtype=self.dtype,
+                            comm=self.comm)
         dist_arr[:] = trans_arr
 
         return dist_arr

@@ -20,7 +20,7 @@ from caput import mpiutil, mpiarray
 
 
 
-class TestMPIAray(unittest.TestCase):
+class TestMPIArray(unittest.TestCase):
 
     def test_construction(self):
 
