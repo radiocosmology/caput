@@ -1188,7 +1188,12 @@ class H5IOMixin(object):
         # Ensure parent directory is present.
         dirname = path.dirname(filename)
         if not path.isdir(dirname):
-            os.makedirs(dirname)
+            try:
+                os.makedirs(dirname)
+            except OSError as e:
+                # It's possible the directory was created by another MPI task
+                if not path.isdir(dirname):
+                    raise e
         # Cases for `output` object type.
         if isinstance(output, memh5.MemGroup):
             # Already in memory.
@@ -1248,7 +1253,12 @@ class BasicContMixin(object):
         # Ensure parent directory is present.
         dirname = path.dirname(filename)
         if dirname != '' and not path.isdir(dirname):
-            os.makedirs(dirname)
+            try:
+                os.makedirs(dirname)
+            except OSError as e:
+                # It's possible the directory was created by another MPI task
+                if not path.isdir(dirname):
+                    raise e
         # Cases for `output` object type.
         if not isinstance(output, memh5.BasicCont):
             raise RuntimeError('Object to write out is not an instance of memh5.BasicCont')
