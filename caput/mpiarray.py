@@ -538,8 +538,9 @@ class MPIArray(np.ndarray):
         import h5py
 
         if not h5py.get_config().mpi:
-            if isinstance(filename, basestring):
-                self._to_hdf5_serial(filename, dataset, create)
+            if isinstance(f, basestring):
+                self._to_hdf5_serial(f, dataset, create)
+                return
             else:
                 raise ValueError(
                     "Argument must be a filename if h5py does not have MPI support"

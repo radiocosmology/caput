@@ -1806,7 +1806,7 @@ def _distributed_group_to_hdf5_serial(group, fname, hints=True, **kwargs):
 
         # Groups are written out by recursing
         if is_group(entry):
-            _distributed_group_to_hdf5(entry, fname, **kwargs)
+            _distributed_group_to_hdf5_serial(entry, fname, **kwargs)
 
         # Write out distributed datasets (only the data, the attributes are written below)
         elif isinstance(entry, MemDatasetDistributed):
