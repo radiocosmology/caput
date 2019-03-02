@@ -112,7 +112,7 @@ import os
 import time
 import numpy as np
 
-from caput import mpiutil
+from caput import mpiutil, misc
 
 
 class _global_resolver(object):
@@ -499,17 +499,7 @@ class MPIArray(np.ndarray):
         -------
         array : MPIArray
         """
-
-        import h5py
-
-        if isinstance(f, basestring):
-            fh = h5py.File(f, 'r')
-            to_close = True
-        elif isinstance(f, h5py.File):
-            fh = f
-            to_close = False
-        else:
-            raise Exception("Did not receive a h5py.File or filename")
+        fh = misc.open_h5py_mpi(f, 'r', comm)
 
         dset = fh[dataset]
         gshape = dset.shape
@@ -519,19 +509,25 @@ class MPIArray(np.ndarray):
         start = dist_arr.local_offset[0]
         end = start + dist_arr.local_shape[0]
 
-        dist_arr[:] = dset[start:end]
+        # Read using MPI-IO if possible
+        if fh.is_mpi:
+            with dset.collective:
+                print("using mpi-io")
+                dist_arr[:] = dset[start:end]
+        else:
+            dist_arr[:] = dset[start:end]
 
-        if to_close:
+        if fh.opened:
             fh.close()
 
         return dist_arr
 
-    def to_hdf5(self, filename, dataset, create=False):
+    def to_hdf5(self, f, dataset, create=False):
         """Parallel write into a contiguous HDF5 dataset.
 
         Parameters
         ----------
-        filename : str
+        filename : str, h5py.File or h5py.Group
             File to write dataset into.
         dataset : string
             Name of dataset to write into. Should not exist.
@@ -541,41 +537,33 @@ class MPIArray(np.ndarray):
 
         import h5py
 
-        if self.comm is None or self.comm.rank == 0:
+        if not h5py.get_config().mpi:
+            if isinstance(filename, basestring):
+                self._to_hdf5_serial(filename, dataset, create)
+            else:
+                raise ValueError(
+                    "Argument must be a filename if h5py does not have MPI support"
+                )
 
-            with h5py.File(filename, 'a' if create else 'r+') as fh:
-                if dataset in fh:
-                    raise Exception("Dataset should not exist.")
+        mode = 'a' if create else 'r+'
 
-                fh.create_dataset(dataset, self.global_shape, dtype=self.dtype)
-                fh[dataset][:] = np.array(0.0).astype(self.dtype)
+        fh = misc.open_h5py_mpi(f, mode, self.comm)
 
-        # wait until all processes see the created file
-        while not os.path.exists(filename):
-            time.sleep(1)
+        dset = fh.create_dataset(dataset, shape=self.global_shape, dtype=self.dtype)
 
-        # self._comm.Barrier()
-        mpiutil.barrier(comm=self.comm)
+        start = self.local_offset[self.axis]
+        end = start + self.local_shape[self.axis]
 
-        if self.axis == 0:
-            dist_arr = self
-        else:
-            dist_arr = self.redistribute(axis=0)
+        # Construct slices for axis
+        sl = [slice(None, None)] * self.axis
+        sl += [slice(start, end)]
+        sl = tuple(sl)
 
-        size = 1 if self.comm is None else self.comm.size
-        for ri in range(size):
+        with dset.collective:
+            dset[sl] = self[:]
 
-            rank = 0 if self.comm is None else self.comm.rank
-            if ri == rank:
-                with h5py.File(filename, 'r+') as fh:
-
-                    start = dist_arr.local_offset[0]
-                    end = start + dist_arr.local_shape[0]
-
-                    fh[dataset][start:end] = dist_arr
-
-            # dist_arr._comm.Barrier()
-            mpiutil.barrier(comm=self.comm)
+        if fh.opened:
+            fh.close()
 
     def transpose(self, axes):
         """Transpose the array axes.
@@ -656,3 +644,60 @@ class MPIArray(np.ndarray):
         arr_copy : MPIArray
         """
         return MPIArray.wrap(self.view(np.ndarray).copy(), axis=self.axis, comm=self.comm)
+
+    def _to_hdf5_serial(self, filename, dataset, create=False):
+        """Write into an HDF5 dataset.
+
+        This explicitly serialises the IO so that it works when h5py does not
+        support MPI-IO.
+
+        Parameters
+        ----------
+        filename : str
+            File to write dataset into.
+        dataset : string
+            Name of dataset to write into. Should not exist.
+        """
+
+        ## Naive non-parallel implementation to start
+
+        import h5py
+
+        if h5py.get_config().mpi:
+            import warnings
+            warnings.warn('h5py has parallel support. '
+                          'Use the parallel `.to_hdf5` routine instead.')
+
+        if self.comm is None or self.comm.rank == 0:
+
+            with h5py.File(filename, 'a' if create else 'r+') as fh:
+                if dataset in fh:
+                    raise Exception("Dataset should not exist.")
+
+                fh.create_dataset(dataset, self.global_shape, dtype=self.dtype)
+                fh[dataset][:] = np.array(0.0).astype(self.dtype)
+
+        # wait until all processes see the created file
+        while not os.path.exists(filename):
+            time.sleep(1)
+
+        self.comm.Barrier()
+
+        if self.axis == 0:
+            dist_arr = self
+        else:
+            dist_arr = self.redistribute(axis=0)
+
+        size = 1 if self.comm is None else self.comm.size
+        for ri in range(size):
+
+            rank = 0 if self.comm is None else self.comm.rank
+            if ri == rank:
+                with h5py.File(filename, 'r+') as fh:
+
+                    start = dist_arr.local_offset[0]
+                    end = start + dist_arr.local_shape[0]
+
+                    fh[dataset][start:end] = dist_arr
+
+            dist_arr.comm.Barrier()

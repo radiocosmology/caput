@@ -16,6 +16,7 @@ from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
+from past.builtins import basestring
 import numpy as np
 
 
@@ -69,3 +70,51 @@ def vectorize(**base_kwargs):
             return self.__class__(new_func)
 
     return _vectorize_desc
+
+
+def open_h5py_mpi(f, mode, comm=None):
+    """Ensure that we have an h5py File object.
+
+    Opens with MPI-IO if possible.
+
+    The returned file handle is annotated with two attributes: `.is_mpi`
+    which says whether the file was opened as an MPI file and `.opened` which
+    says whether it was opened in this call.
+
+    Parameters
+    ----------
+    f : string, h5py.File or h5py.Group
+        Filename to open, or already open file object. If already open this
+        is just returned as is.
+    mode : string
+        Mode to open file in.
+    comm : mpi4py.Comm, optional
+        MPI communicator to use. Uses `COMM_WORLD` if not set.
+
+    Returns
+    -------
+    fh : h5py.File
+        File handle for h5py.File, with two extra attributes `.is_mpi` and
+        `.opened`.
+    """
+    import h5py
+    has_mpi = h5py.get_config().mpi
+
+    if isinstance(f, basestring):
+        # Open using MPI-IO if we can
+        if has_mpi:
+            from mpi4py import MPI
+            comm = comm if comm is not None else MPI.COMM_WORLD
+            fh = h5py.File(f, mode, driver='mpio', comm=comm)
+        else:
+            fh = h5py.File(f, mode)
+        fh.opened = True
+    elif isinstance(f, (h5py.File, h5py.Group)):
+        fh = f
+        fh.opened = False
+    else:
+        raise ValueError("Did not receive a h5py.File or filename")
+
+    fh.is_mpi = (fh.file.driver == 'mpio')
+
+    return fh

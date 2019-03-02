@@ -64,12 +64,12 @@ class TestMemGroupDistributed(unittest.TestCase):
         # Create an empty array with a specified shape
         pdset = g.create_dataset('parallel_data', shape=(size, 10), dtype=np.float64, distributed=True, distributed_axis=0)
         pdset[:] = rank
-        pdset.attrs['rank'] = rank
+        pdset.attrs['const'] = 17
 
         # Create an empty array with a specified shape
         sdset = g.create_dataset('serial_data', shape=(size*5, 10), dtype=np.float64)
         sdset[:] = rank
-        sdset.attrs['rank'] = rank
+        sdset.attrs['const'] = 18
 
         # Create nested groups
         g.create_group('hello/world')
@@ -80,15 +80,15 @@ class TestMemGroupDistributed(unittest.TestCase):
         with h5py.File(self.fname, 'r') as f:
 
             # Test that the file attributes are correct
-            self.assertTrue(f['parallel_data'].attrs['rank'] == 0)
+            self.assertTrue(f['parallel_data'].attrs['const'] == 17)
 
             # Test that the parallel dataset has been written correctly
             self.assertTrue((f['parallel_data'][:, 0] == np.arange(size)).all())
-            self.assertTrue(f['parallel_data'].attrs['rank'] == 0)
+            self.assertTrue(f['parallel_data'].attrs['const'] == 17)
 
             # Test that the common dataset has been written correctly (i.e. by rank=0)
             self.assertTrue((f['serial_data'][:] == 0).all())
-            self.assertTrue(f['serial_data'].attrs['rank'] == 0)
+            self.assertTrue(f['serial_data'].attrs['const'] == 18)
 
             # Check group structure is correct
             self.assertIn('hello', f)
@@ -108,8 +108,8 @@ class TestMemGroupDistributed(unittest.TestCase):
         self.assertIn('world', g2['hello'])
 
         # Check the attributes
-        self.assertTrue(g2['parallel_data'].attrs['rank'] == 0)
-        self.assertTrue(g2['serial_data'].attrs['rank'] == 0)
+        self.assertTrue(g2['parallel_data'].attrs['const'] == 17)
+        self.assertTrue(g2['serial_data'].attrs['const'] == 18)
 
     def tearDown(self):
         if rank == 0:
