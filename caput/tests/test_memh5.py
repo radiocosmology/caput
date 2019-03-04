@@ -10,6 +10,7 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 import unittest
 import os
 import glob
+import gc
 
 import numpy as np
 import h5py
@@ -48,6 +49,7 @@ class TestGroup(unittest.TestCase):
         g.create_dataset('data', data=data)
         self.assertTrue(np.allclose(data, g['data']))
 
+
     def test_recursive_create(self):
         g = memh5.MemGroup()
         self.assertRaises(ValueError, g.create_group, '')
@@ -66,8 +68,14 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(memh5.is_group(g['a']))
         self.assertTrue(np.all(g['a/ra'][:] == data))
         g['a'].create_dataset('/ra', data=data)
-        print(list(g.keys()))
         self.assertTrue(np.all(g['ra'][:] == data))
+        self.assertIsInstance(g['a/ra'].parent, memh5.MemGroup)
+
+        # Check that d keeps g in scope.
+        d = g['a/ra']
+        del g
+        gc.collect()
+        self.assertTrue(np.all(d.file['ra'][:] == data))
 
 
 class TestH5Files(unittest.TestCase):
@@ -159,13 +167,28 @@ class TestMemDiskGroup(unittest.TestCase):
         # Save a subclass of MemDiskGroup
         tsc = TempSubClass()
         tsc.create_dataset('dset', data=np.arange(10))
-        tsc.save('temp_mdg.h5')
+        tsc.save(self.fname)
 
         # Load it from disk
-        tsc2 = memh5.MemDiskGroup.from_file('temp_mdg.h5')
+        tsc2 = memh5.MemDiskGroup.from_file(self.fname)
+        tsc3 = memh5.MemDiskGroup.from_file(self.fname, ondisk=True)
 
         # Check that is is recreated with the correct type
         self.assertIsInstance(tsc2, TempSubClass)
+        self.assertIsInstance(tsc3, TempSubClass)
+
+        # Check that parent/etc is properly implemented.
+        # Turns out this is very hard so give up for now.
+        #self.assertIsInstance(tsc2['dset'].parent, TempSubClass)
+        #self.assertIsInstance(tsc3['dset'].parent, TempSubClass)
+        tsc3.close()
+
+        with memh5.MemDiskGroup.from_file(self.fname, ondisk=True) as tsc4:
+            self.assertRaises(IOError, h5py.File, self.fname, 'w')
+
+        with memh5.MemDiskGroup.from_file(self.fname, ondisk=False) as tsc4:
+            f = h5py.File(self.fname, 'w')
+            f.close()
 
     def tearDown(self):
         file_names = glob.glob(self.fname + '*')
