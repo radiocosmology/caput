@@ -17,6 +17,11 @@ with memh5.BasicCont.from_file("filename.h5"):
 - Support for new CHIME stacked data with `reverse_map` (#58)
 - Better handling of missing config information (#56)
 
+### Changed
+
+- IO for distributed `memh5` containers is now MPI parallel if possible (#66).
+  This should make a big difference to write times of large containers.
+
 ### Fixed
 
 - Fixed circular references in memh5 containers (#60)
