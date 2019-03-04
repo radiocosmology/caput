@@ -22,6 +22,11 @@ objects and can be written to, and loaded from disk like normal :class:`memh5`
 objects.  Support for this must be explicitly enabled in the root group at
 creation with the `distributed=True` flag.
 
+.. warning::
+    It has been observed that the parallel write of distributed datasets can
+    lock up. This was when using macOS using `ompio` of OpenMPI 3.0.
+    Switching to `romio` as the MPI-IO backend helped here, but please report
+    any further issues.
 
 Basic Classes
 =============

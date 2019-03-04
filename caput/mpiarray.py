@@ -512,7 +512,6 @@ class MPIArray(np.ndarray):
         # Read using MPI-IO if possible
         if fh.is_mpi:
             with dset.collective:
-                print("using mpi-io")
                 dist_arr[:] = dset[start:end]
         else:
             dist_arr[:] = dset[start:end]
