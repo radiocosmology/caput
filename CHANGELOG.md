@@ -5,6 +5,25 @@ project adheres to [Semantic Versioning](http://semver.org/), with the exception
 that I'm using PEP440 to denote pre-releases.
 
 
+## Dev
+
+### Added
+
+- Context Manager for all memh5 container types (#60). You can now do:
+```python
+with memh5.BasicCont.from_file("filename.h5"):
+   pass
+```
+- Support for new CHIME stacked data with `reverse_map` (#58)
+- Better handling of missing config information (#56)
+
+### Fixed
+
+- Fixed circular references in memh5 containers (#60)
+- Fixed a race condition when creating output directories (#64)
+- Fixed bug in `tod.concatenate`.
+
+
 ## [0.6.0] - 2019-01-18
 
 ### Changed
