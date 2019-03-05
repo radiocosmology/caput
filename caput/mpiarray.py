@@ -497,9 +497,8 @@ class MPIArray(np.ndarray):
                 request.Wait(status=stat)
 
                 if stat.error != mpiutil.MPI.SUCCESS:
-                    print
-                    "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****" % (
-                    ir, ic, self.comm.rank)
+                    print("**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****"
+                          .format(ir, ic, self.comm.rank))
 
             self.comm.Barrier()
 
@@ -512,9 +511,8 @@ class MPIArray(np.ndarray):
                 request.Wait(status=stat)
 
                 if stat.error != mpiutil.MPI.SUCCESS:
-                    print
-                    "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****" % (
-                    ir, ir, self.comm.rank)
+                    print("**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****"
+                          .format(ir, ir, self.comm.rank))
 
             # Put together the blocks we received
             np.concatenate(buffers, self.axis, trans_arr)
