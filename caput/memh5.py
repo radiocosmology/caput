@@ -1896,7 +1896,9 @@ def _distributed_group_to_hdf5_serial(group, fname, hints=True, **kwargs):
 
 
 def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
-    """Private routine to restore full tree from an HDF5 file into a distributed memh5 object."""
+    """Private routine to copy full data tree from distributed memh5 object
+    into an HDF5 file.
+    This version paralellizes all IO."""
 
     # == Create some internal functions for doing the read ==
     # Function to perform a recursive clone of the tree structure
@@ -1918,7 +1920,7 @@ def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
                 # Check if we are in a distributed dataset
                 if isinstance(item, MemDatasetDistributed):
 
-                    # Read from file into MPIArray
+                    # Write to file from MPIArray
                     item.data.to_hdf5(h5group, key)
                     dset = h5group[key]
 
@@ -1946,7 +1948,7 @@ def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
         if not f.is_mpi:
             raise RuntimeError("Could not create file %s in MPI mode" % fname)
 
-        # Start recursive file read
+        # Start recursive file write
         _copy_to_file(group, f)
 
         if hints:
