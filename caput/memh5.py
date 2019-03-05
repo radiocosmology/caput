@@ -22,6 +22,11 @@ objects and can be written to, and loaded from disk like normal :class:`memh5`
 objects.  Support for this must be explicitly enabled in the root group at
 creation with the `distributed=True` flag.
 
+.. warning::
+    It has been observed that the parallel write of distributed datasets can
+    lock up. This was when using macOS using `ompio` of OpenMPI 3.0.
+    Switching to `romio` as the MPI-IO backend helped here, but please report
+    any further issues.
 
 Basic Classes
 =============
@@ -81,11 +86,10 @@ import h5py
 
 from . import mpiutil
 from . import mpiarray
-
+from . import misc
 
 # Basic Classes
 # -------------
-
 
 
 class ro_dict(collections.Mapping):
@@ -479,7 +483,10 @@ class MemGroup(_BaseGroup):
             with h5py.File(filename, **kwargs) as f:
                 deep_group_copy(self, f)
         else:
-            _distributed_group_to_hdf5(self, filename, **kwargs)
+            if h5py.get_config().mpi:
+                _distributed_group_to_hdf5_parallel(self, filename, **kwargs)
+            else:
+                _distributed_group_to_hdf5_serial(self, filename, **kwargs)
 
     def create_group(self, name):
         """Create a group within the storage tree."""
@@ -1807,9 +1814,12 @@ def format_abs_path(path):
     return out
 
 
-def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
-    """Private routine to copy full data tree from distributed memh5 object into an
-    HDF5 file."""
+def _distributed_group_to_hdf5_serial(group, fname, hints=True, **kwargs):
+    """Private routine to copy full data tree from distributed memh5 object
+    into an HDF5 file.
+
+    This version explicitly serialises all IO.
+    """
 
     if not group.distributed:
         raise RuntimeError('This should only run on distributed datasets [%s].' % group.name)
@@ -1846,7 +1856,7 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
 
         # Groups are written out by recursing
         if is_group(entry):
-            _distributed_group_to_hdf5(entry, fname, **kwargs)
+            _distributed_group_to_hdf5_serial(entry, fname, **kwargs)
 
         # Write out distributed datasets (only the data, the attributes are written below)
         elif isinstance(entry, MemDatasetDistributed):
@@ -1885,6 +1895,69 @@ def _distributed_group_to_hdf5(group, fname, hints=True, **kwargs):
     comm.Barrier()
 
 
+def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
+    """Private routine to copy full data tree from distributed memh5 object
+    into an HDF5 file.
+    This version paralellizes all IO."""
+
+    # == Create some internal functions for doing the read ==
+    # Function to perform a recursive clone of the tree structure
+    def _copy_to_file(memgroup, h5group):
+
+        # Copy over attributes
+        copyattrs(memgroup.attrs, h5group.attrs)
+
+        for key, item in memgroup.items():
+
+            # If group, create the entry and the recurse into it
+            if is_group(item):
+                new_group = h5group.create_group(key)
+                _copy_to_file(item, new_group)
+
+            # If dataset, create dataset
+            else:
+
+                # Check if we are in a distributed dataset
+                if isinstance(item, MemDatasetDistributed):
+
+                    # Write to file from MPIArray
+                    item.data.to_hdf5(h5group, key)
+                    dset = h5group[key]
+
+                    if hints:
+                        dset.attrs['__memh5_distributed_dset'] = True
+
+                else:
+                    # Create dataset (collective)
+                    dset = h5group.create_dataset(key, shape=item.shape, dtype=item.dtype)
+
+                    # Write common data from rank 0
+                    if memgroup.comm.rank == 0:
+                        dset[:] = item
+
+                    if hints:
+                        dset.attrs['__memh5_distributed_dset'] = False
+
+                # Copy attributes over into dataset
+                copyattrs(item.attrs, dset.attrs)
+
+
+    # Open file on all ranks
+    mode = kwargs.get('mode', 'w')
+    with misc.open_h5py_mpi(fname, mode, comm=group.comm) as f:
+        if not f.is_mpi:
+            raise RuntimeError("Could not create file %s in MPI mode" % fname)
+
+        # Start recursive file write
+        _copy_to_file(group, f)
+
+        if hints:
+            f.attrs['__memh5_distributed_file'] = True
+
+    # Final synchronisation
+    group.comm.Barrier()
+
+
 def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
     """Private routine to restore full tree from an HDF5 file into a distributed memh5 object."""
 
@@ -1921,7 +1994,7 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
                 if ('__memh5_distributed_dset' in item.attrs) and item.attrs['__memh5_distributed_dset']:
 
                     # Read from file into MPIArray
-                    pdata = mpiarray.MPIArray.from_hdf5(f, key, comm=comm)
+                    pdata = mpiarray.MPIArray.from_hdf5(h5group, key, comm=comm)
 
                     # Create dataset from MPIArray
                     dset = memgroup.create_dataset(key, data=pdata, distributed=True)
@@ -1940,7 +2013,7 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
                 _copy_attrs_bcast(item, dset)
 
     # Open file on all ranks
-    with h5py.File(fname, 'r') as f:
+    with misc.open_h5py_mpi(fname, 'r', comm=comm) as f:
 
         # Start recursive file read
         _copy_from_file(f, group)
@@ -1986,4 +2059,3 @@ def bytes_to_unicode(s):
         return {bytes_to_unicode(k): bytes_to_unicode(v) for k, v in s.items()}
 
     return s
-
