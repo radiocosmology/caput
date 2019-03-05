@@ -1655,7 +1655,7 @@ class BasicCont(MemDiskGroup):
             for name, item in group.items():
 
                 # Recurse into subgroups
-                if isinstance(item, MemGroup):
+                if isinstance(item, _Storage):
                     _tree_crawl(item)
 
                 # Okay, we've found a distributed dataset, let's try and redistribute it
@@ -1694,7 +1694,7 @@ class BasicCont(MemDiskGroup):
                             warnings.warn(('Could not find an axis (out of %s)'
                                             + 'to distributed dataset %s over.') % (str(dist_axis), name))
 
-        _tree_crawl(self._data)
+        _tree_crawl(self._data._storage_root)
 
 
 # Utilities
