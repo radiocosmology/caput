@@ -7,8 +7,11 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 
 from future.utils import bytes_to_native_str
 
-from setuptools import setup
+import numpy
 import os
+from Cython.Build import cythonize
+from setuptools import setup, find_packages
+from setuptools.extension import Extension
 
 from caput import __version__
 
@@ -49,22 +52,34 @@ except:
     warnings.warn("Could not install additional Skyfield data.")
     skyfield_data = {}
 
+# Cython
+extensions = [
+    Extension(
+        name=bytes_to_native_str(b'caput.weighted_median'),
+        sources=[bytes_to_native_str(b'caput/weighted_median.pyx')],
+        include_dirs=[numpy.get_include()],
+        language="c++",
+        extra_compile_args=['-std=c++11','-fopenmp','-g0','-O3',],
+        extra_link_args=["-std=c++11","-fopenmp"],
+    ),
+]
+
 setup(
     name='caput',
     version=__version__,
-    packages=['caput', 'caput.tests'],
+    packages = find_packages(),
     scripts=['scripts/caput-pipeline'],
     install_requires=requires,
     extras_require={
         'mpi': ['mpi4py>=1.3']
     },
-
     package_data=skyfield_data,
-
     # metadata for upload to PyPI
     author="Kiyo Masui, J. Richard Shaw",
     author_email="kiyo@physics.ubc.ca",
     description="Cluster Astronomical Python Utilities.",
     license="GPL v3.0",
-    url="http://github.com/radiocosmology/caput"
+    url="http://github.com/radiocosmology/caput",
+    ext_modules=cythonize(extensions),
+    include_dirs=[numpy.get_include()],
 )
