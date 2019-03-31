@@ -146,7 +146,7 @@ source %(venv)s
 cd %(workdir)s
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
+srun python %(scriptpath)s run %(configpath)s &> %(logpath)s
 """
 
     if clusterconf['queue_sys'] == 'pbs':

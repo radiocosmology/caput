@@ -517,7 +517,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                                            out_dset.id).id
                 out_dset.id.write(mspace, fspace, mdata, mtype)
             else:
-                out_dset[out_slice] = dataset
+                out_dset[out_slice] = dataset[:]
         # Increment the start indexes for the next item of the list.
         for axis in current_concat_index_start.keys():
             current_concat_index_start[axis] += current_concat_index_n[axis]

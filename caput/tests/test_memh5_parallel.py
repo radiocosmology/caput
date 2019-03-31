@@ -156,5 +156,19 @@ class TestMemDiskGroupDistributed(unittest.TestCase):
             for fname in file_names:
                 os.remove(fname)
 
+class TestBasicCont(unittest.TestCase):
+
+    def test_redistribute(self):
+
+        g = memh5.BasicCont(distributed=True)
+
+        # Create an array from data
+        g.create_dataset('data', shape=(10, 10), distributed=True, distributed_axis=0)
+        self.assertEqual(g['data'].distributed_axis, 0)
+        g.redistribute(1)
+        self.assertEqual(g['data'].distributed_axis, 1)
+
+
+
 if __name__ == '__main__':
     unittest.main()
