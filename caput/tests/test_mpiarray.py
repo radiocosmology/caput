@@ -75,7 +75,7 @@ class TestMPIArray(unittest.TestCase):
 
         if mpiutil.rank0:
             df = df[:-1]
-        
+
         if mpiutil.size > 1:
             with self.assertRaises(Exception):
                 mpiarray.MPIArray.wrap(df, axis=0)
@@ -116,6 +116,14 @@ class TestMPIArray(unittest.TestCase):
         assert (ds2 == ds).all()
 
         mpiutil.barrier()
+
+
+        # Check that reading over another distributed axis works
+        ds3 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=1)
+        assert ds3.shape[0] == gshape[0]
+        assert ds3.shape[1] == mpiutil.split_local(gshape[1])[0]
+        ds3 = ds3.redistribute(axis=0)
+        assert (ds3 == ds).all()
 
         if mpiutil.rank0 and os.path.exists(fname):
             os.remove(fname)

@@ -565,11 +565,13 @@ class MPIArray(np.ndarray):
 
         dset = fh[dataset]
         gshape = dset.shape
+        naxis = len(gshape)
         dtype = dset.dtype
 
-        # Check that the axis is valid
-        if axis < 0 or axis >= len(gshape):
-            raise ValueError("Distributed axis not in range (0, %i)" len(gshape) - 1)
+        # Check that the axis is valid and wrap to an actual position
+        if axis < -naxis or axis >= naxis:
+            raise ValueError("Distributed axis not in range (%i, %i)" % (-naxis, naxis-1))
+        axis = naxis + axis if axis < 0 else axis
 
         dist_arr = cls(gshape, axis=axis, comm=comm, dtype=dtype)
 
@@ -577,7 +579,7 @@ class MPIArray(np.ndarray):
         end = start + dist_arr.local_shape[axis]
 
         # Create the slice object into the global array
-        sl = [slice(None)] * axis + [slice(start, end)]
+        sl = tuple([slice(None)] * axis + [slice(start, end)])
 
         # Read using MPI-IO if possible
         if fh.is_mpi:
