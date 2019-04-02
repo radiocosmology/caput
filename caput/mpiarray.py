@@ -570,7 +570,7 @@ class MPIArray(np.ndarray):
 
         # Check that the axis is valid and wrap to an actual position
         if axis < -naxis or axis >= naxis:
-            raise ValueError("Distributed axis not in range (%i, %i)" % (-naxis, naxis-1))
+            raise ValueError("Distributed axis %i not in range (%i, %i)" % (axis, -naxis, naxis-1))
         axis = naxis + axis if axis < 0 else axis
 
         dist_arr = cls(gshape, axis=axis, comm=comm, dtype=dtype)
