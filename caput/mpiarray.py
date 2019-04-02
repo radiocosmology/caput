@@ -482,7 +482,7 @@ class MPIArray(np.ndarray):
         return enumerate(range(start, end))
 
     @classmethod
-    def from_hdf5(cls, f, dataset, comm=None):
+    def from_hdf5(cls, f, dataset, comm=None, axis=0):
         """Read MPIArray from an HDF5 dataset in parallel.
 
         Parameters
@@ -504,17 +504,25 @@ class MPIArray(np.ndarray):
         dset = fh[dataset]
         gshape = dset.shape
         dtype = dset.dtype
-        dist_arr = cls(gshape, axis=0, comm=comm, dtype=dtype)
 
-        start = dist_arr.local_offset[0]
-        end = start + dist_arr.local_shape[0]
+        # Check that the axis is valid
+        if axis < 0 or axis >= len(gshape):
+            raise ValueError("Distributed axis not in range (0, %i)" len(gshape) - 1)
+
+        dist_arr = cls(gshape, axis=axis, comm=comm, dtype=dtype)
+
+        start = dist_arr.local_offset[axis]
+        end = start + dist_arr.local_shape[axis]
+
+        # Create the slice object into the global array
+        sl = [slice(None)] * axis + [slice(start, end)]
 
         # Read using MPI-IO if possible
         if fh.is_mpi:
             with dset.collective:
-                dist_arr[:] = dset[start:end]
+                dist_arr[:] = dset[sl]
         else:
-            dist_arr[:] = dset[start:end]
+            dist_arr[:] = dset[sl]
 
         if fh.opened:
             fh.close()
