@@ -553,9 +553,12 @@ class MPIArray(np.ndarray):
             File to read dataset from.
         dataset : string
             Name of dataset to read from. Must exist.
-        comm : MPI.Comm
+        comm : MPI.Comm, optional
             MPI communicator to distribute over. If `None` optional, use
             `MPI.COMM_WORLD`.
+        axis : int, optional
+            Axis over which the read should be distributed. This can be used
+            to select the most efficient axis for the reading.
 
         Returns
         -------
