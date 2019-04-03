@@ -18,7 +18,8 @@ import numpy as np
 
 from caput import mpiutil, mpiarray
 
-
+import sys
+sys.excepthook = mpiutil.sys_excepthook
 
 class TestMPIArray(unittest.TestCase):
 
@@ -75,7 +76,7 @@ class TestMPIArray(unittest.TestCase):
 
         if mpiutil.rank0:
             df = df[:-1]
-        
+
         if mpiutil.size > 1:
             with self.assertRaises(Exception):
                 mpiarray.MPIArray.wrap(df, axis=0)
@@ -115,6 +116,35 @@ class TestMPIArray(unittest.TestCase):
 
         assert (ds2 == ds).all()
 
+        mpiutil.barrier()
+
+
+        # Check that reading over another distributed axis works
+        ds3 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=1)
+        assert ds3.shape[0] == gshape[0]
+        assert ds3.shape[1] == mpiutil.split_local(gshape[1])[0]
+        ds3 = ds3.redistribute(axis=0)
+        assert (ds3 == ds).all()
+        mpiutil.barrier()
+
+        # Check a read with an arbitrary slice in there. This only checks the shape is correct.
+        ds4 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=1, sel=(np.s_[3:10:2], np.s_[1:16:3]))
+        assert ds4.shape[0] == 4
+        assert ds4.shape[1] == mpiutil.split_local(5)[0]
+        mpiutil.barrier()
+
+        # Check the read with a slice along the axis being read
+        ds5 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=1, sel=(np.s_[:], np.s_[3:15:2]))
+        assert ds5.shape[0] == gshape[0]
+        assert ds5.shape[1] == mpiutil.split_local(6)[0]
+        ds5 = ds5.redistribute(axis=0)
+        assert (ds5 == ds[:, 3:15:2]).all()
+        mpiutil.barrier()
+
+        # Check the read with a slice along the axis being read
+        ds6 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=0, sel=(np.s_[:], np.s_[3:15:2]))
+        ds6 = ds6.redistribute(axis=0)
+        assert (ds6 == ds[:, 3:15:2]).all()
         mpiutil.barrier()
 
         if mpiutil.rank0 and os.path.exists(fname):

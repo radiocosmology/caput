@@ -544,7 +544,7 @@ class MPIArray(np.ndarray):
         return enumerate(range(start, end))
 
     @classmethod
-    def from_hdf5(cls, f, dataset, comm=None):
+    def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
         """Read MPIArray from an HDF5 dataset in parallel.
 
         Parameters
@@ -553,9 +553,16 @@ class MPIArray(np.ndarray):
             File to read dataset from.
         dataset : string
             Name of dataset to read from. Must exist.
-        comm : MPI.Comm
+        comm : MPI.Comm, optional
             MPI communicator to distribute over. If `None` optional, use
             `MPI.COMM_WORLD`.
+        axis : int, optional
+            Axis over which the read should be distributed. This can be used
+            to select the most efficient axis for the reading.
+        sel : tuple, optional
+            A tuple of slice objects used to make a selection from the array
+            *before* reading. The output will be this selection from the dataset
+            distributed over the given axis.
 
         Returns
         -------
@@ -564,19 +571,45 @@ class MPIArray(np.ndarray):
         fh = misc.open_h5py_mpi(f, 'r', comm)
 
         dset = fh[dataset]
-        gshape = dset.shape
+        dshape = dset.shape  # Shape of the underlying dataset
+        naxis = len(dshape)
         dtype = dset.dtype
-        dist_arr = cls(gshape, axis=0, comm=comm, dtype=dtype)
 
-        start = dist_arr.local_offset[0]
-        end = start + dist_arr.local_shape[0]
+        # Check that the axis is valid and wrap to an actual position
+        if axis < -naxis or axis >= naxis:
+            raise ValueError("Distributed axis %i not in range (%i, %i)" % (axis, -naxis, naxis-1))
+        axis = naxis + axis if axis < 0 else axis
+
+        # Ensure sel is defined to cover all axes
+        if sel is None:
+            sel = [slice(None)] * naxis
+        if len(sel) < naxis:
+            sel = list(sel) + [slice(None)] * (naxis - len(sel))
+        sel = list(sel)
+
+        # Figure out the final array size and create it
+        gshape = []
+        for l, sl in zip(dshape, sel):
+            start, end, stride = sl.indices(l)
+            n = 1 + (end - start - 1) // stride
+            gshape.append(n)
+        dist_arr = cls(gshape, axis=axis, comm=comm, dtype=dtype)
+
+        # Get the local start and end indices
+        lstart = dist_arr.local_offset[axis]
+        lend = lstart + dist_arr.local_shape[axis]
+
+        # Create the slice object into the dataset by resolving the rank's slice on the sel
+        dstart, dend, dstride = sel[axis].indices(dshape[axis])
+        sel[axis] = slice(dstart + lstart * dstride, dstart + lend * dstride, dstride)
+        sel = tuple(sel)
 
         # Read using MPI-IO if possible
         if fh.is_mpi:
             with dset.collective:
-                dist_arr[:] = dset[start:end]
+                dist_arr[:] = dset[sel]
         else:
-            dist_arr[:] = dset[start:end]
+            dist_arr[:] = dset[sel]
 
         if fh.opened:
             fh.close()
