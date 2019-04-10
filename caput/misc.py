@@ -16,6 +16,7 @@ from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
+import os
 from past.builtins import basestring
 import numpy as np
 
@@ -118,3 +119,75 @@ def open_h5py_mpi(f, mode, comm=None):
     fh.is_mpi = (fh.file.driver == 'mpio')
 
     return fh
+
+
+class lock_file(object):
+    """Manage a lock file around a file creation operation.
+
+    Parameters
+    ----------
+    filename : str
+        Final name for the file.
+    preserve : bool, optional
+        Keep the temporary file in the event of failure.
+    comm : MPI.COMM, optional
+        If present only rank=0 will create/remove the lock file and move the
+        file.
+
+    Returns
+    -------
+    tmp_name : str
+        File name to use in the locked block.
+
+    Example
+    -------
+
+    >>> with lock_file('file_to_create.h5') as fname:
+    ...     container.save(fname)
+    ...
+    """
+
+    def __init__(self, name, preserve=False, comm=None):
+
+        from . import mpiutil
+
+        if comm is not None and not hasattr(comm, 'rank'):
+            raise ValueError('comm argument does not seem to be an MPI communicator.')
+
+        self.name = name
+        self.rank0 = mpiutil.rank0 if comm is None else comm.rank == 0
+        self.preserve = preserve
+
+    def __enter__(self):
+
+        if self.rank0:
+            with open(self.lockfile, 'w+') as fh:
+                fh.write("")
+
+        return self.tmpfile
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+
+        if self.rank0:
+
+            # Check if exception was raised and delete the temp file if needed
+            if exc_type is not None:
+                if not self.preserve:
+                    os.remove(self.tmpfile)
+            # Otherwise things were successful and we should move the file over
+            else:
+                os.rename(self.tmpfile, self.name)
+
+            # Finally remove the lock file
+            os.remove(self.lockfile)
+
+        return False
+
+    @property
+    def tmpfile(self):
+        base, fname = os.path.split(self.name)
+        return os.path.join(base, '.' + fname)
+
+    @property
+    def lockfile(self):
+        return self.tmpfile + '.lock'
