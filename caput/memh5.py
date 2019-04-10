@@ -1690,7 +1690,7 @@ class BasicCont(MemDiskGroup):
                     # Note that this clause is on the FOR.
                     else:
                         # If we are here we didn't find a matching axis, emit a warning
-                        if group.comm.rank == 0:
+                        if self.comm.rank == 0:
                             warnings.warn(('Could not find an axis (out of %s)'
                                             + 'to distributed dataset %s over.') % (str(dist_axis), name))
 
