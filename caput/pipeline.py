@@ -330,6 +330,7 @@ import warnings
 import yaml
 
 from . import config
+from . import misc
 
 
 # Set the module logger.
@@ -1197,7 +1198,11 @@ class H5IOMixin(object):
         # Cases for `output` object type.
         if isinstance(output, memh5.MemGroup):
             # Already in memory.
-            output.to_hdf5(filename, mode='w')
+
+            # Lock file
+            with misc.lock_file(filename, comm=output.comm) as fn:
+                output.to_hdf5(fn, mode='w')
+
         elif isinstance(output, h5py.Group):
             if path.isfile(filename) and path.samefile(output.file.filename,
                                                        filename):
@@ -1207,7 +1212,10 @@ class H5IOMixin(object):
                 # Copy to memory then to disk
                 # XXX This can be made much more efficient using a direct copy.
                 out_copy = memh5.MemGroup.from_hdf5(output)
-                out_copy.to_hdf5(filename, mode='w')
+
+                # Lock file as we write
+                with misc.lock_file(filename) as fn:
+                    out_copy.to_hdf5(fn, mode='w')
 
 
 class BasicContMixin(object):
