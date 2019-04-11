@@ -604,8 +604,12 @@ class MPIArray(np.ndarray):
         sel[axis] = slice(dstart + lstart * dstride, dstart + lend * dstride, dstride)
         sel = tuple(sel)
 
+        # Check that there are no null slices, otherwise we need to turn off
+        # collective IO to work around an h5py issue (#965)
+        no_null_slices = dist_arr.global_shape[axis] >= dist_arr.comm.size
+
         # Read using MPI-IO if possible
-        if fh.is_mpi:
+        if fh.is_mpi and no_null_slices:
             with dset.collective:
                 dist_arr[:] = dset[sel]
         else:
@@ -654,7 +658,14 @@ class MPIArray(np.ndarray):
         sl += [slice(start, end)]
         sl = tuple(sl)
 
-        with dset.collective:
+        # Check that there are no null slices, otherwise we need to turn off
+        # collective IO to work around an h5py issue (#965)
+        no_null_slices = self.global_shape[self.axis] >= self.comm.size
+
+        if fh.is_mpi and no_null_slices:
+            with dset.collective:
+                dset[sl] = self[:]
+        else:
             dset[sl] = self[:]
 
         if fh.opened:
