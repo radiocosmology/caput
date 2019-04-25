@@ -61,6 +61,7 @@ def vectorize(**base_kwargs):
             return arr
 
         def __get__(self, obj, type=None):
+
             # As a descriptor, this gets called whenever this is used to wrap a
             # function, and simply binds it to the instance
 
@@ -73,7 +74,7 @@ def vectorize(**base_kwargs):
     return _vectorize_desc
 
 
-def open_h5py_mpi(f, mode, comm=None):
+def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
     """Ensure that we have an h5py File object.
 
     Opens with MPI-IO if possible.
@@ -89,6 +90,8 @@ def open_h5py_mpi(f, mode, comm=None):
         is just returned as is.
     mode : string
         Mode to open file in.
+    use_mpi : bool, optional
+        Whether to use MPI-IO or not (default True)
     comm : mpi4py.Comm, optional
         MPI communicator to use. Uses `COMM_WORLD` if not set.
 
@@ -103,7 +106,7 @@ def open_h5py_mpi(f, mode, comm=None):
 
     if isinstance(f, basestring):
         # Open using MPI-IO if we can
-        if has_mpi:
+        if has_mpi and use_mpi:
             from mpi4py import MPI
             comm = comm if comm is not None else MPI.COMM_WORLD
             fh = h5py.File(f, mode, driver='mpio', comm=comm)
