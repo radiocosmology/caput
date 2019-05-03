@@ -276,8 +276,8 @@ def parallel_map(func, glist, root=None, method='con', comm=_comm):
         # Synchronize
         # barrier(comm=comm)
 
-        # Zip to remove indices and extract the return values into a list
-        return list(zip(*sortlist)[1])
+        # Extract the return values into a list
+        return [item for ind, item in sortlist]
     else:
         return None
 
