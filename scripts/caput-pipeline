@@ -30,6 +30,50 @@ def run(configfile, loglevel='INFO'):
 @arg('configfile', help='Configuration file to queue up.')
 @arg('--nosubmit', help='Don\'t submit the job to the queue.')
 def queue(configfile, nosubmit=False):
+    """Queue a job on a cluster.
+
+    This queues the job, using parameters from the `cluster` section of the
+    submitted YAML file.
+
+    There are several *required* keys:
+
+    ``nodes``
+        The number of nodes to run the job on.
+    ``time``
+        The time length of the job. Must be a string that the queueing system
+        understands.
+    ``directory``
+        The directory to place the output in.
+
+    There are many *optional* keys that control more functionality:
+
+    ``system``
+        A name of the cluster that we are running on, if this is supported
+        (currently ``gpc`` and ``cedar``), this uses more relevant default
+        values.
+    ``queue_system``
+        The queue system to run on. Either ``pbs`` or ``slurm``.
+    ``queue``
+        The queue to submit to. Only used for *PBS*
+    ``ompnum``
+        The number of OpenMP threads to use.
+    ``pernode``
+        Number of processes to run on each node.
+    ``mem``
+        How much memory to reserve per node.
+    ``account``
+        The account to submit the job against. Only used on *SLURM*
+    ``ppn``
+        Only used for PBS. Should typically be equal to the number of
+        *processors* on a node.
+    ``venv``
+        Path to a virtual environment to load before running.
+    ``temp_directory``
+        If set, save the output to a temporary location while running and
+        then move to a final location if the job successfully finishes. This
+        may be slow, if the temporary and final directories are not on the
+        same filesystem.
+    """
 
     import os.path
     import shutil
@@ -77,7 +121,7 @@ def queue(configfile, nosubmit=False):
     rconf.update(**conf)
 
     # Check to see if any required keys are missing
-    required_keys = {'nodes', 'time', 'name', 'directory',
+    required_keys = {'nodes', 'time', 'directory',
                      'ppn', 'queue', 'ompnum', 'pernode'}
     missing_keys = required_keys - set(rconf.keys())
     if missing_keys:
