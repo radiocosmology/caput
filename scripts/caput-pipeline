@@ -6,6 +6,9 @@ path to a yaml pipeline file.  For an example of a pipeline file, see
 documentation for caput.pipeline.
 """
 
+from os.path import (normpath, expanduser, expandvars, realpath,
+                     abspath, isabs, join, exists)
+
 from argh import arg, dispatch_commands
 
 
@@ -38,83 +41,92 @@ def queue(configfile, nosubmit=False):
     ## Global configuration
     ## Create output directory and copy over params file.
     if 'cluster' not in yconf:
-        raise Exception('Configuration file must have an \'config\' section.')
+        raise ValueError("Configuration file must have an \"cluster\" section.")
 
     conf = yconf['cluster']
 
-    if 'directory' not in conf:
-        raise Exception('Must specify output directory.')
-    workdir = conf['directory']
-    workdir = os.path.normpath(os.path.expandvars(os.path.expanduser(workdir)))
+    # Base setting if nothing else is set
+    defaults = {
+        "name": "job",
+        "queue": "batch",
+        "pernode": 1,
+        "ompnum": 8,
+    }
 
-    if not os.path.isabs(workdir):
-        raise Exception('Output directory path must be absolute.')
+    # Per system overrides (i.e. specialisations for Scinet GPC and Westgrid
+    # cedar)
+    system_defaults = {
+        "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
+        "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-krs"}
+    }
 
-    pbsdir = os.path.normpath(workdir + '/pbs/')
+    # Start to generate the full resolved config
+    rconf = defaults.copy()
 
-    # Create directory if required
-    if not os.path.exists(pbsdir):
-        os.makedirs(pbsdir)
+    # If the system is specified update the current config with it
+    if 'system' in conf:
+
+        sys = conf['system']
+
+        if sys not in system_defaults:
+            raise ValueError("Specified system \"%s\: is not known." % sys)
+
+        rconf.update(**system_defaults[sys])
+
+    # Update the current config with the rest of the users variables
+    rconf.update(**conf)
+
+    # Check to see if any required keys are missing
+    required_keys = {'nodes', 'time', 'name', 'directory',
+                     'ppn', 'queue', 'ompnum', 'pernode'}
+    missing_keys = required_keys - set(rconf.keys())
+    if missing_keys:
+        raise ValueError("Missing required keys: %s" % missing_keys)
+
+    # If no temporary directory set, just use the final directory
+    if 'temp_directory' not in rconf:
+        rconf['temp_directory'] = rconf['directory']
+
+    # Construct the working directory
+    workdir = expandpath(rconf['temp_directory'])
+    if not isabs(workdir):
+        raise ValueError('Working directory path %s must be absolute' % workdir)
+
+    # Construct the output directory
+    finaldir = expandpath(rconf['directory'])
+    if not isabs(finaldir):
+        raise ValueError('Final output directory path %s must be absolute' % finaldir)
+
+    # Create temporary directory if required
+    jobdir = join(workdir, 'job/')
+    if not exists(jobdir):
+        os.makedirs(jobdir)
 
     # Copy config file into output directory (check it's not already there first)
-    sfile = os.path.realpath(os.path.abspath(configfile))
-    dfile = os.path.realpath(os.path.abspath(pbsdir + '/config.yaml'))
-
+    sfile = fixpath(configfile)
+    dfile = fixpath(join(jobdir, "config.yaml"))
     if sfile != dfile:
         shutil.copy(sfile, dfile)
 
-    clusterconf = {}
-
-    # Set up required PBS vars
-    if 'nodes' not in conf:
-        raise Exception('Nodes is required.')
-    clusterconf['nodes'] = conf['nodes']
-
-    if 'time' not in conf:
-        raise Exception('Job time is required.')
-    clusterconf['time'] = conf['time']
-
-    # Set queueing system w. per-cluster defaults
-    cluster_defaults = {
-        'gpc' : {'ppn': 8, 'mem': '16000M', 'queue_sys': 'pbs', 'account':None,},
-        'cedar': {'ppn': 32, 'mem': '0', 'queue_sys': 'slurm', 'account':'rpp-krs',}
-    }
-    if 'system' in conf:
-        clusterconf['queue_sys'] = conf['queue_sys'] if 'queue_sys' in conf else cluster_defaults[conf['system']]['queue_sys']
-        clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else cluster_defaults[conf['system']]['ppn']
-        clusterconf['mem'] = conf['mem'] if 'mem' in conf else cluster_defaults[conf['system']]['mem']
-        clusterconf['account'] = conf['account'] if 'account' in conf else cluster_defaults[conf['system']]['account']
-    else:
-        if 'queue_sys' in conf:
-            clusterconf['queue_sys'] = conf['queue_sys']
-        else:
-            clusterconf['queue_sys'] = 'pbs'
-            raise Warning('Queueing system not set, defaulting to PBS')
-        clusterconf['ppn'] = conf['ppn'] if 'ppn' in conf else 8
-        clusterconf['mem'] = conf['mem'] if 'mem' in conf else '16000M'
-        clusterconf['account'] = conf['account'] if 'account' in conf else None
-
-    # Set up optional PBS vars
-    clusterconf['ompnum'] = conf['ompnum'] if 'ompnum' in conf else 8
-    clusterconf['queue'] = conf['queue'] if 'queue' in conf else 'batch'
-    clusterconf['pernode'] = conf['pernode'] if 'pernode' in conf else 1
-    clusterconf['name'] = conf['name'] if 'name' in conf else 'job'
-
-    # Set vars only needed to create script
-    clusterconf['mpiproc'] = clusterconf['nodes'] * clusterconf['pernode']
-    clusterconf['workdir'] = workdir
-    clusterconf['scriptpath'] = os.path.realpath(__file__)
-    clusterconf['logpath'] = pbsdir + '/jobout.log'
-    clusterconf['configpath'] = pbsdir + '/config.yaml'
-
     # Set up virtualenv
-    if 'venv' in conf:
-        if not os.path.exists(conf['venv'] + '/bin/activate'):
-            raise Exception('Could not find virtualenv')
-
-        clusterconf['venv'] = conf['venv'] + '/bin/activate'
+    if 'venv' in rconf:
+        venvpath = rconf['venv'] + '/bin/activate'
+        if not exists(venvpath):
+            raise ValueError("Could not find virtualenv at path %s" % rconf["venv"])
+        rconf["venv"] = venvpath
     else:
-        clusterconf['venv'] = '/dev/null'
+        rconf["venv"] = "/dev/null"
+
+    # Derived vars only needed to create script
+    rconf['mpiproc'] = rconf['nodes'] * rconf['pernode']
+    rconf['workdir'] = workdir
+    rconf['finaldir'] = finaldir
+    rconf['scriptpath'] = fixpath(__file__)
+    rconf['logpath'] = join(jobdir, 'jobout.log')
+    rconf['configpath'] = join(jobdir, 'config.yaml')
+    rconf['statuspath'] = join(jobdir, 'STATUS')
+    rconf['usetemp'] = 1 if rconf['finaldir'] != rconf['workdir'] else 0
+
 
     pbs_script = """#!/bin/bash
 #PBS -l nodes=%(nodes)i:ppn=%(ppn)i
@@ -131,6 +143,23 @@ cd %(workdir)s
 export OMP_NUM_THREADS=%(ompnum)i
 
 mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
+
+retcode=$?
+
+# Set the status
+if [ $retcode -eq 0 ]
+then
+    echo FINISHED > %(statuspath)s
+else
+    echo CRASHED > %(statuspath)s
+fi
+
+# If the job was successful, then move the output to its final location
+if [ %(usetemp)s -eq 1 ] && [ $retcode -eq 0 ]
+then
+    mkdir -p $(dirname \"%(finaldir)s\")
+    mv \"%(workdir)s\" \"%(finaldir)s\"
+fi
 """
     slurm_script = """#!/bin/bash
 #SBATCH --account=%(account)s
@@ -141,30 +170,60 @@ mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s
 #SBATCH --time=%(time)s
 #SBATCH --job-name=%(name)s
 
+echo RUNNING > %(statuspath)s
+
 source %(venv)s
 
 cd %(workdir)s
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 srun python %(scriptpath)s run %(configpath)s &> %(logpath)s
+
+retcode=$?
+
+# Set the status
+if [ $retcode -eq 0 ]
+then
+    echo FINISHED > %(statuspath)s
+else
+    echo CRASHED > %(statuspath)s
+fi
+
+# If the job was successful, then move the output to its final location
+if [ %(usetemp)s -eq 1 ] && [ $retcode -eq 0 ]
+then
+    mkdir -p $(dirname \"%(finaldir)s\")
+    mv \"%(workdir)s\" \"%(finaldir)s\"
+fi
 """
 
-    if clusterconf['queue_sys'] == 'pbs':
-        script = pbs_script % clusterconf
+    if rconf['queue_sys'] == 'pbs':
+        script = pbs_script
         job_command = 'qsub'
-    elif clusterconf['queue_sys'] == 'slurm':
-        script = slurm_script % clusterconf
+    elif rconf['queue_sys'] == 'slurm':
+        script = slurm_script
         job_command = 'sbatch'
     else:
-        raise Exception('Specified queueing system not recognized')
+        raise ValueError('Specified queueing system not recognized')
 
-    scriptname = pbsdir + '/jobscript.sh'
+    # Fill in the template variables
+    script = script % rconf
 
-    with open(scriptname, 'w') as f:
+    # Write and submit the jobscript
+    with open(jobdir + '/jobscript.sh', 'w') as f:
         f.write(script)
-
     if not nosubmit:
-        os.system('cd %s; %s jobscript.sh' % (pbsdir, job_command))
+        os.system('cd %s; %s jobscript.sh' % (jobdir, job_command))
+
+
+def expandpath(path):
+    """Expand any variables, user directories in path"""
+    return normpath(expandvars(expanduser(path)))
+
+
+def fixpath(path):
+    """Turn path to an absolute path"""
+    return realpath(abspath(path))
 
 
 if __name__ == '__main__':
