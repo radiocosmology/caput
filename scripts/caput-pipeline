@@ -14,14 +14,50 @@ products = None
 
 @arg('configfile', help='Configuration file to run.')
 @arg('--loglevel', help='Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
-def run(configfile, loglevel='INFO'):
-    from caput.pipeline import Manager
+@arg('--pystuck', help='Run pystuck for out of band debugging')
+@arg('--profile', help='Run with cProfile. Output files are rank_XXX.prof')
+def run(configfile, loglevel='INFO', pystuck=False, profile=False):
+
+    import cProfile
     import logging
+
+    from caput.pipeline import Manager
+
     level = getattr(logging, loglevel.upper())
     logging.basicConfig(level=level)
 
+    # Try to setup pystuck to allow for out of band debugging
+    if pystuck:
+        try:
+            import pystuck
+            from mpi4py import MPI
+            rank = MPI.COMM_WORLD.rank
+            hostname = MPI.Get_processor_name()
+            port = 4000 + rank
+
+            logging.info("Starting pystuck for rank=%4i on host %s:%i",
+                         rank, hostname, port)
+            pystuck.run_server(host="0.0.0.0", port=port)
+        except ImportError:
+            pass
+
     P = Manager.from_yaml_file(configfile)
+
+    if profile:
+        logging.info("Enabling profiling.")
+        pr = cProfile.Profile()
+        pr.enable()
     P.run()
+
+    if profile:
+        try:
+            from mpi4py import MPI
+            rank = MPI.COMM_WORLD.rank
+        except ImportError:
+            rank = 0
+        prof_file = 'rank_%3d.prof' % rank
+        logging.debug("Writing profile to: %s", prof_file)
+        pr.dump_stats(prof_file)
 
 
 @arg('configfile', help='Configuration file to queue up.')
