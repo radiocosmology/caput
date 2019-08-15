@@ -43,6 +43,7 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
 import sys
+import time
 import warnings
 from types import ModuleType
 import numpy as np
@@ -70,10 +71,15 @@ try:
 
     rank0 = True if rank == 0 else False
 
-    sys_excepthook = sys.excepthook
-
     def mpi_excepthook(type, value, traceback):
-        sys_excepthook(type, value, traceback)
+
+        # Run the standard exception handler, but try to ensure the output if flushed out before
+        # aborting
+        sys.__excepthook__(type, value, traceback)
+        sys.stdout.flush()
+        sys.stderr.flush()
+        time.sleep(5)
+
         MPI.COMM_WORLD.Abort(1)
 
     sys.excepthook = mpi_excepthook
