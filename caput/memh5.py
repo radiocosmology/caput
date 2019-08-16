@@ -1793,9 +1793,27 @@ def deep_group_copy(g1, g2):
             g2.create_group(key)
             deep_group_copy(entry, g2[key])
         else:
-            g2.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
-                    data=entry)
+
+            # Deal with unicode numpy datasets that aren't supported by HDF5
+            unicode_hint = False
+            if entry.dtype.kind == "U" and isinstance(g2, h5py.Group):
+                # Attempt to coerce to a type that HDF5 supports
+                data = entry[:].astype("S")
+                unicode_hint = True
+            elif (entry.dtype.kind == "S" and not isinstance(g2, h5py.Group) and
+                    entry.attrs.get("__memh5_unicode", False)):
+                # Convert back from a unicode dataset that was written to HDF5
+                data = entry[:].astype("U")
+            else:
+                data = entry
+
+            g2.create_dataset(key, shape=data.shape, dtype=data.dtype,
+                              data=data)
             copyattrs(entry.attrs, g2[key].attrs)
+
+            # Add a hint that memh5 should convert back to unicode
+            if unicode_hint:
+                g2[key].attrs["__memh5_unicode"] = True
 
 
 def format_abs_path(path):
@@ -1875,17 +1893,29 @@ def _distributed_group_to_hdf5_serial(group, fname, hints=True, **kwargs):
 
                 # Write out common datasets and copy their attrs
                 if isinstance(entry, MemDatasetCommon):
-                    dset = f.create_dataset(entry.name, data=entry._data)
+
+                    if entry.dtype.kind == "U":
+                        data = entry.data.astype("S")
+                    else:
+                        data = entry
+
+                    dset = f.create_dataset(entry.name, data=data)
                     copyattrs(entry.attrs, dset.attrs)
 
                     if hints:
                         dset.attrs['__memh5_distributed_dset'] = False
+
+                    if entry.dtype.kind == "U":
+                        dset.attrs['__memh5_unicode'] = True
 
                 # Copy the attributes over for a distributed dataset
                 elif isinstance(entry, MemDatasetDistributed):
 
                     if entry.name not in f:
                         raise RuntimeError('Distributed dataset should already have been created.')
+
+                    if entry.dtype.kind == "U":
+                        raise RuntimeError("Cannot write Unicode datasets to distributed datasets.")
 
                     copyattrs(entry.attrs, f[entry.name].attrs)
 
@@ -1920,6 +1950,9 @@ def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
                 # Check if we are in a distributed dataset
                 if isinstance(item, MemDatasetDistributed):
 
+                    if item.dtype.kind == "U":
+                        raise RuntimeError("Cannot write Unicode datasets to distributed datasets.")
+
                     # Write to file from MPIArray
                     item.data.to_hdf5(h5group, key)
                     dset = h5group[key]
@@ -1929,14 +1962,22 @@ def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
 
                 else:
                     # Create dataset (collective)
-                    dset = h5group.create_dataset(key, shape=item.shape, dtype=item.dtype)
+                    if item.dtype.kind == "U":
+                        data = item.data.astype("S")
+                    else:
+                        data = item.data
+
+                    dset = h5group.create_dataset(key, shape=data.shape, dtype=data.dtype)
 
                     # Write common data from rank 0
                     if memgroup.comm.rank == 0:
-                        dset[:] = item
+                        dset[:] = data
 
                     if hints:
                         dset.attrs['__memh5_distributed_dset'] = False
+
+                    if item.dtype.kind == "U":
+                        dset.attrs['__memh5_unicode'] = True
 
                 # Copy attributes over into dataset
                 copyattrs(item.attrs, dset.attrs)
@@ -2003,7 +2044,13 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
                     # Read common data onto rank zero and broadcast
                     cdata = None
                     if comm.rank == 0:
+
                         cdata = item[:]
+
+                        # Convert ascii string back to unicode if requested
+                        if item.dtype.kind == "S" and item.attrs.get("__memh5_unicode", False):
+                            cdata = cdata.astype("U")
+
                     cdata = comm.bcast(cdata, root=0)
 
                     # Create dataset from array

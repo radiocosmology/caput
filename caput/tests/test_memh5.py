@@ -211,5 +211,59 @@ class TestBasicCont(unittest.TestCase):
         # But make sure this works.
         d.create_dataset('a', data=np.arange(5))
 
+
+class TestUnicodeDataset(unittest.TestCase):
+    """Test that a unicode memh5 dataset is round tripped correctly."""
+
+    fname = 'tmp_test_unicode.h5'
+
+    def test_to_from_hdf5(self):
+
+        udata = np.array(["Test", "this", "works"])
+        sdata = udata.astype("S")
+        self.assertEqual(udata.dtype.kind, "U")
+        self.assertEqual(sdata.dtype.kind, "S")
+
+        m = memh5.MemGroup()
+        udset = m.create_dataset("udata", data=udata)
+        sdset = m.create_dataset("sdata", data=sdata)
+        self.assertEqual(udset.dtype.kind, "U")
+        self.assertEqual(sdset.dtype.kind, "S")
+
+        m.to_hdf5(self.fname)
+
+        with h5py.File(self.fname, "r") as fh:
+            self.assertEqual(fh["udata"].dtype.kind, "S")
+            self.assertEqual(fh["sdata"].dtype.kind, "S")
+
+            self.assertIn("__memh5_unicode", fh["udata"].attrs)
+            self.assertNotIn("__memh5_unicode", fh["sdata"].attrs)
+
+            self.assertTrue(fh["udata"].attrs["__memh5_unicode"])
+
+        m2 = memh5.MemGroup.from_hdf5(self.fname)
+
+        self.assertEqual(m2["udata"].dtype.kind, "U")
+        self.assertEqual(m2["sdata"].dtype.kind, "S")
+        self.assertTrue((m["udata"].data == m2["udata"].data).all())
+        self.assertTrue((m["sdata"].data == m2["sdata"].data).all())
+
+    def test_failure(self):
+        # Test that we fail when trying to write a non ASCII character
+
+        udata = np.array(["\u03B2"])
+
+        m = memh5.MemGroup()
+        udset = m.create_dataset("udata", data=udata)
+
+        with self.assertRaises(UnicodeEncodeError):
+            m.to_hdf5(self.fname)
+
+    def tearDown(self):
+        file_names = glob.glob(self.fname + '*')
+        for fname in file_names:
+            os.remove(fname)
+
+
 if __name__ == '__main__':
     unittest.main()

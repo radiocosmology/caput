@@ -74,6 +74,9 @@ class TestMemGroupDistributed(unittest.TestCase):
         # Create nested groups
         g.create_group('hello/world')
 
+        # Test round tripping unicode data
+        g.create_dataset("unicode_data", data=np.array(["hello"]))
+
         g.to_hdf5(self.fname)
 
         # Test that the HDF5 file has the correct structure
@@ -106,6 +109,10 @@ class TestMemGroupDistributed(unittest.TestCase):
         # Check group structure is correct
         self.assertIn('hello', g2)
         self.assertIn('world', g2['hello'])
+
+        # Check the unicode dataset
+        self.assertEqual(g2["unicode_data"].dtype.kind, "U")
+        self.assertEqual(g2["unicode_data"][0], "hello")
 
         # Check the attributes
         self.assertTrue(g2['parallel_data'].attrs['const'] == 17)
