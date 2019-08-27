@@ -8,7 +8,6 @@ from cython.parallel import prange, parallel
 from MedianTree cimport Tree, Data
 cimport numpy as np
 cimport cython
-cimport openmp
 
 
 def _check_arrays(data, weights):
