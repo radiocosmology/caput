@@ -280,3 +280,36 @@ class TestMWM(unittest.TestCase):
         weights = np.random.rand(14, 8)
         np.testing.assert_array_equal(py_mwm_nd(values, weights, 3),
                                       moving_weighted_median(values, weights, (3, 3)))
+
+    # weights are all zeros for a region that is smaller than the window
+    def test_small_zero_weight(self):
+
+        window = (3, 3)
+        zero_shape = (2, 2)
+        shape = (10, 10)
+
+        data = np.ones(shape, dtype=np.float64)
+        weight = np.ones_like(data)
+        weight[1:zero_shape[0]+1, 1:zero_shape[1]+1] = 0.0
+
+        np.testing.assert_array_equal(data,
+                                      moving_weighted_median(data, weight, window))
+
+    # weights are all zeros for a region that is the size of the window, this has historically
+    # caused a segfault
+    def test_med_zero_weight(self):
+
+        window = (3,)
+        zero_shape = (3,)
+        shape = (10,)
+
+        data = np.ones(shape, dtype=np.float64)
+        weight = np.ones_like(data)
+        weight[1:zero_shape[0]+1] = 0.0
+
+        result = data.copy()
+        result[2] = np.nan
+
+        np.testing.assert_array_equal(result,
+                                      moving_weighted_median(data, weight, window))
+
