@@ -7,8 +7,11 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 
 from future.utils import bytes_to_native_str
 
-import numpy
 import os
+import re
+import sysconfig
+
+import numpy
 from Cython.Build import cythonize
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
@@ -53,14 +56,22 @@ except:
     skyfield_data = {}
 
 # Cython
+# Decide whether to use OpenMP or not
+if (('CAPUT_NO_OPENMP' in os.environ) or
+    (re.search('gcc', sysconfig.get_config_var('CC')) is None)):
+    print("Not using OpenMP")
+    omp_args = []
+else:
+    omp_args = ['-fopenmp']
+
 extensions = [
     Extension(
         name=bytes_to_native_str(b'caput.weighted_median'),
         sources=[bytes_to_native_str(b'caput/weighted_median.pyx')],
         include_dirs=[numpy.get_include()],
         language="c++",
-        extra_compile_args=['-std=c++11','-fopenmp','-g0','-O3',],
-        extra_link_args=["-std=c++11","-fopenmp"],
+        extra_compile_args=(omp_args + ['-std=c++11','-g0','-O3',]),
+        extra_link_args=(omp_args + ["-std=c++11"]),
     ),
 ]
 
