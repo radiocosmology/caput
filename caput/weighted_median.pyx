@@ -203,7 +203,9 @@ def _mwm_1D(np.ndarray[np.float64_t, ndim=1] data, np.ndarray[np.float64_t, ndim
             else:
                 node = dummy
             fifo.push_back(node)
-        medians[i] = avl.weighted_median(method)
+
+        # Get the median giving NaN if the tree if empty (all zero weights)
+        medians[i] = avl.weighted_median(method) if avl.size() else np.nan
     return medians
 
 @cython.boundscheck(False)  # Deactivate bounds checking

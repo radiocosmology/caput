@@ -8,7 +8,8 @@ cdef extern from "MedianTree.hpp" namespace "MedianTree":
         Tree() nogil
         shared_ptr[Data[T]] insert(const T& element, const double weight) nogil
         bool remove(const shared_ptr[Data[T]] node) nogil
-        double weighted_median(char method) nogil
+        T weighted_median(char method) nogil
+        int size()
 
 cdef extern from "MedianTreeNodeData.hpp" namespace "MedianTree":
     cdef cppclass Data[T]:
