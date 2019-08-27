@@ -97,7 +97,7 @@ public:
      *
      * @return The weighted median of the whole tree.
      */
-    double weighted_median(char method);
+    T weighted_median(char method);
 
 
     /*************************************************
@@ -133,12 +133,12 @@ public:
 
 
 private:
-    double weighted_median_split(node_ptr<T> node, double previous_weights, double next_weights,
-                                 double midpoint);
-    double weighted_median_lower(node_ptr<T> node, double previous_weights, double next_weights,
-                                 double midpoint);
-    double weighted_median_higher(node_ptr<T> node, double previous_weights, double next_weights,
-                                  double midpoint);
+    T weighted_median_split(node_ptr<T> node, double previous_weights, double next_weights,
+                            double midpoint);
+    T weighted_median_lower(node_ptr<T> node, double previous_weights, double next_weights,
+                            double midpoint);
+    T weighted_median_higher(node_ptr<T> node, double previous_weights, double next_weights,
+                             double midpoint);
     node_ptr<T> find_max();
     node_ptr<T> find_min();
     node_ptr<T> in_order_successor(node_ptr<T> node);
@@ -201,6 +201,7 @@ template<typename T>
 inline data_ptr<T> Tree<T>::insert(const T& element, const double weight) {
     if (root == nullptr) {
         root = std::make_shared<Node<T>>(element, weight);
+        tree_size++;
         return root->data;
     }
 
@@ -273,6 +274,7 @@ bool Tree<T>::remove(const data_ptr<T> element) {
 
     balance_path(successor);
     tree_size--;
+
     return true;
 }
 
@@ -282,7 +284,9 @@ node_ptr<T> Tree<T>::remove_node(Node<T>& node) {
     // No children of the found node, remove it.
     if (!node.left && !node.right) {
         node_ptr<T> parent = node.parent.lock();
-        if (node.left_child)
+        if (!parent)  // Node is the root node
+            root = nullptr;
+        else if (node.left_child)
             parent->left = nullptr;
         else
             parent->right = nullptr;
@@ -290,9 +294,10 @@ node_ptr<T> Tree<T>::remove_node(Node<T>& node) {
     }
 
     // Node has one child. Replace the node with the child
+    // ... this works if the node is the root node
     if (!node.left || !node.right) {
         node_ptr<T> child = node.left ? node.left : node.right;
-        pointer_to(node) = child;
+        pointer_to(node) = child; // will change the root node
         node_ptr<T> parent = node.parent.lock();
         child->parent = parent;
         child->left_child = node.left_child;
@@ -301,6 +306,7 @@ node_ptr<T> Tree<T>::remove_node(Node<T>& node) {
 
     // Node has two children. Find the successor, swap with the node to delete,
     // and delete the original place of the successor
+    // ... also works fine when removing the root
     node_ptr<T> successor = find_min(node.right);
     node.data = successor->data;
     return remove_node(*successor);
@@ -523,7 +529,7 @@ void Tree<T>::print_list() {
  * smaller or equal half the sum of all weights 0..n. The weights are assumed to  *
  * be order according to the values.                                         */
 template<typename T>
-double Tree<T>::weighted_median(char method) {
+T Tree<T>::weighted_median(char method) {
     if (root == nullptr)
         return 0;
     node_ptr<T> node = root;
@@ -551,12 +557,15 @@ double Tree<T>::weighted_median(char method) {
         return weighted_median_lower(node, previous_weights, next_weights, midpoint);
     if (method == 'h')
         return weighted_median_higher(node, previous_weights, next_weights, midpoint);
-    throw std::invalid_argument("Method must be 's', 'l' or 'h', but was " + method);
+
+    std::string msg = "Method must be 's', 'l' or 'h', but was ";
+    msg += method;
+    throw std::invalid_argument(msg);
 }
 
 template<typename T>
-double Tree<T>::weighted_median_split(node_ptr<T> node, double previous_weights,
-                                      double next_weights, double midpoint) {
+T Tree<T>::weighted_median_split(node_ptr<T> node, double previous_weights,
+                                 double next_weights, double midpoint) {
     node_ptr<T> top_median = node;
     double median = (double)node->data->value;
     size_t splt_median_cnt = 1;
@@ -582,8 +591,8 @@ double Tree<T>::weighted_median_split(node_ptr<T> node, double previous_weights,
 }
 
 template<typename T>
-double Tree<T>::weighted_median_higher(node_ptr<T> node, double previous_weights,
-                                       double next_weights, double midpoint) {
+T Tree<T>::weighted_median_higher(node_ptr<T> node, double previous_weights,
+                                  double next_weights, double midpoint) {
     // Take the highest value that qualifies.
     while (node->right_weight + next_weights <= midpoint
            && node->left_weight + previous_weights + node->data->weight <= midpoint && node->right)
@@ -592,8 +601,8 @@ double Tree<T>::weighted_median_higher(node_ptr<T> node, double previous_weights
 }
 
 template<typename T>
-double Tree<T>::weighted_median_lower(node_ptr<T> node, double previous_weights,
-                                      double next_weights, double midpoint) {
+T Tree<T>::weighted_median_lower(node_ptr<T> node, double previous_weights,
+                                 double next_weights, double midpoint) {
     // Take the lowest value that qualifies.
     while (node->left_weight + previous_weights <= midpoint
            && node->right_weight + next_weights + node->data->weight <= midpoint && node->left)
