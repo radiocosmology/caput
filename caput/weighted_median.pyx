@@ -130,10 +130,12 @@ def moving_weighted_median(data, weights, size, method="split"):
 
     Raises
     ------
-    AttributeError
-        If the number of dimensions is not 1 or 2 and if a value of the window size was not uneven.
+    ValueError
+        If the value of the window size was not odd.
     RuntimeError
         If there was an internal error in the C++ implementation.
+    NotImplementedError
+        If the data has more than two dimensions.
     """
     data, weights = _check_arrays(data, weights)
     cdef char c_method = _check_method(method)
@@ -143,16 +145,22 @@ def moving_weighted_median(data, weights, size, method="split"):
     if size == 1:
         return np.where(weights != 0, data, weights)
 
-    if data.ndim is 1:
+    if data.ndim == 1:
+        if isinstance(size, (tuple, list)):
+            if len(size) > 1:
+                raise ValueError('Size ({}) has too many dimensions for 1D data.'.format(size))
+            size = size[0]
+
         if size % 2 == 0:
-            raise AttributeError('Need an uneven window size (got {}).'.format(size))
+            raise ValueError('Need an uneven window size (got {}).'.format(size))
         return _mwm_1D(data, weights, size, c_method)
-    if data.ndim is 2:
+
+    if data.ndim == 2:
         if any(np.asarray(size) % 2 == 0):
-            raise AttributeError('Need an uneven window size (got {}).'.format(size))
+            raise ValueError('Need an uneven window size (got {}).'.format(size))
 
         return _mwm_2D(data, weights, size, c_method)
-    raise AttributeError('weighted_median() is only implemented for 1 and 2 dimensions, not {}'
+    raise NotImplementedError('weighted_median() is only implemented for 1 and 2 dimensions, not {}'
                          .format(data.ndim))
 
 
