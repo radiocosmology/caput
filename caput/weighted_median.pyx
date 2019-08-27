@@ -19,13 +19,13 @@ def _check_arrays(data, weights):
         weights = np.array(weights, dtype=np.float64)
 
     if data.dtype != np.dtype(np.float64):
-        raise AttributeError('Expected data to be numpy.float64 (got {}).'.format(data.dtype))
+        raise ValueError('Expected data to be numpy.float64 (got {}).'.format(data.dtype))
     if weights.dtype != np.dtype(np.float64):
-        raise AttributeError('Expected weights to be numpy.float64 (got {}).'
-                             .format(weights.dtype))
+        raise ValueError('Expected weights to be numpy.float64 (got {}).'
+                         .format(weights.dtype))
     if data.ndim != weights.ndim:
-        raise AttributeError('Expected data and weights to have same dimensions (is {} and {}).'
-                             .format(data.ndim, weights.ndim))
+        raise ValueError('Expected data and weights to have same dimensions (is {} and {}).'
+                         .format(data.ndim, weights.ndim))
 
     return data, weights
 
@@ -55,7 +55,7 @@ def weighted_median(data, weights, method="split"):
 
     Raises
     ------
-    AttributeError
+    NotImplementedError
         If the number of dimensions is not 1 or 2.
     RuntimeError
         If there was an internal error in the C++ implementation.
@@ -67,8 +67,8 @@ def weighted_median(data, weights, method="split"):
         return _weighted_median_1D(data, weights, c_method)
     if data.ndim is 2:
         return _weighted_median_2D(data, weights, c_method)
-    raise AttributeError('weighted_median is only implemented for 1 and 2 dimensions, not {}'
-                         .format(data.ndim))
+    raise NotImplementedError('weighted_median is only implemented for 1 and 2 dimensions, not {}'
+                              .format(data.ndim))
 
 
 def _weighted_median_1D(np.ndarray[np.float64_t, ndim=1] data,
@@ -99,7 +99,7 @@ METHODS_C = ['s', 'l', 'h']
 
 def _check_method(method):
     if method not in METHODS:
-        raise AttributeError('Method should be one of {}, found {}'.format(METHODS, method))
+        raise ValueError('Method should be one of {}, found {}'.format(METHODS, method))
     return ord(METHODS_C[METHODS.index(method)])
 
 def moving_weighted_median(data, weights, size, method="split"):
@@ -141,7 +141,7 @@ def moving_weighted_median(data, weights, size, method="split"):
     cdef char c_method = _check_method(method)
 
     if size == 0:
-        raise AttributeError('Got size=0, what do you expect me to do with that?')
+        raise ValueError('Got size=0, what do you expect me to do with that?')
     if size == 1:
         return np.where(weights != 0, data, weights)
 
