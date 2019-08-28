@@ -434,7 +434,7 @@ class Manager(config.Reader):
         self: Pipeline object
         """
 
-        yaml_params = yaml.load(yaml_doc)
+        yaml_params = yaml.safe_load(yaml_doc)
         self = cls.from_config(yaml_params['pipeline'])
         self.all_params = yaml_params
         return self
