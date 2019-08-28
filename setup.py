@@ -19,7 +19,7 @@ from setuptools.extension import Extension
 from caput import __version__
 
 
-REQUIRES = ['numpy', 'h5py', 'PyYAML']
+REQUIRES = ['numpy', 'h5py', 'PyYAML', 'cython']
 
 # Don't install requirements if on ReadTheDocs build system.
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
@@ -84,6 +84,7 @@ setup(
     extras_require={
         'mpi': ['mpi4py>=1.3']
     },
+    setup_requires=['cython'],
     package_data=skyfield_data,
     # metadata for upload to PyPI
     author="Kiyo Masui, J. Richard Shaw",
