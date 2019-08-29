@@ -1780,15 +1780,18 @@ def copyattrs(a1, a2):
         # If we are copying into memh5 ensure that any string are unicode
         return bytes_to_unicode(value)
 
-    for key, value in a1.items():
-        a2[key] = _map_attr(value)
+    for key in sorted(a1):
+        a2[key] = _map_attr(a1[key])
 
 
 def deep_group_copy(g1, g2):
     """Copy full data tree from one group to another."""
 
     copyattrs(g1.attrs, g2.attrs)
-    for key, entry in g1.items():
+
+    # Sort to ensure consistent insertion order
+    for key in sorted(g1):
+        entry = g1[key]
         if is_group(entry):
             g2.create_group(key)
             deep_group_copy(entry, g2[key])
@@ -1870,7 +1873,10 @@ def _distributed_group_to_hdf5_serial(group, fname, hints=True, **kwargs):
     comm.Barrier()
 
     # Write out groups and distributed datasets, these operations must be done collectively
-    for key, entry in group.items():
+    # Sort to ensure insertion order is identical
+    for key in sorted(group):
+
+        entry = group[key]
 
         # Groups are written out by recursing
         if is_group(entry):
@@ -1937,7 +1943,10 @@ def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
         # Copy over attributes
         copyattrs(memgroup.attrs, h5group.attrs)
 
-        for key, item in memgroup.items():
+        # Sort the items to ensure we insert in a consistent order across ranks
+        for key in sorted(memgroup):
+
+            item = memgroup[key]
 
             # If group, create the entry and the recurse into it
             if is_group(item):
@@ -2021,7 +2030,10 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
         # Copy over attributes
         _copy_attrs_bcast(h5group, memgroup)
 
-        for key, item in h5group.items():
+        # Sort items to ensure consistent order
+        for key in sorted(h5group):
+
+            item = h5group[key]
 
             # If group, create the entry and the recurse into it
             if is_group(item):
