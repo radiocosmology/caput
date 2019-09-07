@@ -19,7 +19,7 @@ from setuptools.extension import Extension
 from caput import __version__
 
 
-REQUIRES = ['numpy>=1.16', 'h5py', 'PyYAML', 'cython']
+REQUIRES = ['numpy>=1.16', 'h5py', 'PyYAML', 'cython', 'future']
 
 # Don't install requirements if on ReadTheDocs build system.
 on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
