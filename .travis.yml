@@ -24,16 +24,15 @@ install:
 
 jobs:
   include:
-    - stage: doctest
-      script: "sphinx-build -b html doc/ doc/_build/html"
-    - stage: test caput
-      script:
-        - "cd ~; nosetests caput"
-        - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
-        - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"
-        - "cd ~; mpirun -np 4 nosetests caput.tests.test_moving_weighted_median"
     - stage: code linting
       python: 3.7
       script:
         - "pip install black"
         - "black --check ."
+
+script:
+    - "sphinx-build -b html doc/ doc/_build/html"
+    - "cd ~; nosetests caput"
+    - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
+    - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"
+    - "cd ~; mpirun -np 4 nosetests caput.tests.test_moving_weighted_median"
