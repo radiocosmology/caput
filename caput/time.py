@@ -133,10 +133,10 @@ and a complete cycle of ERA.
 .. _`IERS constants`: http://hpiers.obspm.fr/eop-pc/models/constants.html
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 
@@ -151,7 +151,7 @@ from .misc import vectorize
 
 
 # Approximate number of seconds in a sidereal second.
-SIDEREAL_S = 1. / (1. + 1.0 / 365.259636)
+SIDEREAL_S = 1.0 / (1.0 + 1.0 / 365.259636)
 
 # Approximate length of a stellar second (in SI seconds)
 STELLAR_S = SIDEREAL_S + 0.0084 / (24 * 3600)
@@ -220,11 +220,13 @@ class Observer(object):
         """
         from skyfield.api import Topos
 
-        earth = self.skyfield.ephemeris['earth']
+        earth = self.skyfield.ephemeris["earth"]
 
-        obs = earth + Topos(latitude_degrees=self.latitude,
-                            longitude_degrees=self.longitude,
-                            elevation_m=self.altitude)
+        obs = earth + Topos(
+            latitude_degrees=self.latitude,
+            longitude_degrees=self.longitude,
+            elevation_m=self.altitude,
+        )
 
         return obs
 
@@ -385,7 +387,7 @@ class Observer(object):
         obs.pressure = 0
 
         # Save the shape for the return value and flatten
-        if hasattr(time, '__len__'):
+        if hasattr(time, "__len__"):
             time = np.array(time)
             sh = time.shape
             time = time.flatten()
@@ -397,7 +399,7 @@ class Observer(object):
         ra = np.degrees(ra.radians)
 
         # Reshape to the input shape
-        if hasattr(ra, '__len__'):
+        if hasattr(ra, "__len__"):
             ra = ra.reshape(sh)
 
         return ra
@@ -423,6 +425,7 @@ def unix_to_skyfield_time(unix_time):
     """
 
     from skyfield import timelib
+
     ts = skyfield_wrapper.timescale
 
     days, seconds = divmod(unix_time, 24 * 3600.0)
@@ -461,7 +464,7 @@ def unix_to_era(unix_time):
 
     era = earthlib.earth_rotation_angle(t.ut1)  # in cycles
 
-    return (360.0 * era)
+    return 360.0 * era
 
 
 def era_to_unix(era, time0):
@@ -489,7 +492,7 @@ def era_to_unix(era, time0):
 
     era0 = unix_to_era(time0)
 
-    diff_era_deg = ((era - era0) % 360.0)  # Convert from degrees in seconds (time)
+    diff_era_deg = (era - era0) % 360.0  # Convert from degrees in seconds (time)
 
     # Convert to time difference using the rough estimate of the Stellar second
     # (~50 us accuracy). Could be improved with better estimate of the Stellar
@@ -633,8 +636,10 @@ def leap_seconds_between(time_a, time_b):
     # this wouldn't be true, but if it's not it means things have gone crazy
     if np.any(np.abs(time_shift - time_shift_int) > 0.01):
 
-        raise RuntimeError("Time shifts between TT and UTC does not seem to" +
-                           " be an integer number of seconds.")
+        raise RuntimeError(
+            "Time shifts between TT and UTC does not seem to"
+            + " be an integer number of seconds."
+        )
 
     # If the differences are close then there is no leap second
     return time_shift_int
@@ -654,7 +659,7 @@ def ensure_unix(time):
         Output time.
     """
 
-    time0 = np.array(time).flatten()[0] if hasattr(time, '__len__') else time
+    time0 = np.array(time).flatten()[0] if hasattr(time, "__len__") else time
 
     if isinstance(time0, datetime):
         return datetime_to_unix(time)
@@ -676,10 +681,11 @@ def ensure_unix(time):
         try:
             return np.float64(time)
         except TypeError:
-            raise TypeError('Could not convert %s into a UNIX time' % repr(type(time)))
+            raise TypeError("Could not convert %s into a UNIX time" % repr(type(time)))
 
 
 _warned_utc_datetime = False
+
 
 def naive_datetime_to_utc(dt):
     """Add UTC timezone info to a naive datetime.
@@ -705,7 +711,9 @@ def naive_datetime_to_utc(dt):
 
         if not _warned_utc_datetime:
 
-            warnings.warn('Skyfield not installed. Cannot add UTC timezone to datetime.')
+            warnings.warn(
+                "Skyfield not installed. Cannot add UTC timezone to datetime."
+            )
             _warned_utc_datetime = True
 
     return dt
@@ -756,7 +764,7 @@ class SkyfieldWrapper(object):
     reload
     """
 
-    def __init__(self, path=None, expire=True, ephemeris='de421.bsp'):
+    def __init__(self, path=None, expire=True, ephemeris="de421.bsp"):
 
         import os
 
@@ -764,15 +772,16 @@ class SkyfieldWrapper(object):
 
         if path is None:
 
-            if 'CAPUT_SKYFIELD_PATH' in os.environ:
-                path = os.environ['CAPUT_SKYFIELD_PATH']
+            if "CAPUT_SKYFIELD_PATH" in os.environ:
+                path = os.environ["CAPUT_SKYFIELD_PATH"]
             else:
-                path = os.path.join(os.path.dirname(__file__), 'data', '')
+                path = os.path.join(os.path.dirname(__file__), "data", "")
 
         # Defer failure if Skyfield is not available until we try to load
         # anything
         try:
             from skyfield import api
+
             self._load = api.Loader(path, expire=expire)
         except ImportError:
             pass
@@ -786,7 +795,7 @@ class SkyfieldWrapper(object):
         or `ephemeris`."""
 
         if self._load is None:
-            raise RuntimeError('Skyfield is not installed.')
+            raise RuntimeError("Skyfield is not installed.")
         return self._load
 
     @property
@@ -806,7 +815,9 @@ class SkyfieldWrapper(object):
             try:
                 self._timescale = self.load.timescale()
             except:
-                warnings.warn("Could not update Skyfield data to more recent version. Trying existing data.")
+                warnings.warn(
+                    "Could not update Skyfield data to more recent version. Trying existing data."
+                )
                 self.load.expire = False
                 self._timescale = self.load.timescale()
 
@@ -823,7 +834,9 @@ class SkyfieldWrapper(object):
             try:
                 self._ephemeris = self.load(self._ephemeris_name)
             except:
-                warnings.warn("Could not update Skyfield data to more recent version. Trying existing data.")
+                warnings.warn(
+                    "Could not update Skyfield data to more recent version. Trying existing data."
+                )
                 self.load.expire = False
                 self._ephemeris = self.load(self._ephemeris_name)
 
@@ -842,6 +855,7 @@ class SkyfieldWrapper(object):
         finally:
             self.load.expire = exp_val
 
+
 # Set up a module local Skyfield wrapper for time conversion functions in this
 # module to use.
 skyfield_wrapper = SkyfieldWrapper()
@@ -849,4 +863,5 @@ skyfield_wrapper = SkyfieldWrapper()
 
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod()

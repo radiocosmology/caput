@@ -10,10 +10,10 @@ Routines
     vectorize
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 import os
@@ -102,14 +102,16 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
         `.opened`.
     """
     import h5py
+
     has_mpi = h5py.get_config().mpi
 
     if isinstance(f, basestring):
         # Open using MPI-IO if we can
         if has_mpi and use_mpi:
             from mpi4py import MPI
+
             comm = comm if comm is not None else MPI.COMM_WORLD
-            fh = h5py.File(f, mode, driver='mpio', comm=comm)
+            fh = h5py.File(f, mode, driver="mpio", comm=comm)
         else:
             fh = h5py.File(f, mode)
         fh.opened = True
@@ -119,7 +121,7 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
     else:
         raise ValueError("Did not receive a h5py.File or filename")
 
-    fh.is_mpi = (fh.file.driver == 'mpio')
+    fh.is_mpi = fh.file.driver == "mpio"
 
     return fh
 
@@ -154,8 +156,8 @@ class lock_file(object):
 
         from . import mpiutil
 
-        if comm is not None and not hasattr(comm, 'rank'):
-            raise ValueError('comm argument does not seem to be an MPI communicator.')
+        if comm is not None and not hasattr(comm, "rank"):
+            raise ValueError("comm argument does not seem to be an MPI communicator.")
 
         self.name = name
         self.rank0 = mpiutil.rank0 if comm is None else comm.rank == 0
@@ -164,7 +166,7 @@ class lock_file(object):
     def __enter__(self):
 
         if self.rank0:
-            with open(self.lockfile, 'w+') as fh:
+            with open(self.lockfile, "w+") as fh:
                 fh.write("")
 
         return self.tmpfile
@@ -189,8 +191,8 @@ class lock_file(object):
     @property
     def tmpfile(self):
         base, fname = os.path.split(self.name)
-        return os.path.join(base, '.' + fname)
+        return os.path.join(base, "." + fname)
 
     @property
     def lockfile(self):
-        return self.tmpfile + '.lock'
+        return self.tmpfile + ".lock"

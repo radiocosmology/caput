@@ -1,8 +1,8 @@
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 import unittest
@@ -13,40 +13,40 @@ from caput import config
 
 
 class Person(config.Reader):
-    name = config.Property(default='Bill', proptype=str)
-    age = config.Property(default=26, proptype=float, key='ageinyears')
+    name = config.Property(default="Bill", proptype=str)
+    age = config.Property(default=26, proptype=float, key="ageinyears")
 
 
 class PersonWithPet(Person):
-    petname = config.Property(default='Molly', proptype=str)
+    petname = config.Property(default="Molly", proptype=str)
     petage = 36
 
 
 class TestConfig(unittest.TestCase):
 
-    testdict = { 'name' : 'Richard', 'ageinyears' : 40, 'petname' : 'Sooty'}
+    testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
     def test_default_params(self):
 
         person1 = Person()
 
-        self.assertEqual(person1.name, 'Bill')
+        self.assertEqual(person1.name, "Bill")
         self.assertEqual(person1.age, 26.0)
         self.assertIsInstance(person1.age, float)
 
     def test_set_params(self):
 
         person = Person()
-        person.name = 'Mick'
+        person.name = "Mick"
 
-        self.assertEqual(person.name, 'Mick')
+        self.assertEqual(person.name, "Mick")
 
     def test_read_config(self):
 
         person = Person()
         person.read_config(self.testdict)
 
-        self.assertEqual(person.name, 'Richard')
+        self.assertEqual(person.name, "Richard")
         self.assertEqual(person.age, 40.0)
 
     def test_inherit_read_config(self):
@@ -54,9 +54,9 @@ class TestConfig(unittest.TestCase):
         person = PersonWithPet()
         person.read_config(self.testdict)
 
-        self.assertEqual(person.name, 'Richard')
+        self.assertEqual(person.name, "Richard")
         self.assertEqual(person.age, 40.0)
-        self.assertEqual(person.petname, 'Sooty')        
+        self.assertEqual(person.petname, "Sooty")
 
     def test_pickle(self):
 
@@ -64,6 +64,6 @@ class TestConfig(unittest.TestCase):
         person.read_config(self.testdict)
         person2 = pickle.loads(pickle.dumps(person))
 
-        self.assertEqual(person2.name, 'Richard')
+        self.assertEqual(person2.name, "Richard")
         self.assertEqual(person2.age, 40.0)
-        self.assertEqual(person2.petname, 'Sooty')   
+        self.assertEqual(person2.petname, "Sooty")
