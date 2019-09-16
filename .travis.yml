@@ -23,12 +23,12 @@ install:
     - "python setup.py build_ext --inplace"
 
 jobs:
-  include:
-    - stage: code linting
-      python: 3.7
-      script:
-        - "pip install black"
-        - "black --check ."
+    include:
+        - stage: code linting
+            python: 3.7
+            script:
+                - "pip install black"
+                - "black --check ."
 
 script:
     - "sphinx-build -b html doc/ doc/_build/html"
