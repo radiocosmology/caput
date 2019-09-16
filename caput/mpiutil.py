@@ -36,10 +36,10 @@ Functions
 
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 import sys
@@ -134,40 +134,41 @@ def close(aprocs):
             _comm.isend(_close_message(), dest=i)
 
 
-def partition_list(full_list, i, n, method='con'):
+def partition_list(full_list, i, n, method="con"):
     """Partition a list into `n` pieces. Return the `i`th partition."""
 
     def _partition(N, n, i):
         ### If partiion `N` numbers into `n` pieces,
         ### return the start and stop of the `i`th piece
-        base = (N // n)
+        base = N // n
         rem = N % n
-        num_lst = rem * [base+1] + (n - rem) * [base]
+        num_lst = rem * [base + 1] + (n - rem) * [base]
         cum_num_lst = np.cumsum([0] + num_lst)
 
-        return cum_num_lst[i], cum_num_lst[i+1]
+        return cum_num_lst[i], cum_num_lst[i + 1]
 
     N = len(full_list)
     start, stop = _partition(N, n, i)
 
-    if method == 'con':
+    if method == "con":
         return full_list[start:stop]
-    elif method == 'alt':
+    elif method == "alt":
         return full_list[i::n]
-    elif method == 'rand':
+    elif method == "rand":
         choices = np.random.permutation(N)[start:stop]
-        return [ full_list[i] for i in choices ]
+        return [full_list[i] for i in choices]
     else:
-        raise ValueError('Unknown partition method %s' % method)
+        raise ValueError("Unknown partition method %s" % method)
 
 
-def partition_list_mpi(full_list, method='con', comm=_comm):
+def partition_list_mpi(full_list, method="con", comm=_comm):
     """Return the partition of a list specific to the current MPI process."""
     if comm is not None:
         rank = comm.rank
         size = comm.size
 
     return partition_list(full_list, rank, size, method=method)
+
 
 # alias mpilist for partition_list_mpi for convenience
 mpilist = partition_list_mpi
@@ -178,8 +179,8 @@ def mpirange(*args, **kargs):
     """
     full_list = list(range(*args))
 
-    method = kargs.get('method', 'con')
-    comm = kargs.get('comm', _comm)
+    method = kargs.get("method", "con")
+    comm = kargs.get("comm", _comm)
 
     return partition_list_mpi(full_list, method=method, comm=comm)
 
@@ -221,7 +222,7 @@ def allreduce(sendobj, op=None, comm=_comm):
 #         # TODO, other cases
 
 
-def parallel_map(func, glist, root=None, method='con', comm=_comm):
+def parallel_map(func, glist, root=None, method="con", comm=_comm):
     """Apply a parallel map using MPI.
 
     Should be called collectively on the same list. All ranks return the full
@@ -333,14 +334,14 @@ def split_m(n, m):
     :fun:`split_all`, :fun:`split_local`
 
     """
-    base = (n // m)
+    base = n // m
     rem = n % m
 
     part = base * np.ones(m, dtype=np.int) + (np.arange(m) < rem).astype(np.int)
 
     bound = np.cumsum(np.insert(part, 0, 0))
 
-    return np.array([part, bound[:m], bound[1:(m + 1)]])
+    return np.array([part, bound[:m], bound[1 : (m + 1)]])
 
 
 def split_all(n, comm=_comm):
@@ -428,7 +429,7 @@ def gather_local(global_array, local_array, local_start, root=0, comm=_comm):
 
     if comm is None or comm.size == 1:
         # only one process
-        slc = [slice(s, s+n) for (s, n) in zip(local_start, local_size)]
+        slc = [slice(s, s + n) for (s, n) in zip(local_start, local_size)]
         global_array[slc] = local_array.copy()
     else:
         local_sizes = comm.gather(local_size, root=root)
@@ -438,15 +439,27 @@ def gather_local(global_array, local_array, local_start, root=0, comm=_comm):
         # Each process should send its local sections.
         if np.prod(local_size) > 0:
             # send only when array is non-empty
-            sreq = comm.Isend([np.ascontiguousarray(local_array), mpi_type], dest=root, tag=0)
+            sreq = comm.Isend(
+                [np.ascontiguousarray(local_array), mpi_type], dest=root, tag=0
+            )
 
         if comm.rank == root:
             # list of processes which have non-empty array
-            nonempty_procs = [ i for i in range(comm.size) if np.prod(local_sizes[i]) > 0 ]
+            nonempty_procs = [
+                i for i in range(comm.size) if np.prod(local_sizes[i]) > 0
+            ]
             # create newtype corresponding to the local array section in the global array
-            sub_type = [ mpi_type.Create_subarray(global_array.shape, local_sizes[i], local_starts[i]).Commit() for i in nonempty_procs ] # default order=ORDER_C
+            sub_type = [
+                mpi_type.Create_subarray(
+                    global_array.shape, local_sizes[i], local_starts[i]
+                ).Commit()
+                for i in nonempty_procs
+            ]  # default order=ORDER_C
             # Post each receive
-            reqs = [ comm.Irecv([global_array, sub_type[si]], source=sr, tag=0) for (si, sr) in enumerate(nonempty_procs) ]
+            reqs = [
+                comm.Irecv([global_array, sub_type[si]], source=sr, tag=0)
+                for (si, sr) in enumerate(nonempty_procs)
+            ]
 
             # Wait for requests to complete
             MPI.Prequest.Waitall(reqs)
@@ -484,9 +497,12 @@ def transpose_blocks(row_array, shape, comm=_comm):
             # a trivial transpose.
             # Note that to mimic the mpi behaviour we have to allow the
             # last index to be trimmed.
-            return row_array[..., :shape[-1]].copy()
+            return row_array[..., : shape[-1]].copy()
         else:
-            raise ValueError('Shape %s is incompatible with `row_array`s shape %s' % (shape, row_array.shape))
+            raise ValueError(
+                "Shape %s is incompatible with `row_array`s shape %s"
+                % (shape, row_array.shape)
+            )
 
     nr = shape[0]
     nc = shape[-1]
@@ -498,7 +514,7 @@ def transpose_blocks(row_array, shape, comm=_comm):
     par, sar, ear = split_all(nr, comm=comm) * nm
     pac, sac, eac = split_all(nc, comm=comm)
 
-    #print pr, nc, shape, row_array.shape
+    # print pr, nc, shape, row_array.shape
 
     row_array = row_array[:nr, ..., :nc].reshape(pr, nc)
 
@@ -530,7 +546,7 @@ def transpose_blocks(row_array, shape, comm=_comm):
                 # Construct the block to send by cutting out the correct
                 # columns
                 block = row_array[:, sic:eic].copy()
-                #print ir, ic, comm.rank, block.shape
+                # print ir, ic, comm.rank, block.shape
 
                 # Send the message
                 request = comm.Isend([block, mpitype], dest=ic, tag=tag)
@@ -539,9 +555,11 @@ def transpose_blocks(row_array, shape, comm=_comm):
             if comm.rank == ic:
 
                 # Receive the message into the correct set of rows of recv_buffer
-                request = comm.Irecv([recv_buffer[sir:eir], mpitype], source=ir, tag=tag)
+                request = comm.Irecv(
+                    [recv_buffer[sir:eir], mpitype], source=ir, tag=tag
+                )
                 requests_recv.append([ir, ic, request])
-                #print ir, ic, comm.rank, recv_buffer[sir:eir].shape
+                # print ir, ic, comm.rank, recv_buffer[sir:eir].shape
 
     # Wait for all processes to have started their messages
     comm.Barrier()
@@ -551,16 +569,18 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
         stat = MPI.Status()
 
-        #try:
+        # try:
         request.Wait(status=stat)
-        #except MPI.Exception:
+        # except MPI.Exception:
         #    print comm.rank, ir, ic, sar[ir], ear[ir], sac[ic], eac[ic], shape
 
         if stat.error != MPI.SUCCESS:
-            print("**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****" % (ir, ic, comm.rank))
+            print(
+                "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****"
+                % (ir, ic, comm.rank)
+            )
 
-
-    #print "rank %i: Done waiting on MPI SEND" % comm.rank
+    # print "rank %i: Done waiting on MPI SEND" % comm.rank
 
     comm.Barrier()
 
@@ -569,14 +589,17 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
         stat = MPI.Status()
 
-        #try:
+        # try:
         request.Wait(status=stat)
-        #except MPI.Exception:
+        # except MPI.Exception:
         #    print comm.rank, (ir, ic), (ear[ir]-sar[ir], eac[ic]-sac[ic]),
-        #shape, recv_buffer[sar[ir]:ear[ir]].shape, recv_buffer.dtype, row_array.dtype
+        # shape, recv_buffer[sar[ir]:ear[ir]].shape, recv_buffer.dtype, row_array.dtype
 
         if stat.error != MPI.SUCCESS:
-            print("**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****" % (ir, ir, comm.rank))
+            print(
+                "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****"
+                % (ir, ir, comm.rank)
+            )
 
     return recv_buffer.reshape(shape[:-1] + (pc,))
 
@@ -616,7 +639,7 @@ def allocate_hdf5_dataset(fname, dsetname, shape, dtype, comm=_comm):
     if comm is None or comm.rank == 0:
 
         # Create/open file
-        f = h5py.File(fname, 'a')
+        f = h5py.File(fname, "a")
 
         # Create dataspace and HDF5 datatype
         sp = h5py.h5s.create_simple(shape, shape)
@@ -684,7 +707,9 @@ def parallel_rows_write_hdf5(fname, dsetname, local_data, shape, comm=_comm):
 
     """
 
-    offset, size = allocate_hdf5_dataset(fname, dsetname, shape, local_data.dtype, comm=comm)
+    offset, size = allocate_hdf5_dataset(
+        fname, dsetname, shape, local_data.dtype, comm=comm
+    )
 
     lr, sr, er = split_local(shape[0], comm=comm)
 
@@ -693,11 +718,17 @@ def parallel_rows_write_hdf5(fname, dsetname, local_data, shape, comm=_comm):
     lock_and_write_buffer(local_data, fname, offset + sr * nc, lr * nc)
 
 
-
 # this is a thin wrapper around THIS module (we patch sys.modules[__name__])
 class SelfWrapper(ModuleType):
     def __init__(self, self_module, baked_args={}):
-        for attr in ["__file__", "__hash__", "__buildins__", "__doc__", "__name__", "__package__"]:
+        for attr in [
+            "__file__",
+            "__hash__",
+            "__buildins__",
+            "__doc__",
+            "__name__",
+            "__package__",
+        ]:
             setattr(self, attr, getattr(self_module, attr, None))
 
         self.self_module = self_module

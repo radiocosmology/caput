@@ -1,9 +1,9 @@
 """Unit tests for ephemeris module."""
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 import unittest
@@ -17,7 +17,6 @@ from caput import time as ctime
 
 
 class TestUT2RATransit(unittest.TestCase):
-
     def test_epoch(self):
 
         from skyfield import earthlib
@@ -83,14 +82,13 @@ class TestUT2RATransit(unittest.TestCase):
         start_ra = obs.transit_RA(start)
         ra = obs.transit_RA(times)
         delta_ra = ra - start_ra
-        expected = delta / 3600. * 15. / ctime.SIDEREAL_S
-        error = ((expected - delta_ra + 180.) % 360) - 180
+        expected = delta / 3600.0 * 15.0 / ctime.SIDEREAL_S
+        error = ((expected - delta_ra + 180.0) % 360) - 180
         # Tolerance limited by stellar aberation (40" peak to peak).
         self.assertTrue(np.allclose(error, 0, atol=0.02))
 
 
 class TestLSA(unittest.TestCase):
-
     def test_lsa_skyfield(self):
         # Check an lsa calculated by caput.time against one calculated by PyEphem
 
@@ -155,12 +153,13 @@ class TestLSA(unittest.TestCase):
         # but the last one should be one sidereal day behind (because times[0]
         # was not in the correct sidereal day)
         itimes = obs.lsa_to_unix(lsas, times[0])
-        self.assertTrue(np.allclose(times[:-1], itimes[:-1], rtol=1.e-5, atol=1.e-5))
-        self.assertAlmostEqual(times[-1] - itimes[-1], 24 * 3600.0 * ctime.SIDEREAL_S, 1)
+        self.assertTrue(np.allclose(times[:-1], itimes[:-1], rtol=1.0e-5, atol=1.0e-5))
+        self.assertAlmostEqual(
+            times[-1] - itimes[-1], 24 * 3600.0 * ctime.SIDEREAL_S, 1
+        )
 
 
 class TestLSD(unittest.TestCase):
-
     def test_lrd(self):
 
         """Test Local Earth Rotation Day (LSD) definition."""
@@ -175,7 +174,9 @@ class TestLSD(unittest.TestCase):
         ut = ctime.datetime_to_unix(dt)
 
         # Check that the fractional part if equal to the transit RA
-        self.assertAlmostEqual(360.0 * (obs.unix_to_lsd(ut) % 1.0), obs.unix_to_lsa(ut), places=4)
+        self.assertAlmostEqual(
+            360.0 * (obs.unix_to_lsd(ut) % 1.0), obs.unix_to_lsa(ut), places=4
+        )
 
         # Check a specific precalculated CSD
         # csd1 = -1.1848262244129479
@@ -197,11 +198,10 @@ class TestLSD(unittest.TestCase):
 
         # Check the inverse is correct.
         itimes = obs.lsd_to_unix(lsds)
-        self.assertTrue(np.allclose(times, itimes, rtol=1.e-5, atol=1.e-5))
+        self.assertTrue(np.allclose(times, itimes, rtol=1.0e-5, atol=1.0e-5))
 
 
 class TestTime(unittest.TestCase):
-
     def test_datetime_to_string(self):
         dt = datetime(2014, 4, 21, 16, 33, 12, 12356)
         fdt = ctime.datetime_to_timestr(dt)
@@ -229,7 +229,9 @@ class TestTime(unittest.TestCase):
         self.assertEqual(dt.hour, new_dt.hour)
         self.assertEqual(dt.minute, new_dt.minute)
         self.assertEqual(dt.second, new_dt.second)
-        self.assertTrue(abs(dt.microsecond - new_dt.microsecond) <= 1000)  # Skyfield rounds its output at the millisecond level.
+        self.assertTrue(
+            abs(dt.microsecond - new_dt.microsecond) <= 1000
+        )  # Skyfield rounds its output at the millisecond level.
 
     def test_time_precision(self):
         """Make sure we have ~0.03 ms precision and that we aren't overflowing
@@ -331,11 +333,10 @@ class TestTime(unittest.TestCase):
 
         self.assertTrue((ctime.ensure_unix(dt_list) == ut_array).all())
         self.assertTrue((ctime.ensure_unix(ut_array) == ut_array).all())
-        self.assertTrue(np.allclose(ctime.ensure_unix(sf_array), ut_array, rtol=1e-10, atol=1e-4))
+        self.assertTrue(
+            np.allclose(ctime.ensure_unix(sf_array), ut_array, rtol=1e-10, atol=1e-4)
+        )
 
 
-
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

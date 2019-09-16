@@ -28,10 +28,10 @@ Functions
 
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 from future.utils import text_type
@@ -65,7 +65,7 @@ class TOData(memh5.BasicCont):
 
     """
 
-    time_axes = ('time',)
+    time_axes = ("time",)
 
     @property
     def time(self):
@@ -75,11 +75,19 @@ class TOData(memh5.BasicCont):
 
         """
 
-        return self.index_map['time'][:]
+        return self.index_map["time"][:]
 
     @classmethod
-    def from_mult_files(cls, files, data_group=None, start=None, stop=None,
-                        datasets=None, dataset_filter=None, **kwargs):
+    def from_mult_files(
+        cls,
+        files,
+        data_group=None,
+        start=None,
+        stop=None,
+        datasets=None,
+        dataset_filter=None,
+        **kwargs
+    ):
         """Create new data object by concatenating a series of objects.
 
         Parameters
@@ -92,22 +100,22 @@ class TOData(memh5.BasicCont):
 
         """
 
-        if 'mode' not in kwargs:
-            kwargs['mode'] = 'r'
-        if 'ondisk' not in kwargs:
-            kwargs['ondisk'] = True
+        if "mode" not in kwargs:
+            kwargs["mode"] = "r"
+        if "ondisk" not in kwargs:
+            kwargs["ondisk"] = True
 
         files = ensure_file_list(files)
         files = [cls.from_file(f, **kwargs) for f in files]
 
         return concatenate(
-                files,
-                out_group=data_group,
-                start=start,
-                stop=stop,
-                datasets=datasets,
-                dataset_filter=dataset_filter,
-                )
+            files,
+            out_group=data_group,
+            start=start,
+            stop=stop,
+            datasets=datasets,
+            dataset_filter=dataset_filter,
+        )
 
     @staticmethod
     def convert_time(time):
@@ -280,16 +288,17 @@ class Reader(object):
         """
 
         return self.data_class.from_mult_files(
-                self.files,
-                data_group=out_group,
-                start=self.time_sel[0],
-                stop=self.time_sel[1],
-                datasets=self.dataset_sel,
-                )
+            self.files,
+            data_group=out_group,
+            start=self.time_sel[0],
+            stop=self.time_sel[1],
+            datasets=self.dataset_sel,
+        )
 
 
-def concatenate(data_list, out_group=None, start=None, stop=None,
-                datasets=None, dataset_filter=None):
+def concatenate(
+    data_list, out_group=None, start=None, stop=None, datasets=None, dataset_filter=None
+):
     """Concatenate data along the time axis.
 
     All :class:`TOData` objects to be concatenated are assumed to have the
@@ -332,7 +341,9 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     """
 
     if dataset_filter is None:
-        def dataset_filter(d): return d
+
+        def dataset_filter(d):
+            return d
 
     filter_time_slice = len(inspect.getargspec(dataset_filter).args) == 2
 
@@ -341,9 +352,9 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     concatenation_axes = first_data.time_axes
 
     # Ensure *start* and *stop* are mappings.
-    if not hasattr(start, '__getitem__'):
+    if not hasattr(start, "__getitem__"):
         start = {axis: start for axis in concatenation_axes}
-    if not hasattr(stop, '__getitem__'):
+    if not hasattr(stop, "__getitem__"):
         stop = {axis: stop for axis in concatenation_axes}
 
     # Get the length of all axes for which we are concatenating.
@@ -357,10 +368,8 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     # Get real start and stop indexes.
     for axis in concatenation_axes:
         start[axis], stop[axis] = _start_stop_inds(
-                start.get(axis, None),
-                stop.get(axis, None),
-                concat_index_lengths[axis],
-                )
+            start.get(axis, None), stop.get(axis, None), concat_index_lengths[axis]
+        )
 
     if first_data.distributed and not isinstance(out_group, h5py.Group):
         distributed = True
@@ -379,9 +388,8 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             # Initialize the dataset.
             dtype = index_map.dtype
             out.create_index_map(
-                    axis,
-                    np.empty(shape=(stop[axis] - start[axis],), dtype=dtype),
-                    )
+                axis, np.empty(shape=(stop[axis] - start[axis],), dtype=dtype)
+            )
         else:
             # Just copy it.
             out.create_index_map(axis, index_map)
@@ -400,20 +408,24 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
     # Now loop over the list and copy the data.
     for data in data_list:
         # Get the concatenation axis lengths for this BaseData.
-        current_concat_index_n = {axis: len(data.index_map.get(axis, []))
-                                  for axis in concatenation_axes}
+        current_concat_index_n = {
+            axis: len(data.index_map.get(axis, [])) for axis in concatenation_axes
+        }
         # Start with the index_map.
         for axis in concatenation_axes:
             axis_finished = current_concat_index_start[axis] >= stop[axis]
-            axis_not_started = (current_concat_index_start[axis]
-                                + current_concat_index_n[axis] <= start[axis])
+            axis_not_started = (
+                current_concat_index_start[axis] + current_concat_index_n[axis]
+                <= start[axis]
+            )
             if axis_finished or axis_not_started:
                 continue
             in_slice, out_slice = _get_in_out_slice(
-                    start[axis], stop[axis],
-                    current_concat_index_start[axis],
-                    current_concat_index_n[axis],
-                    )
+                start[axis],
+                stop[axis],
+                current_concat_index_start[axis],
+                current_concat_index_n[axis],
+            )
             out.index_map[axis][out_slice] = data.index_map[axis][in_slice]
         # Now copy over the datasets and flags.
         this_dataset_names = _copy_non_time_data(data)
@@ -424,7 +436,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
             attrs = dataset.attrs
 
             # Figure out which axis we are concatenating over.
-            for a in memh5.bytes_to_unicode(attrs['axis']):
+            for a in memh5.bytes_to_unicode(attrs["axis"]):
                 if a in concatenation_axes:
                     axis = a
                     break
@@ -433,17 +445,19 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 raise ValueError(msg % name)
             # Figure out where we are in that axis and how to slice it.
             axis_finished = current_concat_index_start[axis] >= stop[axis]
-            axis_not_started = (current_concat_index_start[axis]
-                                + current_concat_index_n[axis] <= start[axis])
+            axis_not_started = (
+                current_concat_index_start[axis] + current_concat_index_n[axis]
+                <= start[axis]
+            )
             if axis_finished or axis_not_started:
                 continue
             axis_rate = 1  # Place holder for eventual implementation.
             in_slice, out_slice = _get_in_out_slice(
-                    start[axis] * axis_rate,
-                    stop[axis] * axis_rate,
-                    current_concat_index_start[axis] * axis_rate,
-                    current_concat_index_n[axis] * axis_rate,
-                    )
+                start[axis] * axis_rate,
+                stop[axis] * axis_rate,
+                current_concat_index_start[axis] * axis_rate,
+                current_concat_index_n[axis] * axis_rate,
+            )
 
             # Filter the dataset.
             if filter_time_slice:
@@ -456,7 +470,7 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 attrs = dataset.attrs
 
             # Do this *after* the filter, in case filter changed axis order.
-            axis_ind = list(memh5.bytes_to_unicode(attrs['axis'])).index(axis)
+            axis_ind = list(memh5.bytes_to_unicode(attrs["axis"])).index(axis)
 
             # Slice input data if the filter doesn't do it.
             if not filter_time_slice:
@@ -480,19 +494,17 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
                 dtype = dataset.dtype
                 full_shape = shape[:axis_ind]
                 full_shape += ((stop[axis] - start[axis]) * axis_rate,)
-                full_shape += shape[axis_ind + 1:]
-                if (distributed
-                        and isinstance(dataset, memh5.MemDatasetDistributed)):
+                full_shape += shape[axis_ind + 1 :]
+                if distributed and isinstance(dataset, memh5.MemDatasetDistributed):
                     new_dset = out.create_dataset(
-                            name,
-                            shape=full_shape,
-                            dtype=dtype,
-                            distributed=True,
-                            distributed_axis=dataset.distributed_axis,
-                            )
+                        name,
+                        shape=full_shape,
+                        dtype=dtype,
+                        distributed=True,
+                        distributed_axis=dataset.distributed_axis,
+                    )
                 else:
-                    new_dset = out.create_dataset(name, shape=full_shape,
-                                                  dtype=dtype)
+                    new_dset = out.create_dataset(name, shape=full_shape, dtype=dtype)
                 memh5.copyattrs(attrs, new_dset.attrs)
 
             out_dset = out[name]
@@ -500,21 +512,25 @@ def concatenate(data_list, out_group=None, start=None, stop=None,
 
             # Copy the data in.
             out_dtype = out_dset.dtype
-            if (out_dtype.kind == 'V' and not out_dtype.fields
-                    and out_dtype.shape
-                    and isinstance(out_dset, h5py.Dataset)):
+            if (
+                out_dtype.kind == "V"
+                and not out_dtype.fields
+                and out_dtype.shape
+                and isinstance(out_dset, h5py.Dataset)
+            ):
                 # Awkward special case for pure subarray dtypes, which h5py and
                 # numpy treat differently.
                 # Drop down to low level interface. I think this is only
                 # nessisary for pretty old h5py.
                 from h5py import h5t
                 from h5py._hl import selections
+
                 mtype = h5t.py_create(out_dtype)
                 mdata = dataset.copy().flat[:]
                 mspace = selections.SimpleSelection(
-                        (mdata.size // out_dtype.itemsize,)).id
-                fspace = selections.select(out_dset.shape, out_slice,
-                                           out_dset.id).id
+                    (mdata.size // out_dtype.itemsize,)
+                ).id
+                fspace = selections.select(out_dset.shape, out_slice, out_dset.id).id
                 out_dset.id.write(mspace, fspace, mdata, mtype)
             else:
                 out_dset[out_slice] = dataset[:]
@@ -536,11 +552,11 @@ def ensure_file_list(files):
         files = [files]
     elif isinstance(files, basestring):
         files = sorted(glob.glob(files))
-    elif hasattr(files, '__iter__'):
+    elif hasattr(files, "__iter__"):
         # Copy the sequence and make sure it's mutable.
         files = list(files)
     else:
-        raise ValueError('Input could not be interpreted as a list of files.')
+        raise ValueError("Input could not be interpreted as a list of files.")
     return files
 
 
@@ -565,7 +581,7 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
         memh5.copyattrs(data.attrs, out.attrs)
 
     for key, entry in data.items():
-        if key in ['index_map', 'reverse_map']:
+        if key in ["index_map", "reverse_map"]:
             # XXX exclude index map and reverse map.
             continue
         if memh5.is_group(entry):
@@ -576,18 +592,21 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
             _copy_non_time_data(entry, sub_out, to_dataset_names)
         else:
             # Check if any axis is a 'time' axis
-            if ('axis' in entry.attrs and
-                    set(data.time_axes).intersection(memh5.bytes_to_unicode(entry.attrs['axis']))):
+            if "axis" in entry.attrs and set(data.time_axes).intersection(
+                memh5.bytes_to_unicode(entry.attrs["axis"])
+            ):
                 to_dataset_names.append(entry.name)
             elif out is not None:
-                out.create_dataset(key, shape=entry.shape, dtype=entry.dtype,
-                                   data=entry)
+                out.create_dataset(
+                    key, shape=entry.shape, dtype=entry.dtype, data=entry
+                )
                 memh5.copyattrs(entry.attrs, out[key].attrs)
-    to_dataset_names = [n[1:] if n[0] == '/' else n for n in to_dataset_names]
+    to_dataset_names = [n[1:] if n[0] == "/" else n for n in to_dataset_names]
     return to_dataset_names
 
 
 # XXX andata still calls these.
+
 
 def _start_stop_inds(start, stop, ntime):
     if start is None:
@@ -604,6 +623,8 @@ def _start_stop_inds(start, stop, ntime):
 
 
 def _get_in_out_slice(start, stop, current, ntime):
-    out_slice = np.s_[max(0, current - start):min(stop - start, current - start + ntime)]
-    in_slice = np.s_[max(0, start - current):min(ntime, stop - current)]
+    out_slice = np.s_[
+        max(0, current - start) : min(stop - start, current - start + ntime)
+    ]
+    in_slice = np.s_[max(0, start - current) : min(ntime, stop - current)]
     return in_slice, out_slice

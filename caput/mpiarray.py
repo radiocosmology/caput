@@ -101,10 +101,10 @@ Here is an example of this in action::
 
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 from past.builtins import basestring
@@ -163,7 +163,9 @@ class _global_resolver(object):
         # containing rank, and set None on all others.
         if isinstance(slice_list[self.axis], int):
             index = slice_list[self.axis] - self.offset
-            slice_list[self.axis] = None if (index < 0 or index >= local_length) else index
+            slice_list[self.axis] = (
+                None if (index < 0 or index >= local_length) else index
+            )
             fullslice = False
 
         # If it's a slice, then resolve any offsets
@@ -177,7 +179,9 @@ class _global_resolver(object):
 
             # Check if start is defined, and modify slice
             if start is not None:
-                start = start if start >= 0 else start + self.length  # Resolve negative indices
+                start = (
+                    start if start >= 0 else start + self.length
+                )  # Resolve negative indices
                 fullslice = False
                 start = start - self.offset
             else:
@@ -185,7 +189,9 @@ class _global_resolver(object):
 
             # Check if stop is defined and modify slice
             if stop is not None:
-                stop = stop if stop >= 0 else stop + self.length  # Resolve negative indices
+                stop = (
+                    stop if stop >= 0 else stop + self.length
+                )  # Resolve negative indices
                 fullslice = False
                 stop = stop - self.offset
             else:
@@ -230,7 +236,9 @@ class _global_resolver(object):
 
             # Figure out which is the distributed axis after the slicing, by
             # removing slice axes which are just ints from the mapping
-            dist_axis = [index for index, sl in enumerate(slobj) if not isinstance(sl, int)].index(self.axis)
+            dist_axis = [
+                index for index, sl in enumerate(slobj) if not isinstance(sl, int)
+            ].index(self.axis)
 
             return MPIArray.wrap(arr, axis=dist_axis, comm=self.array._comm)
 
@@ -314,7 +322,9 @@ class MPIArray(np.ndarray):
             comm = mpiutil.world
 
         # Determine local section of distributed axis
-        local_num, local_start, local_end = mpiutil.split_local(global_shape[axis], comm=comm)
+        local_num, local_start, local_end = mpiutil.split_local(
+            global_shape[axis], comm=comm
+        )
 
         # Figure out the local shape and offset
         lshape = list(global_shape)
@@ -427,8 +437,10 @@ class MPIArray(np.ndarray):
         except KeyError:
             if self.comm.rank == 0:
                 import warnings
-                warnings.warn('Cannot redistribute array of compound datatypes.'
-                              ' Sorry!!')
+
+                warnings.warn(
+                    "Cannot redistribute array of compound datatypes." " Sorry!!"
+                )
             return self
 
         # Get a view of the array
@@ -443,12 +455,14 @@ class MPIArray(np.ndarray):
 
             else:
                 raise ValueError(
-                    'Global shape %s is incompatible with local arrays shape %s'
-                    % (self.global_shape, self.shape))
+                    "Global shape %s is incompatible with local arrays shape %s"
+                    % (self.global_shape, self.shape)
+                )
         else:
             pc, sc, ec = mpiutil.split_local(arr.shape[axis], comm=self.comm)
-            par, sar, ear = mpiutil.split_all(self.global_shape[self.axis],
-                                              comm=self.comm)
+            par, sar, ear = mpiutil.split_all(
+                self.global_shape[self.axis], comm=self.comm
+            )
             pac, sac, eac = mpiutil.split_all(arr.shape[axis], comm=self.comm)
 
             new_shape = np.asarray(self.global_shape)
@@ -476,8 +490,9 @@ class MPIArray(np.ndarray):
                     # Send and receive the messages as non-blocking passes
                     if self.comm.rank == ir:
                         # Send the message
-                        request = self.comm.Isend([blocks[ic].flatten(),
-                                                   mpitype], dest=ic, tag=tag)
+                        request = self.comm.Isend(
+                            [blocks[ic].flatten(), mpitype], dest=ic, tag=tag
+                        )
 
                         requests_send.append([ir, ic, request])
 
@@ -487,8 +502,9 @@ class MPIArray(np.ndarray):
                         buffer_shape[self.axis] = ear[ir] - sar[ir]
                         buffers.append(np.ndarray(buffer_shape, dtype=arr.dtype))
 
-                        request = self.comm.Irecv([buffers[ir], mpitype],
-                                             source=ir, tag=tag)
+                        request = self.comm.Irecv(
+                            [buffers[ir], mpitype], source=ir, tag=tag
+                        )
                         requests_recv.append([ir, ic, request])
 
             # Wait for all processes to have started their messages
@@ -502,8 +518,11 @@ class MPIArray(np.ndarray):
                 request.Wait(status=stat)
 
                 if stat.error != mpiutil.MPI.SUCCESS:
-                    print("**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****"
-                          .format(ir, ic, self.comm.rank))
+                    print(
+                        "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****".format(
+                            ir, ic, self.comm.rank
+                        )
+                    )
 
             self.comm.Barrier()
 
@@ -516,15 +535,19 @@ class MPIArray(np.ndarray):
                 request.Wait(status=stat)
 
                 if stat.error != mpiutil.MPI.SUCCESS:
-                    print("**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****"
-                          .format(ir, ir, self.comm.rank))
+                    print(
+                        "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****".format(
+                            ir, ir, self.comm.rank
+                        )
+                    )
 
             # Put together the blocks we received
             np.concatenate(buffers, self.axis, trans_arr)
 
         # Create a new MPIArray object out of the data
-        dist_arr = MPIArray(self.global_shape, axis=axis, dtype=self.dtype,
-                            comm=self.comm)
+        dist_arr = MPIArray(
+            self.global_shape, axis=axis, dtype=self.dtype, comm=self.comm
+        )
         dist_arr[:] = trans_arr
 
         return dist_arr
@@ -577,10 +600,10 @@ class MPIArray(np.ndarray):
 
         # Don't both using MPI where the axis is not zero. It's probably just slower.
         # TODO: with tuning this might not be true. Keep an eye on this.
-        use_mpi = (axis > 0)
+        use_mpi = axis > 0
 
         # Read the file. Opening with MPI if requested, and we can
-        fh = misc.open_h5py_mpi(f, 'r', use_mpi=use_mpi, comm=comm)
+        fh = misc.open_h5py_mpi(f, "r", use_mpi=use_mpi, comm=comm)
 
         dset = fh[dataset]
         dshape = dset.shape  # Shape of the underlying dataset
@@ -589,8 +612,9 @@ class MPIArray(np.ndarray):
 
         # Check that the axis is valid and wrap to an actual position
         if axis < -naxis or axis >= naxis:
-            raise ValueError("Distributed axis %i not in range (%i, %i)" %
-                             (axis, -naxis, naxis-1))
+            raise ValueError(
+                "Distributed axis %i not in range (%i, %i)" % (axis, -naxis, naxis - 1)
+            )
         axis = naxis + axis if axis < 0 else axis
 
         # Ensure sel is defined to cover all axes
@@ -630,8 +654,9 @@ class MPIArray(np.ndarray):
 
             # Loop over partitions of the IO and perform them
             for part in partitions:
-                islice, fslice = _partition_sel(sel, split_axis,
-                                                gshape[split_axis], part)
+                islice, fslice = _partition_sel(
+                    sel, split_axis, gshape[split_axis], part
+                )
                 dist_arr[fslice] = dset[islice]
 
         if fh.opened:
@@ -663,7 +688,7 @@ class MPIArray(np.ndarray):
                     "Argument must be a filename if h5py does not have MPI support"
                 )
 
-        mode = 'a' if create else 'r+'
+        mode = "a" if create else "r+"
 
         fh = misc.open_h5py_mpi(f, mode, self.comm)
 
@@ -782,7 +807,9 @@ class MPIArray(np.ndarray):
         -------
         arr_copy : MPIArray
         """
-        return MPIArray.wrap(self.view(np.ndarray).copy(), axis=self.axis, comm=self.comm)
+        return MPIArray.wrap(
+            self.view(np.ndarray).copy(), axis=self.axis, comm=self.comm
+        )
 
     def _to_hdf5_serial(self, filename, dataset, create=False):
         """Write into an HDF5 dataset.
@@ -804,12 +831,15 @@ class MPIArray(np.ndarray):
 
         if h5py.get_config().mpi:
             import warnings
-            warnings.warn('h5py has parallel support. '
-                          'Use the parallel `.to_hdf5` routine instead.')
+
+            warnings.warn(
+                "h5py has parallel support. "
+                "Use the parallel `.to_hdf5` routine instead."
+            )
 
         if self.comm is None or self.comm.rank == 0:
 
-            with h5py.File(filename, 'a' if create else 'r+') as fh:
+            with h5py.File(filename, "a" if create else "r+") as fh:
                 if dataset in fh:
                     raise Exception("Dataset should not exist.")
 
@@ -832,7 +862,7 @@ class MPIArray(np.ndarray):
 
             rank = 0 if self.comm is None else self.comm.rank
             if ri == rank:
-                with h5py.File(filename, 'r+') as fh:
+                with h5py.File(filename, "r+") as fh:
 
                     start = dist_arr.local_offset[0]
                     end = start + dist_arr.local_shape[0]
@@ -860,7 +890,7 @@ class MPIArray(np.ndarray):
         """
         from mpi4py import MPI
 
-        threshold_bytes = threshold * 2**30
+        threshold_bytes = threshold * 2 ** 30
         largest_size = self.comm.allreduce(self.nbytes, op=MPI.MAX)
         num_split = int(np.ceil(largest_size / threshold_bytes))
 
@@ -878,7 +908,8 @@ class MPIArray(np.ndarray):
         else:
             raise RuntimeError(
                 "Can't identify an IO partition less than %.2f GB in size: "
-                "shape=%s, distributed axis=%i" % (threshold, self.global_shape, self.axis)
+                "shape=%s, distributed axis=%i"
+                % (threshold, self.global_shape, self.axis)
             )
 
         logger.debug("Splitting along axis %i, %i ways", split_axis, num_split)
@@ -888,7 +919,6 @@ class MPIArray(np.ndarray):
 
         slices = [slice(start, end) for start, end in zip(starts, ends)]
         return split_axis, slices
-
 
 
 def _partition_sel(sel, split_axis, n, slice_):
@@ -928,8 +958,8 @@ def _reslice(slice_, n, subslice):
     if subslice.step is not None and subslice.step > 1:
         raise ValueError("stride > 1 not supported. subslice: %s" % subslice)
 
-    return slice(dstart + subslice.start * dstep,
-                 dstart + subslice.stop * dstep, dstep)
+    return slice(dstart + subslice.start * dstep, dstart + subslice.stop * dstep, dstep)
+
 
 def _expand_sel(sel, naxis):
     # Expand the selection to the full dimensions

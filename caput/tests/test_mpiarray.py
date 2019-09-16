@@ -5,10 +5,10 @@ Designed to be run as an MPI job with four processes like::
     $ mpirun -np 4 python test_mpiarray.py
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 import os
@@ -19,10 +19,11 @@ import numpy as np
 from caput import mpiutil, mpiarray
 
 import sys
+
 sys.excepthook = mpiutil.sys_excepthook
 
-class TestMPIArray(unittest.TestCase):
 
+class TestMPIArray(unittest.TestCase):
     def test_construction(self):
 
         arr = mpiarray.MPIArray((10, 11), axis=1)
@@ -86,7 +87,7 @@ class TestMPIArray(unittest.TestCase):
         import h5py
 
         # Cleanup directories
-        fname = 'testdset.hdf5'
+        fname = "testdset.hdf5"
 
         if mpiutil.rank0 and os.path.exists(fname):
             os.remove(fname)
@@ -102,25 +103,24 @@ class TestMPIArray(unittest.TestCase):
         l0, s0, e0 = mpiutil.split_local(gshape[0])
         ds[:] = ga[s0:e0]
 
-        ds.redistribute(axis=1).to_hdf5(fname, 'testds', create=True)
+        ds.redistribute(axis=1).to_hdf5(fname, "testds", create=True)
 
         if mpiutil.rank0:
 
-            with h5py.File(fname, 'r') as f:
+            with h5py.File(fname, "r") as f:
 
-                h5ds = f['testds'][:]
+                h5ds = f["testds"][:]
 
                 assert (h5ds == ga).all()
 
-        ds2 = mpiarray.MPIArray.from_hdf5(fname, 'testds')
+        ds2 = mpiarray.MPIArray.from_hdf5(fname, "testds")
 
         assert (ds2 == ds).all()
 
         mpiutil.barrier()
 
-
         # Check that reading over another distributed axis works
-        ds3 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=1)
+        ds3 = mpiarray.MPIArray.from_hdf5(fname, "testds", axis=1)
         assert ds3.shape[0] == gshape[0]
         assert ds3.shape[1] == mpiutil.split_local(gshape[1])[0]
         ds3 = ds3.redistribute(axis=0)
@@ -128,13 +128,17 @@ class TestMPIArray(unittest.TestCase):
         mpiutil.barrier()
 
         # Check a read with an arbitrary slice in there. This only checks the shape is correct.
-        ds4 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=1, sel=(np.s_[3:10:2], np.s_[1:16:3]))
+        ds4 = mpiarray.MPIArray.from_hdf5(
+            fname, "testds", axis=1, sel=(np.s_[3:10:2], np.s_[1:16:3])
+        )
         assert ds4.shape[0] == 4
         assert ds4.shape[1] == mpiutil.split_local(5)[0]
         mpiutil.barrier()
 
         # Check the read with a slice along the axis being read
-        ds5 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=1, sel=(np.s_[:], np.s_[3:15:2]))
+        ds5 = mpiarray.MPIArray.from_hdf5(
+            fname, "testds", axis=1, sel=(np.s_[:], np.s_[3:15:2])
+        )
         assert ds5.shape[0] == gshape[0]
         assert ds5.shape[1] == mpiutil.split_local(6)[0]
         ds5 = ds5.redistribute(axis=0)
@@ -142,7 +146,9 @@ class TestMPIArray(unittest.TestCase):
         mpiutil.barrier()
 
         # Check the read with a slice along the axis being read
-        ds6 = mpiarray.MPIArray.from_hdf5(fname, 'testds', axis=0, sel=(np.s_[:], np.s_[3:15:2]))
+        ds6 = mpiarray.MPIArray.from_hdf5(
+            fname, "testds", axis=0, sel=(np.s_[:], np.s_[3:15:2])
+        )
         ds6 = ds6.redistribute(axis=0)
         assert (ds6 == ds[:, 3:15:2]).all()
         mpiutil.barrier()
@@ -205,27 +211,29 @@ class TestMPIArray(unittest.TestCase):
         rank = mpiutil.rank
         size = mpiutil.size
 
-
-        darr = mpiarray.MPIArray((size*5, 20), axis=0)
+        darr = mpiarray.MPIArray((size * 5, 20), axis=0)
 
         # Initialise the distributed array
         for li, gi in darr.enumerate(axis=0):
-            darr[li] = 10*(10*rank+li) + np.arange(20)
-
+            darr[li] = 10 * (10 * rank + li) + np.arange(20)
 
         # Construct numpy array which should be equivalent to the global array
-        whole_array = 10*(10*np.arange(4.0)[:, np.newaxis]+np.arange(5.0)[np.newaxis, :]).flatten()[:, np.newaxis] + np.arange(20)[np.newaxis, :]
+        whole_array = (
+            10
+            * (
+                10 * np.arange(4.0)[:, np.newaxis] + np.arange(5.0)[np.newaxis, :]
+            ).flatten()[:, np.newaxis]
+            + np.arange(20)[np.newaxis, :]
+        )
 
         # Extract the section for each rank distributed along axis=0
-        local_array = whole_array[(rank*5):((rank+1)*5)]
+        local_array = whole_array[(rank * 5) : ((rank + 1) * 5)]
 
         # Extract the correct section for each rank distributed along axis=0
-        local_array_T = whole_array[:, (rank*5):((rank+1)*5)]
-
+        local_array_T = whole_array[:, (rank * 5) : ((rank + 1) * 5)]
 
         # Check that these are the same
         assert (local_array == darr).all()
-
 
         # Check a simple slice on the non-parallel axis
         arr = darr.global_slice[:, 3:5]
@@ -233,7 +241,6 @@ class TestMPIArray(unittest.TestCase):
 
         assert isinstance(arr, mpiarray.MPIArray)
         assert (arr == res).all()
-
 
         # Check a single element extracted from the non-parallel axis
         arr = darr.global_slice[:, 3]
@@ -245,48 +252,42 @@ class TestMPIArray(unittest.TestCase):
             # Check a slice on the parallel axis
             arr = darr.global_slice[:7, 3:5]
 
-            res = { 0 : local_array[:, 3:5],
-                    1 : local_array[:2, 3:5],
-                    2 : None,
-                    3 : None }
+            res = {0: local_array[:, 3:5], 1: local_array[:2, 3:5], 2: None, 3: None}
 
             assert arr == res[rank] if arr is None else (arr == res[rank]).all()
-
 
             # Check a single element from the parallel axis
             arr = darr.global_slice[7, 3:5]
 
-            res = { 0 : None,
-                    1 : local_array[2, 3:5],
-                    2 : None,
-                    3 : None }
+            res = {0: None, 1: local_array[2, 3:5], 2: None, 3: None}
 
             assert arr == res[rank] if arr is None else (arr == res[rank]).all()
-
 
             # Check a slice on the redistributed parallel axis
             darr_T = darr.redistribute(axis=1)
             arr = darr_T.global_slice[3:5, :7]
 
-            res = { 0 : local_array_T[3:5, :],
-                    1 : local_array_T[3:5, :2],
-                    2 : None,
-                    3 : None }
+            res = {
+                0: local_array_T[3:5, :],
+                1: local_array_T[3:5, :2],
+                2: None,
+                3: None,
+            }
 
             assert arr == res[rank] if arr is None else (arr == res[rank]).all()
 
         # Check a slice that removes an axis
-        darr = mpiarray.MPIArray((10, 20, size*5), axis=2)
+        darr = mpiarray.MPIArray((10, 20, size * 5), axis=2)
         dslice = darr.global_slice[:, 0, :]
 
-        assert dslice.global_shape == (10, size*5)
+        assert dslice.global_shape == (10, size * 5)
         assert dslice.local_shape == (10, 5)
 
         # Check ellipsis and slice at the end
-        darr = mpiarray.MPIArray((size*5, 20, 10), axis=0)
+        darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
         dslice = darr.global_slice[..., 4:9]
 
-        assert dslice.global_shape == (size*5, 20, 5)
+        assert dslice.global_shape == (size * 5, 20, 5)
         assert dslice.local_shape == (5, 20, 5)
 
         # Check slice that goes off the end of the axis
@@ -296,25 +297,28 @@ class TestMPIArray(unittest.TestCase):
         assert dslice.global_shape == (size, 136, 41)
         assert dslice.local_shape == (1, 136, 41)
 
-
     def test_global_setslice(self):
 
         rank = mpiutil.rank
         size = mpiutil.size
 
-
-        darr = mpiarray.MPIArray((size*5, 20), axis=0)
+        darr = mpiarray.MPIArray((size * 5, 20), axis=0)
 
         # Initialise the distributed array
         for li, gi in darr.enumerate(axis=0):
-            darr[li] = 10*(10*rank+li) + np.arange(20)
-
+            darr[li] = 10 * (10 * rank + li) + np.arange(20)
 
         # Construct numpy array which should be equivalent to the global array
-        whole_array = 10*(10*np.arange(4.0)[:, np.newaxis]+np.arange(5.0)[np.newaxis, :]).flatten()[:, np.newaxis] + np.arange(20)[np.newaxis, :]
+        whole_array = (
+            10
+            * (
+                10 * np.arange(4.0)[:, np.newaxis] + np.arange(5.0)[np.newaxis, :]
+            ).flatten()[:, np.newaxis]
+            + np.arange(20)[np.newaxis, :]
+        )
 
         # Extract the section for each rank distributed along axis=0
-        local_array = whole_array[(rank*5):((rank+1)*5)]
+        local_array = whole_array[(rank * 5) : ((rank + 1) * 5)]
         # Set slice
 
         # Check a simple assignment to a slice along the non-parallel axis
@@ -323,13 +327,11 @@ class TestMPIArray(unittest.TestCase):
 
         assert (darr == local_array).all()
 
-
         # Check a partial assignment along the parallel axis
         darr.global_slice[7:, 7:9] = -3.0
         whole_array[7:, 7:9] = -3.0
 
         assert (darr == local_array).all()
-
 
         # Check assignment of a single index on the parallel axis
         darr.global_slice[6] = np.arange(20.0)
@@ -379,5 +381,5 @@ class TestMPIArray(unittest.TestCase):
 #         assert (td1.attrs['message'] == td2.attrs['message'])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -49,10 +49,10 @@ Fourier transforming each of these two axes of the distributed array::
 
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 import os
@@ -64,7 +64,7 @@ from mpi4py import MPI
 from . import mpiarray
 
 
-warnings.warn('MPIDataset is deprecated in favour of memh5 and will be removed soon.')
+warnings.warn("MPIDataset is deprecated in favour of memh5 and will be removed soon.")
 
 
 class MPIDataset(collections.Mapping):
@@ -124,7 +124,11 @@ class MPIDataset(collections.Mapping):
             cdt._common[k] = v.copy() if deep and v is not None else v
 
         for k, v in self._distributed.items():
-            cdt._distributed[k] = mpiarray.MPIArray.wrap(v.copy(), axis=v.axis, comm=v.comm) if deep and v is not None else v
+            cdt._distributed[k] = (
+                mpiarray.MPIArray.wrap(v.copy(), axis=v.axis, comm=v.comm)
+                if deep and v is not None
+                else v
+            )
 
         cdt._comm = self._comm
 
@@ -161,7 +165,7 @@ class MPIDataset(collections.Mapping):
         import h5py
 
         if not os.path.exists(filename):
-            raise IOError('File does not exist.')
+            raise IOError("File does not exist.")
 
         if comm is None:
             comm = MPI.COMM_WORLD
@@ -172,7 +176,7 @@ class MPIDataset(collections.Mapping):
 
         fh = None
         if pdset._comm.rank == 0:
-            fh = h5py.File(filename, 'r')
+            fh = h5py.File(filename, "r")
             #
             # if '__mpidataset_class' not in fh.attrs:
             #     raise Exception('Not in the MPIDataset format.')
@@ -181,17 +185,17 @@ class MPIDataset(collections.Mapping):
             # if fh.attrs['__mpidataset_class'] != cls.__name__:
             #     raise Exception('Not correct MPIDataset class.')
 
-            if '__mpidataset_class' not in fh.attrs:
-                raise Exception('Not in the MPIDataset format.')
+            if "__mpidataset_class" not in fh.attrs:
+                raise Exception("Not in the MPIDataset format.")
 
             # Won't properly deal with inheritance. Ho hum.
-            if fh.attrs['__mpidataset_class'] != cls.__name__:
-                raise Exception('Not correct MPIDataset class.')
+            if fh.attrs["__mpidataset_class"] != cls.__name__:
+                raise Exception("Not correct MPIDataset class.")
 
         # Read in attributes
         attr_dict = None
         if pdset._comm.rank == 0:
-            attr_dict = { k: v for k, v in fh.attrs.items() }
+            attr_dict = {k: v for k, v in fh.attrs.items()}
         pdset._attrs = pdset._comm.bcast(attr_dict, root=0)
 
         # Read in common datasets and broadcast to all processes
@@ -240,13 +244,13 @@ class MPIDataset(collections.Mapping):
         import h5py
 
         if os.path.exists(filename):
-            raise IOError('File %s already exists.' % filename)
+            raise IOError("File %s already exists." % filename)
 
         self._comm.Barrier()
 
         if self._comm.rank == 0:
 
-            with h5py.File(filename, 'w') as fh:
+            with h5py.File(filename, "w") as fh:
 
                 # Save attributes
                 for k, v in self.attrs.items():
@@ -297,4 +301,5 @@ class MPIDataset(collections.Mapping):
 
     def __iter__(self):
         import itertools
+
         return itertools.chain(self.common, self.distributed)
