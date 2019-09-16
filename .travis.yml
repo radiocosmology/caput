@@ -15,19 +15,25 @@ addons:
 env:
     - CAPUT_SKYFIELD_PATH=/home/travis
 
-before_install:
-    - "pip3 install black"
-
 install:
     - "pip install -r requirements.txt"
     - "pip install -e .[mpi]"
     - "pip install -e .[skyfield]"
     - "pip install -r doc/requirements.txt"
     - "python setup.py build_ext --inplace"
-script:
-    - "sphinx-build -b html doc/ doc/_build/html"
-    - "black --check ."
-    - "cd ~; nosetests caput"
-    - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
-    - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"
-    - "cd ~; mpirun -np 4 nosetests caput.tests.test_moving_weighted_median"
+
+jobs:
+  include:
+    - stage: code linting
+      python: 3.7
+      script:
+        - "pip install black"
+        - "black --check ."
+    - stage: doctest
+      script: "sphinx-build -b html doc/ doc/_build/html"
+    - stage: test caput
+      script:
+        - "cd ~; nosetests caput"
+        - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
+        - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"
+        - "cd ~; mpirun -np 4 nosetests caput.tests.test_moving_weighted_median"
