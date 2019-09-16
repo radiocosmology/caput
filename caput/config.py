@@ -61,11 +61,12 @@ Richard 40.0 Sooty
 
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
+
 
 class Property(object):
     """Custom property descriptor that can load values from a given dict.
@@ -188,24 +189,28 @@ class Reader(object):
             the config dictionary
         """
         import inspect
-        
+
         config_keys = [x for x in config.keys()]
         prop_keys = []
         for basecls in inspect.getmro(type(self))[::-1]:
             for propname, clsprop in basecls.__dict__.items():
                 if isinstance(clsprop, Property):
                     clsprop._from_config(self, config)
-                    prop_keys.append(clsprop.key)             
+                    prop_keys.append(clsprop.key)
 
         if compare_keys:
             if set(config_keys) - set(prop_keys):
-                raise Exception("Configuration keys [%s] do not have corresponding properties" 
-                                % ", ".join(set(config_keys) - set(prop_keys)))
+                raise Exception(
+                    "Configuration keys [%s] do not have corresponding properties"
+                    % ", ".join(set(config_keys) - set(prop_keys))
+                )
         if not use_defaults:
             if set(prop_keys) - set(config_keys):
-                raise Exception("Property keys [%s] are not present in configuration dictionary" 
-                                % ", ".join(set(prop_keys) - set(config_keys)))
-        
+                raise Exception(
+                    "Property keys [%s] are not present in configuration dictionary"
+                    % ", ".join(set(prop_keys) - set(config_keys))
+                )
+
         self._finalise_config()
 
     def _finalise_config(self):
@@ -236,6 +241,7 @@ def utc_time(default=None):
     def _prop(val):
         # Include import here to get around circular import issues
         from . import time
+
         return time.ensure_unix(val)
 
     prop = Property(proptype=_prop, default=default)
@@ -272,7 +278,7 @@ def float_in_range(start, end, default=None):
         val = float(val)
 
         if val < start or val > end:
-            raise ValueError('Input %f not in range [%f, %f]' % (val, start, end))
+            raise ValueError("Input %f not in range [%f, %f]" % (val, start, end))
 
         return val
 
@@ -308,13 +314,14 @@ def enum(options, default=None):
     def _prop(val):
 
         if val not in options:
-            raise ValueError('Input %f not in %s' % (repr(val), repr(options)))
+            raise ValueError("Input %f not in %s" % (repr(val), repr(options)))
 
         return val
 
     if default is not None and default not in options:
-        raise ValueError('Default value %s must be in %s (or None)' %
-                         (repr(default), repr(options)))
+        raise ValueError(
+            "Default value %s must be in %s (or None)" % (repr(default), repr(options))
+        )
 
     prop = Property(proptype=_prop, default=default)
 
@@ -323,4 +330,5 @@ def enum(options, default=None):
 
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod()

@@ -308,13 +308,14 @@ See the documentation for these base classes for more details.
 
 """
 # === Start Python 2/3 compatibility
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
+from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
 # === End Python 2/3 compatibility
 
 from future import standard_library
+
 standard_library.install_aliases()
 from past.builtins import basestring
 from future.utils import raise_from
@@ -344,6 +345,7 @@ local_tasks = {}
 
 # Exceptions
 # ----------
+
 
 class PipelineConfigError(Exception):
     """Raised when there is an error setting up a pipeline."""
@@ -387,6 +389,7 @@ class _PipelineFinished(Exception):
 # Pipeline Manager
 # ----------------
 
+
 class Manager(config.Reader):
     """Pipeline manager for setting up and running pipeline tasks.
 
@@ -397,7 +400,7 @@ class Manager(config.Reader):
 
     """
 
-    logging = config.Property(default='warning', proptype=str)
+    logging = config.Property(default="warning", proptype=str)
     multiprocessing = config.Property(default=1, proptype=int)
     cluster = config.Property(default={}, proptype=dict)
     tasks = config.Property(default=[], proptype=list)
@@ -435,10 +438,9 @@ class Manager(config.Reader):
         """
 
         yaml_params = yaml.safe_load(yaml_doc)
-        self = cls.from_config(yaml_params['pipeline'])
+        self = cls.from_config(yaml_params["pipeline"])
         self.all_params = yaml_params
         return self
-
 
     def run(self):
         """Main driver method for the pipeline.
@@ -451,7 +453,7 @@ class Manager(config.Reader):
         # Set logging level.
         numeric_level = getattr(logging, self.logging.upper(), None)
         if not isinstance(numeric_level, int):
-            raise ValueError('Invalid logging level: %s' % self.logging)
+            raise ValueError("Invalid logging level: %s" % self.logging)
         logging.basicConfig(level=numeric_level)
         # Initialize all tasks.
         pipeline_tasks = []
@@ -473,9 +475,10 @@ class Manager(config.Reader):
                     out = task._pipeline_next()
                 except _PipelineMissingData:
                     if pipeline_tasks.index(task) == 0:
-                        msg = ("%s missing input data and is at beginning of"
-                               " task list. Advancing state."
-                               % task.__class__.__name__)
+                        msg = (
+                            "%s missing input data and is at beginning of"
+                            " task list. Advancing state." % task.__class__.__name__
+                        )
                         logger.debug(msg)
                         task._pipeline_advance_state()
                     break
@@ -485,22 +488,24 @@ class Manager(config.Reader):
                 # Now pass the output data products to any task that needs
                 # them.
                 out_keys = task._out_keys
-                if out is None:     # This iteration supplied no output.
+                if out is None:  # This iteration supplied no output.
                     continue
-                elif len(out_keys) == 0:    # Output not handled by pipeline.
+                elif len(out_keys) == 0:  # Output not handled by pipeline.
                     continue
                 elif len(out_keys) == 1:
                     if type(out_keys) is tuple:
                         # In config file, written as `out: out_key`. No
                         # unpacking if `out` is a length 1 sequence.
                         out = (out,)
-                    else:   # `out_keys` is a list.
+                    else:  # `out_keys` is a list.
                         # In config file, written as `out: [out_key,]`.
                         # `out` must be a length 1 sequence.
                         pass
                 elif len(out_keys) != len(out):
-                    msg = ('Found unexpected number of outputs in %s (got %i expected %i)' %
-                           (task.__class__.__name__, len(out), len(out_keys)))
+                    msg = (
+                        "Found unexpected number of outputs in %s (got %i expected %i)"
+                        % (task.__class__.__name__, len(out), len(out_keys))
+                    )
                     raise PipelineRuntimeError(msg)
                 keys = str(out_keys)
                 msg = "%s produced output data product with keys %s."
@@ -509,18 +514,17 @@ class Manager(config.Reader):
                 for receiving_task in pipeline_tasks:
                     receiving_task._pipeline_inspect_queue_product(out_keys, out)
 
-
     def _setup_task(self, task_spec):
         """Set up a pipeline task from the spec given in the tasks list."""
 
         # Check that only the expected keys are in the task spec.
         for key in task_spec.keys():
-            if not key in ['type', 'params', 'requires', 'in', 'out']:
+            if not key in ["type", "params", "requires", "in", "out"]:
                 msg = "Task got an unexpected key '%s' in 'tasks' list." % key
                 raise PipelineConfigError(msg)
         # 'type' is a required key.
         try:
-            task_path = task_spec['type']
+            task_path = task_spec["type"]
         except KeyError:
             msg = "'type' not specified for task."
             raise PipelineConfigError(msg)
@@ -530,21 +534,24 @@ class Manager(config.Reader):
             try:
                 task_cls = _import_class(task_path)
             except Exception as e:
-                msg = ("Loading task '%s' caused error - %s: %s" %
-                       (task_path, e.__class__.__name__, str(e)))
+                msg = "Loading task '%s' caused error - %s: %s" % (
+                    task_path,
+                    e.__class__.__name__,
+                    str(e),
+                )
                 raise_from(PipelineConfigError(msg), e)
 
         # Get the parameters and initialize the class.
         params = {}
 
-        if 'params' in task_spec:
+        if "params" in task_spec:
 
             # If params is a dict, assume params are inline
-            if isinstance(task_spec['params'], dict):
-                params.update(task_spec['params'])
+            if isinstance(task_spec["params"], dict):
+                params.update(task_spec["params"])
             else:  # Otherwise assume it's a list of keys
 
-                param_keys = task_spec['params']
+                param_keys = task_spec["params"]
 
                 # Must be a list of keys, convert if only one key was specified.
                 if not isinstance(param_keys, list):
@@ -566,6 +573,7 @@ class Manager(config.Reader):
 
 # Pipeline Task Base Classes
 # --------------------------
+
 
 class TaskBase(config.Reader):
     """Base class for all pipeline tasks.
@@ -698,26 +706,29 @@ class TaskBase(config.Reader):
         # Put pipeline in state such that `setup` is the next stage called.
         self._pipeline_advance_state()
         # Parse the task spec.
-        requires = _format_product_keys(task_spec, 'requires')
-        in_ = _format_product_keys(task_spec, 'in')
-        out = _format_product_keys(task_spec, 'out')
+        requires = _format_product_keys(task_spec, "requires")
+        in_ = _format_product_keys(task_spec, "in")
+        out = _format_product_keys(task_spec, "out")
         # Inspect the `setup` method to see how many arguments it takes.
         setup_argspec = inspect.getargspec(self.setup)
         # Make sure it matches `requires` keys list specified in config.
         n_requires = len(requires)
         try:
             len_defaults = len(setup_argspec.defaults)
-        except TypeError:    # defaults is None
+        except TypeError:  # defaults is None
             len_defaults = 0
         min_req = len(setup_argspec.args) - len_defaults - 1
         if n_requires < min_req:
-            msg = ("Didn't get enough 'requires' keys. Expected at least"
-                   " %d and only got %d." % (min_req, n_requires))
+            msg = (
+                "Didn't get enough 'requires' keys. Expected at least"
+                " %d and only got %d." % (min_req, n_requires)
+            )
             raise PipelineConfigError(msg)
-        if (n_requires > len(setup_argspec.args) - 1
-            and setup_argspec.varargs is None):
-            msg = ("Got too many 'requires' keys. Expected at most %d and"
-                   " got %d." % (len(setup_argspec.args) - 1, n_requires))
+        if n_requires > len(setup_argspec.args) - 1 and setup_argspec.varargs is None:
+            msg = "Got too many 'requires' keys. Expected at most %d and" " got %d." % (
+                len(setup_argspec.args) - 1,
+                n_requires,
+            )
             raise PipelineConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
         next_argspec = inspect.getargspec(self.next)
@@ -725,17 +736,20 @@ class TaskBase(config.Reader):
         n_in = len(in_)
         try:
             len_defaults = len(next_argspec.defaults)
-        except TypeError:    # defaults is None
+        except TypeError:  # defaults is None
             len_defaults = 0
         min_in = len(next_argspec.args) - len_defaults - 1
         if n_in < min_in:
-            msg = ("Didn't get enough 'in' keys. Expected at least"
-                   " %d and only got %d." % (min_in, n_in))
+            msg = (
+                "Didn't get enough 'in' keys. Expected at least"
+                " %d and only got %d." % (min_in, n_in)
+            )
             raise PipelineConfigError(msg)
-        if (n_in > len(next_argspec.args) - 1
-            and next_argspec.varargs is None):
-            msg = ("Got too many 'in' keys. Expected at most %d and"
-                   " got %d." % (len(next_argspec.args) - 1, n_in))
+        if n_in > len(next_argspec.args) - 1 and next_argspec.varargs is None:
+            msg = "Got too many 'in' keys. Expected at most %d and" " got %d." % (
+                len(next_argspec.args) - 1,
+                n_in,
+            )
             raise PipelineConfigError(msg)
         # Now that all data product keys have been verified to be valid, store
         # them on the instance.
@@ -770,7 +784,10 @@ class TaskBase(config.Reader):
                     # XXX Clean up.
                     print("Something left: %i" % in_.qsize())
 
-                    msg = "Task finished %s iterating `next()` but input queue \'%s\' isn't empty." % (self.__class__.__name__, in_key)
+                    msg = (
+                        "Task finished %s iterating `next()` but input queue '%s' isn't empty."
+                        % (self.__class__.__name__, in_key)
+                    )
                     warnings.warn(msg)
 
             self._in = None
@@ -853,8 +870,10 @@ class TaskBase(config.Reader):
                     msg = msg % (self.__class__.__name__, key)
                     logger.debug(msg)
                     if self._requires is None:
-                        msg = ("Tried to set 'requires' data product, but"
-                               "`setup()` already run.")
+                        msg = (
+                            "Tried to set 'requires' data product, but"
+                            "`setup()` already run."
+                        )
                         raise PipelineRuntimeError(msg)
                     if not self._requires[jj] is None:
                         msg = "'requires' data product set more than once."
@@ -869,8 +888,10 @@ class TaskBase(config.Reader):
                     logger.debug(msg)
                     # Check that task is still accepting inputs.
                     if self._in is None:
-                        msg = ("Tried to queue 'requires' data product, but"
-                               "`next()` iteration already completed.")
+                        msg = (
+                            "Tried to queue 'requires' data product, but"
+                            "`next()` iteration already completed."
+                        )
                         raise PipelineRuntimeError(msg)
                     else:
                         # Accept the data product and store for later use.
@@ -885,8 +906,8 @@ class _OneAndOne(TaskBase):
 
     """
 
-    input_root = config.Property(default='None', proptype=str)
-    output_root = config.Property(default='None', proptype=str)
+    input_root = config.Property(default="None", proptype=str)
+    output_root = config.Property(default="None", proptype=str)
 
     def process(self, input):
         """Override this method with your data processing task.
@@ -901,13 +922,16 @@ class _OneAndOne(TaskBase):
         # Inspect the `process` method to see how many arguments it takes.
         pro_argspec = inspect.getargspec(self.process)
         n_args = len(pro_argspec.args) - 1
-        if n_args  > 1:
-            msg = ("`process` method takes more than 1 argument, which is not"
-                   " allowed.")
+        if n_args > 1:
+            msg = (
+                "`process` method takes more than 1 argument, which is not" " allowed."
+            )
             raise PipelineConfigError(msg)
         if pro_argspec.varargs or pro_argspec.keywords or pro_argspec.defaults:
-            msg = ("`process` method may not have variable length or optional"
-                   " arguments.")
+            msg = (
+                "`process` method may not have variable length or optional"
+                " arguments."
+            )
             raise PipelineConfigError(msg)
         if n_args == 0:
             self._no_input = True
@@ -917,18 +941,24 @@ class _OneAndOne(TaskBase):
         # Make sure we know where to get the data from.
         if self.input_root == "None":
             if len(self._in) != n_args:
-                msg = ("No data to iterate over. 'input_root' is 'None' and"
-                       " there are no 'in' keys.")
+                msg = (
+                    "No data to iterate over. 'input_root' is 'None' and"
+                    " there are no 'in' keys."
+                )
                 raise PipelineConfigError(msg)
         else:
             if len(self._in) != 0:
-                msg = ("For data input, supplied both a file path and an 'in'"
-                       " key.  If not reading to disk, set 'input_root' to"
-                       " 'None'.")
+                msg = (
+                    "For data input, supplied both a file path and an 'in'"
+                    " key.  If not reading to disk, set 'input_root' to"
+                    " 'None'."
+                )
                 raise PipelineConfigError(msg)
             if n_args != 1:
-                msg = ("Reading input from disk but `process` method takes no"
-                       " arguments.")
+                msg = (
+                    "Reading input from disk but `process` method takes no"
+                    " arguments."
+                )
 
     def read_process_write(self, input, input_filename, output_filename):
         """Reads input, executes any processing and writes output."""
@@ -936,11 +966,13 @@ class _OneAndOne(TaskBase):
         # Read input if needed.
         if input is None and not self._no_input:
             if input_filename is None:
-                raise RuntimeError('No file to read from.')
+                raise RuntimeError("No file to read from.")
             input_filename = self.input_root + input_filename
             input_filename = path.expanduser(input_filename)
-            logger.info("%s reading data from file %s." %
-                        (self.__class__.__name__, input_filename))
+            logger.info(
+                "%s reading data from file %s."
+                % (self.__class__.__name__, input_filename)
+            )
             input = self.read_input(input_filename)
         # Analyse.
         if self._no_input:
@@ -951,13 +983,15 @@ class _OneAndOne(TaskBase):
         else:
             output = self.process(input)
         # Write output if needed.
-        if self.output_root != 'None' and not output is None:
+        if self.output_root != "None" and not output is None:
             if output_filename is None:
-                raise RuntimeError('No file to write to.')
+                raise RuntimeError("No file to write to.")
             output_filename = self.output_root + output_filename
             output_filename = path.expanduser(output_filename)
-            logger.info("%s writing data to file %s." %
-                        (self.__class__.__name__, output_filename))
+            logger.info(
+                "%s writing data to file %s."
+                % (self.__class__.__name__, output_filename)
+            )
             output_dirname = os.path.dirname(output_filename)
             if not os.path.isdir(output_dirname):
                 os.makedirs(output_dirname)
@@ -1037,9 +1071,8 @@ class SingleBase(_OneAndOne):
 
     """
 
-    input_filename = config.Property(default='', proptype=str)
-    output_filename = config.Property(default='', proptype=str)
-
+    input_filename = config.Property(default="", proptype=str)
+    output_filename = config.Property(default="", proptype=str)
 
     def next(self, input=None):
         """Should not need to override."""
@@ -1053,8 +1086,7 @@ class SingleBase(_OneAndOne):
 
         if input:
             input = self.cast_input(input)
-        return self.read_process_write(input, self.input_filename,
-                                       self.output_filename)
+        return self.read_process_write(input, self.input_filename, self.output_filename)
 
 
 class IterBase(_OneAndOne):
@@ -1111,8 +1143,8 @@ class IterBase(_OneAndOne):
     """
 
     file_middles = config.Property(default=[], proptype=list)
-    input_ext = config.Property(default='', proptype=str)
-    output_ext = config.Property(default='', proptype=str)
+    input_ext = config.Property(default="", proptype=str)
+    output_ext = config.Property(default="", proptype=str)
 
     def __init__(self):
         _OneAndOne.__init__(self)
@@ -1123,7 +1155,7 @@ class IterBase(_OneAndOne):
 
         # Sort out filenames.
         if self.iteration >= len(self.file_middles):
-            if not self.input_root == 'None':
+            if not self.input_root == "None":
                 # We are iterating over input files and have run out.
                 raise PipelineStopIteration()
             else:
@@ -1140,8 +1172,7 @@ class IterBase(_OneAndOne):
 
         if input:
             input = self.cast_input(input)
-        output = self.read_process_write(input, input_filename,
-                                       output_filename)
+        output = self.read_process_write(input, input_filename, output_filename)
         self.iteration += 1
         return output
 
@@ -1158,20 +1189,22 @@ class H5IOMixin(object):
     """
 
     # TODO, implement reading on disk (i.e. no copy to memory).
-    #ondisk = config.Property(default=False, proptype=bool)
+    # ondisk = config.Property(default=False, proptype=bool)
 
     def read_input(self, filename):
         """Method for reading hdf5 input."""
 
         from caput import memh5
-        return memh5.MemGroup.from_hdf5(filename, mode='r')
+
+        return memh5.MemGroup.from_hdf5(filename, mode="r")
 
     def read_output(self, filename):
         """Method for reading hdf5 output (from caches)."""
 
         # Replicate code from read_input in case read_input is overridden.
         from caput import memh5
-        return memh5.MemGroup.from_hdf5(filename, mode='r')
+
+        return memh5.MemGroup.from_hdf5(filename, mode="r")
 
     def write_output(self, filename, output):
         """Method for writing hdf5 output.
@@ -1201,11 +1234,10 @@ class H5IOMixin(object):
 
             # Lock file
             with misc.lock_file(filename, comm=output.comm) as fn:
-                output.to_hdf5(fn, mode='w')
+                output.to_hdf5(fn, mode="w")
 
         elif isinstance(output, h5py.Group):
-            if path.isfile(filename) and path.samefile(output.file.filename,
-                                                       filename):
+            if path.isfile(filename) and path.samefile(output.file.filename, filename):
                 # `output` already lives in this file.
                 output.flush()
             else:
@@ -1215,7 +1247,7 @@ class H5IOMixin(object):
 
                 # Lock file as we write
                 with misc.lock_file(filename) as fn:
-                    out_copy.to_hdf5(fn, mode='w')
+                    out_copy.to_hdf5(fn, mode="w")
 
 
 class BasicContMixin(object):
@@ -1230,7 +1262,7 @@ class BasicContMixin(object):
     """
 
     # TODO, implement reading on disk (i.e. no copy to memory).
-    #ondisk = config.Property(default=False, proptype=bool)
+    # ondisk = config.Property(default=False, proptype=bool)
 
     # Private setting for reading of inputs, should be overriden in sub class.
     _distributed = False
@@ -1240,14 +1272,20 @@ class BasicContMixin(object):
         """Method for reading hdf5 input."""
 
         from caput import memh5
-        return memh5.BasicCont.from_file(filename, distributed=self._distributed, comm=self._comm)
+
+        return memh5.BasicCont.from_file(
+            filename, distributed=self._distributed, comm=self._comm
+        )
 
     def read_output(self, filename):
         """Method for reading hdf5 output (from caches)."""
 
         # Replicate code from read_input in case read_input is overridden.
         from caput import memh5
-        return memh5.BasicCont.from_file(filename, distributed=self._distributed, comm=self._comm)
+
+        return memh5.BasicCont.from_file(
+            filename, distributed=self._distributed, comm=self._comm
+        )
 
     def write_output(self, filename, output):
         """Method for writing hdf5 output.
@@ -1260,7 +1298,7 @@ class BasicContMixin(object):
 
         # Ensure parent directory is present.
         dirname = path.dirname(filename)
-        if dirname != '' and not path.isdir(dirname):
+        if dirname != "" and not path.isdir(dirname):
             try:
                 os.makedirs(dirname)
             except OSError as e:
@@ -1269,7 +1307,9 @@ class BasicContMixin(object):
                     raise e
         # Cases for `output` object type.
         if not isinstance(output, memh5.BasicCont):
-            raise RuntimeError('Object to write out is not an instance of memh5.BasicCont')
+            raise RuntimeError(
+                "Object to write out is not an instance of memh5.BasicCont"
+            )
 
         # Already in memory.
         output.save(filename)
@@ -1297,6 +1337,7 @@ class IterH5Base(H5IOMixin, IterBase):
 
 # Internal Functions
 # ------------------
+
 
 def _format_product_keys(spec, name):
     """Formats the pipeline task product keys.
@@ -1330,8 +1371,8 @@ def _format_product_keys(spec, name):
 
 def _import_class(class_path):
     """Import class dynamically from a string."""
-    path_split = class_path.split('.')
-    module_path = '.'.join(path_split[:-1])
+    path_split = class_path.split(".")
+    module_path = ".".join(path_split[:-1])
     class_name = path_split[-1]
     if module_path:
         m = __import__(module_path)
@@ -1345,4 +1386,5 @@ def _import_class(class_path):
 
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod()
