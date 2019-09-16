@@ -15,6 +15,9 @@ addons:
 env:
     - CAPUT_SKYFIELD_PATH=/home/travis
 
+before_install:
+    - "pip3 install black"
+
 install:
     - "pip install -r requirements.txt"
     - "pip install -e .[mpi]"
@@ -23,6 +26,7 @@ install:
     - "python setup.py build_ext --inplace"
 script:
     - "sphinx-build -b html doc/ doc/_build/html"
+    - "black --check ."
     - "cd ~; nosetests caput"
     - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
     - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"
