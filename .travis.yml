@@ -15,10 +15,9 @@ addons:
 
 install:
     - "pip install -r requirements.txt"
-    - "pip install -e .[mpi]"
-    - "pip install -e .[skyfield]"
+    - "pip install mpi4py"
+    - "python setup.py develop"
     - "pip install -r doc/requirements.txt"
-    - "python setup.py build_ext --inplace"
 
 jobs:
     include:

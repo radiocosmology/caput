@@ -51,6 +51,7 @@ try:
 
 except Exception as e:
     import warnings
+
     warnings.warn("Could not install additional Skyfield data: %s" % str(e))
     skyfield_data = {}
 
