@@ -12,8 +12,6 @@ addons:
             - libhdf5-serial-dev
             - libopenmpi-dev
             - openmpi-bin
-env:
-    - CAPUT_SKYFIELD_PATH=/home/travis
 
 install:
     - "pip install -r requirements.txt"

@@ -47,11 +47,11 @@ try:
             "data/deltat.preds",
         ]
     }
+    print("Successfully cached skyfield data.")
 
-except:
+except Exception as e:
     import warnings
-
-    warnings.warn("Could not install additional Skyfield data.")
+    warnings.warn("Could not install additional Skyfield data: %s" % str(e))
     skyfield_data = {}
 
 # Cython
