@@ -533,6 +533,9 @@ class MemGroup(_BaseGroup):
         data=None,
         distributed=False,
         distributed_axis=None,
+        chunks=None,
+        compression=None,
+        compression_opts=None,
         **kwargs
     ):
         """Create a new dataset.
@@ -643,12 +646,22 @@ class MemGroup(_BaseGroup):
 
                 # Create distributed dataset
                 new_dataset = MemDatasetDistributed.from_mpi_array(
-                    data, name=full_path_name, storage_root=storage_root
+                    data,
+                    name=full_path_name,
+                    storage_root=storage_root,
+                    chunks=chunks,
+                    compression=compression,
+                    compression_opts=compression_opts,
                 )
             else:
                 # Create common dataset
                 new_dataset = MemDatasetCommon.from_numpy_array(
-                    data, name=full_path_name, storage_root=storage_root
+                    data,
+                    name=full_path_name,
+                    storage_root=storage_root,
+                    chunks=chunks,
+                    compression=compression,
+                    compression_opts=compression_opts,
                 )
 
         # Otherwise create an empty array and copy into it (if needed)
@@ -669,6 +682,9 @@ class MemGroup(_BaseGroup):
                     comm=self.comm,
                     name=full_path_name,
                     storage_root=storage_root,
+                    chunks=chunks,
+                    compression=compression,
+                    compression_opts=compression_opts,
                 )
             else:
                 new_dataset = MemDatasetCommon(
@@ -676,6 +692,9 @@ class MemGroup(_BaseGroup):
                     dtype=dtype,
                     name=full_path_name,
                     storage_root=storage_root,
+                    chunks=chunks,
+                    compression=compression,
+                    compression_opts=compression_opts,
                 )
 
             if data is not None:
@@ -727,6 +746,9 @@ class MemGroup(_BaseGroup):
             name,
             shape=dset_shape,
             dtype=dset_type,
+            chunks=dset.chunks,
+            compression=dset.compression,
+            compression_opts=dset.compression_opts,
             data=md,
             distributed=True,
             distributed_axis=distributed_axis,
@@ -769,7 +791,13 @@ class MemGroup(_BaseGroup):
         copyattrs(dset.attrs, attr_dict)
         del dset
         new_dset = self.create_dataset(
-            name, data=global_array, shape=dset_shape, dtype=dset_type
+            name,
+            data=global_array,
+            shape=dset_shape,
+            dtype=dset_type,
+            chunks=dset.chunks,
+            compression=dset.compression,
+            compression_opts=dset.compression_opts,
         )
         copyattrs(attr_dict, new_dset.attrs)
 
@@ -809,6 +837,9 @@ class MemDataset(_MemObjMixin):
         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
         out._attrs = self._attrs
         out._data = self._data
+        out.chunks = self.chunks
+        out.compression = self.compression
+        out.compression_opts = self.compression_opts
         return out
 
     @property
@@ -829,20 +860,32 @@ class MemDataset(_MemObjMixin):
 
     @property
     def shape(self):
-        raise NotImplementedError("Not implmemented in base class.")
+        raise NotImplementedError("Not implemented in base class.")
 
     @property
     def dtype(self):
-        raise NotImplementedError("Not implmemented in base class.")
+        raise NotImplementedError("Not implemented in base class.")
+
+    @property
+    def chunks(self):
+        raise NotImplementedError("Not implemented in base class.")
+
+    @property
+    def compression(self):
+        raise NotImplementedError("Not implemented in base class.")
+
+    @property
+    def compression_opts(self):
+        raise NotImplementedError("Not implemented in base class.")
 
     def __getitem__(self, obj):
-        raise NotImplementedError("Not implmemented in base class.")
+        raise NotImplementedError("Not implemented in base class.")
 
     def __setitem__(self, obj, val):
-        raise NotImplementedError("Not implmemented in base class.")
+        raise NotImplementedError("Not implemented in base class.")
 
     def __len__(self):
-        raise NotImplementedError("Not implmemented in base class.")
+        raise NotImplementedError("Not implemented in base class.")
 
 
 class MemDatasetCommon(MemDataset):
@@ -875,13 +918,26 @@ class MemDatasetCommon(MemDataset):
 
     """
 
-    def __init__(self, shape, dtype, **kwargs):
+    def __init__(
+        self,
+        shape,
+        dtype,
+        chunks=None,
+        compression=None,
+        compression_opts=None,
+        **kwargs
+    ):
         super(MemDatasetCommon, self).__init__(**kwargs)
 
         self._data = np.zeros(shape, dtype)
+        self._chunks = chunks
+        self._compression = compression
+        self._compression_opts = compression_opts
 
     @classmethod
-    def from_numpy_array(cls, data, **kwargs):
+    def from_numpy_array(
+        cls, data, chunks=None, compression=None, compression_opts=None, **kwargs
+    ):
         """Initialise from a numpy array.
 
         Parameters
@@ -902,6 +958,9 @@ class MemDatasetCommon(MemDataset):
         super(MemDatasetCommon, self).__init__(**kwargs)
 
         self._data = data
+        self._chunks = chunks
+        self._compression = compression
+        self._compression_opts = compression_opts
         return self
 
     @property
@@ -931,6 +990,30 @@ class MemDatasetCommon(MemDataset):
     @property
     def dtype(self):
         return self._data.dtype
+
+    @property
+    def chunks(self):
+        return self._chunks
+
+    @chunks.setter
+    def chunks(self, val):
+        self._chunks = val
+
+    @property
+    def compression(self):
+        return self._compression
+
+    @compression.setter
+    def compression(self, val):
+        self._compression = val
+
+    @property
+    def compression_opts(self):
+        return self._compression_opts
+
+    @compression_opts.setter
+    def compression_opts(self, val):
+        self._compression_opts = val
 
     def __getitem__(self, obj):
         return self._data[obj]
@@ -990,13 +1073,28 @@ class MemDatasetDistributed(MemDataset):
 
     """
 
-    def __init__(self, shape, dtype, axis=0, comm=None, **kwargs):
+    def __init__(
+        self,
+        shape,
+        dtype,
+        axis=0,
+        comm=None,
+        chunks=None,
+        compression=None,
+        compression_opts=None,
+        **kwargs
+    ):
         super(MemDatasetDistributed, self).__init__(**kwargs)
 
         self._data = mpiarray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
+        self._chunks = chunks
+        self._compression = compression
+        self._compression_opts = compression_opts
 
     @classmethod
-    def from_mpi_array(cls, data, **kwargs):
+    def from_mpi_array(
+        cls, data, chunks=None, compression=None, compression_opts=None, **kwargs
+    ):
         if not isinstance(data, mpiarray.MPIArray):
             raise TypeError("Object must be a numpy array (or subclass).")
 
@@ -1004,6 +1102,9 @@ class MemDatasetDistributed(MemDataset):
         super(MemDatasetDistributed, self).__init__(**kwargs)
 
         self._data = data
+        self._chunks = chunks
+        self._compression = compression
+        self._compression_opts = compression_opts
         return self
 
     @property
@@ -1041,6 +1142,30 @@ class MemDatasetDistributed(MemDataset):
     @property
     def dtype(self):
         return self._data.dtype
+
+    @property
+    def chunks(self):
+        return self._chunks
+
+    @chunks.setter
+    def chunks(self, val):
+        self._chunks = val
+
+    @property
+    def compression(self):
+        return self._compression
+
+    @compression.setter
+    def compression(self, val):
+        self._compression = val
+
+    @property
+    def compression_opts(self):
+        return self._compression_opts
+
+    @compression_opts.setter
+    def compression_opts(self, val):
+        self._compression_opts = val
 
     @property
     def distributed_axis(self):
@@ -1902,7 +2027,15 @@ def deep_group_copy(g1, g2):
             else:
                 data = entry
 
-            g2.create_dataset(key, shape=data.shape, dtype=data.dtype, data=data)
+            g2.create_dataset(
+                key,
+                shape=data.shape,
+                dtype=data.dtype,
+                data=data,
+                chunks=entry.chunks,
+                compression=entry.compression,
+                compression_opts=entry.compression_opts,
+            )
             copyattrs(entry.attrs, g2[key].attrs)
 
             # Add a hint that memh5 should convert back to unicode
@@ -1977,9 +2110,16 @@ def _distributed_group_to_hdf5_serial(group, fname, hints=True, **kwargs):
 
         # Write out distributed datasets (only the data, the attributes are written below)
         elif isinstance(entry, MemDatasetDistributed):
+
             arr = entry._data
 
-            arr.to_hdf5(fname, entry.name)
+            arr.to_hdf5(
+                fname,
+                entry.name,
+                chunks=entry.chunks,
+                compression=entry.compression,
+                compression_opts=entry.compression_opts,
+            )
 
         comm.Barrier()
 
@@ -1998,7 +2138,13 @@ def _distributed_group_to_hdf5_serial(group, fname, hints=True, **kwargs):
                     else:
                         data = entry
 
-                    dset = f.create_dataset(entry.name, data=data)
+                    dset = f.create_dataset(
+                        entry.name,
+                        data=data,
+                        chunks=entry.chunks,
+                        compression=entry.compression,
+                        compression_opts=entry.compression_opts,
+                    )
                     copyattrs(entry.attrs, dset.attrs)
 
                     if hints:
@@ -2062,7 +2208,13 @@ def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
                         )
 
                     # Write to file from MPIArray
-                    item.data.to_hdf5(h5group, key)
+                    item.data.to_hdf5(
+                        h5group,
+                        key,
+                        chunks=item.chunks,
+                        compression=item.compression,
+                        compression_opts=item.compression_opts,
+                    )
                     dset = h5group[key]
 
                     if hints:
@@ -2076,7 +2228,12 @@ def _distributed_group_to_hdf5_parallel(group, fname, hints=True, **kwargs):
                         data = item.data
 
                     dset = h5group.create_dataset(
-                        key, shape=data.shape, dtype=data.dtype
+                        key,
+                        shape=data.shape,
+                        dtype=data.dtype,
+                        chunks=item.chunks,
+                        compression=item.compression,
+                        compression_opts=item.compression_opts,
                     )
 
                     # Write common data from rank 0

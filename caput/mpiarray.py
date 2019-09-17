@@ -647,6 +647,7 @@ class MPIArray(np.ndarray):
         #   collective IO which is usually slow
         # TODO: change if h5py bug fixed
         # TODO: better would be a test on contiguous IO size
+        # TODO: do we need collective IO to read chunked data?
         use_collective = fh.is_mpi and no_null_slices and axis > 0
 
         # Read using collective MPI-IO if specified
@@ -664,7 +665,15 @@ class MPIArray(np.ndarray):
 
         return dist_arr
 
-    def to_hdf5(self, f, dataset, create=False):
+    def to_hdf5(
+        self,
+        f,
+        dataset,
+        create=False,
+        chunks=None,
+        compression=None,
+        compression_opts=None,
+    ):
         """Parallel write into a contiguous HDF5 dataset.
 
         Parameters
@@ -674,8 +683,6 @@ class MPIArray(np.ndarray):
         dataset : string
             Name of dataset to write into. Should not exist.
         """
-
-        ## Naive non-parallel implementation to start
 
         import h5py
 
@@ -691,8 +698,6 @@ class MPIArray(np.ndarray):
         mode = "a" if create else "r+"
 
         fh = misc.open_h5py_mpi(f, mode, self.comm)
-
-        dset = fh.create_dataset(dataset, shape=self.global_shape, dtype=self.dtype)
 
         start = self.local_offset[self.axis]
         end = start + self.local_shape[self.axis]
@@ -712,9 +717,25 @@ class MPIArray(np.ndarray):
         # - there are no null slices (h5py bug)
         # - we are not distributed over axis=0 as there is no advantage for
         #   collective IO which is usually slow
+        # - unless we want to use compression/chunking
         # TODO: change if h5py bug fixed
         # TODO: better would be a test on contiguous IO size
-        use_collective = fh.is_mpi and no_null_slices and self.axis > 0
+        use_collective = (
+            fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
+        )
+
+        if fh.is_mpi and not use_collective:
+            # Need to disable compression if we can't use collective IO
+            chunks, compression, compression_opts = None, None, None
+
+        dset = fh.create_dataset(
+            dataset,
+            shape=self.global_shape,
+            dtype=self.dtype,
+            chunks=chunks,
+            compression=compression,
+            compression_opts=compression_opts,
+        )
 
         # Read using collective MPI-IO if specified
         with dset.collective if use_collective else DummyContext():
