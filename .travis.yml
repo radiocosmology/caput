@@ -17,7 +17,6 @@ install:
     - "pip install -r requirements.txt"
     - "pip install mpi4py"
     - "python setup.py develop"
-    - "pip install -r doc/requirements.txt"
 
 jobs:
     include:
@@ -30,6 +29,7 @@ jobs:
         - stage: doc build
           python: 3.7
           script:
+            - "pip install -r doc/requirements.txt"
             - "sphinx-build -b html doc/ doc/_build/html"
 
 script:
