@@ -1,3 +1,7 @@
+# editor rubble
+*~
+.*.swp
+
 *.py[cod]
 
 # C extensions
