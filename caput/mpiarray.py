@@ -688,7 +688,8 @@ class MPIArray(np.ndarray):
 
         if not h5py.get_config().mpi:
             if isinstance(f, basestring):
-                self._to_hdf5_serial(f, dataset, create)
+                self._to_hdf5_serial(f, dataset, create, chunks,
+                                     compression, compression_opts)
                 return
             else:
                 raise ValueError(
@@ -832,7 +833,8 @@ class MPIArray(np.ndarray):
             self.view(np.ndarray).copy(), axis=self.axis, comm=self.comm
         )
 
-    def _to_hdf5_serial(self, filename, dataset, create=False):
+    def _to_hdf5_serial(self, filename, dataset, create=False, chunks=None,
+                        compression=None, compression_opts=None):
         """Write into an HDF5 dataset.
 
         This explicitly serialises the IO so that it works when h5py does not
@@ -864,7 +866,8 @@ class MPIArray(np.ndarray):
                 if dataset in fh:
                     raise Exception("Dataset should not exist.")
 
-                fh.create_dataset(dataset, self.global_shape, dtype=self.dtype)
+                fh.create_dataset(dataset, self.global_shape, dtype=self.dtype, chunks=chunks,
+                                  compression=compression, compression_opts=compression_opts)
                 fh[dataset][:] = np.array(0.0).astype(self.dtype)
 
         # wait until all processes see the created file
