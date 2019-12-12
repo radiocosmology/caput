@@ -73,6 +73,10 @@ def queue(configfile, nosubmit=False):
         then move to a final location if the job successfully finishes. This
         may be slow, if the temporary and final directories are not on the
         same filesystem.
+
+    If a root-level section named `run_before` is present and contains a string
+    it will be run as a python script as part of the job script when the job starts
+    and before the main pipeline run.
     """
 
     import os.path
@@ -162,15 +166,25 @@ def queue(configfile, nosubmit=False):
         rconf["venv"] = "/dev/null"
 
     # Derived vars only needed to create script
-    rconf['mpiproc'] = rconf['nodes'] * rconf['pernode']
-    rconf['workdir'] = workdir
-    rconf['finaldir'] = finaldir
-    rconf['scriptpath'] = fixpath(__file__)
-    rconf['logpath'] = join(jobdir, 'jobout.log')
-    rconf['configpath'] = join(jobdir, 'config.yaml')
-    rconf['statuspath'] = join(jobdir, 'STATUS')
-    rconf['usetemp'] = 1 if rconf['finaldir'] != rconf['workdir'] else 0
+    rconf["mpiproc"] = rconf["nodes"] * rconf["pernode"]
+    rconf["workdir"] = workdir
+    rconf["finaldir"] = finaldir
+    rconf["scriptpath"] = fixpath(__file__)
+    rconf["logpath"] = join(jobdir, "jobout.log")
+    rconf["configpath"] = join(jobdir, "config.yaml")
+    rconf["statuspath"] = join(jobdir, "STATUS")
+    rconf["usetemp"] = 1 if rconf["finaldir"] != rconf["workdir"] else 0
 
+    # Look for script to run before starting the job
+    if "run_before" in yconf:
+        if not isinstance(yconf["run_before"], str):
+            raise ValueError("'run_before' section must contain only a string.")
+        pre_script = join(jobdir, "run_before.py")
+        with open(pre_script, "w") as fh:
+            fh.write(yconf["run_before"])
+        rconf["run_before"] = "python " + pre_script
+    else:
+        rconf["run_before"] = ""
 
     pbs_script = """#!/bin/bash
 #PBS -l nodes=%(nodes)i:ppn=%(ppn)i
@@ -185,6 +199,8 @@ source %(venv)s
 
 cd %(workdir)s
 export OMP_NUM_THREADS=%(ompnum)i
+
+%(run_before)s
 
 mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
 
@@ -220,6 +236,8 @@ source %(venv)s
 
 cd %(workdir)s
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+%(run_before)s
 
 srun python %(scriptpath)s run %(configpath)s &> %(logpath)s
 
