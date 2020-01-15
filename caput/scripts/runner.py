@@ -1,25 +1,49 @@
-#!/usr/bin/env python
-"""Executes a data analysis pipeline given a pipeline YAML file.
+from os.path import (
+    normpath,
+    expanduser,
+    expandvars,
+    realpath,
+    abspath,
+    isabs,
+    join,
+    exists,
+)
 
-This script, when executed on the command line, accepts a single parameter, the
-path to a yaml pipeline file.  For an example of a pipeline file, see
-documentation for caput.pipeline.
-"""
-
-from os.path import (normpath, expanduser, expandvars, realpath,
-                     abspath, isabs, join, exists)
-
-from argh import arg, dispatch_commands
+import click
 
 
 products = None
 
 
-@arg('configfile', help='Configuration file to run.')
-@arg('--loglevel', help='Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)')
-def run(configfile, loglevel='INFO'):
+@click.group()
+def cli():
+    """Executes a data analysis pipeline given a pipeline YAML file.
+
+    This script, when executed on the command line, accepts a single parameter, the
+    path to a yaml pipeline file.  For an example of a pipeline file, see
+    documentation for caput.pipeline.
+    """
+    pass
+
+
+@cli.command()
+@click.argument(
+    "configfile",
+    type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
+)
+@click.option(
+    "--loglevel",
+    type=click.Choice(
+        ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], case_sensitive=False
+    ),
+    default="INFO",
+    help="Logging level.",
+)
+def run(configfile, loglevel):
+    """Run a pipeline immediately from the given CONFIGFILE."""
     from caput.pipeline import Manager
     import logging
+
     level = getattr(logging, loglevel.upper())
     logging.basicConfig(level=level)
 
@@ -27,16 +51,23 @@ def run(configfile, loglevel='INFO'):
     P.run()
 
 
-@arg('configfile', help='Configuration file to queue up.')
-@arg('--nosubmit', help='Don\'t submit the job to the queue.')
-def queue(configfile, nosubmit=False):
-    """Queue a job on a cluster.
+@cli.command()
+@click.argument(
+    "configfile",
+    type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
+)
+@click.option(
+    "--submit/--nosubmit", default=True, help="Submit the job to the queue (or not)"
+)
+def queue(configfile, submit=False):
+    """Queue a pipeline on a cluster from the given CONFIGFILE.
 
     This queues the job, using parameters from the `cluster` section of the
     submitted YAML file.
 
     There are several *required* keys:
 
+    \b
     ``nodes``
         The number of nodes to run the job on.
     ``time``
@@ -47,6 +78,7 @@ def queue(configfile, nosubmit=False):
 
     There are many *optional* keys that control more functionality:
 
+    \b
     ``system``
         A name of the cluster that we are running on, if this is supported
         (currently ``gpc`` and ``cedar``), this uses more relevant default
@@ -79,15 +111,15 @@ def queue(configfile, nosubmit=False):
     import shutil
     import yaml
 
-    with open(configfile, 'r') as f:
+    with open(configfile, "r") as f:
         yconf = yaml.safe_load(f)
 
     ## Global configuration
     ## Create output directory and copy over params file.
-    if 'cluster' not in yconf:
-        raise ValueError("Configuration file must have an \"cluster\" section.")
+    if "cluster" not in yconf:
+        raise ValueError('Configuration file must have an "cluster" section.')
 
-    conf = yconf['cluster']
+    conf = yconf["cluster"]
 
     # Base setting if nothing else is set
     defaults = {
@@ -101,19 +133,19 @@ def queue(configfile, nosubmit=False):
     # cedar)
     system_defaults = {
         "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
-        "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-krs"}
+        "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-krs"},
     }
 
     # Start to generate the full resolved config
     rconf = defaults.copy()
 
     # If the system is specified update the current config with it
-    if 'system' in conf:
+    if "system" in conf:
 
-        sys = conf['system']
+        sys = conf["system"]
 
         if sys not in system_defaults:
-            raise ValueError("Specified system \"%s\: is not known." % sys)
+            raise ValueError('Specified system "%s\: is not known.' % sys)
 
         rconf.update(**system_defaults[sys])
 
@@ -121,28 +153,27 @@ def queue(configfile, nosubmit=False):
     rconf.update(**conf)
 
     # Check to see if any required keys are missing
-    required_keys = {'nodes', 'time', 'directory',
-                     'ppn', 'queue', 'ompnum', 'pernode'}
+    required_keys = {"nodes", "time", "directory", "ppn", "queue", "ompnum", "pernode"}
     missing_keys = required_keys - set(rconf.keys())
     if missing_keys:
         raise ValueError("Missing required keys: %s" % missing_keys)
 
     # If no temporary directory set, just use the final directory
-    if 'temp_directory' not in rconf:
-        rconf['temp_directory'] = rconf['directory']
+    if "temp_directory" not in rconf:
+        rconf["temp_directory"] = rconf["directory"]
 
     # Construct the working directory
-    workdir = expandpath(rconf['temp_directory'])
+    workdir = expandpath(rconf["temp_directory"])
     if not isabs(workdir):
-        raise ValueError('Working directory path %s must be absolute' % workdir)
+        raise ValueError("Working directory path %s must be absolute" % workdir)
 
     # Construct the output directory
-    finaldir = expandpath(rconf['directory'])
+    finaldir = expandpath(rconf["directory"])
     if not isabs(finaldir):
-        raise ValueError('Final output directory path %s must be absolute' % finaldir)
+        raise ValueError("Final output directory path %s must be absolute" % finaldir)
 
     # Create temporary directory if required
-    jobdir = join(workdir, 'job/')
+    jobdir = join(workdir, "job/")
     if not exists(jobdir):
         os.makedirs(jobdir)
 
@@ -153,8 +184,8 @@ def queue(configfile, nosubmit=False):
         shutil.copy(sfile, dfile)
 
     # Set up virtualenv
-    if 'venv' in rconf:
-        venvpath = rconf['venv'] + '/bin/activate'
+    if "venv" in rconf:
+        venvpath = rconf["venv"] + "/bin/activate"
         if not exists(venvpath):
             raise ValueError("Could not find virtualenv at path %s" % rconf["venv"])
         rconf["venv"] = venvpath
@@ -162,15 +193,14 @@ def queue(configfile, nosubmit=False):
         rconf["venv"] = "/dev/null"
 
     # Derived vars only needed to create script
-    rconf['mpiproc'] = rconf['nodes'] * rconf['pernode']
-    rconf['workdir'] = workdir
-    rconf['finaldir'] = finaldir
-    rconf['scriptpath'] = fixpath(__file__)
-    rconf['logpath'] = join(jobdir, 'jobout.log')
-    rconf['configpath'] = join(jobdir, 'config.yaml')
-    rconf['statuspath'] = join(jobdir, 'STATUS')
-    rconf['usetemp'] = 1 if rconf['finaldir'] != rconf['workdir'] else 0
-
+    rconf["mpiproc"] = rconf["nodes"] * rconf["pernode"]
+    rconf["workdir"] = workdir
+    rconf["finaldir"] = finaldir
+    rconf["scriptpath"] = fixpath(__file__)
+    rconf["logpath"] = join(jobdir, "jobout.log")
+    rconf["configpath"] = join(jobdir, "config.yaml")
+    rconf["statuspath"] = join(jobdir, "STATUS")
+    rconf["usetemp"] = 1 if rconf["finaldir"] != rconf["workdir"] else 0
 
     pbs_script = """#!/bin/bash
 #PBS -l nodes=%(nodes)i:ppn=%(ppn)i
@@ -241,23 +271,23 @@ then
 fi
 """
 
-    if rconf['queue_sys'] == 'pbs':
+    if rconf["queue_sys"] == "pbs":
         script = pbs_script
-        job_command = 'qsub'
-    elif rconf['queue_sys'] == 'slurm':
+        job_command = "qsub"
+    elif rconf["queue_sys"] == "slurm":
         script = slurm_script
-        job_command = 'sbatch'
+        job_command = "sbatch"
     else:
-        raise ValueError('Specified queueing system not recognized')
+        raise ValueError("Specified queueing system not recognized")
 
     # Fill in the template variables
     script = script % rconf
 
     # Write and submit the jobscript
-    with open(jobdir + '/jobscript.sh', 'w') as f:
+    with open(jobdir + "/jobscript.sh", "w") as f:
         f.write(script)
-    if not nosubmit:
-        os.system('cd %s; %s jobscript.sh' % (jobdir, job_command))
+    if submit:
+        os.system("cd %s; %s jobscript.sh" % (jobdir, job_command))
 
 
 def expandpath(path):
@@ -268,7 +298,3 @@ def expandpath(path):
 def fixpath(path):
     """Turn path to an absolute path"""
     return realpath(abspath(path))
-
-
-if __name__ == '__main__':
-    dispatch_commands([run, queue])

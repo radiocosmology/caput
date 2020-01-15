@@ -19,7 +19,7 @@ from setuptools.extension import Extension
 from caput import __version__
 
 
-REQUIRES = ["numpy>=1.16", "h5py", "PyYAML", "cython", "future"]
+REQUIRES = ["numpy>=1.16", "h5py", "PyYAML", "cython", "future", "click"]
 
 # Don't install requirements if on ReadTheDocs build system.
 on_rtd = os.environ.get("READTHEDOCS", None) == "True"
@@ -54,7 +54,10 @@ setup(
     name="caput",
     version=__version__,
     packages=find_packages(),
-    scripts=["scripts/caput-pipeline"],
+    entry_points="""
+        [console_scripts]
+        caput-pipeline=caput.scripts.runner:cli
+    """,
     install_requires=requires,
     extras_require={"mpi": ["mpi4py>=1.3"]},
     setup_requires=["cython"],

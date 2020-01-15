@@ -30,7 +30,7 @@ Installation
     pip install git+https://github.com/radiocosmology/caput.git
 
 caput depends on h5py_, numpy_ and PyYAML_. For full functionality it also
-requires argh_, mpi4py_ and Skyfield_.
+requires click_, mpi4py_ and Skyfield_.
 
 Modules
 -------
@@ -60,6 +60,6 @@ Indices and tables
 .. _numpy: http://www.numpy.org/
 .. _PyYAML: http://pyyaml.org/
 .. _mpi4py: http://mpi4py.readthedocs.io/en/stable/
-.. _argh: http://argh.readthedocs.io/en/latest/
+.. _click: http://click.palletsprojects.com/
 .. _Skyfield: http://rhodesmill.org/skyfield/
 .. _Freenode: http://freenode.net
