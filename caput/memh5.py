@@ -76,7 +76,6 @@ from past.builtins import basestring
 from future.utils import raise_from, text_type
 
 import sys
-import collections
 import warnings
 import posixpath
 from ast import literal_eval
@@ -88,11 +87,18 @@ from . import mpiutil
 from . import mpiarray
 from . import misc
 
+# TODO: Python 3 dependent import as the class was moved
+if sys.version_info.major > 2:
+    from collections.abc import Mapping
+else:
+    from collections import Mapping
+
+
 # Basic Classes
 # -------------
 
 
-class ro_dict(collections.Mapping):
+class ro_dict(Mapping):
     """A dict that is read-only to the user.
 
     This class isn't strictly read-only but it cannot be modified through the
@@ -249,7 +255,7 @@ class _MemObjMixin(object):
         return not self.__eq__(other)
 
 
-class _BaseGroup(_MemObjMixin, collections.Mapping):
+class _BaseGroup(_MemObjMixin, Mapping):
     """Implement the majority of the Group interface.
 
     Subclasses must setup the underlying storage in thier constructors, as well
