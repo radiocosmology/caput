@@ -87,7 +87,7 @@ class TestH5Files(unittest.TestCase):
     fname = "tmp_test_memh5.h5"
 
     def setUp(self):
-        with h5py.File(self.fname) as f:
+        with h5py.File(self.fname, "w") as f:
             l1 = f.create_group("level1")
             l2 = l1.create_group("level2")
             d1 = l1.create_dataset("large", data=np.arange(100))
@@ -118,9 +118,8 @@ class TestH5Files(unittest.TestCase):
                 self.assertEqual(this_a, this_b)
 
     def test_h5_sanity(self):
-        f = h5py.File(self.fname)
-        self.assertGroupsEqual(f, f)
-        f.close()
+        with h5py.File(self.fname, "r") as f:
+            self.assertGroupsEqual(f, f)
 
     def test_to_from_hdf5(self):
         m = memh5.MemGroup.from_hdf5(self.fname)
@@ -189,10 +188,10 @@ class TestMemDiskGroup(unittest.TestCase):
         # self.assertIsInstance(tsc3['dset'].parent, TempSubClass)
         tsc3.close()
 
-        with memh5.MemDiskGroup.from_file(self.fname, ondisk=True) as tsc4:
+        with memh5.MemDiskGroup.from_file(self.fname, mode="r", ondisk=True) as tsc4:
             self.assertRaises(IOError, h5py.File, self.fname, "w")
 
-        with memh5.MemDiskGroup.from_file(self.fname, ondisk=False) as tsc4:
+        with memh5.MemDiskGroup.from_file(self.fname, mode="r", ondisk=False) as tsc4:
             f = h5py.File(self.fname, "w")
             f.close()
 
