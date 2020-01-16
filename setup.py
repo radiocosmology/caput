@@ -29,31 +29,16 @@ else:
     requires = REQUIRES
 
 
-# Try and install Skyfield data
-try:
-    from caput import time as ctime
-
-    # Force download of data
-    sf = ctime.SkyfieldWrapper(ephemeris="http://e-mode.phas.ubc.ca/~jrs65/de421.bsp")
-    sf.reload()
-
-    # Set package data to be installed alongside skyfield
-    skyfield_data = {
-        # TODO: Py3 remove this hack needed to work around a setuptools bug
-        bytes_to_native_str(b"caput"): [
-            "data/Leap_Second.dat",
-            "data/de421.bsp",
-            "data/deltat.data",
-            "data/deltat.preds",
-        ]
-    }
-    print("Successfully cached skyfield data.")
-
-except Exception as e:
-    import warnings
-
-    warnings.warn("Could not install additional Skyfield data: %s" % str(e))
-    skyfield_data = {}
+# Set package data to be installed alongside skyfield
+skyfield_data = {
+    # TODO: Py3 remove this hack needed to work around a setuptools bug
+    bytes_to_native_str(b"caput"): [
+        "data/Leap_Second.dat",
+        "data/de421.bsp",
+        "data/deltat.data",
+        "data/deltat.preds",
+    ]
+}
 
 # Cython
 # Decide whether to use OpenMP or not
