@@ -811,17 +811,28 @@ class SkyfieldWrapper(object):
         """A :class:`skyfield.timelib.Timescale` object. Loaded at first call,
         and then cached."""
 
-        if self._timescale is None:
-            try:
-                self._timescale = self.load.timescale()
-            except:
-                warnings.warn(
-                    "Could not update Skyfield data to more recent version. Trying existing data."
-                )
-                self.load.expire = False
-                self._timescale = self.load.timescale()
+        if self._timescale:
+            return self._timescale
 
-        return self._timescale
+        # Try to load skyfield data (downloading an update if it has expired)
+        try:
+            self._timescale = self.load.timescale()
+            return self._timescale
+        except IOError:
+            warnings.warn("Can not update Skyfield data. Trying existing data.")
+
+        # If we are here either the data didn't exist, or the server cannot be
+        # reached. Try to load skyfield data, ignoring any expiry, this should
+        # work provided a file already exisits
+        try:
+            self.load.expire = False
+            self._timescale = self.load.timescale()
+            return self._timescale
+        except IOError:
+            raise IOError(
+                "Could not find existing Skyfield timescale data at %s"
+                % self.load.directory
+            )
 
     _ephemeris = None
 
@@ -830,17 +841,28 @@ class SkyfieldWrapper(object):
         """A Skyfield ephemeris object (:class:`skyfield.jpllib.SpiceKernel`).
         Loaded at first call, and then cached."""
 
-        if self._ephemeris is None:
-            try:
-                self._ephemeris = self.load(self._ephemeris_name)
-            except:
-                warnings.warn(
-                    "Could not update Skyfield data to more recent version. Trying existing data."
-                )
-                self.load.expire = False
-                self._ephemeris = self.load(self._ephemeris_name)
+        if self._ephemeris:
+            return self._ephemeris
 
-        return self._ephemeris
+        # Try to load skyfield data (downloading an update if it has expired)
+        try:
+            self._ephemeris = self.load(self._ephemeris_name)
+            return self._ephemeris
+        except IOError:
+            warnings.warn("Can not update Skyfield data. Trying existing data.")
+
+        # If we are here either the data didn't exist, or the server cannot be
+        # reached. Try to load skyfield data, ignoring any expiry, this should
+        # work provided a file already exisits
+        try:
+            self.load.expire = False
+            self._ephemeris = self.load(self._ephemeris_name)
+            return self._ephemeris
+        except IOError:
+            raise IOError(
+                "Could not find existing Skyfield ephemeris data at %s"
+                % self.load.directory
+            )
 
     def reload(self):
         """Reload the Skyfield data regardless of the `expire` setting.
