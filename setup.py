@@ -29,17 +29,6 @@ else:
     requires = REQUIRES
 
 
-# Set package data to be installed alongside skyfield
-skyfield_data = {
-    # TODO: Py3 remove this hack needed to work around a setuptools bug
-    bytes_to_native_str(b"caput"): [
-        "data/Leap_Second.dat",
-        "data/de421.bsp",
-        "data/deltat.data",
-        "data/deltat.preds",
-    ]
-}
-
 # Cython
 # Decide whether to use OpenMP or not
 if ("CAPUT_NO_OPENMP" in os.environ) or (
@@ -69,7 +58,6 @@ setup(
     install_requires=requires,
     extras_require={"mpi": ["mpi4py>=1.3"]},
     setup_requires=["cython"],
-    package_data=skyfield_data,
     # metadata for upload to PyPI
     author="Kiyo Masui, J. Richard Shaw",
     author_email="kiyo@physics.ubc.ca",

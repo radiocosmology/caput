@@ -16,6 +16,23 @@ import numpy as np
 from caput import time as ctime
 
 
+def setUpModule():
+    """Download the required Skyfield files from a mirror on a CHIME server.
+
+    The upstream servers for the timescale and ephemeris data can be
+    flaky. Use this to ensure a copy will be downloaded at the risk of it
+    being potentially out of date. This is useful for things like CI
+    servers, but otherwise letting Skyfield do it's downloading is a
+    better idea.
+    """
+    mirror_url = "https://bao.chimenet.ca/skyfield/"
+
+    files = ["Leap_Second.dat", "deltat.data", "deltat.preds", "de421.bsp"]
+
+    for file in files:
+        ctime.skyfield_wrapper.load(mirror_url + file)
+
+
 class TestUT2RATransit(unittest.TestCase):
     def test_epoch(self):
 
