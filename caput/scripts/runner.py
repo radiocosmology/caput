@@ -298,3 +298,7 @@ def expandpath(path):
 def fixpath(path):
     """Turn path to an absolute path"""
     return realpath(abspath(path))
+
+if __name__ == '__main__':
+    cli()
+
