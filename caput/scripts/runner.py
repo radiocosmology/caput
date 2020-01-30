@@ -216,7 +216,7 @@ source %(venv)s
 cd %(workdir)s
 export OMP_NUM_THREADS=%(ompnum)i
 
-mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
+mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none caput-pipeline run %(configpath)s &> %(logpath)s
 
 retcode=$?
 
@@ -251,7 +251,7 @@ source %(venv)s
 cd %(workdir)s
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-srun python %(scriptpath)s run %(configpath)s &> %(logpath)s
+srun caput-pipeline run %(configpath)s &> %(logpath)s
 
 retcode=$?
 
@@ -298,7 +298,3 @@ def expandpath(path):
 def fixpath(path):
     """Turn path to an absolute path"""
     return realpath(abspath(path))
-
-if __name__ == '__main__':
-    cli()
-
