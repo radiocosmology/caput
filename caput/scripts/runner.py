@@ -299,5 +299,6 @@ def fixpath(path):
     """Turn path to an absolute path"""
     return realpath(abspath(path))
 
+# This is needed because the queue script calls this file directly.
 if __name__ == '__main__':
     cli()
