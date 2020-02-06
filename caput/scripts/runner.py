@@ -122,12 +122,7 @@ def queue(configfile, submit=False):
     conf = yconf["cluster"]
 
     # Base setting if nothing else is set
-    defaults = {
-        "name": "job",
-        "queue": "batch",
-        "pernode": 1,
-        "ompnum": 8,
-    }
+    defaults = {"name": "job", "queue": "batch", "pernode": 1, "ompnum": 8}
 
     # Per system overrides (i.e. specialisations for Scinet GPC and Westgrid
     # cedar)
@@ -299,6 +294,7 @@ def fixpath(path):
     """Turn path to an absolute path"""
     return realpath(abspath(path))
 
+
 # This is needed because the queue script calls this file directly.
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()
