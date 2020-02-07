@@ -181,7 +181,7 @@ def queue(configfile, submit=False):
     sfile = fixpath(configfile)
     dfile = fixpath(join(jobdir, "config.yaml"))
     if sfile != dfile:
-        shutil.copy(sfile, dfile)
+        shutil.copyfile(sfile, dfile)
 
     # Set up virtualenv
     if "venv" in rconf:
