@@ -328,6 +328,75 @@ def enum(options, default=None):
     return prop
 
 
+def list_type(type_=None, length=None, maxlength=None, default=None):
+    """A property type that validates lists against required properties.
+
+    Parameters
+    ----------
+    type_ : type, optional
+        Type to apply. If `None` does not attempt to validate elements against type.
+    length : int, optional
+        Exact length of the list we expect. If `None` (default) accept any length.
+    maxlength : int, optional
+        Maximum length of the list. If `None` (default) there is no maximum length.
+    default : optional
+        The optional default value.
+
+    Returns
+    -------
+    prop : Property
+        A property instance setup to validate the type.
+
+    Examples
+    --------
+    Should be used like::
+
+        class Project(object):
+
+            mode = list_type(int, length=2, default=[3, 4])
+    """
+
+    def _prop(val):
+
+        if not isinstance(val, (list, tuple)):
+            raise ValueError("Expected to receive a list, but got '%s.'" % repr(val))
+
+        if type_:
+            for ii, item in enumerate(val):
+                if not isinstance(item, type_):
+                    raise ValueError(
+                        "Expected to receive a list with items of type %s, but got "
+                        "'%s.' at position %i" % (type_, val, ii)
+                    )
+
+        if length and len(val) != length:
+            raise ValueError(
+                "List expected to be of length %i, but was actually length %i"
+                % (length, len(val))
+            )
+
+        if maxlength and len(val) > maxlength:
+            raise ValueError(
+                "Maximum length of list is %i is, but list was actually length %i"
+                % (maxlength, len(val))
+            )
+
+        return val
+
+    if default:
+        try:
+            _prop(default)
+        except ValueError as e:
+            raise ValueError(
+                "Default value %s does not satisfy property requirements: %s"
+                % (default, repr(e))
+            )
+
+    prop = Property(proptype=_prop, default=default)
+
+    return prop
+
+
 if __name__ == "__main__":
     import doctest
 
