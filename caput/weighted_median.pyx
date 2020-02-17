@@ -177,7 +177,7 @@ def _mwm_1D(np.ndarray[np.float64_t, ndim=1] data, np.ndarray[np.float64_t, ndim
     cdef shared_ptr[Data[double]] dummy = shared_ptr[Data[double]](new Data[double](0, 0))
 
     # Add all elements that are in the window on start
-    for i in range(size // 2 + 1):
+    for i in range(min(size // 2 + 1, len_data)):
         if weights[i] != 0:
             node = avl.insert(data[i], weights[i])
         else:
@@ -263,7 +263,7 @@ def _mwm_2D(np.ndarray[np.float64_t, ndim=2] data, np.ndarray[np.float64_t, ndim
                 lower_limit = len_data_x
 
             # Add all elements that are in the window on start the col
-            for y in range(size_y // 2 + 1):
+            for y in range(min(size_y // 2 + 1, len_data_y)):
                 for x in range(upper_limit, lower_limit):
                     if weights[y,x] != 0:
                         node = avl.insert(data[y, x], weights[y, x])

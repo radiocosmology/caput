@@ -316,6 +316,29 @@ class TestMWM(unittest.TestCase):
             moving_weighted_median(values, weights, (3, 3)),
         )
 
+    def test_2d_mwm_small_large_window(self):
+        # Try a window that is much larger than the input array.
+        # This has caused crashes in older versions
+
+        values = [
+            [8.0, 6.0, 1.0, 5.0],
+            [6.0, 6.0, 8.0, 10.0],
+            [8.0, 4.0, 4.0, 7.0],
+            [10.0, 1.0, 7.0, 8.0],
+        ]
+        weights = [
+            [8.0, 6.0, 1.0, 5.0],
+            [6.0, 6.0, 8.0, 10.0],
+            [8.0, 4.0, 4.0, 7.0],
+            [10.0, 1.0, 7.0, 8.0],
+        ]
+        py_res = py_mwm_nd(values, weights, 11)
+        cy_res = moving_weighted_median(values, weights, (11, 11))
+        np.testing.assert_array_equal(py_res, cy_res)
+
+        # The window is so large all values should be equal, double check that
+        np.testing.assert_array_equal(cy_res, cy_res[0, 0])
+
     def test_2d_mwm_int(self):
         values = np.asarray(np.random.randint(0, 10, (14, 8)), np.float64)
         weights = np.asarray(np.random.randint(0, 10, (14, 8)), np.float64)
