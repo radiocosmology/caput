@@ -80,6 +80,7 @@ import warnings
 import posixpath
 from ast import literal_eval
 
+import json
 import numpy as np
 import h5py
 
@@ -1987,6 +1988,9 @@ def copyattrs(a1, a2):
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
 
+    # When serializing dictionaries, add this in front of the string
+    json_prefix = "!!_memh5_json:"
+
     def _map_attr(value):
 
         # Any arrays of numpy type unicode strings must be transformed before being copied into HDF5
@@ -2003,10 +2007,21 @@ def copyattrs(a1, a2):
                 return value
 
         # If we are copying into memh5 ensure that any string are unicode
-        return bytes_to_unicode(value)
+        value = bytes_to_unicode(value)
+
+        # Deserialize "special" _json values
+        if not isinstance(value, str):
+            return value
+        if value.startswith(json_prefix):
+            return json.loads(value[len(json_prefix) :])
+        return value
 
     for key in sorted(a1):
-        a2[key] = _map_attr(a1[key])
+        # Serialize dict values to json
+        if isinstance(a1[key], dict):
+            a2[key] = json_prefix + json.dumps(a1[key])
+        else:
+            a2[key] = _map_attr(a1[key])
 
 
 def deep_group_copy(g1, g2):

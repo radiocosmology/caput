@@ -39,3 +39,4 @@ script:
     - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
     - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"
     - "cd ~; mpirun -np 4 nosetests caput.tests.test_moving_weighted_median"
+    - "cd ~; mpirun -np 4 nosetests caput.tests.test_metadata"
