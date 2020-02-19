@@ -311,23 +311,23 @@ See the documentation for these base classes for more details.
 from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+from past.builtins import basestring
 
 # === End Python 2/3 compatibility
 
 from future import standard_library
 
 standard_library.install_aliases()
-from past.builtins import basestring
 from future.utils import raise_from
 
-import sys
+from copy import deepcopy
+import importlib
 import inspect
 import queue
 import logging
 import os
 from os import path
 import warnings
-
 import yaml
 
 from . import config
@@ -390,6 +390,46 @@ class _PipelineFinished(Exception):
 # ----------------
 
 
+def _get_versions(modules):
+    """
+    Get the versions of a list of python modules.
+
+    Parameters
+    ----------
+    modules : List[str]
+        Names of python modules.
+
+    Returns
+    -------
+    Dict[str, str]
+    """
+    if isinstance(modules, basestring):
+        modules = [modules]
+    if not isinstance(modules, list):
+        raise Exception(
+            "Value of 'save_versions' is of type '{}' (expected 'str' or 'list(str)').".format(
+                type(modules).__name__
+            )
+        )
+    versions = {}
+    for module in modules:
+        if not isinstance(module, basestring):
+            raise Exception(
+                "Found value of type '{}' in list 'save_versions' (expected 'str').".format(
+                    type(module).__name__
+                )
+            )
+        try:
+            versions[module] = importlib.import_module(module).__version__
+        except ModuleNotFoundError as err:
+            raise Exception(
+                "Failure getting versions requested with config parameter 'save_versions': {}".format(
+                    err
+                )
+            )
+    return versions
+
+
 class Manager(config.Reader):
     """Pipeline manager for setting up and running pipeline tasks.
 
@@ -398,12 +438,32 @@ class Manager(config.Reader):
     the each task in the appropriate order. It also handles intermediate data
     products and ensuring that the correct products are passed between tasks.
 
+    Attributes
+    ----------
+    logging : str
+        Log level.
+    multiprocessing : int
+        TODO
+    cluster : dict
+        TODO
+    tasks : list
+        Configuration of pipeline tasks.
+    save_versions : list
+        Module names (str). This list together with the version strings from these
+        modules are attached to output metadata. Default: [].
+    save_config : bool
+        If this is True, the global pipeline configuration is attached to output
+        metadata. Default: True.
     """
 
     logging = config.Property(default="warning", proptype=str)
     multiprocessing = config.Property(default=1, proptype=int)
     cluster = config.Property(default={}, proptype=dict)
     tasks = config.Property(default=[], proptype=list)
+
+    # Options to be stored in self.all_tasks_params
+    versions = config.Property(default=[], proptype=_get_versions, key="save_versions")
+    save_config = config.Property(default=True, proptype=bool)
 
     @classmethod
     def from_yaml_file(cls, file_name):
@@ -438,8 +498,23 @@ class Manager(config.Reader):
         """
 
         yaml_params = yaml.safe_load(yaml_doc)
+        try:
+            if not isinstance(yaml_params["pipeline"], dict):
+                raise Exception(
+                    "Value 'pipeline' in YAML configuration is of type '{}' (expected a YAML block here).".format(
+                        type(yaml_params["pipeline"]).__name__
+                    )
+                )
+        except TypeError:
+            raise Exception(
+                "Couldn't find key 'pipeline' in YAML configuration document."
+            )
         self = cls.from_config(yaml_params["pipeline"])
         self.all_params = yaml_params
+        self.all_tasks_params = {
+            "versions": self.versions,
+            "pipeline_config": self.all_params if self.save_config else None,
+        }
         return self
 
     def run(self):
@@ -565,9 +640,13 @@ class Manager(config.Reader):
                     msg = "Parameter group %s not found in config." % param_key
                     raise PipelineConfigError(msg)
 
+        # add global params to params
+        task_params = deepcopy(self.all_tasks_params)
+        task_params.update(params)
+
         # Setup task
-        task = task_cls._pipeline_from_config(params, task_spec)
-        # Set up data product keys.
+        task = task_cls._pipeline_from_config(task_params, task_spec)
+
         return task
 
 
