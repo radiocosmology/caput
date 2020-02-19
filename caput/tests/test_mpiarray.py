@@ -58,6 +58,29 @@ class TestMPIArray(unittest.TestCase):
         arr3 = arr.redistribute(axis=5)
         assert (arr3 == garr[:, :, :, :, :, s2:e2]).view(np.ndarray).all()
 
+    def test_gather(self):
+
+        rank = mpiutil.rank
+        size = mpiutil.size
+        block = 2
+
+        global_shape = (2, 3, size * block)
+        global_array = np.zeros(global_shape, dtype=np.float64)
+        global_array[..., :] = np.arange(size * block)
+
+        arr = mpiarray.MPIArray(global_shape, dtype=np.float64, axis=2)
+        arr[:] = global_array[..., (rank * block) : ((rank + 1) * block)]
+
+        assert (arr.allgather() == global_array).all()
+
+        gather_rank = 1 if size > 1 else 0
+        ga = arr.gather(rank=gather_rank)
+
+        if rank == gather_rank:
+            assert (ga == global_array).all()
+        else:
+            assert ga is None
+
     def test_wrap(self):
 
         ds = mpiarray.MPIArray((10, 17))
