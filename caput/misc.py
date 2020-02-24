@@ -56,7 +56,7 @@ def vectorize(**base_kwargs):
             arr = np.vectorize(self.func, **base_kwargs)(*args, **kwargs)
 
             if not len(arr.shape):
-                arr = np.asscalar(arr)
+                arr = arr.item()
 
             return arr
 

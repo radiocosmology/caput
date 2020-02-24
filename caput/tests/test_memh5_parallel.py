@@ -90,7 +90,9 @@ class TestMemGroupDistributed(unittest.TestCase):
         # Test round tripping unicode data
         g.create_dataset("unicode_data", data=np.array(["hello"]))
 
-        g.to_hdf5(self.fname)
+        g.to_hdf5(
+            self.fname, convert_attribute_strings=True, convert_dataset_strings=True
+        )
 
         # Test that the HDF5 file has the correct structure
         with h5py.File(self.fname, "r") as f:
@@ -111,7 +113,12 @@ class TestMemGroupDistributed(unittest.TestCase):
             self.assertIn("world", f["hello"])
 
         # Test that the read in group has the same structure as the original
-        g2 = memh5.MemGroup.from_hdf5(self.fname, distributed=True)
+        g2 = memh5.MemGroup.from_hdf5(
+            self.fname,
+            distributed=True,
+            convert_attribute_strings=True,
+            convert_dataset_strings=True,
+        )
 
         # Check that the parallel data is still the same
         self.assertTrue((g2["parallel_data"][:] == g["parallel_data"][:]).all())
