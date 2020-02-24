@@ -235,23 +235,36 @@ class TestUnicodeDataset(unittest.TestCase):
         self.assertEqual(udset.dtype.kind, "U")
         self.assertEqual(sdset.dtype.kind, "S")
 
-        m.to_hdf5(self.fname)
+        # Test a write without conversion. This should throw an exception
+        with self.assertRaises(TypeError):
+            m.to_hdf5(self.fname)
+
+        # Write with conversion
+        m.to_hdf5(
+            self.fname, convert_attribute_strings=True, convert_dataset_strings=True
+        )
 
         with h5py.File(self.fname, "r") as fh:
             self.assertEqual(fh["udata"].dtype.kind, "S")
             self.assertEqual(fh["sdata"].dtype.kind, "S")
 
-            self.assertIn("__memh5_unicode", fh["udata"].attrs)
-            self.assertNotIn("__memh5_unicode", fh["sdata"].attrs)
-
-            self.assertTrue(fh["udata"].attrs["__memh5_unicode"])
-
+        # Test a load without conversion, types should be bytestrings
         m2 = memh5.MemGroup.from_hdf5(self.fname)
-
-        self.assertEqual(m2["udata"].dtype.kind, "U")
+        self.assertEqual(m2["udata"].dtype.kind, "S")
         self.assertEqual(m2["sdata"].dtype.kind, "S")
-        self.assertTrue((m["udata"].data == m2["udata"].data).all())
+        # Check the dtype here, for some reason Python 2 thinks the arrays are equal
+        # and Python 3 does not even though both agree that the datatypes are different
+        self.assertTrue(m["udata"].dtype != m2["udata"].dtype)
         self.assertTrue((m["sdata"].data == m2["sdata"].data).all())
+
+        # Test a load *with* conversion, types should be unicode
+        m3 = memh5.MemGroup.from_hdf5(
+            self.fname, convert_attribute_strings=True, convert_dataset_strings=True
+        )
+        self.assertEqual(m3["udata"].dtype.kind, "U")
+        self.assertEqual(m3["sdata"].dtype.kind, "U")
+        self.assertTrue((m["udata"].data == m3["udata"].data).all())
+        self.assertTrue((m["udata"].data == m3["sdata"].data).all())
 
     def test_failure(self):
         # Test that we fail when trying to write a non ASCII character
@@ -259,9 +272,9 @@ class TestUnicodeDataset(unittest.TestCase):
         udata = np.array(["\u03B2"])
 
         m = memh5.MemGroup()
-        udset = m.create_dataset("udata", data=udata)
+        m.create_dataset("udata", data=udata)
 
-        with self.assertRaises(UnicodeEncodeError):
+        with self.assertRaises(TypeError):
             m.to_hdf5(self.fname)
 
     def tearDown(self):
