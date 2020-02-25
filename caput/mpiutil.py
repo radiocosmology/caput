@@ -738,6 +738,8 @@ class SelfWrapper(ModuleType):
             return globals()[name]
         elif _comm is not None and name in MPI.__dict__:
             return MPI.__dict__[name]
+        else:
+            raise AttributeError("module 'mpiutil' has no attribute '%s'" % name)
 
     def __call__(self, **kwargs):
         # print 'here'

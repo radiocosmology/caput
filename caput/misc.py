@@ -147,6 +147,8 @@ class lock_file(object):
     Example
     -------
 
+    >>> from . import memh5
+    >>> container = memh5.BasicCont()
     >>> with lock_file('file_to_create.h5') as fname:
     ...     container.save(fname)
     ...

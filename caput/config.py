@@ -42,9 +42,9 @@ And a dictionary of replacement parameters.
 
 First let's check what the default parameters are:
 
->>> print person1.name, person1.age
+>>> print(person1.name, person1.age)
 Bill 26.0
->>> print person2.name, person2.age, person2.petname
+>>> print(person2.name, person2.age, person2.petname)
 Bill 26.0 Molly
 
 Now let's load the configuration from a dictionary:
@@ -54,9 +54,9 @@ Now let's load the configuration from a dictionary:
 
 Then we'll print the output to see the updated configuration:
 
->>> print person1.name, person1.age
+>>> print(person1.name, person1.age)
 Richard 40.0
->>> print person2.name, person2.age, person2.petname
+>>> print(person2.name, person2.age, person2.petname)
 Richard 40.0 Sooty
 
 """
