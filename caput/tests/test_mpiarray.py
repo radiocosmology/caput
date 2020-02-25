@@ -21,7 +21,6 @@ from caput import mpiutil, mpiarray
 import sys
 
 
-
 class TestMPIArray(unittest.TestCase):
     def test_construction(self):
 
