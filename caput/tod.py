@@ -298,7 +298,14 @@ class Reader(object):
 
 
 def concatenate(
-    data_list, out_group=None, start=None, stop=None, datasets=None, dataset_filter=None
+    data_list,
+    out_group=None,
+    start=None,
+    stop=None,
+    datasets=None,
+    dataset_filter=None,
+    convert_attribute_strings=False,
+    convert_dataset_strings=False,
 ):
     """Concatenate data along the time axis.
 
@@ -334,6 +341,10 @@ def concatenate(
         dataset (either h5py or memh5). Optionally may accept a second
         argument that is slice along the time axis, which the filter should
         apply.
+    convert_attribute_strings : bool, optional
+        Try and convert attribute string types to unicode. Default is `False`.
+    convert_dataset_strings : bool, optional
+        Try and convert dataset string types to unicode. Default is `False`.
 
     Returns
     -------
@@ -382,7 +393,7 @@ def concatenate(
     # Choose return class and initialize the object.
     out = first_data.__class__(out_group, distributed=distributed, comm=comm)
 
-    # Resolve the index maps. XXX Shouldn't be nessisary after fix to
+    # Resolve the index maps. XXX Shouldn't be necessary after fix to
     # _copy_non_time_data.
     for axis, index_map in first_data.index_map.items():
         if axis in concatenation_axes:
@@ -399,7 +410,12 @@ def concatenate(
     for axis, reverse_map in first_data.reverse_map.items():
         out.create_reverse_map(axis, reverse_map)
 
-    all_dataset_names = _copy_non_time_data(data_list, out)
+    all_dataset_names = _copy_non_time_data(
+        data_list,
+        out,
+        convert_attribute_strings=convert_attribute_strings,
+        convert_dataset_strings=convert_dataset_strings,
+    )
     if datasets is None:
         dataset_names = all_dataset_names
     else:
@@ -429,7 +445,11 @@ def concatenate(
             )
             out.index_map[axis][out_slice] = data.index_map[axis][in_slice]
         # Now copy over the datasets and flags.
-        this_dataset_names = _copy_non_time_data(data)
+        this_dataset_names = _copy_non_time_data(
+            data,
+            convert_attribute_strings=convert_attribute_strings,
+            convert_dataset_strings=convert_dataset_strings,
+        )
         for name in this_dataset_names:
             dataset = data[name]
             if name not in dataset_names:
@@ -506,7 +526,9 @@ def concatenate(
                     )
                 else:
                     new_dset = out.create_dataset(name, shape=full_shape, dtype=dtype)
-                memh5.copyattrs(attrs, new_dset.attrs)
+                memh5.copyattrs(
+                    attrs, new_dset.attrs, convert_strings=convert_attribute_strings
+                )
 
             out_dset = out[name]
             out_slice = (slice(None),) * axis_ind + (out_slice,)
@@ -561,7 +583,13 @@ def ensure_file_list(files):
     return files
 
 
-def _copy_non_time_data(data, out=None, to_dataset_names=None):
+def _copy_non_time_data(
+    data,
+    out=None,
+    to_dataset_names=None,
+    convert_attribute_strings=False,
+    convert_dataset_strings=False,
+):
     """Crawl data copying everything but time-ordered datasets to out.
 
     Return list of all time-order dataset names. Leading '/' is stripped off.
@@ -579,7 +607,9 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
         data = data[0]
 
     if out is not None:
-        memh5.copyattrs(data.attrs, out.attrs)
+        memh5.copyattrs(
+            data.attrs, out.attrs, convert_strings=convert_attribute_strings
+        )
 
     for key, entry in data.items():
         if key in ["index_map", "reverse_map"]:
@@ -590,7 +620,13 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
                 sub_out = out.require_group(key)
             else:
                 sub_out = None
-            _copy_non_time_data(entry, sub_out, to_dataset_names)
+            _copy_non_time_data(
+                entry,
+                sub_out,
+                to_dataset_names,
+                convert_attribute_strings,
+                convert_dataset_strings,
+            )
         else:
             # Check if any axis is a 'time' axis
             if "axis" in entry.attrs and set(data.time_axes).intersection(
@@ -598,10 +634,15 @@ def _copy_non_time_data(data, out=None, to_dataset_names=None):
             ):
                 to_dataset_names.append(entry.name)
             elif out is not None:
-                out.create_dataset(
-                    key, shape=entry.shape, dtype=entry.dtype, data=entry
+                data = (
+                    memh5.ensure_unicode(entry.data)
+                    if convert_dataset_strings
+                    else entry.data
                 )
-                memh5.copyattrs(entry.attrs, out[key].attrs)
+                out.create_dataset(key, shape=entry.shape, dtype=entry.dtype, data=data)
+                memh5.copyattrs(
+                    entry.attrs, out[key].attrs, convert_strings=convert_dataset_strings
+                )
     to_dataset_names = [n[1:] if n[0] == "/" else n for n in to_dataset_names]
     return to_dataset_names
 
