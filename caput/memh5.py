@@ -1419,13 +1419,12 @@ class MemDiskGroup(_BaseGroup):
         # in the attributes of the root.
         new_cls = cls
         if detect_subclass and "__memh5_subclass" in data_group.attrs:
-            from .pipeline import _import_class
 
             clspath = data_group.attrs["__memh5_subclass"]
 
             # Try and get a reference to the requested class (warn if we cannot find it)
             try:
-                new_cls = _import_class(clspath)
+                new_cls = misc.import_class(clspath)
             except (ImportError, KeyError):
                 warnings.warn("Could not import memh5 subclass %s" % clspath)
 

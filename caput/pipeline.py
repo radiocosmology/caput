@@ -311,21 +311,18 @@ See the documentation for these base classes for more details.
 from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-from past.builtins import basestring
 
 # === End Python 2/3 compatibility
 
-from future import standard_library
-
-standard_library.install_aliases()
+from past.builtins import basestring
 from future.utils import raise_from
 
-from copy import deepcopy
-import importlib
-import inspect
 import queue
 import logging
 import os
+import importlib
+from copy import deepcopy
+
 from os import path
 import warnings
 import yaml
@@ -607,7 +604,7 @@ class Manager(config.Reader):
             task_cls = local_tasks[task_path]
         else:
             try:
-                task_cls = _import_class(task_path)
+                task_cls = misc.import_class(task_path)
             except Exception as e:
                 msg = "Loading task '%s' caused error - %s: %s" % (
                     task_path,
@@ -789,7 +786,7 @@ class TaskBase(config.Reader):
         in_ = _format_product_keys(task_spec, "in")
         out = _format_product_keys(task_spec, "out")
         # Inspect the `setup` method to see how many arguments it takes.
-        setup_argspec = inspect.getargspec(self.setup)
+        setup_argspec = misc.getfullargspec(self.setup)
         # Make sure it matches `requires` keys list specified in config.
         n_requires = len(requires)
         try:
@@ -810,7 +807,7 @@ class TaskBase(config.Reader):
             )
             raise PipelineConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
-        next_argspec = inspect.getargspec(self.next)
+        next_argspec = misc.getfullargspec(self.next)
         # Make sure it matches `in` keys list specified in config.
         n_in = len(in_)
         try:
@@ -999,14 +996,19 @@ class _OneAndOne(TaskBase):
         """Checks inputs and outputs and stuff."""
 
         # Inspect the `process` method to see how many arguments it takes.
-        pro_argspec = inspect.getargspec(self.process)
+        pro_argspec = misc.getfullargspec(self.process)
         n_args = len(pro_argspec.args) - 1
         if n_args > 1:
             msg = (
                 "`process` method takes more than 1 argument, which is not" " allowed."
             )
             raise PipelineConfigError(msg)
-        if pro_argspec.varargs or pro_argspec.keywords or pro_argspec.defaults:
+        if (
+            pro_argspec.varargs
+            or pro_argspec.keywords
+            or pro.argspec.kwonlyargs
+            or pro_argspec.defaults
+        ):
             msg = (
                 "`process` method may not have variable length or optional"
                 " arguments."
@@ -1446,21 +1448,6 @@ def _format_product_keys(spec, name):
             msg = "Data product keys must be strings."
             raise PipelineConfigError(msg)
     return out_prod
-
-
-def _import_class(class_path):
-    """Import class dynamically from a string."""
-    path_split = class_path.split(".")
-    module_path = ".".join(path_split[:-1])
-    class_name = path_split[-1]
-    if module_path:
-        m = __import__(module_path)
-        for comp in path_split[1:]:
-            m = getattr(m, comp)
-        task_cls = m
-    else:
-        task_cls = globals()[class_name]
-    return task_cls
 
 
 if __name__ == "__main__":

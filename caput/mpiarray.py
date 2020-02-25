@@ -883,7 +883,7 @@ class MPIArray(np.ndarray):
                 # Put the data into the correct location
                 dest_slice = [slice(None)] * len(self.shape)
                 dest_slice[self.axis] = slice(s, e)
-                arr[dest_slice] = tbuf
+                arr[tuple(dest_slice)] = tbuf
 
         return arr
 
@@ -914,7 +914,7 @@ class MPIArray(np.ndarray):
             # Copy the array into the correct place
             dest_slice = [slice(None)] * len(self.shape)
             dest_slice[self.axis] = slice(s, e)
-            arr[dest_slice] = tbuf
+            arr[tuple(dest_slice)] = tbuf
 
         return arr
 

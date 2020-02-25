@@ -13,11 +13,16 @@ Routines
 from __future__ import absolute_import, division, print_function, unicode_literals
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+from future.utils import PY3
+from past.builtins import basestring
 
 # === End Python 2/3 compatibility
 
+import collections
+import importlib
+import inspect
 import os
-from past.builtins import basestring
+
 import numpy as np
 
 
@@ -198,3 +203,72 @@ class lock_file(object):
     @property
     def lockfile(self):
         return self.tmpfile + ".lock"
+
+
+# Wrapper for getfullargspec
+def getfullargspec(f):
+    """Python 2 compatible implementation of `inspect.getfullargspec`.
+
+    Parameters
+    ----------
+    f : function
+        Callable to inspect.
+
+    Returns
+    -------
+    fullargspec : namedtuple
+        Named tuple with various fields. See `inspect.getfullargspec`.
+    """
+
+    if PY3:
+        return inspect.getfullargspec(f)
+    else:
+        argspec = inspect.getargspec(f)
+
+        fullargspec_type = collections.namedtuple(
+            "FullArgSpec",
+            [
+                "args",
+                "varargs",
+                "varkw",
+                "defaults",
+                "kwonlyargs",
+                "kwonlydefaults",
+                "annotations",
+            ],
+        )
+
+        return fullargspec_type(
+            args=argspec.args,
+            varargs=argspec.varargs,
+            defaults=argspec.defaults,
+            varkw=argspec.keywords,  # This is the equivalent field
+            kwonlyargs=[],  # KW only args do not exist in Python 2
+            kwonlydefaults=[],
+            annotations=[],  # Annotations do not exist in Python 2
+        )
+
+
+def import_class(class_path):
+    """Import class dynamically from a string.
+
+    Parameters
+    ----------
+    class_path : str
+        Fully qualified path to the class. If only a single component, look up in the
+        globals.
+
+    Returns
+    -------
+    class : class object
+        The class we want to load.
+    """
+    path_split = class_path.split(".")
+    module_path = ".".join(path_split[:-1])
+    class_name = path_split[-1]
+    if module_path:
+        m = importlib.import_module(module_path)
+        task_cls = getattr(m, class_name)
+    else:
+        task_cls = globals()[class_name]
+    return task_cls

@@ -43,6 +43,7 @@ import numpy as np
 import h5py
 
 from . import memh5
+from . import misc
 from . import mpiarray
 
 
@@ -345,7 +346,7 @@ def concatenate(
         def dataset_filter(d):
             return d
 
-    filter_time_slice = len(inspect.getargspec(dataset_filter).args) == 2
+    filter_time_slice = len(misc.getfullargspec(dataset_filter).args) == 2
 
     # Inspect first entry in the list to get constant parts..
     first_data = data_list[0]
