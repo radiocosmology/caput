@@ -20,7 +20,6 @@ from caput import mpiutil, mpiarray
 
 import sys
 
-sys.excepthook = mpiutil.sys_excepthook
 
 
 class TestMPIArray(unittest.TestCase):

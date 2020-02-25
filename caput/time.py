@@ -881,9 +881,3 @@ class SkyfieldWrapper(object):
 # Set up a module local Skyfield wrapper for time conversion functions in this
 # module to use.
 skyfield_wrapper = SkyfieldWrapper()
-
-
-if __name__ == "__main__":
-    import doctest
-
-    doctest.testmod()

@@ -74,16 +74,16 @@ trivial but fully implemented task:
 ...         self.i = 0
 ...
 ...     def setup(self):
-...         print "Setting up PrintEggs."
+...         print("Setting up PrintEggs.")
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
 ...             raise PipelineStopIteration()
-...         print "Spam and %s eggs." % self.eggs[self.i]
+...         print("Spam and %s eggs." % self.eggs[self.i])
 ...         self.i += 1
 ...
 ...     def finish(self):
-...         print "Finished PrintEggs."
+...         print("Finished PrintEggs.")
 
 Any return value of these three pipeline methods can be handled by the pipeline
 and provided to subsequent tasks. The methods :meth:`setup` and :meth:`next`
@@ -99,7 +99,7 @@ that are designed to operate in this manner.
 ...         self.i = 0
 ...
 ...     def setup(self):
-...         print "Setting up GetEggs."
+...         print("Setting up GetEggs.")
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
@@ -109,20 +109,20 @@ that are designed to operate in this manner.
 ...         return egg
 ...
 ...     def finish(self):
-...         print "Finished GetEggs."
+...         print("Finished GetEggs.")
 
 >>> class CookEggs(TaskBase):
 ...
 ...     style = config.Property(proptype=str)
 ...
 ...     def setup(self):
-...         print "Setting up CookEggs."
+...         print("Setting up CookEggs.")
 ...
 ...     def next(self, egg):
-...         print "Cooking %s %s eggs." % (self.style, egg)
+...         print("Cooking %s %s eggs." % (self.style, egg))
 ...
 ...     def finish(self):
-...         print "Finished CookEggs."
+...         print("Finished CookEggs.")
 
 Note that :meth:`CookEggs.next` never raises a :exc:`PipelineStopIteration`.
 This is because there is no way for the task to internally know how long to
@@ -224,13 +224,13 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 >>> class DoNothing(TaskBase):
 ...
 ...     def setup(self):
-...         print "Setting up DoNothing."
+...         print("Setting up DoNothing.")
 ...
 ...     def next(self, input):
-...         print "DoNothing next."
+...         print("DoNothing next.")
 ...
 ...     def finish(self):
-...         print "Finished DoNothing."
+...         print("Finished DoNothing.")
 
 >>> local_tasks.update(globals())  # Required for interactive sessions only.
 >>> new_spam_config = '''
