@@ -460,6 +460,9 @@ class MemGroup(_BaseGroup):
         comm : MPI.Comm, optional
             MPI communicator to distributed over. If :obj:`None` use
             :obj:`MPI.COMM_WORLD`.
+        selections : dict
+            If this is not None, it should map dataset names to axis selections as valid
+            numpy indexes.
         convert_attribute_strings : bool, optional
             Try and convert attribute string types to unicode. Default is `False`.
         convert_dataset_strings : bool, optional
@@ -489,7 +492,7 @@ class MemGroup(_BaseGroup):
                 deep_group_copy(
                     f,
                     self,
-                    selections,
+                    selections=selections,
                     convert_attribute_strings=convert_attribute_strings,
                     convert_dataset_strings=convert_dataset_strings,
                 )
@@ -2226,13 +2229,16 @@ def deep_group_copy(
         unicode.
     """
 
+    if selections is None:
+        selections = slice(None)
+
     copyattrs(g1.attrs, g2.attrs, convert_strings=convert_attribute_strings)
 
     # Sort to ensure consistent insertion order
     for key in sorted(g1):
         entry = g1[key]
         if isinstance(selections, dict):
-            selection = selections.get(key, None)
+            selection = selections.get(key, slice(None))
         else:
             selection = selections
         if is_group(entry):
@@ -2245,24 +2251,22 @@ def deep_group_copy(
                 convert_attribute_strings=convert_attribute_strings,
             )
         else:
-            if selection is None:
-                selection = slice(None)
-
-            data = entry[selection]
-
             if convert_dataset_strings:
 
                 # Convert unicode strings back into ascii byte strings. This will break
                 # if there are characters outside of the ascii range
                 if isinstance(g2, h5py.Group):
-                    data = ensure_bytestring(data[:])
+                    data = ensure_bytestring(entry[selection])
 
                 # Convert strings in an HDF5 dataset into unicode
                 else:
-                    data = ensure_unicode(data[:])
+                    data = ensure_unicode(entry[selection])
 
             elif isinstance(g2, h5py.Group):
-                data = check_unicode(data)
+                data = check_unicode(entry)
+                data = data[selection]
+            else:
+                data = entry[selection]
 
             g2.create_dataset(
                 key,
@@ -2556,7 +2560,7 @@ def _distributed_group_from_hdf5(
         copyattrs(attr_dict, memitem.attrs, **kwargs)
 
     # Function to perform a recursive clone of the tree structure
-    def _copy_from_file(h5group, memgroup, selections=slice(None)):
+    def _copy_from_file(h5group, memgroup, selections=None):
 
         # Copy over attributes
         _copy_attrs_bcast(h5group, memgroup, convert_strings=convert_attribute_strings)
@@ -2567,7 +2571,7 @@ def _distributed_group_from_hdf5(
             item = h5group[key]
 
             if isinstance(selections, dict):
-                selection = selections.get(key, slice(None))
+                selection = selections.get(key, None)
             else:
                 selection = selections
 
@@ -2595,7 +2599,10 @@ def _distributed_group_from_hdf5(
                     # Read common data onto rank zero and broadcast
                     cdata = None
                     if comm.rank == 0:
-                        cdata = item[selection]
+                        if selection is None:
+                            cdata = item[:]
+                        else:
+                            cdata = item[selection]
 
                         # Convert ascii string back to unicode if requested
                         if convert_dataset_strings:
