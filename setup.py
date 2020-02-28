@@ -16,7 +16,7 @@ from Cython.Build import cythonize
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
 
-from caput import __version__
+import versioneer
 
 
 REQUIRES = ["numpy>=1.16", "h5py", "PyYAML", "cython", "future", "click"]
@@ -50,9 +50,11 @@ extensions = [
     )
 ]
 
+
 setup(
     name="caput",
-    version=__version__,
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     packages=find_packages(),
     entry_points="""
         [console_scripts]

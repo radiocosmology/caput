@@ -18,6 +18,7 @@ addons:
 install:
     - "pip install -r requirements.txt"
     - "pip install mpi4py"
+    - "pip install pytest"
     - "python setup.py develop"
 
 jobs:
@@ -35,7 +36,6 @@ jobs:
             - "sphinx-build -b html doc/ doc/_build/html"
 
 script:
-    - "cd ~; nosetests caput"
-    - "cd ~; mpirun -np 4 nosetests caput.tests.test_memh5_parallel"
-    - "cd ~; mpirun -np 4 nosetests caput.tests.test_mpiarray"
-    - "cd ~; mpirun -np 4 nosetests caput.tests.test_moving_weighted_median"
+    - "pytest --doctest-modules caput/"
+    - "mpirun -np 4 pytest caput/tests/test_memh5_parallel.py"
+    - "mpirun -np 4 pytest caput/tests/test_mpiarray.py"

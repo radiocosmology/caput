@@ -74,16 +74,16 @@ trivial but fully implemented task:
 ...         self.i = 0
 ...
 ...     def setup(self):
-...         print "Setting up PrintEggs."
+...         print("Setting up PrintEggs.")
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
 ...             raise PipelineStopIteration()
-...         print "Spam and %s eggs." % self.eggs[self.i]
+...         print("Spam and %s eggs." % self.eggs[self.i])
 ...         self.i += 1
 ...
 ...     def finish(self):
-...         print "Finished PrintEggs."
+...         print("Finished PrintEggs.")
 
 Any return value of these three pipeline methods can be handled by the pipeline
 and provided to subsequent tasks. The methods :meth:`setup` and :meth:`next`
@@ -99,7 +99,7 @@ that are designed to operate in this manner.
 ...         self.i = 0
 ...
 ...     def setup(self):
-...         print "Setting up GetEggs."
+...         print("Setting up GetEggs.")
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
@@ -109,20 +109,20 @@ that are designed to operate in this manner.
 ...         return egg
 ...
 ...     def finish(self):
-...         print "Finished GetEggs."
+...         print("Finished GetEggs.")
 
 >>> class CookEggs(TaskBase):
 ...
 ...     style = config.Property(proptype=str)
 ...
 ...     def setup(self):
-...         print "Setting up CookEggs."
+...         print("Setting up CookEggs.")
 ...
 ...     def next(self, egg):
-...         print "Cooking %s %s eggs." % (self.style, egg)
+...         print("Cooking %s %s eggs." % (self.style, egg))
 ...
 ...     def finish(self):
-...         print "Finished CookEggs."
+...         print("Finished CookEggs.")
 
 Note that :meth:`CookEggs.next` never raises a :exc:`PipelineStopIteration`.
 This is because there is no way for the task to internally know how long to
@@ -224,13 +224,13 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 >>> class DoNothing(TaskBase):
 ...
 ...     def setup(self):
-...         print "Setting up DoNothing."
+...         print("Setting up DoNothing.")
 ...
 ...     def next(self, input):
-...         print "DoNothing next."
+...         print("DoNothing next.")
 ...
 ...     def finish(self):
-...         print "Finished DoNothing."
+...         print("Finished DoNothing.")
 
 >>> local_tasks.update(globals())  # Required for interactive sessions only.
 >>> new_spam_config = '''
@@ -314,20 +314,17 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 
 # === End Python 2/3 compatibility
 
-from future import standard_library
-
-standard_library.install_aliases()
 from past.builtins import basestring
 from future.utils import raise_from
 
-import sys
-import inspect
 import queue
 import logging
 import os
+import importlib
+from copy import deepcopy
+
 from os import path
 import warnings
-
 import yaml
 
 from . import config
@@ -390,6 +387,46 @@ class _PipelineFinished(Exception):
 # ----------------
 
 
+def _get_versions(modules):
+    """
+    Get the versions of a list of python modules.
+
+    Parameters
+    ----------
+    modules : List[str]
+        Names of python modules.
+
+    Returns
+    -------
+    Dict[str, str]
+    """
+    if isinstance(modules, basestring):
+        modules = [modules]
+    if not isinstance(modules, list):
+        raise Exception(
+            "Value of 'save_versions' is of type '{}' (expected 'str' or 'list(str)').".format(
+                type(modules).__name__
+            )
+        )
+    versions = {}
+    for module in modules:
+        if not isinstance(module, basestring):
+            raise Exception(
+                "Found value of type '{}' in list 'save_versions' (expected 'str').".format(
+                    type(module).__name__
+                )
+            )
+        try:
+            versions[module] = importlib.import_module(module).__version__
+        except ModuleNotFoundError as err:
+            raise Exception(
+                "Failure getting versions requested with config parameter 'save_versions': {}".format(
+                    err
+                )
+            )
+    return versions
+
+
 class Manager(config.Reader):
     """Pipeline manager for setting up and running pipeline tasks.
 
@@ -398,12 +435,32 @@ class Manager(config.Reader):
     the each task in the appropriate order. It also handles intermediate data
     products and ensuring that the correct products are passed between tasks.
 
+    Attributes
+    ----------
+    logging : str
+        Log level.
+    multiprocessing : int
+        TODO
+    cluster : dict
+        TODO
+    tasks : list
+        Configuration of pipeline tasks.
+    save_versions : list
+        Module names (str). This list together with the version strings from these
+        modules are attached to output metadata. Default: [].
+    save_config : bool
+        If this is True, the global pipeline configuration is attached to output
+        metadata. Default: True.
     """
 
     logging = config.Property(default="warning", proptype=str)
     multiprocessing = config.Property(default=1, proptype=int)
     cluster = config.Property(default={}, proptype=dict)
     tasks = config.Property(default=[], proptype=list)
+
+    # Options to be stored in self.all_tasks_params
+    versions = config.Property(default=[], proptype=_get_versions, key="save_versions")
+    save_config = config.Property(default=True, proptype=bool)
 
     @classmethod
     def from_yaml_file(cls, file_name):
@@ -438,8 +495,23 @@ class Manager(config.Reader):
         """
 
         yaml_params = yaml.safe_load(yaml_doc)
+        try:
+            if not isinstance(yaml_params["pipeline"], dict):
+                raise Exception(
+                    "Value 'pipeline' in YAML configuration is of type '{}' (expected a YAML block here).".format(
+                        type(yaml_params["pipeline"]).__name__
+                    )
+                )
+        except TypeError:
+            raise Exception(
+                "Couldn't find key 'pipeline' in YAML configuration document."
+            )
         self = cls.from_config(yaml_params["pipeline"])
         self.all_params = yaml_params
+        self.all_tasks_params = {
+            "versions": self.versions,
+            "pipeline_config": self.all_params if self.save_config else None,
+        }
         return self
 
     def run(self):
@@ -532,7 +604,7 @@ class Manager(config.Reader):
             task_cls = local_tasks[task_path]
         else:
             try:
-                task_cls = _import_class(task_path)
+                task_cls = misc.import_class(task_path)
             except Exception as e:
                 msg = "Loading task '%s' caused error - %s: %s" % (
                     task_path,
@@ -565,9 +637,13 @@ class Manager(config.Reader):
                     msg = "Parameter group %s not found in config." % param_key
                     raise PipelineConfigError(msg)
 
+        # add global params to params
+        task_params = deepcopy(self.all_tasks_params)
+        task_params.update(params)
+
         # Setup task
-        task = task_cls._pipeline_from_config(params, task_spec)
-        # Set up data product keys.
+        task = task_cls._pipeline_from_config(task_params, task_spec)
+
         return task
 
 
@@ -710,7 +786,7 @@ class TaskBase(config.Reader):
         in_ = _format_product_keys(task_spec, "in")
         out = _format_product_keys(task_spec, "out")
         # Inspect the `setup` method to see how many arguments it takes.
-        setup_argspec = inspect.getargspec(self.setup)
+        setup_argspec = misc.getfullargspec(self.setup)
         # Make sure it matches `requires` keys list specified in config.
         n_requires = len(requires)
         try:
@@ -731,7 +807,7 @@ class TaskBase(config.Reader):
             )
             raise PipelineConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
-        next_argspec = inspect.getargspec(self.next)
+        next_argspec = misc.getfullargspec(self.next)
         # Make sure it matches `in` keys list specified in config.
         n_in = len(in_)
         try:
@@ -920,14 +996,19 @@ class _OneAndOne(TaskBase):
         """Checks inputs and outputs and stuff."""
 
         # Inspect the `process` method to see how many arguments it takes.
-        pro_argspec = inspect.getargspec(self.process)
+        pro_argspec = misc.getfullargspec(self.process)
         n_args = len(pro_argspec.args) - 1
         if n_args > 1:
             msg = (
                 "`process` method takes more than 1 argument, which is not" " allowed."
             )
             raise PipelineConfigError(msg)
-        if pro_argspec.varargs or pro_argspec.keywords or pro_argspec.defaults:
+        if (
+            pro_argspec.varargs
+            or pro_argspec.keywords
+            or pro.argspec.kwonlyargs
+            or pro_argspec.defaults
+        ):
             msg = (
                 "`process` method may not have variable length or optional"
                 " arguments."
@@ -1367,21 +1448,6 @@ def _format_product_keys(spec, name):
             msg = "Data product keys must be strings."
             raise PipelineConfigError(msg)
     return out_prod
-
-
-def _import_class(class_path):
-    """Import class dynamically from a string."""
-    path_split = class_path.split(".")
-    module_path = ".".join(path_split[:-1])
-    class_name = path_split[-1]
-    if module_path:
-        m = __import__(module_path)
-        for comp in path_split[1:]:
-            m = getattr(m, comp)
-        task_cls = m
-    else:
-        task_cls = globals()[class_name]
-    return task_cls
 
 
 if __name__ == "__main__":

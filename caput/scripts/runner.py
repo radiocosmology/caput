@@ -140,7 +140,7 @@ def queue(configfile, submit=False):
         sys = conf["system"]
 
         if sys not in system_defaults:
-            raise ValueError('Specified system "%s\: is not known.' % sys)
+            raise ValueError('Specified system "%s": is not known.' % sys)
 
         rconf.update(**system_defaults[sys])
 

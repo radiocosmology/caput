@@ -832,6 +832,92 @@ class MPIArray(np.ndarray):
             self.view(np.ndarray).copy(), axis=self.axis, comm=self.comm
         )
 
+    def gather(self, rank=0):
+        """Gather a full copy onto a specific rank.
+
+        Parameters
+        ----------
+        rank : int, optional
+            Rank to gather onto. Default is rank=0
+
+        Returns
+        -------
+        arr : np.ndarray, or None
+            The full global array on the specified rank.
+        """
+        if self.comm.rank == rank:
+            arr = np.ndarray(self.global_shape, dtype=self.dtype)
+        else:
+            arr = None
+
+        splits = mpiutil.split_all(self.global_shape[self.axis], self.comm)
+
+        for ri, (n, s, e) in enumerate(zip(*splits)):
+
+            if self.comm.rank == rank:
+
+                # Construct a temporary array for the data to be received into
+                tshape = list(self.global_shape)
+                tshape[self.axis] = n
+                tbuf = np.ndarray(tshape, dtype=self.dtype)
+
+                # Set up the non-blocking receive request
+                request = self.comm.Irecv(tbuf, source=ri)
+
+            # Send the data
+            if self.comm.rank == ri:
+                self.comm.Isend(self.view(np.ndarray), dest=rank)
+
+            if self.comm.rank == rank:
+
+                # Wait until the data has arrived
+                stat = mpiutil.MPI.Status()
+                request.Wait(status=stat)
+
+                if stat.error != mpiutil.MPI.SUCCESS:
+                    print(
+                        "**** ERROR in MPI RECV (source: %i,  dest rank: %i) *****"
+                        % (ri, rank)
+                    )
+
+                # Put the data into the correct location
+                dest_slice = [slice(None)] * len(self.shape)
+                dest_slice[self.axis] = slice(s, e)
+                arr[tuple(dest_slice)] = tbuf
+
+        return arr
+
+    def allgather(self):
+        """Gather a full copy onto each rank.
+
+        Returns
+        -------
+        arr : np.ndarray
+            The full global array.
+        """
+        arr = np.ndarray(self.global_shape, dtype=self.dtype)
+
+        splits = mpiutil.split_all(self.global_shape[self.axis], self.comm)
+
+        for ri, (n, s, e) in enumerate(zip(*splits)):
+
+            # Construct a temporary array for the data to be received into
+            tshape = list(self.global_shape)
+            tshape[self.axis] = n
+            tbuf = np.ndarray(tshape, dtype=self.dtype)
+
+            if self.comm.rank == ri:
+                tbuf[:] = self
+
+            self.comm.Bcast(tbuf, root=ri)
+
+            # Copy the array into the correct place
+            dest_slice = [slice(None)] * len(self.shape)
+            dest_slice[self.axis] = slice(s, e)
+            arr[tuple(dest_slice)] = tbuf
+
+        return arr
+
     def _to_hdf5_serial(self, filename, dataset, create=False):
         """Write into an HDF5 dataset.
 

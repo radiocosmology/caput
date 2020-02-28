@@ -80,6 +80,7 @@ import warnings
 import posixpath
 from ast import literal_eval
 
+import json
 import numpy as np
 import h5py
 
@@ -419,7 +420,7 @@ class MemGroup(_BaseGroup):
     def from_group(cls, group):
         """Create a new instance by deep copying an existing group.
 
-        Agnostic as to whether the group to be copyed is a `MemGroup` or an
+        Agnostic as to whether the group to be copied is a `MemGroup` or an
         `h5py.Group` (which includes `hdf5.File` objects).
 
         """
@@ -439,6 +440,8 @@ class MemGroup(_BaseGroup):
         hints=True,
         comm=None,
         selections=None,
+        convert_dataset_strings=False,
+        convert_attribute_strings=False,
         **kwargs
     ):
         """Create a new instance by copying from an hdf5 group.
@@ -457,6 +460,10 @@ class MemGroup(_BaseGroup):
         comm : MPI.Comm, optional
             MPI communicator to distributed over. If :obj:`None` use
             :obj:`MPI.COMM_WORLD`.
+        convert_attribute_strings : bool, optional
+            Try and convert attribute string types to unicode. Default is `False`.
+        convert_dataset_strings : bool, optional
+            Try and convert dataset string types to unicode. Default is `False`.
 
         Returns
         -------
@@ -470,7 +477,8 @@ class MemGroup(_BaseGroup):
         if comm is None:
             if distributed:
                 warnings.warn(
-                    "Cannot load file in distributed mode when there is no MPI communicator!!"
+                    "Cannot load file in distributed mode when there is no MPI"
+                    "communicator!!"
                 )
             distributed = False
 
@@ -478,15 +486,34 @@ class MemGroup(_BaseGroup):
             kwargs["mode"] = "r"
             with h5py.File(filename, **kwargs) as f:
                 self = cls(distributed=distributed, comm=comm)
-                deep_group_copy(f, self, selections)
+                deep_group_copy(
+                    f,
+                    self,
+                    selections,
+                    convert_attribute_strings=convert_attribute_strings,
+                    convert_dataset_strings=convert_dataset_strings,
+                )
         else:
             self = _distributed_group_from_hdf5(
-                filename, comm=comm, hints=hints, selections=selections
+                filename,
+                comm=comm,
+                hints=hints,
+                selections=selections,
+                convert_attribute_strings=convert_attribute_strings,
+                convert_dataset_strings=convert_dataset_strings,
             )
 
         return self
 
-    def to_hdf5(self, filename, mode="w", hints=True, **kwargs):
+    def to_hdf5(
+        self,
+        filename,
+        mode="w",
+        hints=True,
+        convert_attribute_strings=False,
+        convert_dataset_strings=False,
+        **kwargs
+    ):
         """Replicate object on disk in an hdf5 file.
 
         Any keyword arguments are passed on to the constructor for `h5py.File`.
@@ -498,16 +525,38 @@ class MemGroup(_BaseGroup):
         hints : boolean, optional
             Whether to write hints into the file that described whether datasets
             are distributed, or not.
+        convert_attribute_strings : bool, optional
+            Try and convert attribute string types to a unicode type that HDF5
+            understands. Default is `False`.
+        convert_dataset_strings : bool, optional
+            Try and convert dataset string types to bytestrings. Default is `False`.
         """
 
         if not self.distributed:
             with h5py.File(filename, mode, **kwargs) as f:
-                deep_group_copy(self, f)
+                deep_group_copy(
+                    self,
+                    f,
+                    convert_attribute_strings=convert_attribute_strings,
+                    convert_dataset_strings=convert_dataset_strings,
+                )
         else:
             if h5py.get_config().mpi:
-                _distributed_group_to_hdf5_parallel(self, filename, mode, **kwargs)
+                _distributed_group_to_hdf5_parallel(
+                    self,
+                    filename,
+                    mode,
+                    convert_attribute_strings=convert_attribute_strings,
+                    convert_dataset_strings=convert_dataset_strings,
+                )
             else:
-                _distributed_group_to_hdf5_serial(self, filename, mode, **kwargs)
+                _distributed_group_to_hdf5_serial(
+                    self,
+                    filename,
+                    mode,
+                    convert_attribute_strings=convert_attribute_strings,
+                    convert_dataset_strings=convert_dataset_strings,
+                )
 
     def create_group(self, name):
         """Create a group within the storage tree."""
@@ -1373,13 +1422,12 @@ class MemDiskGroup(_BaseGroup):
         # in the attributes of the root.
         new_cls = cls
         if detect_subclass and "__memh5_subclass" in data_group.attrs:
-            from .pipeline import _import_class
 
             clspath = data_group.attrs["__memh5_subclass"]
 
             # Try and get a reference to the requested class (warn if we cannot find it)
             try:
-                new_cls = _import_class(clspath)
+                new_cls = misc.import_class(clspath)
             except (ImportError, KeyError):
                 warnings.warn("Could not import memh5 subclass %s" % clspath)
 
@@ -1478,6 +1526,8 @@ class MemDiskGroup(_BaseGroup):
         distributed=False,
         comm=None,
         detect_subclass=True,
+        convert_attribute_strings=None,
+        convert_dataset_strings=None,
         **kwargs
     ):
         """Create data object from analysis hdf5 file, store in memory or on disk.
@@ -1504,10 +1554,25 @@ class MemDiskGroup(_BaseGroup):
         detect_subclass: boolean, optional
             If *data_group* is specified, whether to inspect for a
             '__memh5_subclass' attribute which specifies a subclass to return.
+        convert_attribute_strings : bool, optional
+            Try and convert attribute string types to unicode. If not specified, look
+            up the name as a class attribute to find a default, and otherwise use
+            `False`.
+        convert_dataset_strings : bool, optional
+            Try and convert dataset string types to unicode. If not specified, look
+            up the name as a class attribute to find a default, and otherwise use
+            `False`.
         **kwargs : any other arguments
             Any additional keyword arguments are passed to :class:`h5py.File`'s
             constructor if *file_* is a filename and silently ignored otherwise.
         """
+
+        # Get a value for the conversion parameters, looking up on the class type if
+        # not supplied
+        if convert_attribute_strings is None:
+            convert_attribute_strings = getattr(cls, "convert_attribute_strings", False)
+        if convert_dataset_strings is None:
+            convert_dataset_strings = getattr(cls, "convert_dataset_strings", False)
 
         if not ondisk:
             if isinstance(file_, h5py.Group):
@@ -1526,7 +1591,13 @@ class MemDiskGroup(_BaseGroup):
             sel = cls._make_selections(cls, sel_args)
 
             data = MemGroup.from_hdf5(
-                file_, distributed=distributed, comm=comm, selections=sel, **kwargs
+                file_,
+                distributed=distributed,
+                comm=comm,
+                selections=sel,
+                convert_attribute_strings=convert_attribute_strings,
+                convert_dataset_strings=convert_dataset_strings,
+                **kwargs
             )
             toclose = False
         else:
@@ -1702,8 +1773,39 @@ class MemDiskGroup(_BaseGroup):
         if self.ondisk:
             self._data.flush()
 
-    def save(self, filename, **kwargs):
-        """Save data to hdf5 file."""
+    def save(
+        self,
+        filename,
+        convert_attribute_strings=None,
+        convert_dataset_strings=None,
+        **kwargs
+    ):
+        """Save data to hdf5 file.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the file to save into.
+        convert_attribute_strings : bool, optional
+            Try and convert attribute string types to a format HDF5 understands. If
+            not specified, look up the name as a class attribute to find a default,
+            and otherwise use `False`.
+        convert_dataset_strings : bool, optional
+            Try and convert dataset string types to bytestrings before saving to
+            HDF5. If not specified, look up the name as a class attribute to find a
+            default, and otherwise use `False`.
+        **kwargs
+            Keyword arguments passed through to the file creating, e.g. `mode`.
+        """
+
+        # Get a value for the conversion parameters, looking up on the instance if
+        # not supplied
+        if convert_attribute_strings is None:
+            convert_attribute_strings = getattr(
+                self, "convert_attribute_strings", False
+            )
+        if convert_dataset_strings is None:
+            convert_dataset_strings = getattr(self, "convert_dataset_strings", False)
 
         # Write out a hint as to what the class of this object is, do this by
         # inserting it into the attributes before saving out.
@@ -1716,7 +1818,12 @@ class MemDiskGroup(_BaseGroup):
             with h5py.File(filename, **kwargs) as f:
                 deep_group_copy(self._data, f)
         else:
-            self._data.to_hdf5(filename, **kwargs)
+            self._data.to_hdf5(
+                filename,
+                convert_attribute_strings=convert_attribute_strings,
+                convert_dataset_strings=convert_dataset_strings,
+                **kwargs
+            )
 
 
 class BasicCont(MemDiskGroup):
@@ -2020,13 +2127,32 @@ def get_h5py_File(f, **kwargs):
     return f, opened
 
 
-def copyattrs(a1, a2):
+def copyattrs(a1, a2, convert_strings=False):
+    """Copy attributes from one h5py/memh5 attribute object to another.
+
+    Parameters
+    ----------
+    a1 : h5py/memh5 object
+        Attributes to copy from.
+    a1 : h5py/memh5 object
+        Attributes to copy into.
+    convert_strings : bool, optional
+        Convert string attributes (or lists/arrays of them) to ensure that they are
+        unicode.
+    """
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
 
-    def _map_attr(value):
+    # When serializing dictionaries, add this in front of the string
+    json_prefix = "!!_memh5_json:"
 
-        # Any arrays of numpy type unicode strings must be transformed before being copied into HDF5
+    def _map_unicode(value):
+
+        if not convert_strings:
+            return value
+
+        # Any arrays of numpy type unicode strings must be transformed before being
+        # copied into HDF5
         if isinstance(a2, h5py.AttributeManager):
 
             # As h5py will coerce the value to an array anyway, do it now such
@@ -2035,18 +2161,34 @@ def copyattrs(a1, a2):
                 value = np.array(value)
 
             if isinstance(value, np.ndarray) and value.dtype.kind == "U":
-                return value.astype(h5py.special_dtype(vlen=text_type))
-            else:
-                return value
+                value = value.astype(h5py.special_dtype(vlen=text_type))
+
+            return value
 
         # If we are copying into memh5 ensure that any string are unicode
         return bytes_to_unicode(value)
 
+    def _map_json(value):
+        # Serialize/deserialize "special" json values
+        if isinstance(value, dict):
+            value = json_prefix + json.dumps(value)
+        elif isinstance(value, str) and value.startswith(json_prefix):
+            value = json.loads(value[len(json_prefix) :])
+        return value
+
     for key in sorted(a1):
-        a2[key] = _map_attr(a1[key])
+        val = _map_unicode(a1[key])
+        val = _map_json(val)
+        a2[key] = val
 
 
-def deep_group_copy(g1, g2, selections=None):
+def deep_group_copy(
+    g1,
+    g2,
+    selections=None,
+    convert_dataset_strings=False,
+    convert_attribute_strings=False,
+):
     """
     Copy full data tree from one group to another.
 
@@ -2079,9 +2221,12 @@ def deep_group_copy(g1, g2, selections=None):
         If this is not None, it should have a subset of the same hierarchical structure
         as g1, but ultimately describe axis selections for group entries as valid
         numpy indexes.
+    convert_strings : bool, optional
+        Convert string attributes (or lists/arrays of them) to ensure that they are
+        unicode.
     """
 
-    copyattrs(g1.attrs, g2.attrs)
+    copyattrs(g1.attrs, g2.attrs, convert_strings=convert_attribute_strings)
 
     # Sort to ensure consistent insertion order
     for key in sorted(g1):
@@ -2092,26 +2237,32 @@ def deep_group_copy(g1, g2, selections=None):
             selection = selections
         if is_group(entry):
             g2.create_group(key)
-            deep_group_copy(entry, g2[key], selection)
+            deep_group_copy(
+                entry,
+                g2[key],
+                selection,
+                convert_dataset_strings=convert_dataset_strings,
+                convert_attribute_strings=convert_attribute_strings,
+            )
         else:
             if selection is None:
                 selection = slice(None)
 
-            # Deal with unicode numpy datasets that aren't supported by HDF5
-            unicode_hint = False
-            if entry.dtype.kind == "U" and isinstance(g2, h5py.Group):
-                # Attempt to coerce to a type that HDF5 supports
-                data = entry[selection].astype("S")
-                unicode_hint = True
-            elif (
-                entry.dtype.kind == "S"
-                and not isinstance(g2, h5py.Group)
-                and entry.attrs.get("__memh5_unicode", False)
-            ):
-                # Convert back from a unicode dataset that was written to HDF5
-                data = entry[selection].astype("U")
-            else:
-                data = entry[selection]
+            data = entry[selection]
+
+            if convert_dataset_strings:
+
+                # Convert unicode strings back into ascii byte strings. This will break
+                # if there are characters outside of the ascii range
+                if isinstance(g2, h5py.Group):
+                    data = ensure_bytestring(data[:])
+
+                # Convert strings in an HDF5 dataset into unicode
+                else:
+                    data = ensure_unicode(data[:])
+
+            elif isinstance(g2, h5py.Group):
+                data = check_unicode(data)
 
             g2.create_dataset(
                 key,
@@ -2122,11 +2273,9 @@ def deep_group_copy(g1, g2, selections=None):
                 compression=entry.compression,
                 compression_opts=entry.compression_opts,
             )
-            copyattrs(entry.attrs, g2[key].attrs)
-
-            # Add a hint that memh5 should convert back to unicode
-            if unicode_hint:
-                g2[key].attrs["__memh5_unicode"] = True
+            copyattrs(
+                entry.attrs, g2[key].attrs, convert_strings=convert_attribute_strings
+            )
 
 
 def format_abs_path(path):
@@ -2145,7 +2294,15 @@ def format_abs_path(path):
     return out
 
 
-def _distributed_group_to_hdf5_serial(group, fname, mode, hints=True, **kwargs):
+def _distributed_group_to_hdf5_serial(
+    group,
+    fname,
+    mode,
+    hints=True,
+    convert_dataset_strings=False,
+    convert_attribute_strings=False,
+    **kwargs
+):
     """Private routine to copy full data tree from distributed memh5 object
     into an HDF5 file.
 
@@ -2166,7 +2323,9 @@ def _distributed_group_to_hdf5_serial(group, fname, mode, hints=True, **kwargs):
         # attrs
         if group.name == "/":
             with h5py.File(fname, mode, **kwargs) as f:
-                copyattrs(group.attrs, f.attrs)
+                copyattrs(
+                    group.attrs, f.attrs, convert_strings=convert_attribute_strings
+                )
 
                 if hints:
                     f.attrs["__memh5_distributed_file"] = True
@@ -2175,7 +2334,9 @@ def _distributed_group_to_hdf5_serial(group, fname, mode, hints=True, **kwargs):
         else:
             with h5py.File(fname, "r+", **kwargs) as f:
                 g = f.create_group(group.name)
-                copyattrs(group.attrs, g.attrs)
+                copyattrs(
+                    group.attrs, g.attrs, convert_strings=convert_attribute_strings
+                )
 
     comm.Barrier()
 
@@ -2188,12 +2349,19 @@ def _distributed_group_to_hdf5_serial(group, fname, mode, hints=True, **kwargs):
 
         # Groups are written out by recursing
         if is_group(entry):
-            _distributed_group_to_hdf5_serial(entry, fname, mode, **kwargs)
+            _distributed_group_to_hdf5_serial(
+                entry,
+                fname,
+                mode,
+                convert_dataset_strings=convert_dataset_strings,
+                convert_attribute_strings=convert_attribute_strings,
+                **kwargs
+            )
 
         # Write out distributed datasets (only the data, the attributes are written below)
         elif isinstance(entry, MemDatasetDistributed):
 
-            arr = entry._data
+            arr = check_unicode(entry)
 
             arr.to_hdf5(
                 fname,
@@ -2215,10 +2383,12 @@ def _distributed_group_to_hdf5_serial(group, fname, mode, hints=True, **kwargs):
                 # Write out common datasets and copy their attrs
                 if isinstance(entry, MemDatasetCommon):
 
-                    if entry.dtype.kind == "U":
-                        data = entry.data.astype("S")
+                    # Deal with unicode numpy datasets that aren't supported by HDF5
+                    if convert_dataset_strings:
+                        # Attempt to coerce to a type that HDF5 supports
+                        data = ensure_bytestring(entry.data)
                     else:
-                        data = entry
+                        data = check_unicode(entry)
 
                     dset = f.create_dataset(
                         entry.name,
@@ -2227,13 +2397,14 @@ def _distributed_group_to_hdf5_serial(group, fname, mode, hints=True, **kwargs):
                         compression=entry.compression,
                         compression_opts=entry.compression_opts,
                     )
-                    copyattrs(entry.attrs, dset.attrs)
+                    copyattrs(
+                        entry.attrs,
+                        dset.attrs,
+                        convert_strings=convert_attribute_strings,
+                    )
 
                     if hints:
                         dset.attrs["__memh5_distributed_dset"] = False
-
-                    if entry.dtype.kind == "U":
-                        dset.attrs["__memh5_unicode"] = True
 
                 # Copy the attributes over for a distributed dataset
                 elif isinstance(entry, MemDatasetDistributed):
@@ -2243,12 +2414,11 @@ def _distributed_group_to_hdf5_serial(group, fname, mode, hints=True, **kwargs):
                             "Distributed dataset should already have been created."
                         )
 
-                    if entry.dtype.kind == "U":
-                        raise RuntimeError(
-                            "Cannot write Unicode datasets to distributed datasets."
-                        )
-
-                    copyattrs(entry.attrs, f[entry.name].attrs)
+                    copyattrs(
+                        entry.attrs,
+                        f[entry.name].attrs,
+                        convert_strings=convert_attribute_strings,
+                    )
 
                     if hints:
                         f[entry.name].attrs["__memh5_distributed_dset"] = True
@@ -2256,7 +2426,15 @@ def _distributed_group_to_hdf5_serial(group, fname, mode, hints=True, **kwargs):
     comm.Barrier()
 
 
-def _distributed_group_to_hdf5_parallel(group, fname, mode, hints=True, **kwargs):
+def _distributed_group_to_hdf5_parallel(
+    group,
+    fname,
+    mode,
+    hints=True,
+    convert_dataset_strings=False,
+    convert_attribute_strings=False,
+    **kwargs
+):
     """Private routine to copy full data tree from distributed memh5 object
     into an HDF5 file.
     This version paralellizes all IO.
@@ -2267,7 +2445,9 @@ def _distributed_group_to_hdf5_parallel(group, fname, mode, hints=True, **kwargs
     def _copy_to_file(memgroup, h5group):
 
         # Copy over attributes
-        copyattrs(memgroup.attrs, h5group.attrs)
+        copyattrs(
+            memgroup.attrs, h5group.attrs, convert_strings=convert_attribute_strings
+        )
 
         # Sort the items to ensure we insert in a consistent order across ranks
         for key in sorted(memgroup):
@@ -2285,13 +2465,10 @@ def _distributed_group_to_hdf5_parallel(group, fname, mode, hints=True, **kwargs
                 # Check if we are in a distributed dataset
                 if isinstance(item, MemDatasetDistributed):
 
-                    if item.dtype.kind == "U":
-                        raise RuntimeError(
-                            "Cannot write Unicode datasets to distributed datasets."
-                        )
+                    data = check_unicode(item)
 
                     # Write to file from MPIArray
-                    item.data.to_hdf5(
+                    data.to_hdf5(
                         h5group,
                         key,
                         chunks=item.chunks,
@@ -2303,12 +2480,14 @@ def _distributed_group_to_hdf5_parallel(group, fname, mode, hints=True, **kwargs
                     if hints:
                         dset.attrs["__memh5_distributed_dset"] = True
 
+                # Create common dataset (collective)
                 else:
-                    # Create dataset (collective)
-                    if item.dtype.kind == "U":
-                        data = item.data.astype("S")
+
+                    # Convert from unicode to bytestring
+                    if convert_dataset_strings:
+                        data = ensure_bytestring(item.data)
                     else:
-                        data = item.data
+                        data = check_unicode(item)
 
                     dset = h5group.create_dataset(
                         key,
@@ -2326,11 +2505,10 @@ def _distributed_group_to_hdf5_parallel(group, fname, mode, hints=True, **kwargs
                     if hints:
                         dset.attrs["__memh5_distributed_dset"] = False
 
-                    if item.dtype.kind == "U":
-                        dset.attrs["__memh5_unicode"] = True
-
                 # Copy attributes over into dataset
-                copyattrs(item.attrs, dset.attrs)
+                copyattrs(
+                    item.attrs, dset.attrs, convert_strings=convert_attribute_strings
+                )
 
     # Open file on all ranks
     with misc.open_h5py_mpi(fname, mode, comm=group.comm) as f:
@@ -2347,7 +2525,14 @@ def _distributed_group_to_hdf5_parallel(group, fname, mode, hints=True, **kwargs
     group.comm.Barrier()
 
 
-def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
+def _distributed_group_from_hdf5(
+    fname,
+    comm=None,
+    hints=True,
+    convert_dataset_strings=False,
+    convert_attribute_strings=False,
+    **kwargs
+):
     """
     Restore full tree from an HDF5 file into a distributed memh5 object.
 
@@ -2359,22 +2544,22 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
     group = MemGroup(distributed=True, comm=comm)
     comm = group.comm
 
-    selections = kwargs.get("selections", slice(None))
+    selections = kwargs.pop("selections", slice(None))
 
     # == Create some internal functions for doing the read ==
     # Copy over attributes with a broadcast from rank = 0
-    def _copy_attrs_bcast(h5item, memitem):
+    def _copy_attrs_bcast(h5item, memitem, **kwargs):
         attr_dict = None
         if comm.rank == 0:
             attr_dict = {k: v for k, v in h5item.attrs.items()}
         attr_dict = comm.bcast(attr_dict, root=0)
-        copyattrs(attr_dict, memitem.attrs)
+        copyattrs(attr_dict, memitem.attrs, **kwargs)
 
     # Function to perform a recursive clone of the tree structure
     def _copy_from_file(h5group, memgroup, selections=slice(None)):
 
         # Copy over attributes
-        _copy_attrs_bcast(h5group, memgroup)
+        _copy_attrs_bcast(h5group, memgroup, convert_strings=convert_attribute_strings)
 
         # Sort items to ensure consistent order
         for key in sorted(h5group):
@@ -2413,10 +2598,8 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
                         cdata = item[selection]
 
                         # Convert ascii string back to unicode if requested
-                        if item.dtype.kind == "S" and item.attrs.get(
-                            "__memh5_unicode", False
-                        ):
-                            cdata = cdata.astype("U")
+                        if convert_dataset_strings:
+                            cdata = ensure_unicode(cdata)
 
                     cdata = comm.bcast(cdata, root=0)
 
@@ -2424,7 +2607,7 @@ def _distributed_group_from_hdf5(fname, comm=None, hints=True, **kwargs):
                     dset = memgroup.create_dataset(key, data=cdata, distributed=False)
 
                 # Copy attributes over into dataset
-                _copy_attrs_bcast(item, dset)
+                _copy_attrs_bcast(item, dset, convert_strings=convert_attribute_strings)
 
     # Open file on all ranks
     with misc.open_h5py_mpi(fname, "r", comm=comm) as f:
@@ -2473,3 +2656,207 @@ def bytes_to_unicode(s):
         return {bytes_to_unicode(k): bytes_to_unicode(v) for k, v in s.items()}
 
     return s
+
+
+def dtype_to_unicode(dt):
+    """Convert byte strings in a dtype to unicode.
+
+    This will attempt to parse a numpy dtype and convert strings to unicode.
+
+    .. warning:: Custom alignment will not be preserved in these type conversions as
+                 the byte and unicode string types are of different sizes.
+
+    Parameters
+    ----------
+    dt : np.dtype
+        Data type to convert.
+
+    Returns
+    -------
+    new_dt : np.dtype
+        A new datatype with the converted string type.
+    """
+    return _convert_dtype(dt, "|S", "<U")
+
+
+def dtype_to_bytestring(dt):
+    """Convert unicode strings in a dtype to byte strings.
+
+    This will attempt to parse a numpy dtype and convert strings to bytes.
+
+    .. warning:: Custom alignment will not be preserved in these type conversions as
+                 the byte and unicode string types are of different sizes.
+
+    Parameters
+    ----------
+    dt : np.dtype
+        Data type to convert.
+
+    Returns
+    -------
+    new_dt : np.dtype
+        A new datatype with the converted string type.
+    """
+    return _convert_dtype(dt, "<U", "|S")
+
+
+def _convert_dtype(dt, type_from, type_to):
+    """Convert types in a numpy dtype to another type.
+
+    .. warning:: Custom alignment will not be preserved in these type conversions as
+                 the byte and unicode string types are of different sizes.
+
+    Parameters
+    ----------
+    dt : np.dtype
+        Data type to convert.
+    type_from : str
+        Type code (with alignment) to find.
+    type_to : str
+        Type code (with alignment) to convert to.
+
+    Returns
+    -------
+    new_dt : np.dtype
+        A new datatype with the converted string types.
+    """
+
+    def _conv(t):
+        return t.replace(type_from, type_to)
+
+    # For compound types we must recurse over the full compound type structure
+    def _iter_conv(x):
+        items = []
+
+        for item in x:
+
+            name = item[0]
+            type_ = item[1]
+
+            # Recursively convert the type
+            newtype = _iter_conv(type_) if isinstance(type_, list) else _conv(type_)
+
+            items.append((name, newtype))
+
+        return items
+
+    # For scalar types the conversion is easy
+    if not dt.names:
+        return np.dtype(_conv(dt.str))
+    # For compound types we need to iterate through
+    else:
+        return np.dtype(_iter_conv(dt.descr))
+
+
+def has_kind(dt, kind):
+    """Test if a numpy datatype has any fields of a specified type.
+
+    Parameters
+    ----------
+    dt : np.dtype
+        Data type to convert.
+    kind : str
+        Numpy type code character. e.g. "S" for bytestring and "U" for unicode.
+
+    Returns
+    ------
+    has_kind : bool
+        True if it contains the requested kind.
+    """
+
+    # For scalar types the conversion is easy
+    if not dt.names:
+        return dt.kind == kind
+
+    # For compound types we must recurse over the full compound type structure
+    def _iter_conv(x):
+
+        for item in x:
+            type_ = item[1]
+
+            # Recursively convert the type
+            if isinstance(type_, list) and _iter_conv(type_):
+                return True
+            elif type_[1] == kind:
+                return True
+
+        return False
+
+    return _iter_conv(dt.descr)
+
+
+def has_unicode(dt):
+    """Test if data type contains any unicode fields.
+
+    See `has_kind`.
+    """
+    return has_kind(dt, "U")
+
+
+def has_bytestring(dt):
+    """Test if data type contains any unicode fields.
+
+    See `has_kind`.
+    """
+    return has_kind(dt, "S")
+
+
+def ensure_bytestring(arr):
+    """If needed convert the array to contain bytestrings not unicode.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Input array.
+
+    Returns
+    -------
+    arr_conv : np.ndarray
+        The converted array. If no conversion was required, just returns `arr`.
+    """
+    if has_unicode(arr.dtype):
+        return arr.astype(dtype_to_bytestring(arr.dtype))
+    else:
+        return arr
+
+
+def ensure_unicode(arr):
+    """If needed convert the array to contain unicode strings not bytestrings.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Input array.
+
+    Returns
+    -------
+    arr_conv : np.ndarray
+        The converted array. If no conversion was required, just returns `arr`.
+    """
+    if has_bytestring(arr.dtype):
+        return arr.astype(dtype_to_unicode(arr.dtype))
+    else:
+        return arr
+
+
+def check_unicode(dset):
+    """Test if dataset contains unicode so we can raise an appropriate error.
+
+    If there is no unicode, return the data from the array.
+
+    Parameters
+    ----------
+    dset : MemDataset
+        Dataset to check.
+
+    Returns
+    -------
+    dset :
+        The converted array. If no conversion was required, just returns `arr`.
+    """
+    if has_unicode(dset.dtype):
+        raise TypeError(
+            'Can not write dataset "%s" of unicode type into HDF5.' % dset.name
+        )
+
+    return dset.data

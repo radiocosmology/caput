@@ -22,6 +22,12 @@ class PersonWithPet(Person):
     petage = 36
 
 
+class ListTypeTests(Person):
+    list_max_length = config.list_type(maxlength=2)
+    list_exact_length = config.list_type(length=2)
+    list_type = config.list_type(type_=int)
+
+
 class TestConfig(unittest.TestCase):
 
     testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
@@ -67,3 +73,28 @@ class TestConfig(unittest.TestCase):
         self.assertEqual(person2.name, "Richard")
         self.assertEqual(person2.age, 40.0)
         self.assertEqual(person2.petname, "Sooty")
+
+    def test_list_type(self):
+
+        lt = ListTypeTests()
+
+        with self.assertRaises(ValueError):
+            lt.read_config({"list_max_length": [1, 3, 4]})
+
+        # Should work fine
+        lt = ListTypeTests()
+        lt.read_config({"list_max_length": [1, 2]})
+
+        with self.assertRaises(ValueError):
+            lt.read_config({"list_exact_length": [3]})
+
+        # Work should fine
+        lt = ListTypeTests()
+        lt.read_config({"list_exact_length": [1, 2]})
+
+        with self.assertRaises(ValueError):
+            lt.read_config({"list_type": ["hello"]})
+
+        # Work should fine
+        lt = ListTypeTests()
+        lt.read_config({"list_type": [1, 2]})
