@@ -1501,6 +1501,7 @@ class MemDiskGroup(_BaseGroup):
             self._storage_root, h5py.File
         )
 
+    @staticmethod
     def _make_selections(self, sel_args):
         """
         Overwrite this method in your subclass if you want to implement downselection
