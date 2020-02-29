@@ -2204,7 +2204,9 @@ def deep_group_copy(
     data: [0.1, 0.2, 0.3]
     ```
     , calling
-    >>> deep_group_copy(g1, g2, {"foo": {"bar": slice(2)}})
+    ```
+    deep_group_copy(g1, g2, {"foo": {"bar": slice(2)}})
+    ```
     would select the first two indexes in g1["foo"]["bar"], resulting in the
     following 'g2':
 
