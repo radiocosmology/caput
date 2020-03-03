@@ -75,6 +75,7 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 from past.builtins import basestring
 from future.utils import raise_from, text_type
 
+import datetime
 import sys
 import warnings
 import posixpath
@@ -2139,9 +2140,19 @@ def copyattrs(a1, a2, convert_strings=False):
 
     def _map_json(value):
         # Serialize/deserialize "special" json values
+
+        # Datetimes often appear in the configs (as they are parsed by PyYAML),
+        # so we need to serialise them back to strings
+        def _convert_datetime(v):
+            if isinstance(v, datetime.datetime):
+                return v.isoformat()
+            raise TypeError("Can not JSON serialise object of type %s" % repr(type(v)))
+
         if isinstance(value, dict):
-            value = json_prefix + json.dumps(value)
+            # Save to JSON converting datetimes.
+            value = json_prefix + json.dumps(value, default=_convert_datetime)
         elif isinstance(value, str) and value.startswith(json_prefix):
+            # Read from JSON, keep serialised datetimes as strings
             value = json.loads(value[len(json_prefix) :])
         return value
 
