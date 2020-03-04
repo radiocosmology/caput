@@ -2144,7 +2144,7 @@ def copyattrs(a1, a2, convert_strings=False):
         # Datetimes often appear in the configs (as they are parsed by PyYAML),
         # so we need to serialise them back to strings
         class DatetimeJSONEncoder(json.JSONEncoder):
-            def _convert_datetime(self, v):
+            def default(self, v):
                 if isinstance(v, datetime.datetime):
                     return v.isoformat()
                 # Let the default method raise the TypeError
