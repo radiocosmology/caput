@@ -2231,15 +2231,13 @@ def deep_group_copy(
     for key in sorted(g1):
         entry = g1[key]
         if isinstance(selections, dict):
-            selection = selections.get(key, slice(None))
-        else:
-            selection = selections
+            selections = selections.get(key, slice(None))
         if is_group(entry):
             g2.create_group(key)
             deep_group_copy(
                 entry,
                 g2[key],
-                selection,
+                selections,
                 convert_dataset_strings=convert_dataset_strings,
                 convert_attribute_strings=convert_attribute_strings,
             )
@@ -2249,17 +2247,17 @@ def deep_group_copy(
                 # Convert unicode strings back into ascii byte strings. This will break
                 # if there are characters outside of the ascii range
                 if isinstance(g2, h5py.Group):
-                    data = ensure_bytestring(entry[selection])
+                    data = ensure_bytestring(entry[selections])
 
                 # Convert strings in an HDF5 dataset into unicode
                 else:
-                    data = ensure_unicode(entry[selection])
+                    data = ensure_unicode(entry[selections])
 
             elif isinstance(g2, h5py.Group):
                 data = check_unicode(entry)
-                data = data[selection]
+                data = data[selections]
             else:
-                data = entry[selection]
+                data = entry[selections]
 
             g2.create_dataset(
                 key,
