@@ -310,6 +310,14 @@ class TestMapJSON(unittest.TestCase):
         assert m2.attrs["data"] == data
         assert m2.attrs["datetime"] == {"datetime": time.isoformat()}
 
+    def test_failure(self):
+        """Test that we get a TypeError if we try to serialize something else"""
+        m = memh5.MemGroup()
+        m.attrs["non_serializable"] = {"datetime": self}
+
+        with self.assertRaises(TypeError):
+            m.to_hdf5(self.fname)
+
     def tearDown(self):
         file_names = glob.glob(self.fname + "*")
         for fname in file_names:
