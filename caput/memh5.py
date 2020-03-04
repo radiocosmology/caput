@@ -2197,25 +2197,15 @@ def deep_group_copy(
     Copy full data tree from one group to another.
 
     Copies from g1 to g2. An axis downselection can be specified by supplying the
-    parameter 'selections'. If for example 'g1' is
+    parameter 'selections'. For example to select the first two indexes in g1["foo"]["bar"], do
 
-    ```
-    foo:
-       bar: [1, 2, 3]
-    data: [0.1, 0.2, 0.3]
-    ```
-    , calling
-    ```
-    deep_group_copy(g1, g2, {"foo": {"bar": slice(2)}})
-    ```
-    would select the first two indexes in g1["foo"]["bar"], resulting in the
-    following 'g2':
-
-    ```
-    foo:
-       bar: [0,1]
-    data: [0.1, 0.3]
-    ```
+    >>> g1 = MemGroup()
+    >>> foo = g1.create_group("foo")
+    >>> ds = foo.create_dataset(name="bar", data=np.arange(3))
+    >>> g2 = MemGroup()
+    >>> deep_group_copy(g1, g2, selections={"foo": {"bar": slice(2)}})
+    >>> list(g2["foo"]["bar"])
+    [0, 1]
 
     Parameters
     ----------
