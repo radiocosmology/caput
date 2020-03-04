@@ -2146,7 +2146,8 @@ def copyattrs(a1, a2, convert_strings=False):
         def _convert_datetime(v):
             if isinstance(v, datetime.datetime):
                 return v.isoformat()
-            raise TypeError("Can not JSON serialise object of type %s" % repr(type(v)))
+            # Let the default method raise the TypeError
+            return json.JSONEncoder.default(json.JSONEncoder, v)
 
         if isinstance(value, dict):
             # Save to JSON converting datetimes.
