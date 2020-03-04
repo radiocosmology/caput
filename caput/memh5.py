@@ -2174,7 +2174,7 @@ def copyattrs(a1, a2, convert_strings=False):
 
     def _map_json(value):
         # Serialize/deserialize "special" json values
-        if isinstance(value, dict):
+        if isinstance(value, dict) and isinstance(a2, h5py.AttributeManager):
             value = json_prefix + json.dumps(value)
         elif isinstance(value, str) and value.startswith(json_prefix):
             value = json.loads(value[len(json_prefix) :])
