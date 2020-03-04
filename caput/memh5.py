@@ -2732,6 +2732,10 @@ def _convert_dtype(dt, type_from, type_to):
     """
 
     def _conv(t):
+        # If we get a tuple that should mean it's a type with some extended metadata, extract the
+        # type and throw away the metadata
+        if isinstance(t, tuple):
+            t = t[0]
         return t.replace(type_from, type_to)
 
     # For compound types we must recurse over the full compound type structure
@@ -2786,6 +2790,8 @@ def has_kind(dt, kind):
 
             # Recursively convert the type
             if isinstance(type_, list) and _iter_conv(type_):
+                return True
+            elif isinstance(type_, tuple) and type_[0][1] == kind:
                 return True
             elif type_[1] == kind:
                 return True
