@@ -2153,7 +2153,7 @@ def copyattrs(a1, a2, convert_strings=False):
         if isinstance(value, dict):
             # Save to JSON converting datetimes.
             encoder = DatetimeJSONEncoder()
-            value = json_prefix + json.dumps(value, default=encoder._convert_datetime)
+            value = json_prefix + encoder.encode(value)
         elif isinstance(value, str) and value.startswith(json_prefix):
             # Read from JSON, keep serialised datetimes as strings
             value = json.loads(value[len(json_prefix) :])
