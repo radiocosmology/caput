@@ -7,10 +7,12 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 # === End Python 2/3 compatibility
 
 
+import datetime
 import unittest
 import os
 import glob
 import gc
+import json
 
 import numpy as np
 import h5py
@@ -276,6 +278,37 @@ class TestUnicodeDataset(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             m.to_hdf5(self.fname)
+
+    def tearDown(self):
+        file_names = glob.glob(self.fname + "*")
+        for fname in file_names:
+            os.remove(fname)
+
+
+class TestMapJSON(unittest.TestCase):
+    """Test that a memh5 dataset JSON serialization is done correctly."""
+
+    fname = "tmp_test_json.h5"
+
+    def test_to_from_hdf5(self):
+        json_prefix = "!!_memh5_json:"
+        data = {"foo": {"bar": [1, 2, 3], "fu": "1"}}
+        time = datetime.datetime.now()
+
+        m = memh5.MemGroup()
+        m.attrs["data"] = data
+        m.attrs["datetime"] = {"datetime": time}
+
+        m.to_hdf5(self.fname)
+        with h5py.File(self.fname, "r") as f:
+            assert f.attrs["data"] == json_prefix + json.dumps(data)
+            assert f.attrs["datetime"] == json_prefix + json.dumps(
+                {"datetime": time.isoformat()}
+            )
+
+        m2 = memh5.MemGroup.from_hdf5(self.fname)
+        assert m2.attrs["data"] == data
+        assert m2.attrs["datetime"] == {"datetime": time.isoformat()}
 
     def tearDown(self):
         file_names = glob.glob(self.fname + "*")
