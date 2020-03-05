@@ -75,6 +75,7 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 from past.builtins import basestring
 from future.utils import raise_from, text_type
 
+import datetime
 import sys
 import warnings
 import posixpath
@@ -2174,9 +2175,19 @@ def copyattrs(a1, a2, convert_strings=False):
 
     def _map_json(value):
         # Serialize/deserialize "special" json values
+
+        # Datetimes often appear in the configs (as they are parsed by PyYAML),
+        # so we need to serialise them back to strings
+        def _convert_datetime(v):
+            if isinstance(v, datetime.datetime):
+                return v.isoformat()
+            raise TypeError("Can not JSON serialise object of type %s" % repr(type(v)))
+
         if isinstance(value, dict) and isinstance(a2, h5py.AttributeManager):
-            value = json_prefix + json.dumps(value)
+            # Save to JSON converting datetimes.
+            value = json_prefix + json.dumps(value, default=_convert_datetime)
         elif isinstance(value, str) and value.startswith(json_prefix):
+            # Read from JSON, keep serialised datetimes as strings
             value = json.loads(value[len(json_prefix) :])
         return value
 
@@ -2191,7 +2202,7 @@ def deep_group_copy(
     g2,
     selections=None,
     convert_dataset_strings=False,
-    convert_attribute_strings=False,
+    convert_attribute_strings=False
 ):
     """
     Copy full data tree from one group to another.
@@ -2231,13 +2242,15 @@ def deep_group_copy(
     for key in sorted(g1):
         entry = g1[key]
         if isinstance(selections, dict):
-            selections = selections.get(key, slice(None))
+            selection = selections.get(key, slice(None))
+        else:
+            selection = selections
         if is_group(entry):
             g2.create_group(key)
             deep_group_copy(
                 entry,
                 g2[key],
-                selections,
+                selection,
                 convert_dataset_strings=convert_dataset_strings,
                 convert_attribute_strings=convert_attribute_strings,
             )
@@ -2247,17 +2260,17 @@ def deep_group_copy(
                 # Convert unicode strings back into ascii byte strings. This will break
                 # if there are characters outside of the ascii range
                 if isinstance(g2, h5py.Group):
-                    data = ensure_bytestring(entry[selections])
+                    data = ensure_bytestring(entry[selection])
 
                 # Convert strings in an HDF5 dataset into unicode
                 else:
-                    data = ensure_unicode(entry[selections])
+                    data = ensure_unicode(entry[selection])
 
             elif isinstance(g2, h5py.Group):
                 data = check_unicode(entry)
-                data = data[selections]
+                data = data[selection]
             else:
-                data = entry[selections]
+                data = entry[selection]
 
             g2.create_dataset(
                 key,
@@ -2432,8 +2445,7 @@ def _distributed_group_to_hdf5_parallel(
 ):
     """Private routine to copy full data tree from distributed memh5 object
     into an HDF5 file.
-    This version paralellizes all IO.
-    """
+    This version paralellizes all IO."""
 
     # == Create some internal functions for doing the read ==
     # Function to perform a recursive clone of the tree structure
