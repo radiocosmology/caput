@@ -2228,9 +2228,11 @@ def deep_group_copy(
         If this is not None, it should have a subset of the same hierarchical structure
         as g1, but ultimately describe axis selections for group entries as valid
         numpy indexes.
-    convert_strings : bool, optional
+    convert_attribute_strings : bool, optional
         Convert string attributes (or lists/arrays of them) to ensure that they are
         unicode.
+    convert_dataset_strings : bool, optional
+        Convert strings within datasets to ensure that they are unicode.
     """
 
     if selections is None:
