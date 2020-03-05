@@ -2202,7 +2202,7 @@ def deep_group_copy(
     g2,
     selections=None,
     convert_dataset_strings=False,
-    convert_attribute_strings=False
+    convert_attribute_strings=False,
 ):
     """
     Copy full data tree from one group to another.
