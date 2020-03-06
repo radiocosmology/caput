@@ -18,7 +18,7 @@ freqs = np.arange(len_axis)
 inputs = np.arange(len_axis)
 ra = np.arange(len_axis)
 
-fsel = slice(5)
+fsel = slice(1, 8, 2)
 isel = slice(1, 4)
 sel = {"dset1": (fsel, isel, slice(None)), "dset2": (fsel, slice(None))}
 
