@@ -2143,14 +2143,17 @@ def copyattrs(a1, a2, convert_strings=False):
 
         # Datetimes often appear in the configs (as they are parsed by PyYAML),
         # so we need to serialise them back to strings
-        def _convert_datetime(v):
-            if isinstance(v, datetime.datetime):
-                return v.isoformat()
-            raise TypeError("Can not JSON serialise object of type %s" % repr(type(v)))
+        class DatetimeJSONEncoder(json.JSONEncoder):
+            def default(self, v):
+                if isinstance(v, datetime.datetime):
+                    return v.isoformat()
+                # Let the default method raise the TypeError
+                return json.JSONEncoder.default(self, v)
 
         if isinstance(value, dict):
             # Save to JSON converting datetimes.
-            value = json_prefix + json.dumps(value, default=_convert_datetime)
+            encoder = DatetimeJSONEncoder()
+            value = json_prefix + encoder.encode(value)
         elif isinstance(value, str) and value.startswith(json_prefix):
             # Read from JSON, keep serialised datetimes as strings
             value = json.loads(value[len(json_prefix) :])
