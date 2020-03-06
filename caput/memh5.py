@@ -2214,7 +2214,7 @@ def deep_group_copy(
     >>> foo = g1.create_group("foo")
     >>> ds = foo.create_dataset(name="bar", data=np.arange(3))
     >>> g2 = MemGroup()
-    >>> deep_group_copy(g1, g2, selections={"foo": {"bar": slice(2)}})
+    >>> deep_group_copy(g1, g2, selections={"foo/bar": slice(2)})
     >>> list(g2["foo"]["bar"])
     [0, 1]
 
@@ -2235,30 +2235,30 @@ def deep_group_copy(
         Convert strings within datasets to ensure that they are unicode.
     """
 
-    if selections is None:
-        selections = slice(None)
-
     copyattrs(g1.attrs, g2.attrs, convert_strings=convert_attribute_strings)
 
     # Sort to ensure consistent insertion order
     for key in sorted(g1):
         entry = g1[key]
-        if isinstance(selections, dict):
-            selection = selections.get(key, slice(None))
-        else:
-            selection = selections
         if is_group(entry):
             g2.create_group(key)
             deep_group_copy(
                 entry,
                 g2[key],
-                selection,
+                selections,
                 convert_dataset_strings=convert_dataset_strings,
                 convert_attribute_strings=convert_attribute_strings,
             )
         else:
-            if convert_dataset_strings:
+            # look for selection for this dataset (also try withouth the leading "/")
+            try:
+                selection = selections.get(
+                    entry.name, selections.get(entry.name[1:], slice(None))
+                )
+            except AttributeError:
+                selection = slice(None)
 
+            if convert_dataset_strings:
                 # Convert unicode strings back into ascii byte strings. This will break
                 # if there are characters outside of the ascii range
                 if isinstance(g2, h5py.Group):
@@ -2545,7 +2545,7 @@ def _distributed_group_from_hdf5(
     """
     Restore full tree from an HDF5 file into a distributed memh5 object.
 
-    A `selection=` parameter may be supplied as parts of 'kwargs'. See
+    A `selections=` parameter may be supplied as parts of 'kwargs'. See
     `_deep_group_copy' for a description.
     """
 
@@ -2553,7 +2553,7 @@ def _distributed_group_from_hdf5(
     group = MemGroup(distributed=True, comm=comm)
     comm = group.comm
 
-    selections = kwargs.pop("selections", slice(None))
+    selections = kwargs.pop("selections", None)
 
     # == Create some internal functions for doing the read ==
     # Copy over attributes with a broadcast from rank = 0
@@ -2574,16 +2574,16 @@ def _distributed_group_from_hdf5(
         for key in sorted(h5group):
 
             item = h5group[key]
-
-            if isinstance(selections, dict):
-                selection = selections.get(key, None)
-            else:
-                selection = selections
-
+            try:
+                selection = selections.get(
+                    item.name, selections.get(item.name[1:], None)
+                )
+            except AttributeError:
+                selection = None
             # If group, create the entry and the recurse into it
             if is_group(item):
                 new_group = memgroup.create_group(key)
-                _copy_from_file(item, new_group, selection)
+                _copy_from_file(item, new_group, selections)
 
             # If dataset, create dataset
             else:
