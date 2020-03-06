@@ -440,6 +440,7 @@ class MemGroup(_BaseGroup):
         distributed=False,
         hints=True,
         comm=None,
+        selections=None,
         convert_dataset_strings=False,
         convert_attribute_strings=False,
         **kwargs
@@ -460,6 +461,9 @@ class MemGroup(_BaseGroup):
         comm : MPI.Comm, optional
             MPI communicator to distributed over. If :obj:`None` use
             :obj:`MPI.COMM_WORLD`.
+        selections : dict
+            If this is not None, it should map dataset names to axis selections as valid
+            numpy indexes.
         convert_attribute_strings : bool, optional
             Try and convert attribute string types to unicode. Default is `False`.
         convert_dataset_strings : bool, optional
@@ -489,6 +493,7 @@ class MemGroup(_BaseGroup):
                 deep_group_copy(
                     f,
                     self,
+                    selections=selections,
                     convert_attribute_strings=convert_attribute_strings,
                     convert_dataset_strings=convert_dataset_strings,
                 )
@@ -497,6 +502,7 @@ class MemGroup(_BaseGroup):
                 filename,
                 comm=comm,
                 hints=hints,
+                selections=selections,
                 convert_attribute_strings=convert_attribute_strings,
                 convert_dataset_strings=convert_dataset_strings,
             )
@@ -1496,6 +1502,25 @@ class MemDiskGroup(_BaseGroup):
             self._storage_root, h5py.File
         )
 
+    @staticmethod
+    def _make_selections(self, sel_args):
+        """
+        Overwrite this method in your subclass if you want to implement downselection
+        of axes (e.g. when loading a container from an HDF5 file).
+
+        Parameters
+        ----------
+        sel_args : dict
+            Should contain valid numpy indexes as values and axis names (str) as keys.
+
+        Returns
+        -------
+        dict
+            Mapping of dataset names to numpy indexes for downselection of the data.
+            May include multiple layers of dicts to map the dataset tree
+        """
+        return None
+
     # For creating new instances. #
 
     @classmethod
@@ -1561,10 +1586,20 @@ class MemDiskGroup(_BaseGroup):
             if "mode" in kwargs:
                 del kwargs["mode"]
 
+            # Look for *_sel parameters in kwargs, collect and remove them from kwargs
+            sel_args = {}
+            for a in list(kwargs):
+                if a.endswith("_sel"):
+                    sel_args[a[:-4]] = kwargs.pop(a)
+
+            # Map selections to datasets
+            sel = cls._make_selections(cls, sel_args)
+
             data = MemGroup.from_hdf5(
                 file_,
                 distributed=distributed,
                 comm=comm,
+                selections=sel,
                 convert_attribute_strings=convert_attribute_strings,
                 convert_dataset_strings=convert_dataset_strings,
                 **kwargs
@@ -2150,7 +2185,7 @@ def copyattrs(a1, a2, convert_strings=False):
                 # Let the default method raise the TypeError
                 return json.JSONEncoder.default(self, v)
 
-        if isinstance(value, dict):
+        if isinstance(value, dict) and isinstance(a2, h5py.AttributeManager):
             # Save to JSON converting datetimes.
             encoder = DatetimeJSONEncoder()
             value = json_prefix + encoder.encode(value)
@@ -2166,9 +2201,42 @@ def copyattrs(a1, a2, convert_strings=False):
 
 
 def deep_group_copy(
-    g1, g2, convert_dataset_strings=False, convert_attribute_strings=False
+    g1,
+    g2,
+    selections=None,
+    convert_dataset_strings=False,
+    convert_attribute_strings=False,
 ):
-    """Copy full data tree from one group to another."""
+    """
+    Copy full data tree from one group to another.
+
+    Copies from g1 to g2. An axis downselection can be specified by supplying the
+    parameter 'selections'. For example to select the first two indexes in g1["foo"]["bar"], do
+
+    >>> g1 = MemGroup()
+    >>> foo = g1.create_group("foo")
+    >>> ds = foo.create_dataset(name="bar", data=np.arange(3))
+    >>> g2 = MemGroup()
+    >>> deep_group_copy(g1, g2, selections={"foo/bar": slice(2)})
+    >>> list(g2["foo"]["bar"])
+    [0, 1]
+
+    Parameters
+    ----------
+    g1 : h5py.Group
+        Deep copy from this group.
+    g2 : h5py.Group
+        Deep copy to this group.
+    selections : dict
+        If this is not None, it should have a subset of the same hierarchical structure
+        as g1, but ultimately describe axis selections for group entries as valid
+        numpy indexes.
+    convert_attribute_strings : bool, optional
+        Convert string attributes (or lists/arrays of them) to ensure that they are
+        unicode.
+    convert_dataset_strings : bool, optional
+        Convert strings within datasets to ensure that they are unicode.
+    """
 
     copyattrs(g1.attrs, g2.attrs, convert_strings=convert_attribute_strings)
 
@@ -2180,26 +2248,34 @@ def deep_group_copy(
             deep_group_copy(
                 entry,
                 g2[key],
+                selections,
                 convert_dataset_strings=convert_dataset_strings,
                 convert_attribute_strings=convert_attribute_strings,
             )
         else:
-
-            data = entry
+            # look for selection for this dataset (also try withouth the leading "/")
+            try:
+                selection = selections.get(
+                    entry.name, selections.get(entry.name[1:], slice(None))
+                )
+            except AttributeError:
+                selection = slice(None)
 
             if convert_dataset_strings:
-
                 # Convert unicode strings back into ascii byte strings. This will break
                 # if there are characters outside of the ascii range
                 if isinstance(g2, h5py.Group):
-                    data = ensure_bytestring(entry[:])
+                    data = ensure_bytestring(entry[selection])
 
                 # Convert strings in an HDF5 dataset into unicode
                 else:
-                    data = ensure_unicode(entry[:])
+                    data = ensure_unicode(entry[selection])
 
             elif isinstance(g2, h5py.Group):
                 data = check_unicode(entry)
+                data = data[selection]
+            else:
+                data = entry[selection]
 
             g2.create_dataset(
                 key,
@@ -2469,11 +2545,18 @@ def _distributed_group_from_hdf5(
     convert_attribute_strings=False,
     **kwargs
 ):
-    """Restore full tree from an HDF5 file into a distributed memh5 object."""
+    """
+    Restore full tree from an HDF5 file into a distributed memh5 object.
+
+    A `selections=` parameter may be supplied as parts of 'kwargs'. See
+    `_deep_group_copy' for a description.
+    """
 
     # Create root group
     group = MemGroup(distributed=True, comm=comm)
     comm = group.comm
+
+    selections = kwargs.pop("selections", None)
 
     # == Create some internal functions for doing the read ==
     # Copy over attributes with a broadcast from rank = 0
@@ -2485,7 +2568,7 @@ def _distributed_group_from_hdf5(
         copyattrs(attr_dict, memitem.attrs, **kwargs)
 
     # Function to perform a recursive clone of the tree structure
-    def _copy_from_file(h5group, memgroup):
+    def _copy_from_file(h5group, memgroup, selections=None):
 
         # Copy over attributes
         _copy_attrs_bcast(h5group, memgroup, convert_strings=convert_attribute_strings)
@@ -2494,11 +2577,16 @@ def _distributed_group_from_hdf5(
         for key in sorted(h5group):
 
             item = h5group[key]
-
+            try:
+                selection = selections.get(
+                    item.name, selections.get(item.name[1:], None)
+                )
+            except AttributeError:
+                selection = None
             # If group, create the entry and the recurse into it
             if is_group(item):
                 new_group = memgroup.create_group(key)
-                _copy_from_file(item, new_group)
+                _copy_from_file(item, new_group, selections)
 
             # If dataset, create dataset
             else:
@@ -2509,17 +2597,20 @@ def _distributed_group_from_hdf5(
                 ]:
 
                     # Read from file into MPIArray
-                    pdata = mpiarray.MPIArray.from_hdf5(h5group, key, comm=comm)
+                    pdata = mpiarray.MPIArray.from_hdf5(
+                        h5group, key, comm=comm, sel=selection
+                    )
 
                     # Create dataset from MPIArray
                     dset = memgroup.create_dataset(key, data=pdata, distributed=True)
                 else:
-
                     # Read common data onto rank zero and broadcast
                     cdata = None
                     if comm.rank == 0:
-
-                        cdata = item[:]
+                        if selection is None:
+                            cdata = item[:]
+                        else:
+                            cdata = item[selection]
 
                         # Convert ascii string back to unicode if requested
                         if convert_dataset_strings:
@@ -2537,7 +2628,7 @@ def _distributed_group_from_hdf5(
     with misc.open_h5py_mpi(fname, "r", comm=comm) as f:
 
         # Start recursive file read
-        _copy_from_file(f, group)
+        _copy_from_file(f, group, selections)
 
     # Final synchronisation
     comm.Barrier()
