@@ -75,7 +75,7 @@ Here is an example of this in action::
 
     for ri in range(mpiutil.size):
         if ri == mpiutil.rank:
-            print ri, arr
+            print(ri, arr)
         mpiutil.barrier()
 
     # Use a global index to assign to the array
@@ -87,7 +87,7 @@ Here is an example of this in action::
     # This should be the third column of the array
     for ri in range(mpiutil.size):
         if ri == mpiutil.rank:
-            print ri, arr2
+            print(ri, arr2)
         mpiutil.barrier()
 
     # Fetch a view of the whole array with a partial slice
@@ -96,7 +96,7 @@ Here is an example of this in action::
     # The final two ranks should be None
     for ri in range(mpiutil.size):
         if ri == mpiutil.rank:
-            print ri, arr3
+            print(ri, arr3)
         mpiutil.barrier()
 
 """
@@ -518,7 +518,7 @@ class MPIArray(np.ndarray):
                 request.Wait(status=stat)
 
                 if stat.error != mpiutil.MPI.SUCCESS:
-                    print(
+                    logger.error(
                         "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****".format(
                             ir, ic, self.comm.rank
                         )
@@ -535,7 +535,7 @@ class MPIArray(np.ndarray):
                 request.Wait(status=stat)
 
                 if stat.error != mpiutil.MPI.SUCCESS:
-                    print(
+                    logger.error(
                         "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****".format(
                             ir, ir, self.comm.rank
                         )
@@ -875,7 +875,7 @@ class MPIArray(np.ndarray):
                 request.Wait(status=stat)
 
                 if stat.error != mpiutil.MPI.SUCCESS:
-                    print(
+                    logger.error(
                         "**** ERROR in MPI RECV (source: %i,  dest rank: %i) *****"
                         % (ri, rank)
                     )

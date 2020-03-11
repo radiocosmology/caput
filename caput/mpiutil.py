@@ -42,6 +42,7 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 
 # === End Python 2/3 compatibility
 
+import logging
 import sys
 import time
 import warnings
@@ -55,6 +56,8 @@ _comm = None
 world = None
 rank0 = True
 
+logger = logging.getLogger(__name__)
+
 ## Try to setup MPI and get the comm, rank and size.
 ## If not they should end up as rank=0, size=1.
 try:
@@ -67,7 +70,7 @@ try:
     size = _comm.Get_size()
 
     if _comm is not None and size > 1:
-        print("Starting MPI rank=%i [size=%i]" % (rank, size))
+        logger.debug("Starting MPI rank=%i [size=%i]", rank, size)
 
     rank0 = True if rank == 0 else False
 
@@ -514,8 +517,6 @@ def transpose_blocks(row_array, shape, comm=_comm):
     par, sar, ear = split_all(nr, comm=comm) * nm
     pac, sac, eac = split_all(nc, comm=comm)
 
-    # print pr, nc, shape, row_array.shape
-
     row_array = row_array[:nr, ..., :nc].reshape(pr, nc)
 
     requests_send = []
@@ -546,7 +547,6 @@ def transpose_blocks(row_array, shape, comm=_comm):
                 # Construct the block to send by cutting out the correct
                 # columns
                 block = row_array[:, sic:eic].copy()
-                # print ir, ic, comm.rank, block.shape
 
                 # Send the message
                 request = comm.Isend([block, mpitype], dest=ic, tag=tag)
@@ -559,7 +559,6 @@ def transpose_blocks(row_array, shape, comm=_comm):
                     [recv_buffer[sir:eir], mpitype], source=ir, tag=tag
                 )
                 requests_recv.append([ir, ic, request])
-                # print ir, ic, comm.rank, recv_buffer[sir:eir].shape
 
     # Wait for all processes to have started their messages
     comm.Barrier()
@@ -569,18 +568,13 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
         stat = MPI.Status()
 
-        # try:
         request.Wait(status=stat)
-        # except MPI.Exception:
-        #    print comm.rank, ir, ic, sar[ir], ear[ir], sac[ic], eac[ic], shape
 
         if stat.error != MPI.SUCCESS:
-            print(
+            logger.error(
                 "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****"
                 % (ir, ic, comm.rank)
             )
-
-    # print "rank %i: Done waiting on MPI SEND" % comm.rank
 
     comm.Barrier()
 
@@ -589,14 +583,10 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
         stat = MPI.Status()
 
-        # try:
         request.Wait(status=stat)
-        # except MPI.Exception:
-        #    print comm.rank, (ir, ic), (ear[ir]-sar[ir], eac[ic]-sac[ic]),
-        # shape, recv_buffer[sar[ir]:ear[ir]].shape, recv_buffer.dtype, row_array.dtype
 
         if stat.error != MPI.SUCCESS:
-            print(
+            logger.error(
                 "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****"
                 % (ir, ir, comm.rank)
             )
@@ -742,7 +732,6 @@ class SelfWrapper(ModuleType):
             raise AttributeError("module 'mpiutil' has no attribute '%s'" % name)
 
     def __call__(self, **kwargs):
-        # print 'here'
         return SelfWrapper(self.self_module, kwargs)
 
 
