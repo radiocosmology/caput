@@ -857,9 +857,6 @@ class TaskBase(config.Reader):
             # can be queued.
             for in_, in_key in zip(self._in, self._in_keys):
                 if not in_.empty():
-                    # XXX Clean up.
-                    print("Something left: %i" % in_.qsize())
-
                     msg = (
                         "Task finished %s iterating `next()` but input queue '%s' isn't empty."
                         % (self.__class__.__name__, in_key)
