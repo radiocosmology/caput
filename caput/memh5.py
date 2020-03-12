@@ -80,8 +80,9 @@ import sys
 import warnings
 import posixpath
 from ast import literal_eval
-
 import json
+import logging
+
 import numpy as np
 import h5py
 
@@ -94,6 +95,9 @@ if sys.version_info.major > 2:
     from collections.abc import Mapping
 else:
     from collections import Mapping
+
+
+logger = logging.getLogger(__name__)
 
 
 # Basic Classes
@@ -156,19 +160,14 @@ class _StorageRoot(_Storage):
     def __init__(self, distributed=False, comm=None):
         super(_StorageRoot, self).__init__()
 
-        if comm is None:
+        if distributed and comm is None:
+            logger.debug(
+                "No communicator set for distributed object, using `MPI.COMM_WORLD`"
+            )
             comm = mpiutil.world
 
         self._comm = comm
-
-        if self._comm is None:
-            if distributed:
-                warnings.warn(
-                    "Cannot not be in distributed mode when there is no MPI communicator!!"
-                )
-            self._distributed = False
-        else:
-            self._distributed = distributed
+        self._distributed = distributed
 
     @property
     def comm(self):
