@@ -634,12 +634,12 @@ def _copy_non_time_data(
             ):
                 to_dataset_names.append(entry.name)
             elif out is not None:
-                data = (
+                arr = (
                     memh5.ensure_unicode(entry.data)
                     if convert_dataset_strings
                     else entry.data
                 )
-                out.create_dataset(key, shape=entry.shape, dtype=entry.dtype, data=data)
+                out.create_dataset(key, shape=entry.shape, dtype=entry.dtype, data=arr)
                 memh5.copyattrs(
                     entry.attrs, out[key].attrs, convert_strings=convert_dataset_strings
                 )
