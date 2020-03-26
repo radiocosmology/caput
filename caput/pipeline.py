@@ -1003,7 +1003,7 @@ class _OneAndOne(TaskBase):
         if (
             pro_argspec.varargs
             or pro_argspec.varkw
-            or pro.argspec.kwonlyargs
+            or pro_argspec.kwonlyargs
             or pro_argspec.defaults
         ):
             msg = (
