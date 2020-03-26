@@ -1002,8 +1002,8 @@ class _OneAndOne(TaskBase):
             raise PipelineConfigError(msg)
         if (
             pro_argspec.varargs
-            or pro_argspec.keywords
-            or pro.argspec.kwonlyargs
+            or pro_argspec.varkw
+            or pro_argspec.kwonlyargs
             or pro_argspec.defaults
         ):
             msg = (
