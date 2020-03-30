@@ -442,7 +442,7 @@ class MemGroup(_BaseGroup):
         comm=None,
         selections=None,
         convert_dataset_strings=False,
-        convert_attribute_strings=False,
+        convert_attribute_strings=True,
         **kwargs
     ):
         """Create a new instance by copying from an hdf5 group.
@@ -465,7 +465,7 @@ class MemGroup(_BaseGroup):
             If this is not None, it should map dataset names to axis selections as valid
             numpy indexes.
         convert_attribute_strings : bool, optional
-            Try and convert attribute string types to unicode. Default is `False`.
+            Try and convert attribute string types to unicode. Default is `True`.
         convert_dataset_strings : bool, optional
             Try and convert dataset string types to unicode. Default is `False`.
 
@@ -514,7 +514,7 @@ class MemGroup(_BaseGroup):
         filename,
         mode="w",
         hints=True,
-        convert_attribute_strings=False,
+        convert_attribute_strings=True,
         convert_dataset_strings=False,
         **kwargs
     ):
@@ -531,7 +531,7 @@ class MemGroup(_BaseGroup):
             are distributed, or not.
         convert_attribute_strings : bool, optional
             Try and convert attribute string types to a unicode type that HDF5
-            understands. Default is `False`.
+            understands. Default is `True`.
         convert_dataset_strings : bool, optional
             Try and convert dataset string types to bytestrings. Default is `False`.
         """
@@ -1562,7 +1562,7 @@ class MemDiskGroup(_BaseGroup):
         convert_attribute_strings : bool, optional
             Try and convert attribute string types to unicode. If not specified, look
             up the name as a class attribute to find a default, and otherwise use
-            `False`.
+            `True`.
         convert_dataset_strings : bool, optional
             Try and convert dataset string types to unicode. If not specified, look
             up the name as a class attribute to find a default, and otherwise use
@@ -1575,7 +1575,7 @@ class MemDiskGroup(_BaseGroup):
         # Get a value for the conversion parameters, looking up on the class type if
         # not supplied
         if convert_attribute_strings is None:
-            convert_attribute_strings = getattr(cls, "convert_attribute_strings", False)
+            convert_attribute_strings = getattr(cls, "convert_attribute_strings", True)
         if convert_dataset_strings is None:
             convert_dataset_strings = getattr(cls, "convert_dataset_strings", False)
 
@@ -1794,7 +1794,7 @@ class MemDiskGroup(_BaseGroup):
         convert_attribute_strings : bool, optional
             Try and convert attribute string types to a format HDF5 understands. If
             not specified, look up the name as a class attribute to find a default,
-            and otherwise use `False`.
+            and otherwise use `True`.
         convert_dataset_strings : bool, optional
             Try and convert dataset string types to bytestrings before saving to
             HDF5. If not specified, look up the name as a class attribute to find a
@@ -1806,9 +1806,7 @@ class MemDiskGroup(_BaseGroup):
         # Get a value for the conversion parameters, looking up on the instance if
         # not supplied
         if convert_attribute_strings is None:
-            convert_attribute_strings = getattr(
-                self, "convert_attribute_strings", False
-            )
+            convert_attribute_strings = getattr(self, "convert_attribute_strings", True)
         if convert_dataset_strings is None:
             convert_dataset_strings = getattr(self, "convert_dataset_strings", False)
 
@@ -2205,7 +2203,7 @@ def deep_group_copy(
     g2,
     selections=None,
     convert_dataset_strings=False,
-    convert_attribute_strings=False,
+    convert_attribute_strings=True,
 ):
     """
     Copy full data tree from one group to another.
@@ -2313,7 +2311,7 @@ def _distributed_group_to_hdf5_serial(
     mode,
     hints=True,
     convert_dataset_strings=False,
-    convert_attribute_strings=False,
+    convert_attribute_strings=True,
     **kwargs
 ):
     """Private routine to copy full data tree from distributed memh5 object
@@ -2445,7 +2443,7 @@ def _distributed_group_to_hdf5_parallel(
     mode,
     hints=True,
     convert_dataset_strings=False,
-    convert_attribute_strings=False,
+    convert_attribute_strings=True,
     **kwargs
 ):
     """Private routine to copy full data tree from distributed memh5 object
@@ -2542,7 +2540,7 @@ def _distributed_group_from_hdf5(
     comm=None,
     hints=True,
     convert_dataset_strings=False,
-    convert_attribute_strings=False,
+    convert_attribute_strings=True,
     **kwargs
 ):
     """
