@@ -304,7 +304,7 @@ def concatenate(
     stop=None,
     datasets=None,
     dataset_filter=None,
-    convert_attribute_strings=False,
+    convert_attribute_strings=True,
     convert_dataset_strings=False,
 ):
     """Concatenate data along the time axis.
@@ -342,7 +342,7 @@ def concatenate(
         argument that is slice along the time axis, which the filter should
         apply.
     convert_attribute_strings : bool, optional
-        Try and convert attribute string types to unicode. Default is `False`.
+        Try and convert attribute string types to unicode. Default is `True`.
     convert_dataset_strings : bool, optional
         Try and convert dataset string types to unicode. Default is `False`.
 
@@ -587,7 +587,7 @@ def _copy_non_time_data(
     data,
     out=None,
     to_dataset_names=None,
-    convert_attribute_strings=False,
+    convert_attribute_strings=True,
     convert_dataset_strings=False,
 ):
     """Crawl data copying everything but time-ordered datasets to out.
