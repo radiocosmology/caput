@@ -764,7 +764,7 @@ class SkyfieldWrapper(object):
     reload
     """
 
-    def __init__(self, path=None, expire=True, ephemeris="de421.bsp"):
+    def __init__(self, path=None, expire=False, ephemeris="de421.bsp"):
 
         import os
 
