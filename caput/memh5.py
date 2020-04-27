@@ -1892,7 +1892,16 @@ class BasicCont(MemDiskGroup):
 
         out = {}
         for name, value in self._data["history"].items():
+            warnings.warn(
+                "memh5 dataset {} is using a deprecated history format. Read support of "
+                "files using this format will be continued for now, but you should "
+                "update the instance of caput that wrote this file.".format(self.name),
+                DeprecationWarning,
+            )
             out[name] = value.attrs
+
+        for name, value in self._data["history"].attrs.items():
+            out[name] = value
 
         # TODO: this seems like a trememndous hack. I've changed it to a safer version of
         # eval, but this should probably be removed
@@ -1981,7 +1990,23 @@ class BasicCont(MemDiskGroup):
         del self._data["reverse_map"][axis_name]
 
     def add_history(self, name, history=None):
-        """Create a new history entry."""
+        """
+        Create a new history entry.
+
+        Parameters
+        ----------
+        name : str
+            Name for history entry.
+        history
+            History entry (optional). Needs to be json serializable.
+
+        Notes
+        -----
+        Previously only dictionaries with depth=1 were supported here. The key/value pairs of these
+        where added as attributes to the history group when written to disk. Reading the old
+        history format is still supported, however the history is now an attribute itself and
+        dictionaries of any depth are allowed as history entries.
+        """
 
         if name == "order":
             raise ValueError(
@@ -1992,11 +2017,10 @@ class BasicCont(MemDiskGroup):
             history = {}
         order = self.history["order"]
         order = order + [name]
+
         history_group = self._data["history"]
         history_group.attrs["order"] = text_type(order)
-        history_group.create_group(name)
-        for key, value in history.items():
-            history_group[name].attrs[key] = value
+        history_group.attrs[name] = history
 
     def redistribute(self, dist_axis):
         """Redistribute parallel datasets along a specified axis.
