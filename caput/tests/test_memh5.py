@@ -13,9 +13,9 @@ import os
 import glob
 import gc
 import json
-
 import numpy as np
 import h5py
+import warnings
 
 from caput import memh5
 
@@ -204,8 +204,18 @@ class TestMemDiskGroup(unittest.TestCase):
 
 
 class TestBasicCont(unittest.TestCase):
-    def test_access(self):
+    fname = "test_bc.h5"
+    history_dict = {"foo": {"bar": {"f": 23}, "foo": "bar"}, "bar": 0}
+    json_prefix = "!!_memh5_json:"
+
+    def setUp(self):
         d = memh5.BasicCont()
+        d.create_dataset("a", data=np.arange(5))
+        d.add_history("test", self.history_dict)
+        d.to_disk(self.fname)
+
+    def test_access(self):
+        d = memh5.BasicCont.from_file(self.fname)
         self.assertTrue("history" in d._data)
         self.assertTrue("index_map" in d._data)
         self.assertRaises(KeyError, d.__getitem__, "history")
@@ -215,8 +225,30 @@ class TestBasicCont(unittest.TestCase):
         self.assertRaises(
             ValueError, d.create_dataset, "index_map/stuff", data=np.arange(5)
         )
-        # But make sure this works.
-        d.create_dataset("a", data=np.arange(5))
+
+    def test_history(self):
+        # Check HDF5 file for config- and versiondump
+        with h5py.File(self.fname, "r") as f:
+            history = f["history"].attrs["test"]
+            assert history == self.json_prefix + json.dumps(self.history_dict)
+
+        # add old format history
+        with h5py.File(self.fname, "r+") as f:
+            f["history"].create_group("old_history_format")
+            f["history/old_history_format"].attrs["foo"] = "bar"
+
+        with memh5.MemDiskGroup.from_file(self.fname) as m:
+            with warnings.catch_warnings(record=True) as w:
+                # Cause all warnings to always be triggered.
+                warnings.simplefilter("always")
+                old_history_format = m.history["old_history_format"]
+
+                # Expect exactly one warning about deprecated history format
+                assert len(w) == 1
+                assert issubclass(w[-1].category, DeprecationWarning)
+                assert "deprecated" in str(w[-1].message)
+
+        assert old_history_format == {"foo": "bar"}
 
 
 class TestUnicodeDataset(unittest.TestCase):
