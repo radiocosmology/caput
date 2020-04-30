@@ -67,6 +67,12 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 
 # === End Python 2/3 compatibility
 
+import logging
+
+from . import misc
+
+logger = logging.getLogger(__name__)
+
 
 class Property(object):
     """Custom property descriptor that can load values from a given dict.
@@ -391,6 +397,67 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
                 "Default value %s does not satisfy property requirements: %s"
                 % (default, repr(e))
             )
+
+    prop = Property(proptype=_prop, default=default)
+
+    return prop
+
+
+def logging_config(default={}):
+    """
+    A Property type that validates the caput logging config.
+
+    Allows the type to be either a string (for backward compatibility) or a dict setting log levels
+    per module.
+
+    Parameters
+    ----------
+    default : optional
+        The optional default value.
+
+    Returns
+    -------
+    prop : Property
+        A property instance setup to validate the type.
+
+    Examples
+    --------
+    Should be used like::
+
+        class Project(object):
+
+            loglevels = logging_config({"root": "INFO", "annoying.module": "WARNING"})
+    """
+
+    def _prop(config):
+        if isinstance(config, str):
+            config = {"root": config}
+        elif not isinstance(config, dict):
+            raise ValueError(
+                "Expected a string or YAML block for config value 'logging', got "
+                "'{}'.".format(type(config.__name__))
+            )
+
+        # check entries, get module names and warn for duplicates when sorting into new dict
+        checked_config = {}
+        loglevels = ["DEBUG", "INFO", "WARNING", "ERROR", "NOTSET"]
+        for key, level in config.items():
+            level = level.upper()
+            if level not in loglevels:
+                raise ValueError(
+                    "Expected one of {} for log level of {} (was {}).".format(
+                        loglevels, key, level
+                    )
+                )
+
+            already_set_to = checked_config.get(key, None)
+            if already_set_to is not None and already_set_to != level:
+                logger.warning(
+                    "Setting log level for {} to {}, but is already set to {}. The old value will "
+                    "get ignored.".format(key, level, already_set_to)
+                )
+            checked_config[key] = level
+        return checked_config
 
     prop = Property(proptype=_prop, default=default)
 

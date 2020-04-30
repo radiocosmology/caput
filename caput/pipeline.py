@@ -437,8 +437,8 @@ class Manager(config.Reader):
 
     Attributes
     ----------
-    logging : str
-        Log level.
+    logging : Dict(str, str)
+        Log levels per module. The key "root" stores the root log level.
     multiprocessing : int
         TODO
     cluster : dict
@@ -453,7 +453,7 @@ class Manager(config.Reader):
         metadata. Default: True.
     """
 
-    logging = config.Property(default="warning", proptype=str)
+    logging = config.logging_config(default={"root": "WARNING"})
     multiprocessing = config.Property(default=1, proptype=int)
     cluster = config.Property(default={}, proptype=dict)
     tasks = config.Property(default=[], proptype=list)
@@ -512,7 +512,15 @@ class Manager(config.Reader):
             "versions": self.versions,
             "pipeline_config": self.all_params if self.save_config else None,
         }
+        self._setup_logging()
         return self
+
+    def _setup_logging(self):
+        # set root log level and set up default formatter
+        logging.basicConfig(level=getattr(logging, self.logging.get("root", "WARNING")))
+        for module, level in self.logging.items():
+            if module != "root":
+                logging.getLogger(module).setLevel(getattr(logging, level))
 
     def run(self):
         """Main driver method for the pipeline.
@@ -522,11 +530,6 @@ class Manager(config.Reader):
 
         """
 
-        # Set logging level.
-        numeric_level = getattr(logging, self.logging.upper(), None)
-        if not isinstance(numeric_level, int):
-            raise ValueError("Invalid logging level: %s" % self.logging)
-        logging.basicConfig(level=numeric_level)
         # Initialize all tasks.
         pipeline_tasks = []
         for ii, task_spec in enumerate(self.tasks):

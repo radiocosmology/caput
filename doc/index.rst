@@ -32,6 +32,23 @@ Installation
 caput depends on h5py_, numpy_ and PyYAML_. For full functionality it also
 requires click_, mpi4py_ and Skyfield_.
 
+
+Configuration
+_____________
+
+The caput pipeline runner script accepts a YAML file for configuration. The structure of this file
+is documented in :ref:`config`.
+
+
+Index
+-----
+
+.. toctree::
+   :maxdepth: 2
+
+   config
+
+
 Modules
 -------
 
