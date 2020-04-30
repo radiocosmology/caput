@@ -34,18 +34,22 @@ def cli():
 @click.option(
     "--loglevel",
     type=click.Choice(
-        ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"], case_sensitive=False
+        ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG", "CONFIG"],
+        case_sensitive=False,
     ),
-    default="INFO",
-    help="Logging level.",
+    default="CONFIG",
+    help="Logging level (deprecated, use the config instead).",
 )
 def run(configfile, loglevel):
     """Run a pipeline immediately from the given CONFIGFILE."""
     from caput.pipeline import Manager
-    import logging
 
-    level = getattr(logging, loglevel.upper())
-    logging.basicConfig(level=level)
+    import warnings
+
+    if loglevel != "CONFIG":
+        warnings.warn(
+            "--loglevel is deprecated, use the config file instead", DeprecationWarning
+        )
 
     P = Manager.from_yaml_file(configfile)
     P.run()
