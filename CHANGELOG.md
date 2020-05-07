@@ -1,3 +1,12 @@
+# [20.5.1](https://github.com/radiocosmology/caput/compare/v20.5.0...v20.5.1) (2020-05-07)
+
+
+### Bug Fixes
+
+* **memh5:** json serialize numpy ndarray ([e8156da](https://github.com/radiocosmology/caput/commit/e8156da8d49dc9534378f845c0f36dd160ea7d3f))
+
+
+
 # [20.5.0](https://github.com/radiocosmology/caput/compare/v0.6.0...v20.5.0) (2020-05-05)
 
 Note: we have switched to calendar versioning for this release. 
