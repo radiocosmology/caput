@@ -2197,18 +2197,32 @@ def copyattrs(a1, a2, convert_strings=False):
     def _map_json(value):
         # Serialize/deserialize "special" json values
 
-        # Datetimes often appear in the configs (as they are parsed by PyYAML),
-        # so we need to serialise them back to strings
-        class DatetimeJSONEncoder(json.JSONEncoder):
+        class Memh5JSONEncoder(json.JSONEncoder):
+            """
+            - Datetimes often appear in the configs (as they are parsed by PyYAML),
+              so we need to serialise them back to strings.
+            - Some old data format may have numpy arrays in `history["acq"]`. We have to convert
+              those to lists and decode byte objects.
+            """
+
             def default(self, v):
                 if isinstance(v, datetime.datetime):
                     return v.isoformat()
+                elif isinstance(v, np.number):
+                    return v.data
+                elif isinstance(v, np.ndarray):
+                    if len(v) == 1:
+                        return v.tolist()[0]
+                    return v.tolist()
+                elif isinstance(v, bytes):  # pragma: py3
+                    return v.decode()
+
                 # Let the default method raise the TypeError
                 return json.JSONEncoder.default(self, v)
 
         if isinstance(value, dict) and isinstance(a2, h5py.AttributeManager):
             # Save to JSON converting datetimes.
-            encoder = DatetimeJSONEncoder()
+            encoder = Memh5JSONEncoder()
             value = json_prefix + encoder.encode(value)
         elif isinstance(value, str) and value.startswith(json_prefix):
             # Read from JSON, keep serialised datetimes as strings
