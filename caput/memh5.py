@@ -2038,57 +2038,57 @@ class BasicCont(MemDiskGroup):
         if not isinstance(dist_axis, (list, tuple)):
             dist_axis = [dist_axis]
 
-        # Worker routine to crawl the tree and redistribute any parallel datasets
-        def _tree_crawl(group):
+        stack = list(self._data._storage_root.items())
 
-            for name, item in group.items():
+        # Crawl over the dataset tree and redistribute any matching datasets.
+        # NOTE: this is done using a non-recursive stack-based tree walk, the previous
+        # implementation used a recursive closure which generated a reference
+        # cycle and caused the entire container to be kept alive until an
+        # explicit gc run. So let this be a warning to be careful in this code.
+        while stack:
+            name, item = stack.pop()
 
-                # Recurse into subgroups
-                if isinstance(item, _Storage):
-                    _tree_crawl(item)
+            # Recurse into subgroups
+            if isinstance(item, _Storage):
+                stack += list(item.items())
 
-                # Okay, we've found a distributed dataset, let's try and redistribute it
-                if isinstance(item, MemDatasetDistributed):
+            # Okay, we've found a distributed dataset, let's try and redistribute it
+            if isinstance(item, MemDatasetDistributed):
 
-                    naxis = len(item.shape)
+                naxis = len(item.shape)
 
-                    for axis in dist_axis:
+                for axis in dist_axis:
 
-                        # Try processing if this is a string
-                        if isinstance(axis, basestring):
-                            if "axis" in item.attrs and axis in item.attrs["axis"]:
-                                axis = np.argwhere(item.attrs["axis"] == axis)[0, 0]
-                            else:
-                                continue
-
-                        # Process if axis is an integer
-                        elif isinstance(axis, int):
-
-                            # Deal with negative axis index
-                            if axis < 0:
-                                axis = naxis + axis
-
-                        # Check axis is within bounds
-                        if axis >= naxis:
+                    # Try processing if this is a string
+                    if isinstance(axis, basestring):
+                        if "axis" in item.attrs and axis in item.attrs["axis"]:
+                            axis = np.argwhere(item.attrs["axis"] == axis)[0, 0]
+                        else:
                             continue
 
-                        # Excellent, found a matching axis, time to redistribute
-                        item.redistribute(axis)
-                        break
+                    # Process if axis is an integer
+                    elif isinstance(axis, int):
 
-                    # Note that this clause is on the FOR.
-                    else:
-                        # If we are here we didn't find a matching axis, emit a warning
-                        if self.comm.rank == 0:
-                            warnings.warn(
-                                (
-                                    "Could not find an axis (out of %s)"
-                                    + "to distributed dataset %s over."
-                                )
-                                % (str(dist_axis), name)
-                            )
+                        # Deal with negative axis index
+                        if axis < 0:
+                            axis = naxis + axis
 
-        _tree_crawl(self._data._storage_root)
+                    # Check axis is within bounds
+                    if axis >= naxis:
+                        continue
+
+                    # Excellent, found a matching axis, time to redistribute
+                    item.redistribute(axis)
+                    break
+
+                # Note that this clause is on the FOR.
+                else:
+                    # If we are here we didn't find a matching axis, emit a warning
+                    logger.info(
+                        "Could not find axis (from %s) to distribute dataset %s over.",
+                        str(dist_axis),
+                        name,
+                    )
 
 
 # Utilities
