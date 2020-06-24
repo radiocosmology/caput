@@ -1,4 +1,5 @@
 numpy>=1.16
+scipy
 h5py
 PyYAML
 skyfield>=1.0
