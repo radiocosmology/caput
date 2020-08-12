@@ -1501,8 +1501,8 @@ class MemDiskGroup(_BaseGroup):
             self._storage_root, h5py.File
         )
 
-    @staticmethod
-    def _make_selections(self, sel_args):
+    @classmethod
+    def _make_selections(cls, sel_args):
         """
         Overwrite this method in your subclass if you want to implement downselection
         of axes (e.g. when loading a container from an HDF5 file).
@@ -1592,7 +1592,7 @@ class MemDiskGroup(_BaseGroup):
                     sel_args[a[:-4]] = kwargs.pop(a)
 
             # Map selections to datasets
-            sel = cls._make_selections(cls, sel_args)
+            sel = cls._make_selections(sel_args)
 
             data = MemGroup.from_hdf5(
                 file_,
