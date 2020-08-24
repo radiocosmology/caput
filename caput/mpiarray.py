@@ -656,7 +656,7 @@ class MPIArray(np.ndarray):
             # Loop over partitions of the IO and perform them
             for part in partitions:
                 islice, fslice = _partition_sel(
-                    sel, split_axis, gshape[split_axis], part
+                    sel, split_axis, dshape[split_axis], part
                 )
                 dist_arr[fslice] = dset[islice]
 
