@@ -1059,13 +1059,20 @@ def _len_slice(slice_, n):
 
 def _reslice(slice_, n, subslice):
     # For a slice along an axis of length n, return the slice that would select the
-    # start:end elements of the final array
+    # slice(start, end) elements of the final array.
+    #
+    # In other words find a single slice that has the same affect as application of two successive
+    # slices
     dstart, dstop, dstep = slice_.indices(n)
 
     if subslice.step is not None and subslice.step > 1:
         raise ValueError("stride > 1 not supported. subslice: %s" % subslice)
 
-    return slice(dstart + subslice.start * dstep, dstart + subslice.stop * dstep, dstep)
+    return slice(
+        dstart + subslice.start * dstep,
+        min(dstart + subslice.stop * dstep, dstop),
+        dstep,
+    )
 
 
 def _expand_sel(sel, naxis):
