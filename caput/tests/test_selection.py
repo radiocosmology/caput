@@ -1,3 +1,10 @@
+"""Serial version of the selection tests."""
+# === Start Python 2/3 compatibility
+from __future__ import absolute_import, division, print_function, unicode_literals
+from future.builtins import *  # noqa  pylint: disable=W0401, W0614
+from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+
+# === End Python 2/3 compatibility
 from caput.memh5 import MemGroup
 
 import pytest
@@ -42,13 +49,5 @@ def test_H5FileSelect(container_on_disk):
     """Tests that makes hdf5 objects and tests selecting on their axes."""
 
     m = MemGroup.from_hdf5(container_on_disk, selections=sel)
-    assert np.all(m["dset1"][:] == dset1[(fsel, isel, slice(None))])
-    assert np.all(m["dset2"][:] == dset2[(fsel, slice(None))])
-
-
-def test_H5FileSelect_distributed(container_on_disk):
-    """Load H5 into parallel container while down-selecting axes."""
-
-    m = MemGroup.from_hdf5(container_on_disk, selections=sel, distributed=True)
     assert np.all(m["dset1"][:] == dset1[(fsel, isel, slice(None))])
     assert np.all(m["dset2"][:] == dset2[(fsel, slice(None))])
