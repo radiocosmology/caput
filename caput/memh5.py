@@ -139,9 +139,7 @@ class ro_dict(Mapping):
 
 
 class _Storage(dict):
-    """Underlying container that provides storage backing for in-memory groups.
-
-    """
+    """Underlying container that provides storage backing for in-memory groups."""
 
     def __init__(self, **kwargs):
         super(_Storage, self).__init__(**kwargs)
@@ -153,9 +151,7 @@ class _Storage(dict):
 
 
 class _StorageRoot(_Storage):
-    """Root level of the storage tree.
-
-    """
+    """Root level of the storage tree."""
 
     def __init__(self, distributed=False, comm=None):
         super(_StorageRoot, self).__init__()
@@ -270,8 +266,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
 
     @property
     def comm(self):
-        """Reference to the MPI communicator.
-        """
+        """Reference to the MPI communicator."""
         return getattr(self._storage_root, "comm", None)
 
     @property
@@ -1967,9 +1962,7 @@ class BasicCont(MemDiskGroup):
         return True if parent_name == "/" else False
 
     def create_index_map(self, axis_name, index_map):
-        """Create a new index map.
-
-        """
+        """Create a new index map."""
 
         self._data["index_map"].create_dataset(axis_name, data=index_map)
 
@@ -1978,9 +1971,7 @@ class BasicCont(MemDiskGroup):
         del self._data["index_map"][axis_name]
 
     def create_reverse_map(self, axis_name, index_map):
-        """Create a new reverse map.
-
-        """
+        """Create a new reverse map."""
 
         self._data["reverse_map"].create_dataset(axis_name, data=index_map)
 

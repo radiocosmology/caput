@@ -1059,8 +1059,7 @@ class _OneAndOne(TaskBase):
     output_root = config.Property(default="None", proptype=str)
 
     def process(self, input):
-        """Override this method with your data processing task.
-        """
+        """Override this method with your data processing task."""
 
         output = input
         return output
@@ -1493,8 +1492,7 @@ class IterH5Base(H5IOMixin, IterBase):
 
 
 class Input(TaskBase):
-    """Pass inputs into the pipeline from outside.
-    """
+    """Pass inputs into the pipeline from outside."""
 
     def __init__(self, inputs=None):
         self.inputs = inputs or []

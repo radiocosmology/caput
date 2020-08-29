@@ -75,8 +75,7 @@ logger = logging.getLogger(__name__)
 
 
 class Property(object):
-    """Custom property descriptor that can load values from a given dict.
-    """
+    """Custom property descriptor that can load values from a given dict."""
 
     def __init__(self, default=None, proptype=None, key=None):
         """Make a new property type.
@@ -162,8 +161,7 @@ class Property(object):
 
 
 class Reader(object):
-    """A class that allows the values of Properties to be assigned from a dictionary.
-    """
+    """A class that allows the values of Properties to be assigned from a dictionary."""
 
     @classmethod
     def from_config(cls, config, *args, **kwargs):
