@@ -283,6 +283,39 @@ opertunity for 'non_existent_data_product' to be generated and forces
 `DoNothing` to proceed to :meth:`finish`. This also unblocks :class:`PrintEggs`
 allowing it to proceed normally.
 
+Pure Python Pipelines
+---------------------
+
+It is possible to construct and run a pipeline purely within Python, which can be
+useful for quick prototyping and debugging. This gives direct control over task
+construction and configuration, and allows injection and inspection of pipeline
+products.
+
+To add a task to the pipeline you need to: create an instance of it; set any
+configuration attributes directly (or call :meth:`~TaskBase.read_config` on an
+appropriate dictionary); and then added to the pipeline using the
+:meth:`~Manager.add_task` to add the instance and specify the queues it connects to.
+
+To inject products into the pipeline, use the :class:`~Input` and supply it an
+iterator as an argument. Each item will be fed into the pipeline one by one. To take
+outputs from the pipeline, simply use the :class:`~Output` task. By default this
+simply saves everything it receives into a list, but it can be given a callback
+function to apply processing to each argument in turn.
+
+>>> m = Manager()
+>>> m.add_task(Input(["platypus", "dinosaur"]), out="key1")
+>>> cook = CookEggs()
+>>> cook.style = "coddled"
+>>> m.add_task(cook, in_="key1")
+>>> m.add_task(Output(lambda x: print("I love %s eggs!" % x)), in_="key1")
+>>> m.run()
+Setting up CookEggs.
+Cooking coddled platypus eggs.
+I love platypus eggs!
+Cooking coddled dinosaur eggs.
+I love dinosaur eggs!
+Finished CookEggs.
+
 Advanced Tasks
 --------------
 
@@ -309,26 +342,25 @@ See the documentation for these base classes for more details.
 """
 # === Start Python 2/3 compatibility
 from __future__ import absolute_import, division, print_function, unicode_literals
+
 from future.builtins import *  # noqa  pylint: disable=W0401, W0614
 from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
+from future.utils import raise_from
+from past.builtins import basestring
 
 # === End Python 2/3 compatibility
 
-from past.builtins import basestring
-from future.utils import raise_from
-
-import queue
+import importlib
 import logging
 import os
-import importlib
-from copy import deepcopy
-
-from os import path
+import queue
 import warnings
+from copy import deepcopy
+from os import path
+
 import yaml
 
-from . import config
-from . import misc
+from . import config, misc
 
 
 # Set the module logger.
@@ -456,11 +488,15 @@ class Manager(config.Reader):
     logging = config.logging_config(default={"root": "WARNING"})
     multiprocessing = config.Property(default=1, proptype=int)
     cluster = config.Property(default={}, proptype=dict)
-    tasks = config.Property(default=[], proptype=list)
+    task_specs = config.Property(default=[], proptype=list, key="tasks")
 
     # Options to be stored in self.all_tasks_params
     versions = config.Property(default=[], proptype=_get_versions, key="save_versions")
     save_config = config.Property(default=True, proptype=bool)
+
+    def __init__(self):
+        # Initialise the list of task instances
+        self.tasks = []
 
     @classmethod
     def from_yaml_file(cls, file_name):
@@ -513,6 +549,8 @@ class Manager(config.Reader):
             "pipeline_config": self.all_params if self.save_config else None,
         }
         self._setup_logging()
+        self._setup_tasks()
+
         return self
 
     def _setup_logging(self):
@@ -530,26 +568,14 @@ class Manager(config.Reader):
 
         """
 
-        # Initialize all tasks.
-        pipeline_tasks = []
-        for ii, task_spec in enumerate(self.tasks):
-            try:
-                task = self._setup_task(task_spec)
-            except PipelineConfigError as e:
-                msg = "Setting up task %d caused an error - " % ii
-                msg += str(e)
-                # TODO: Py3 exception chaining
-                raise PipelineConfigError(msg)
-            pipeline_tasks.append(task)
-            logger.debug("Added %s to task list." % task.__class__.__name__)
         # Run the pipeline.
-        while pipeline_tasks:
-            for task in list(pipeline_tasks):  # Copy list so we can alter it.
+        while self.tasks:
+            for task in list(self.tasks):  # Copy list so we can alter it.
                 # These lines control the flow of the pipeline.
                 try:
                     out = task._pipeline_next()
                 except _PipelineMissingData:
-                    if pipeline_tasks.index(task) == 0:
+                    if self.tasks.index(task) == 0:
                         msg = (
                             "%s missing input data and is at beginning of"
                             " task list. Advancing state." % task.__class__.__name__
@@ -558,7 +584,7 @@ class Manager(config.Reader):
                         task._pipeline_advance_state()
                     break
                 except _PipelineFinished:
-                    pipeline_tasks.remove(task)
+                    self.tasks.remove(task)
                     continue
                 # Now pass the output data products to any task that needs
                 # them.
@@ -586,23 +612,44 @@ class Manager(config.Reader):
                 msg = "%s produced output data product with keys %s."
                 msg = msg % (task.__class__.__name__, keys)
                 logger.debug(msg)
-                for receiving_task in pipeline_tasks:
+                for receiving_task in self.tasks:
                     receiving_task._pipeline_inspect_queue_product(out_keys, out)
+
+    def _setup_tasks(self):
+        """Create and setup all tasks from the task list."""
+
+        # Setup all tasks in the task listk
+        for ii, task_spec in enumerate(self.task_specs):
+            try:
+                task, key_spec = self._setup_task(task_spec)
+                self.add_task(
+                    task,
+                    requires=key_spec.get("requires", None),
+                    in_=key_spec.get("in", None),
+                    out=key_spec.get("out", None),
+                )
+            except PipelineConfigError as e:
+                msg = "Setting up task {} caused an error - {}".format(ii, str(e))
+                raise_from(PipelineConfigError(msg), e)
 
     def _setup_task(self, task_spec):
         """Set up a pipeline task from the spec given in the tasks list."""
 
         # Check that only the expected keys are in the task spec.
         for key in task_spec.keys():
-            if not key in ["type", "params", "requires", "in", "out"]:
-                msg = "Task got an unexpected key '%s' in 'tasks' list." % key
-                raise PipelineConfigError(msg)
+            if key not in ["type", "params", "requires", "in", "out"]:
+                raise PipelineConfigError(
+                    "Task got an unexpected key '{}' in 'tasks' list.".format(key)
+                )
+
         # 'type' is a required key.
         try:
             task_path = task_spec["type"]
         except KeyError:
-            msg = "'type' not specified for task."
-            raise PipelineConfigError(msg)
+            raise PipelineConfigError("'type' not specified for task.")
+
+        # Find the tasks class either in the local set, or by importing a fully
+        # qualified class name
         if task_path in local_tasks:
             task_cls = local_tasks[task_path]
         else:
@@ -618,13 +665,14 @@ class Manager(config.Reader):
 
         # Get the parameters and initialize the class.
         params = {}
-
         if "params" in task_spec:
 
             # If params is a dict, assume params are inline
             if isinstance(task_spec["params"], dict):
                 params.update(task_spec["params"])
-            else:  # Otherwise assume it's a list of keys
+
+            # Otherwise assume it's a list of keys
+            else:
 
                 param_keys = task_spec["params"]
 
@@ -644,10 +692,36 @@ class Manager(config.Reader):
         task_params = deepcopy(self.all_tasks_params)
         task_params.update(params)
 
-        # Setup task
-        task = task_cls._pipeline_from_config(task_params, task_spec)
+        # Filter just the specifications for the input/output keys
+        key_spec = {
+            k: v for k, v in task_spec.items() if k in ["requires", "in", "out"]
+        }
 
-        return task
+        # Create and configure the task instance
+        task = task_cls._from_config(task_params)
+
+        return task, key_spec
+
+    def add_task(self, task, requires=None, in_=None, out=None):
+        """Add a task instance to the pipeline.
+
+        Parameters
+        ----------
+        task : TaskBase
+            A pipeline task instance.
+        requires, in_, out : list or string
+            The names of the task inputs and outputs.
+        """
+        try:
+            task._setup_keys(requires=requires, in_=in_, out=out)
+        except Exception as e:
+            msg = "Setting up keys for task {} caused an error - {}".format(
+                task.__class__.__name__, str(e)
+            )
+            raise_from(PipelineConfigError(msg), e)
+
+        self.tasks.append(task)
+        logger.debug("Added {} to task list.".format(task.__class__.__name__))
 
 
 # Pipeline Task Base Classes
@@ -772,22 +846,21 @@ class TaskBase(config.Reader):
     # -----------------------
 
     @classmethod
-    def _pipeline_from_config(cls, config, task_spec):
+    def _from_config(cls, config):
         self = cls.__new__(cls)
         self.read_config(config)
-        self._pipeline_setup(task_spec)
         self.__init__()
         return self
 
-    def _pipeline_setup(self, task_spec):
+    def _setup_keys(self, in_=None, out=None, requires=None):
         """Setup the 'requires', 'in' and 'out' keys for this task."""
 
         # Put pipeline in state such that `setup` is the next stage called.
         self._pipeline_advance_state()
         # Parse the task spec.
-        requires = _format_product_keys(task_spec, "requires")
-        in_ = _format_product_keys(task_spec, "in")
-        out = _format_product_keys(task_spec, "out")
+        requires = _format_product_keys(requires)
+        in_ = _format_product_keys(in_)
+        out = _format_product_keys(out)
         # Inspect the `setup` method to see how many arguments it takes.
         setup_argspec = misc.getfullargspec(self.setup)
         # Make sure it matches `requires` keys list specified in config.
@@ -1375,7 +1448,6 @@ class BasicContMixin(object):
         """
 
         from caput import memh5
-        import h5py
 
         # Ensure parent directory is present.
         dirname = path.dirname(filename)
@@ -1416,11 +1488,63 @@ class IterH5Base(H5IOMixin, IterBase):
     pass
 
 
+# Simple tasks for bridging to Python
+# -----------------------------------
+
+
+class Input(TaskBase):
+    """Pass inputs into the pipeline from outside.
+    """
+
+    def __init__(self, inputs=None):
+        self.inputs = inputs or []
+        self._iter = None
+
+    def next(self):
+        """Pop and return the first element of inputs."""
+
+        if self._iter is None:
+            self._iter = iter(self.inputs)
+
+        try:
+            return next(self._iter)
+        except StopIteration:
+            raise PipelineStopIteration()
+
+
+class Output(TaskBase):
+    """Take outputs from the pipeline and place them in a list.
+
+    To apply some processing to pipeline output (i.e. this tasks input), use the
+    `callback` argument which will get passed the item. The return value of the
+    callback is placed in the `outputs` attribute. Note that this need not be the
+    input, so if pipeline output should be deleted to save memory you can simply
+    return `None`.
+
+    Parameters
+    ----------
+    callback : function, optional
+        A function which can apply some processing to the pipeline output.
+    """
+
+    def __init__(self, callback=None):
+        self.outputs = []
+        self.callback = callback
+
+    def next(self, in_):
+        """Pop and return the first element of inputs."""
+
+        if self.callback:
+            in_ = self.callback(in_)
+
+        self.outputs.append(in_)
+
+
 # Internal Functions
 # ------------------
 
 
-def _format_product_keys(spec, name):
+def _format_product_keys(keys):
     """Formats the pipeline task product keys.
 
     In the pipeline config task list, the values of 'requires', 'in' and 'out'
@@ -1430,24 +1554,22 @@ def _format_product_keys(spec, name):
 
     """
 
-    try:
-        out_prod = spec[name]
-    except KeyError:
-        # Default to empty if not present.
+    if keys is None:
         return []
+
     # Turn into a sequence if only one key was provided.
-    if not isinstance(out_prod, list):
+    if not isinstance(keys, list):
         # Making this a tuple instead of a list is significant.  It only
         # impacts the 'out' product key and affects how return values are
         # unpacked.
-        out_prod = (out_prod,)
+        keys = (keys,)
 
     # Check that all the keys provided are strings.
-    for prod in out_prod:
-        if not isinstance(prod, basestring):
+    for key in keys:
+        if not isinstance(key, basestring):
             msg = "Data product keys must be strings."
             raise PipelineConfigError(msg)
-    return out_prod
+    return keys
 
 
 if __name__ == "__main__":
