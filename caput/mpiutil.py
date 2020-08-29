@@ -178,8 +178,7 @@ mpilist = partition_list_mpi
 
 
 def mpirange(*args, **kargs):
-    """An MPI aware version of `range`, each process gets its own sub section.
-    """
+    """An MPI aware version of `range`, each process gets its own sub section."""
     full_list = list(range(*args))
 
     method = kargs.get("method", "con")
@@ -693,9 +692,7 @@ def lock_and_write_buffer(obj, fname, offset, size):
 
 
 def parallel_rows_write_hdf5(fname, dsetname, local_data, shape, comm=_comm):
-    """Write out array (distributed across processes row wise) into a HDF5 in parallel.
-
-    """
+    """Write out array (distributed across processes row wise) into a HDF5 in parallel."""
 
     offset, size = allocate_hdf5_dataset(
         fname, dsetname, shape, local_data.dtype, comm=comm

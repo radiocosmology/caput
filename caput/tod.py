@@ -220,7 +220,7 @@ class Reader(object):
 
     @property
     def dataset_sel(self):
-        """"Which datasets to read.
+        """Which datasets to read.
 
         Returns
         -------

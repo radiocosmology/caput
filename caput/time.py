@@ -865,8 +865,7 @@ class SkyfieldWrapper(object):
             )
 
     def reload(self):
-        """Reload the Skyfield data regardless of the `expire` setting.
-        """
+        """Reload the Skyfield data regardless of the `expire` setting."""
 
         exp_val = self.load.expire
         self.load.expire = True
