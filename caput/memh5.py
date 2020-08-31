@@ -1396,6 +1396,32 @@ class MemDiskGroup(_BaseGroup):
         self.close()
 
     @classmethod
+    def _detect_subclass_path(cls, group):
+        """Determine the true class of `group` from its attributes (otherwise `cls`)."""
+        return group.attrs.get("__memh5_subclass", None)
+
+    @classmethod
+    def _resolve_subclass(cls, clspath):
+        """Validate and return the subclass corresponding to classpath."""
+
+        if clspath is None:
+            return cls
+
+        # Try and get a reference to the requested class (warn if we cannot find it)
+        try:
+            new_cls = misc.import_class(clspath)
+        except (ImportError, KeyError):
+            warnings.warn("Could not import memh5 subclass %s" % clspath)
+
+        # Check that it is a subclass of MemDiskGroup
+        if not issubclass(new_cls, MemDiskGroup):
+            raise RuntimeError(
+                "Requested type (%s) is not an subclass of memh5.MemDiskGroup."
+                % clspath
+            )
+        return new_cls
+
+    @classmethod
     def from_group(cls, data_group=None, detect_subclass=True):
         """Create data object from a given group.
 
@@ -1415,26 +1441,10 @@ class MemDiskGroup(_BaseGroup):
         -------
         grp : MemDiskGroup
         """
-
-        # Look for a hint as to the sub class we should return, this should be
-        # in the attributes of the root.
-        new_cls = cls
-        if detect_subclass and "__memh5_subclass" in data_group.attrs:
-
-            clspath = data_group.attrs["__memh5_subclass"]
-
-            # Try and get a reference to the requested class (warn if we cannot find it)
-            try:
-                new_cls = misc.import_class(clspath)
-            except (ImportError, KeyError):
-                warnings.warn("Could not import memh5 subclass %s" % clspath)
-
-            # Check that it is a subclass of MemDiskGroup
-            if not issubclass(cls, MemDiskGroup):
-                raise RuntimeError(
-                    "Requested type (%s) is not an instance of memh5.MemDiskGroup."
-                    % clspath
-                )
+        if detect_subclass:
+            new_cls = cls._resolve_subclass(cls._detect_subclass_path(data_group))
+        else:
+            new_cls = cls
 
         self = new_cls.__new__(new_cls)
         MemDiskGroup.__init__(self, data_group=data_group)
