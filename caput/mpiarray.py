@@ -596,8 +596,6 @@ class MPIArray(np.ndarray):
         -------
         array : MPIArray
         """
-        from mpi4py import MPI
-
         # Don't both using MPI where the axis is not zero. It's probably just slower.
         # TODO: with tuning this might not be true. Keep an eye on this.
         use_mpi = axis > 0
@@ -630,7 +628,8 @@ class MPIArray(np.ndarray):
         lstart = dist_arr.local_offset[axis]
         lend = lstart + dist_arr.local_shape[axis]
 
-        # Create the slice object into the dataset by resolving the rank's slice on the sel
+        # Create the slice object into the dataset by resolving the rank's slice on the
+        # sel
         sel[axis] = _reslice(sel[axis], dshape[axis], slice(lstart, lend))
         sel = tuple(sel)
 
