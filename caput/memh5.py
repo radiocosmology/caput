@@ -1589,6 +1589,13 @@ class MemDiskGroup(_BaseGroup):
                 if a.endswith("_sel"):
                     sel_args[a[:-4]] = kwargs.pop(a)
 
+            # Axis selections won't warn if called from a baseclass without detecting
+            # the subclass
+            if sel_args and not detect_subclass and cls in [MemDiskGroup, BasicCont]:
+                warnings.warn(
+                    "Cannot process axis selections as subclass is not known."
+                )
+
             # Map selections to datasets
             sel = cls._make_selections(sel_args)
 
@@ -1614,7 +1621,7 @@ class MemDiskGroup(_BaseGroup):
 
         # Here we explicitly avoid calling __init__ on any derived class. Like
         # with a pickle we want to restore the saved state only.
-        self = cls.from_group(data_group=data)
+        self = cls.from_group(data_group=data, detect_subclass=detect_subclass)
 
         # ... skip the class initialisation, and use a special method
         self._finish_setup()
