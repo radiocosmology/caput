@@ -1469,7 +1469,6 @@ class MemDiskGroup(_BaseGroup):
         """Retrieve an object.
 
         The *name* may be a relative or absolute path
-
         """
 
         value = super(MemDiskGroup, self).__getitem__(name)
@@ -1493,7 +1492,7 @@ class MemDiskGroup(_BaseGroup):
     def __iter__(self):
         for key in super(MemDiskGroup, self).__iter__():
             try:
-                value = self[key]
+                _ = self[key]
             except KeyError:
                 # This key name is not allowed (see __getitem__)
                 continue
