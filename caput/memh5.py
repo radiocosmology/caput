@@ -1561,6 +1561,9 @@ class MemDiskGroup(_BaseGroup):
             Try and convert dataset string types to unicode. If not specified, look
             up the name as a class attribute to find a default, and otherwise use
             `False`.
+        <axis_name>_sel : list or slice
+            Axis selections can be given to only read a subset of the containers. A
+            slice can be given, or a list of specific array indices for that axis.
         **kwargs : any other arguments
             Any additional keyword arguments are passed to :class:`h5py.File`'s
             constructor if *file_* is a filename and silently ignored otherwise.
