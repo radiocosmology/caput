@@ -1,8 +1,7 @@
 """
 A set of miscellaneous routines that don't really fit anywhere more specific.
 
-Routines
-========
+**Functions**
 
 .. autosummary::
     :toctree: generated/
@@ -149,8 +148,8 @@ class lock_file(object):
     tmp_name : str
         File name to use in the locked block.
 
-    Example
-    -------
+    Examples
+    --------
 
     >>> from . import memh5
     >>> container = memh5.BasicCont()

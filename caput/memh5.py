@@ -112,7 +112,7 @@ class ro_dict(Mapping):
     a normal dictionary.
 
     Provides the same interface for reading as the builtin python
-    :class:`dict`s but no methods for writing.
+    :class:`dict` but no methods for writing.
 
     Parameters
     ----------
@@ -406,8 +406,7 @@ class MemGroup(_BaseGroup):
     def mode(self):
         """String indicating if group is readonly ("r") or read-write ("r+").
 
-        :class:`MemGroup`s are always read-write.
-
+        :class:`MemGroup` is always read-write.
         """
         return "r+"
 

@@ -30,6 +30,11 @@ Time conversion routine which are location independent.
     time_of_day
     naive_datetime_to_utc
 
+.. autosummary can't handle functions with decorators, autofunction does.
+.. autofunction:: datetime_to_unix(dt)
+.. autofunction:: time_of_day(time)
+.. autofunction:: unix_to_datetime(unix_time)
+
 
 Local Time Utilities
 ====================

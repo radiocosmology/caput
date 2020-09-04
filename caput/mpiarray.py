@@ -48,7 +48,7 @@ Global Slicing
 ==============
 
 The :class:`MPIArray` also supports slicing with the global index using the
-:attribute:`MPIArray.global_slice` property. This can be used for both fetching
+:py:attr:`~MPIArray.global_slice` property. This can be used for both fetching
 and assignment with global indices, supporting the basic slicing notation of
 `numpy`.
 
