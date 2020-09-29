@@ -1399,7 +1399,7 @@ class H5IOMixin(object):
                 out_copy = memh5.MemGroup.from_hdf5(output)
 
                 # Lock file as we write
-                with misc.lock_file(filename) as fn:
+                with misc.lock_file(filename, comm=out_copy.comm) as fn:
                     out_copy.to_hdf5(fn, mode="w")
 
 
