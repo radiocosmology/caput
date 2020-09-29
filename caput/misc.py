@@ -167,7 +167,9 @@ class lock_file(object):
             raise ValueError("comm argument does not seem to be an MPI communicator.")
 
         self.name = name
-        self.rank0 = mpiutil.rank0 if comm is None else comm.rank == 0
+        # If comm not specified, set internal rank0 marker to True,
+        # so that rank>0 tasks can open their own files
+        self.rank0 = True if comm is None else comm.rank == 0
         self.preserve = preserve
 
     def __enter__(self):
