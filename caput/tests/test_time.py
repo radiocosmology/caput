@@ -214,6 +214,9 @@ def test_lsd_array():
     itimes = obs.lsd_to_unix(lsds)
     assert times == approx(itimes, rel=1e-5, abs=1e-5)
 
+    # Check that it works with zero length arrays
+    assert obs.lsd_to_unix(np.array([])).size == 0
+
 
 def test_datetime_to_string():
     dt = datetime(2014, 4, 21, 16, 33, 12, 12356)
@@ -230,8 +233,7 @@ def test_string_to_datetime():
 def test_from_unix_time():
     """Make sure we are properly parsing the unix time.
 
-    This is as much a test of ephem as our code. See issue #29 on the
-    PyEphem github page.
+    This is as much a test of Skyfield as our code.
     """
 
     unix_time = random.random() * 2e6
@@ -357,3 +359,6 @@ def test_ensure_unix():
     assert (ctime.ensure_unix(dt_list) == ut_array).all()
     assert (ctime.ensure_unix(ut_array) == ut_array).all()
     assert ctime.ensure_unix(sf_array) == approx(ut_array, rel=1e-10, abs=1e-4)
+
+    # Check that it works for zero length arrays
+    assert ctime.ensure_unix(np.array([])).size == 0

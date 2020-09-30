@@ -79,6 +79,88 @@ def vectorize(**base_kwargs):
     return _vectorize_desc
 
 
+def scalarize(dtype=np.float64):
+    """Handle scalars and other iterables being passed to numpy requiring code.
+
+    Parameters
+    ----------
+    dtype : np.dtype, optional
+        The output datatype. Used only to set the return type of zero-length arrays.
+
+    Returns
+    -------
+    vectorized_function : func
+    """
+
+    class _scalarize_desc(object):
+        # See
+        # http://www.ianbicking.org/blog/2008/10/decorators-and-descriptors.html
+        # for a description of this pattern
+
+        def __init__(self, func):
+            # Save a reference to the function and set various properties so the
+            # docstrings etc. get passed through
+            self.func = func
+            self.__doc__ = func.__doc__
+            self.__name__ = func.__name__
+            self.__module__ = func.__module__
+
+        def __call__(self, *args, **kwargs):
+            # This gets called whenever the wrapped function is invoked
+
+            args, scalar, empty = zip(*[self._make_array(a) for a in args])
+
+            if all(empty):
+                return np.array([], dtype=dtype)
+
+            ret = self.func(*args, **kwargs)
+
+            if all(scalar):
+                ret = ret[0]
+
+            return ret
+
+        def _make_array(self, x):
+            # Change iterables to arrays and scalars into length-1 arrays
+
+            from skyfield import timelib
+
+            # Special handling for the slightly awkward skyfield types
+            if isinstance(x, timelib.Time):
+
+                if isinstance(x.tt, np.ndarray):
+                    scalar = False
+                else:
+                    scalar = True
+                    x = x.ts.tt_jd(np.array([x.tt]))
+
+            elif isinstance(x, np.ndarray):
+                scalar = False
+
+            elif isinstance(x, (list, tuple)):
+                x = np.array(x)
+                scalar = False
+
+            else:
+                x = np.array([x])
+                scalar = True
+
+            return (x, scalar, len(x) == 0)
+
+        def __get__(self, obj, type=None):
+
+            # As a descriptor, this gets called whenever this is used to wrap a
+            # function, and simply binds it to the instance
+
+            if obj is None:
+                return self
+
+            new_func = self.func.__get__(obj, type)
+            return self.__class__(new_func)
+
+    return _scalarize_desc
+
+
 def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
     """Ensure that we have an h5py File object.
 
