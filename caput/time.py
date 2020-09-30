@@ -145,9 +145,10 @@ from datetime import datetime
 import warnings
 
 import numpy as np
+from skyfield import timelib
 
 from . import config
-from .misc import vectorize
+from .misc import vectorize, scalarize
 
 
 # Approximate number of seconds in a sidereal second.
@@ -405,6 +406,7 @@ class Observer(object):
         return ra
 
 
+@scalarize()
 def unix_to_skyfield_time(unix_time):
     """Formats the Unix time into a time that can be interpreted by ephem.
 
@@ -440,10 +442,11 @@ def unix_to_skyfield_time(unix_time):
     return t
 
 
+@scalarize()
 def unix_to_era(unix_time):
     """Calculate the Earth Rotation Angle for a given time.
 
-    The Earth Rotation Angle is the angle between the Celetial and Terrestrial
+    The Earth Rotation Angle is the angle between the Celestial and Terrestrial
     Intermediate origins, and is a modern replacement for the Greenwich Sidereal
     Time.
 
@@ -467,6 +470,7 @@ def unix_to_era(unix_time):
     return 360.0 * era
 
 
+@scalarize()
 def era_to_unix(era, time0):
     """Calculate the UNIX time for a given Earth Rotation Angle.
 
@@ -505,7 +509,7 @@ def era_to_unix(era, time0):
     return time0 + diff_time - leap_seconds
 
 
-@vectorize()
+@vectorize(otypes=[object])
 def unix_to_datetime(unix_time):
     """Converts unix time to a :class:`~datetime.datetime` object.
 
@@ -531,7 +535,7 @@ def unix_to_datetime(unix_time):
     return naive_datetime_to_utc(dt)
 
 
-@vectorize()
+@vectorize(otypes=[np.float64])
 def datetime_to_unix(dt):
     """Converts a :class:`~datetime.datetime` object to the unix time.
 
@@ -559,6 +563,7 @@ def datetime_to_unix(dt):
     return since_epoch.total_seconds()
 
 
+@vectorize(otypes=[np.unicode])
 def datetime_to_timestr(dt):
     """Converts a :class:`~datetime.datetime` to "YYYYMMDDTHHMMSSZ" format.
 
@@ -582,6 +587,7 @@ def datetime_to_timestr(dt):
     return dt.strftime("%Y%m%dT%H%M%SZ")
 
 
+@vectorize(otypes=[object])
 def timestr_to_datetime(time_str):
     """Converts date "YYYYMMDDTHHMMSS*" to a :class:`~datetime.datetime`.
 
@@ -603,6 +609,7 @@ def timestr_to_datetime(time_str):
     return datetime.strptime(time_str[:15], "%Y%m%dT%H%M%S")
 
 
+@scalarize(dtype=np.int64)
 def leap_seconds_between(time_a, time_b):
     """Determine how many leap seconds occurred between two Unix times.
 
@@ -645,6 +652,7 @@ def leap_seconds_between(time_a, time_b):
     return time_shift_int
 
 
+@scalarize()
 def ensure_unix(time):
     """Convert the input time to Unix time format.
 
@@ -659,11 +667,9 @@ def ensure_unix(time):
         Output time.
     """
 
-    time0 = np.array(time).flatten()[0] if hasattr(time, "__len__") else time
-
-    if isinstance(time0, datetime):
+    if isinstance(time[0], datetime):
         return datetime_to_unix(time)
-    elif isinstance(time0, basestring):
+    elif isinstance(time[0], basestring):
         return datetime_to_unix(timestr_to_datetime(time))
     else:
 
@@ -672,14 +678,15 @@ def ensure_unix(time):
         try:
             from skyfield import timelib
 
-            if isinstance(time0, timelib.Time):
+            if isinstance(time[0], timelib.Time):
                 return datetime_to_unix(time.utc_datetime())
         except ImportError:
             pass
 
         # Finally try and convert into a float.
         try:
-            return np.float64(time)
+            if np.issubdtype(time.dtype, np.number):
+                return time.astype(np.float64)
         except TypeError:
             raise TypeError("Could not convert %s into a UNIX time" % repr(type(time)))
 
@@ -687,6 +694,7 @@ def ensure_unix(time):
 _warned_utc_datetime = False
 
 
+@vectorize(otypes=[object])
 def naive_datetime_to_utc(dt):
     """Add UTC timezone info to a naive datetime.
 
