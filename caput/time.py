@@ -671,24 +671,12 @@ def ensure_unix(time):
         return datetime_to_unix(time)
     elif isinstance(time[0], basestring):
         return datetime_to_unix(timestr_to_datetime(time))
+    elif isinstance(time[0], timelib.Time):
+        return datetime_to_unix(time.utc_datetime())
+    elif isinstance(time, np.ndarray) and np.issubdtype(time.dtype, np.number):
+        return time.astype(np.float64)
     else:
-
-        # Try and convert a Skyfield time into a UNIX time
-        # Protect the import in case Skyfield is not installed
-        try:
-            from skyfield import timelib
-
-            if isinstance(time[0], timelib.Time):
-                return datetime_to_unix(time.utc_datetime())
-        except ImportError:
-            pass
-
-        # Finally try and convert into a float.
-        try:
-            if np.issubdtype(time.dtype, np.number):
-                return time.astype(np.float64)
-        except TypeError:
-            raise TypeError("Could not convert %s into a UNIX time" % repr(type(time)))
+        raise TypeError("Could not convert %s into a UNIX time" % repr(type(time)))
 
 
 _warned_utc_datetime = False
