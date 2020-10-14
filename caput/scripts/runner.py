@@ -40,7 +40,22 @@ def cli():
     default="CONFIG",
     help="Logging level (deprecated, use the config instead).",
 )
-def run(configfile, loglevel):
+@click.option(
+    "--profile",
+    is_flag=True,
+    default=False,
+    help=(
+        "Run the job in a profiler. This will output a `profile_<rank>.prof` file per "
+        "MPI rank if using cProfile or `profile_<rank>.txt` file for pyinstrument."
+    ),
+)
+@click.option(
+    "--profiler",
+    type=click.Choice(["cProfile", "pyinstrument"], case_sensitive=False),
+    default="cProfile",
+    help="Set the profiler to use. Default is cProfile.",
+)
+def run(configfile, loglevel, profile, profiler):
     """Run a pipeline immediately from the given CONFIGFILE."""
     from caput.pipeline import Manager
 
@@ -51,8 +66,34 @@ def run(configfile, loglevel):
             "--loglevel is deprecated, use the config file instead", DeprecationWarning
         )
 
+    if profile:
+        if profiler == "cProfile":
+            import cProfile
+
+            pr = cProfile.Profile()
+            pr.enable()
+        elif profiler == "pyinstrument":
+            from pyinstrument import Profiler
+
+            pr = Profiler()
+            pr.start()
+
     P = Manager.from_yaml_file(configfile)
     P.run()
+
+    if profile:
+
+        from caput import mpiutil
+
+        rank = mpiutil.rank
+
+        if profiler == "cProfile":
+            pr.disable()
+            pr.dump_stats("profile_%i.prof" % mpiutil.rank)
+        elif profiler == "pyinstrument":
+            pr.stop()
+            with open("profile_%i.txt" % rank, "w") as fh:
+                fh.write(pr.output_text(unicode=True))
 
 
 @cli.command()
