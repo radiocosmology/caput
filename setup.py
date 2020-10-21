@@ -19,14 +19,15 @@ from setuptools.extension import Extension
 import versioneer
 
 
-REQUIRES = ["numpy>=1.16", "h5py", "PyYAML", "cython", "future", "click"]
-
 # Don't install requirements if on ReadTheDocs build system.
 on_rtd = os.environ.get("READTHEDOCS", None) == "True"
 if on_rtd:
     requires = []
 else:
-    requires = REQUIRES
+    # Load the PEP508 formatted requirements from the requirements.txt file. Needs
+    # pip version > 19.0
+    with open("requirements.txt", "r") as fh:
+        requires = fh.readlines()
 
 
 # Cython
