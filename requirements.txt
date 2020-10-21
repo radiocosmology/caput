@@ -5,3 +5,4 @@ PyYAML
 skyfield>=1.0
 future
 cython
+click
