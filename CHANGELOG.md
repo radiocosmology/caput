@@ -1,3 +1,33 @@
+# [20.10.0](https://github.com/radiocosmology/caput/compare/v20.5.1...v20.10.0) (2020-10-21)
+
+
+### Bug Fixes
+
+* **config:** incorrect exception error message ([645b47c](https://github.com/radiocosmology/caput/commit/645b47cdc80b6ff840fcf75e57de9d749cf17d94))
+* **memh5:** change _make_selections to be a classmethod ([9869122](https://github.com/radiocosmology/caput/commit/9869122c2617a8bb91286ae76c9ba37e6aca3cbb))
+* **memh5:** modify BasicCont.redistribute to prevent reference cycles ([0b7efaa](https://github.com/radiocosmology/caput/commit/0b7efaa8f10c0156a099ae6fea51ee741c8bb80c))
+* **memh5:** pass on detect_subclass and warn when axis selections won't work ([f1d2e28](https://github.com/radiocosmology/caput/commit/f1d2e28157c69933f61f1614076521018dfbce43))
+* **misc:** change lock_file() behavior to match docstring ([5aed55e](https://github.com/radiocosmology/caput/commit/5aed55e608d015a9cfef2e39a7331b503d09220d))
+* **mpiarray:** bug when selecting data during distributed read ([3c5392a](https://github.com/radiocosmology/caput/commit/3c5392aa44d690de9ca4659e145e28f52c8e5928))
+* **mpiarray:** upper limit incorrectly set in private function _reslice ([4e2e1e4](https://github.com/radiocosmology/caput/commit/4e2e1e45311139d6da08a9953327c95eae605d1a))
+* **setup:** load `install_requires` from the `requirements.txt` file ([9f25a57](https://github.com/radiocosmology/caput/commit/9f25a5729937b037f30b68fd20faf0c70c5831f7))
+* **time:** allow zero length arrays as arguments ([1a4b324](https://github.com/radiocosmology/caput/commit/1a4b324f6177c33d87811e1cd5b3d1a430e837de))
+
+
+### Features
+
+* **interferometry:** add routines use for interferometry ([2bf97e1](https://github.com/radiocosmology/caput/commit/2bf97e170d8d248411b195eb62430afca3fe06af))
+* **pfb:** routines for calculating and correcting the effects of a PFB ([a044741](https://github.com/radiocosmology/caput/commit/a0447417301014783f7a4444a7a9990d0a840cfe))
+* **pipeline:** allow construction and control of pure Python pipelines ([81af488](https://github.com/radiocosmology/caput/commit/81af4880c9d974bfde837ef0506b9e1bf4288f82))
+* **runner:** support profiling caput-pipeline runs ([9b72e7c](https://github.com/radiocosmology/caput/commit/9b72e7cef645cd66a106622dd21c7ecdc41ce4a8))
+
+
+### Performance Improvements
+
+* **weighted_median:** use quickselect to calculate the static median ([cfddefb](https://github.com/radiocosmology/caput/commit/cfddefbb7c0e55a3915bda2b6b15705ed2c2feb2))
+
+
+
 # [20.5.1](https://github.com/radiocosmology/caput/compare/v20.5.0...v20.5.1) (2020-05-07)
 
 
