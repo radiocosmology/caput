@@ -161,6 +161,51 @@ def scalarize(dtype=np.float64):
     return _scalarize_desc
 
 
+def listize(**base_kwargs):
+    """Make functions that already work with `np.ndarray` or scalars accept lists.
+
+    Also works with tuples.
+
+    Returns
+    -------
+    listized_function : func
+    """
+
+    class _listize_desc(object):
+
+        def __init__(self, func):
+            # Save a reference to the function and set various properties so the
+            # docstrings etc. get passed through
+            self.func = func
+            self.__doc__ = func.__doc__
+            self.__name__ = func.__name__
+            self.__module__ = func.__module__
+
+        def __call__(self, *args, **kwargs):
+            # This gets called whenever the wrapped function is invoked
+
+            new_args = []
+            for arg in args:
+                if isinstance(arg, (list, tuple)):
+                    arg = np.array(arg)
+                new_args.append(arg)
+
+            return self.func(*new_args, **kwargs)
+
+        def __get__(self, obj, type=None):
+
+            # As a descriptor, this gets called whenever this is used to wrap a
+            # function, and simply binds it to the instance
+
+            if obj is None:
+                return self
+
+            new_func = self.func.__get__(obj, type)
+            return self.__class__(new_func)
+
+    return _listize_desc
+
+
 def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
     """Ensure that we have an h5py File object.
 
