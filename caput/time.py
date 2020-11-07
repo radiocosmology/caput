@@ -151,11 +151,21 @@ from . import config
 from .misc import vectorize, scalarize, listize
 
 
-# Approximate number of seconds in a sidereal second.
-SIDEREAL_S = 1.0 / (1.0 + 1.0 / 365.259636)
+# The approximate length of a UT1 second in SI seconds (i.e. LOD / 86400). This was
+# calculated from the IERS EOP C01 IAU2000 data, by calculating the derivative of UT1 -
+# TAI from 2019.5 to 2020.5. Note that the variations in this are quite substantial,
+# but it's typically 1ms over the source of a day
+UT1_S = 1.00000000205
 
-# Approximate length of a stellar second (in SI seconds)
-STELLAR_S = SIDEREAL_S + 0.0084 / (24 * 3600)
+# Approximate number of seconds in a sidereal second.
+# The exact value used here is from https://hpiers.obspm.fr/eop-pc/models/constants.html
+# but can be derived from USNO Circular 179 Equation 2.12
+SIDEREAL_S = 1.0 / 1.002737909350795 * UT1_S
+
+# Approximate length of a stellar second
+# This comes from the definition of ERA-UT1 (see IERS Conventions TR Chapter 1) giving
+# the first ratio a UT1 and stellar second
+STELLAR_S = 1.0 / 1.00273781191135448 * UT1_S
 
 
 class Observer(object):
