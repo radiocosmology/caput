@@ -148,7 +148,7 @@ import numpy as np
 from skyfield import timelib
 
 from . import config
-from .misc import vectorize, scalarize
+from .misc import vectorize, scalarize, listize
 
 
 # Approximate number of seconds in a sidereal second.
@@ -231,6 +231,7 @@ class Observer(object):
 
         return obs
 
+    @listize()
     def unix_to_lsa(self, time):
         """Calculate the Local Stellar Angle.
 
@@ -255,6 +256,7 @@ class Observer(object):
 
     lsa = unix_to_lsa
 
+    @listize()
     def lsa_to_unix(self, lsa, time0):
         """Convert a Local Stellar Angle (LSA) on a given
         day to a UNIX time.
@@ -286,6 +288,7 @@ class Observer(object):
         """
         return self.lsa_to_unix(0.0, self.lsd_start_day)
 
+    @listize()
     def unix_to_lsd(self, time):
         """Calculate the Local Stellar Day (LSD) corresponding to the given time.
 
@@ -318,6 +321,7 @@ class Observer(object):
 
     lsd = unix_to_lsd
 
+    @listize()
     def lsd_to_unix(self, lsd):
         """Calculate the UNIX time corresponding to a given LSD.
 
@@ -342,6 +346,7 @@ class Observer(object):
 
         # Solve for the next transit of that RA after start_unix
         return self.lsa_to_unix(lsa, start_unix)
+
 
     def transit_RA(self, time):
         """Transiting RA for the observer at given Unix Time.
@@ -503,7 +508,7 @@ def era_to_unix(era, time0):
     # Second.
     diff_time = diff_era_deg * 240.0 * STELLAR_S
 
-    # Calculate if any leap seconds occured between the search start and the final value
+    # Did if any leap seconds occurred between the search start and the final value
     leap_seconds = leap_seconds_between(time0, time0 + diff_time)
 
     return time0 + diff_time - leap_seconds
