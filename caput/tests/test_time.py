@@ -217,6 +217,23 @@ def test_lsd_array():
     # Check that it works with zero length arrays
     assert obs.lsd_to_unix(np.array([])).size == 0
 
+    # Check that is works with lists (this was previously a bug)
+    assert obs.lsd_zero() == approx(obs.lsd_to_unix([0.0, 0.0]), abs=1e-3, rel=0)
+
+
+def test_era_accuracy():
+
+    # Pick a time to check the ERA around
+    dts = ctime.ensure_unix(datetime(2000, 1, 1))
+
+    # These should give back the same time, but the accuracy of the STELLAR_S constant
+    # and Skyfields interpolation of dUT1 limit this.
+    t0 = ctime.era_to_unix(0, dts)
+    t1 = ctime.era_to_unix(0, dts - 5 * 3600)
+
+    # The accuracy should be better than a millisecond
+    assert t0 == approx(t1, abs=1e-3)
+
 
 def test_datetime_to_string():
     dt = datetime(2014, 4, 21, 16, 33, 12, 12356)
@@ -362,3 +379,5 @@ def test_ensure_unix():
 
     # Check that it works for zero length arrays
     assert ctime.ensure_unix(np.array([])).size == 0
+
+
