@@ -357,11 +357,11 @@ class Observer(object):
         # Solve for the next transit of that RA after start_unix
         return self.lsa_to_unix(lsa, start_unix)
 
-
+    @scalarize()
     def transit_RA(self, time):
         """Transiting RA for the observer at given Unix Time.
 
-        Because the RA is defined with repect to the specified epoch (J2000 by
+        Because the RA is defined with respect to the specified epoch (J2000 by
         default), the elevation actually matters here. The elevation of the
         equator is used, which minimizes this effect.
 
@@ -402,21 +402,11 @@ class Observer(object):
         el = 90.0 - self.latitude
         obs.pressure = 0
 
-        # Save the shape for the return value and flatten
-        if hasattr(time, "__len__"):
-            time = np.array(time)
-            sh = time.shape
-            time = time.flatten()
-
         st = unix_to_skyfield_time(time)
         pos = obs.at(st).from_altaz(az_degrees=az, alt_degrees=el)
         ra, dec, dist = pos.radec()  # Fetch ICRS position (effectively J2000)
 
         ra = np.degrees(ra.radians)
-
-        # Reshape to the input shape
-        if hasattr(ra, "__len__"):
-            ra = ra.reshape(sh)
 
         return ra
 

@@ -71,7 +71,6 @@ def test_transit_array():
     # Drift rate should be very close to 1 degree/4minutes.
     # Fetch times calculated by ephem
     delta_deg = np.arange(20)
-    delta_deg.shape = (5, 4)
     lst = lst + delta_deg
 
     # Calculate RA using transit_RA
