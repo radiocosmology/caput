@@ -172,7 +172,6 @@ def listize(**base_kwargs):
     """
 
     class _listize_desc(object):
-
         def __init__(self, func):
             # Save a reference to the function and set various properties so the
             # docstrings etc. get passed through
