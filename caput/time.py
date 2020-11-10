@@ -145,6 +145,7 @@ from datetime import datetime
 import warnings
 
 import numpy as np
+from scipy.optimize import brentq
 from skyfield import timelib
 
 from . import config
@@ -202,6 +203,10 @@ class Observer(object):
     lsd_to_unix
     transit_RA
     skyfield_obs
+    transit_times
+    rise_set_times
+    rise_times
+    set_times
     """
 
     longitude = config.float_in_range(-180.0, 180.0, default=0.0)
@@ -222,6 +227,8 @@ class Observer(object):
         if lsd_start is not None:
             self.lsd_start_day = lsd_start
 
+    _obs = None
+
     def skyfield_obs(self):
         """Create a Skyfield topos object for the current location.
 
@@ -233,13 +240,14 @@ class Observer(object):
 
         earth = self.skyfield.ephemeris["earth"]
 
-        obs = earth + Topos(
-            latitude_degrees=self.latitude,
-            longitude_degrees=self.longitude,
-            elevation_m=self.altitude,
-        )
+        if self._obs is None:
+            self._obs = earth + Topos(
+                latitude_degrees=self.latitude,
+                longitude_degrees=self.longitude,
+                elevation_m=self.altitude,
+            )
 
-        return obs
+        return self._obs
 
     @listize()
     def unix_to_lsa(self, time):
@@ -409,6 +417,225 @@ class Observer(object):
         ra = np.degrees(ra.radians)
 
         return ra
+
+    def transit_times(
+        self, source, t0, t1=None, step=0.2, lower=False, return_dec=False
+    ):
+        """Find the transit times of the given source in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the transit of. This can be any body
+            skyfield can observe, such as a star (`skyfield.api.Star`), planet or
+            moon (`skyfield.vectorlib.VectorSum` or
+            `skyfield.jpllib.ChebyshevPosition`).
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that can be converted to a UNIX
+            time by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float
+            The initial search step in days. This is used to find the approximate
+            location between transits, and should be set to something less than the
+            spacing between transits.
+        lower : bool, optional
+            By default this only returns the upper (regular) transit. This will cause
+            lower transits to be returned instead.
+        return_dec : bool, optional
+            If set, also return the declination of the source at transit.
+
+        Returns
+        -------
+        times : np.ndarray
+            UNIX times of transits.
+        dec : np.ndarray
+            Only returned if `return_dec` is set. Declination of source at transit.
+        """
+
+        # The function to find routes for. For the upper transit we just search for
+        # HA=0, for the lower transit we need to rotate the 180 -> -180 transition to
+        # be at 0.
+        def f(t):
+            ha = self._source_ha(source, t)
+            return ha if not lower else (ha % 360.0) - 180.0
+
+        # Calculate the HA at the initial search points
+
+        # Get the ends of the search interval in TT Julian days
+        t0 = ensure_unix(t0)
+        t1 = ensure_unix(t1) if t1 is not None else t0 + 24 * 3600.0
+
+        # Convert the UNIX start and end times into Julian Days
+        t0jd, t1jd = unix_to_skyfield_time([t0, t1]).tt
+
+        transits, _ = _solve_all(f, t0jd, t1jd, step, skip_decreasing=True, xtol=1e-8)
+
+        # Convert into UNIX times
+        t_sf = self.skyfield.timescale.tt_jd(transits)
+        t_unix = skyfield_time_to_unix(t_sf)
+
+        if return_dec:
+
+            if len(transits) > 0:
+                pos = self.skyfield_obs().at(t_sf).observe(source)
+                dec = pos.cirs_radec(epoch=t_sf)[1]._degrees
+            else:
+                dec = np.array([], dtype=np.float64)
+
+            return t_unix, dec
+        else:
+            return t_unix
+
+    def rise_set_times(self, source, t0, t1=None, step=0.2, diameter=0.0):
+        """Find all times a sources rises or sets in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the rising and setting of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float
+            The initial search step in days. This is used to find the approximate
+            location between transits, and should be set to something less than the
+            spacing between transits.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise/set times as UNIX epoch times.
+        rising : np.ndarray
+            Boolean array of whether the time corresponds to a rising (True) or
+            setting (False).
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=False, skip_set=False
+        )
+
+    def rise_times(self, source, t0, t1=None, step=0.2, diameter=0.0):
+        """Find all times a sources rises in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the rising of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float
+            The initial search step in days. This is used to find the approximate
+            location between rises, and should be set to something less than the
+            spacing between rises.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise times as UNIX epoch times.
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=False, skip_set=True
+        )[0]
+
+    def set_times(self, source, t0, t1=None, step=0.2, diameter=0.0):
+        """Find all times a sources sets in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the setting of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float
+            The initial search step in days. This is used to find the approximate
+            location between settings, and should be set to something less than the
+            spacing between settings.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise times as UNIX epoch times.
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=True, skip_set=False
+        )[0]
+
+    def _sr_work(self, source, t0, t1, step, diameter, skip_rise=False, skip_set=False):
+        # A work routine factoring out common functionality
+
+        # The function to find roots for. This is just the altitude of the source with
+        # an offset for it's finite size
+        def f(t):
+            return self._source_alt(source, t) + diameter / 2
+
+        # Get the ends of the search interval in TT Julian days
+        t0 = ensure_unix(t0)
+        t1 = ensure_unix(t1) if t1 is not None else t0 + 24 * 3600.0
+        t0jd, t1jd = unix_to_skyfield_time([t0, t1]).tt
+
+        times, risings = _solve_all(
+            f,
+            t0jd,
+            t1jd,
+            step,
+            skip_increasing=skip_rise,
+            skip_decreasing=skip_set,
+            xtol=1e-6,
+        )
+
+        # Convert into UNIX times
+        times = skyfield_time_to_unix(self.skyfield.timescale.tt_jd(times))
+
+        return times, risings
+
+    def _source_ha(self, source, t):
+        # Calculate the local Hour Angle of a given source
+        time = self.skyfield.timescale.tt_jd(t)
+        lst = time.gast * 15 + self.longitude
+
+        ra = self.skyfield_obs().at(time).observe(source).radec(epoch=time)[0]._degrees
+
+        return (((lst - ra) + 180) % 360) - 180
+
+    def _source_alt(self, source, t):
+        # Calculate the altitude of a given source
+        from skyfield.positionlib import _to_altaz
+
+        time = self.skyfield.timescale.tt_jd(t)
+        pos = self.skyfield_obs().at(time).observe(source)
+
+        # NOTE: we could have used `.apparent().altz()` here, but the corrections for
+        # light travel time are super slow, so we're better off skipping them. To do
+        # this we need to use a private Skyfield method. This isn't a great idea given
+        # how unstable skyfields internal API seems to be, but it saves reinventing the
+        # wheel. We'll see how it goes for now.
+        alt = _to_altaz(pos, None, None)[0].degrees
+
+        return alt
 
 
 @scalarize()
@@ -895,3 +1122,64 @@ class SkyfieldWrapper(object):
 # Set up a module local Skyfield wrapper for time conversion functions in this
 # module to use.
 skyfield_wrapper = SkyfieldWrapper()
+
+
+def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kwargs):
+    """Find all roots of function f, within the interval [x0, x1].
+
+    To find all the roots we need an estimate of the spacing of the roots. This is
+    specified by the parameter `dx`. If this is too large, roots may be missed.
+
+    Parameters
+    ----------
+    f : callable
+        A numpy vectorized function which returns a single value f(x).
+    x0, x1 : float
+        The start and end of the interval to search.
+    dx : float
+        An interval known to be less than the spacing between the closest roots.
+    skip_increasing, skip_decreasing : bool, optional
+        Skip roots where the gradient is positive (or negative).
+    **kwargs
+        Passed to `scipy.optimize.brentq`. `xtol`, `rtol` and `maxiter` are probably
+        the most useful.
+
+    Returns
+    -------
+    roots : np.ndarray[np.float64]
+        The values of the roots found.
+    increasing : np.ndarray[bool]
+        If the gradient at the root is positive.
+    """
+    # Form a grid of points to find intervals to search over
+    x_init = np.linspace(x0, x1, int(np.ceil((x1 - x0) / dx)), endpoint=True)
+    f_init = f(x_init)
+
+    roots = []
+    increasing = []
+
+    # Search through intervals
+    for xa, xb, fa, fb in zip(x_init[:-1], x_init[1:], f_init[:-1], f_init[1:]):
+
+        # Entries are the same sign, so there is no solution in between.
+        # NOTE: we need to deal with the case where one edge might be an exact root,
+        # hence the strictly greater than 0.0
+        if fa * fb > 0.0:
+            continue
+
+        is_increasing = fa < fb
+
+        # Skip positive gradient roots
+        if skip_increasing and is_increasing:
+            continue
+
+        # Skip negative gradient roots
+        if skip_decreasing and not is_increasing:
+            continue
+
+        root = brentq(f, xa, xb, **kwargs)
+
+        roots.append(root)
+        increasing.append(is_increasing)
+
+    return (np.array(roots, dtype=np.float64), np.array(increasing, dtype=np.bool))

@@ -11,6 +11,7 @@ import time
 from datetime import datetime
 
 import numpy as np
+import pytest
 from skyfield import earthlib, api
 from pytest import approx
 
@@ -380,3 +381,53 @@ def test_ensure_unix():
     assert ctime.ensure_unix(np.array([])).size == 0
 
 
+@pytest.fixture
+def chime():
+    # Position from ch_util.ephemeris on 2020/11/09
+    return ctime.Observer(lon=-119.62, lat=49.32, alt=545.0)
+
+
+@pytest.fixture(scope="module")
+def eph():
+    return ctime.skyfield_wrapper.ephemeris
+
+
+def test_transit_times(chime, eph):
+    # Routines to test the transit time calculations
+
+    dts = datetime(2020, 11, 5)
+    dte = datetime(2020, 11, 7)
+
+    times = chime.transit_times(eph["sun"], dts, dte)
+
+    # Calculated via the old version of `ch_util.ephemeris.solar_transit(dts, dte)``
+    precalc_times = [1604605326.0967, 1604691728.9071]
+
+    # Check that the calculations agree within 2s. This criterion comes from the first
+    # attempts to use the new routines, and seems reasonable enough that I'm not going
+    # to track down the difference
+    assert times == approx(precalc_times, abs=2)
+
+
+def test_rise_set_times(chime, eph):
+
+    dts = datetime(2020, 11, 5)
+    dte = datetime(2020, 11, 7)
+
+    # From old version of `ch_util.ephemeris`
+    precalc_times = np.array(
+        [1604535925.5065, 1604588383.0504, 1604622231.5790, 1604674881.4216],
+        dtype=np.float64,
+    )
+    precalc_risings = np.array([False, True, False, True], dtype=np.bool)
+
+    times, risings = chime.rise_set_times(eph["sun"], dts, dte)
+
+    assert times == approx(precalc_times, abs=2)
+    assert np.all(risings == precalc_risings)
+
+    risings = chime.rise_times(eph["sun"], dts, dte)
+    settings = chime.set_times(eph["sun"], dts, dte)
+
+    assert risings == approx(precalc_times[precalc_risings], abs=2)
+    assert settings == approx(precalc_times[~precalc_risings], abs=2)
