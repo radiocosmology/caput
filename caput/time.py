@@ -423,7 +423,7 @@ class Observer(object):
 
 @scalarize()
 def unix_to_skyfield_time(unix_time):
-    """Formats the Unix time into a time that can be interpreted by ephem.
+    """Formats the Unix time into a time that can be interpreted by Skyfield.
 
     Parameters
     ----------
@@ -433,12 +433,6 @@ def unix_to_skyfield_time(unix_time):
     Returns
     -------
     time : :class:`skyfield.timelib.Time`
-
-    See Also
-    --------
-    :meth:`datetime.datetime.utcfromtimestamp`
-    :func:`datetime_to_unix`
-
     """
 
     from skyfield import timelib
@@ -455,6 +449,26 @@ def unix_to_skyfield_time(unix_time):
     t = ts.utc(year, month, day, second=seconds)
 
     return t
+
+
+@scalarize()
+def skyfield_time_to_unix(skyfield_time):
+    """Formats the Skyfield time into UNIX times.
+
+    Parameters
+    ----------
+    skyfield_time : `skyfield.timelib.Time`
+        Skyfield time.
+
+    Returns
+    -------
+    time : float or array of
+        UNIX time.
+    """
+    # TODO: I'm surprised there isn't a better way to do this. Needing to convert via a
+    # datetime isn't great, but the only other ways I think can do it use private
+    # routines
+    return ensure_unix(skyfield_time.utc_datetime())
 
 
 @scalarize()
