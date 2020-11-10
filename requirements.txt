@@ -2,7 +2,7 @@ numpy>=1.16
 scipy
 h5py
 PyYAML
-skyfield>=1.0
+skyfield>=1.31
 future
 cython
 click

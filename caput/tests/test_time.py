@@ -5,6 +5,7 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 
 # === End Python 2/3 compatibility
 
+import os
 import unittest
 import random
 import time
@@ -28,10 +29,12 @@ from caput import time as ctime
 #
 mirror_url = "https://bao.chimenet.ca/skyfield/"
 
-files = ["Leap_Second.dat", "deltat.data", "deltat.preds", "de421.bsp"]
+files = ["Leap_Second.dat", "finals2000A.all", "de421.bsp"]
 
+loader = ctime.skyfield_wrapper.load
 for file in files:
-    ctime.skyfield_wrapper.load(mirror_url + file)
+    if not os.path.exists(loader.path_to(file)):
+        loader.download(mirror_url + file)
 
 
 def test_epoch():

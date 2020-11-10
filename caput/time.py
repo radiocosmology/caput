@@ -989,8 +989,9 @@ class SkyfieldWrapper(object):
         Directory Skyfield should save data in. If not set data will be looked
         for in `$CAPUT_SKYFIELD_PATH` or in `<path to caput>/caput/data`.
     expire : bool, optional
-        Whether to expire existing data. This is `False` by default to avoid
-        unexpected filesystem/network access.
+        Deprecated option. Skyfield no longer has a concept of expiring data. To get
+        updated data you must force an explicit reload of it which can be done via
+        `SkyFieldWrapper.reload`.
     ephemeris : string, optional
         The JPL ephemeris to use. Defaults to `'de421.bsp'`.
 
@@ -1006,11 +1007,18 @@ class SkyfieldWrapper(object):
     reload
     """
 
-    def __init__(self, path=None, expire=False, ephemeris="de421.bsp"):
+    def __init__(self, path=None, expire=None, ephemeris="de421.bsp"):
 
         import os
 
         self._ephemeris_name = ephemeris
+
+        if expire is not None:
+            warnings.warn(
+                "`expiry` argument deprecated as Skyfield has dropped the idea of "
+                "expiring data.",
+                DeprecationWarning,
+            )
 
         if path is None:
 
@@ -1024,7 +1032,7 @@ class SkyfieldWrapper(object):
         try:
             from skyfield import api
 
-            self._load = api.Loader(path, expire=expire)
+            self._load = api.Loader(path)
         except ImportError:
             pass
 
@@ -1056,19 +1064,8 @@ class SkyfieldWrapper(object):
         if self._timescale:
             return self._timescale
 
-        # Try to load skyfield data (downloading an update if it has expired)
         try:
-            self._timescale = self.load.timescale()
-            return self._timescale
-        except IOError:
-            warnings.warn("Can not update Skyfield data. Trying existing data.")
-
-        # If we are here either the data didn't exist, or the server cannot be
-        # reached. Try to load skyfield data, ignoring any expiry, this should
-        # work provided a file already exisits
-        try:
-            self.load.expire = False
-            self._timescale = self.load.timescale()
+            self._timescale = self.load.timescale(builtin=False)
             return self._timescale
         except IOError:
             raise IOError(
@@ -1086,18 +1083,7 @@ class SkyfieldWrapper(object):
         if self._ephemeris:
             return self._ephemeris
 
-        # Try to load skyfield data (downloading an update if it has expired)
         try:
-            self._ephemeris = self.load(self._ephemeris_name)
-            return self._ephemeris
-        except IOError:
-            warnings.warn("Can not update Skyfield data. Trying existing data.")
-
-        # If we are here either the data didn't exist, or the server cannot be
-        # reached. Try to load skyfield data, ignoring any expiry, this should
-        # work provided a file already exisits
-        try:
-            self.load.expire = False
             self._ephemeris = self.load(self._ephemeris_name)
             return self._ephemeris
         except IOError:
@@ -1109,14 +1095,9 @@ class SkyfieldWrapper(object):
     def reload(self):
         """Reload the Skyfield data regardless of the `expire` setting."""
 
-        exp_val = self.load.expire
-        self.load.expire = True
-
-        try:
-            self.timescale
-            self.ephemeris
-        finally:
-            self.load.expire = exp_val
+        # Download the timescale file and ephemeris
+        self.load.download("finals2000A.all")
+        self.load.download(self._ephemeris_name)
 
 
 # Set up a module local Skyfield wrapper for time conversion functions in this
