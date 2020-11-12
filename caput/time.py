@@ -201,6 +201,7 @@ class Observer(object):
     lsa_to_unix
     unix_to_lsd
     lsd_to_unix
+    unix_to_lst
     transit_RA
     skyfield_obs
     transit_times
