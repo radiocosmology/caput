@@ -449,11 +449,12 @@ class Observer(object):
 
         Parameters
         ----------
-        source : skyfield source
+        source : skyfield source or float
             The source we are calculating the transit of. This can be any body
             skyfield can observe, such as a star (`skyfield.api.Star`), planet or
             moon (`skyfield.vectorlib.VectorSum` or
-            `skyfield.jpllib.ChebyshevPosition`).
+            `skyfield.jpllib.ChebyshevPosition`). Additionally if a float is passed,
+            this is equivalent to a body with ICRS RA given by the float, and DEC=0.
         t0 : float unix time, or datetime
             The start time to search for. Any type that can be converted to a UNIX
             time by caput.
@@ -477,6 +478,9 @@ class Observer(object):
         dec : np.ndarray
             Only returned if `return_dec` is set. Declination of source at transit.
         """
+
+        if isinstance(source, float):
+            source = skyfield_star_from_ra_dec(source, 0.0)
 
         # The function to find routes for. For the upper transit we just search for
         # HA=0, for the lower transit we need to rotate the 180 -> -180 transition to
