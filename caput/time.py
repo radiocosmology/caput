@@ -147,6 +147,8 @@ import warnings
 import numpy as np
 from scipy.optimize import brentq
 from skyfield import timelib
+from skyfield.starlib import Star
+from skyfield.units import Angle
 
 from . import config
 from .misc import vectorize, scalarize, listize
@@ -1186,3 +1188,25 @@ def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kw
         increasing.append(is_increasing)
 
     return (np.array(roots, dtype=np.float64), np.array(increasing, dtype=np.bool))
+
+
+def skyfield_star_from_ra_dec(ra, dec, name=""):
+    """Create a Skyfield star object from an ICRS position.
+
+    Parameters
+    ----------
+    ra, dec : float
+        The ICRS position in degrees.
+    name : str, optional
+        The name of the body.
+
+    Returns
+    -------
+    body : skyfield.starlib.Star
+        An object representing the body.
+    """
+
+    body = Star(
+        ra=Angle(degrees=ra, preference="hours"), dec=Angle(degrees=dec), names=name
+    )
+    return body
