@@ -365,6 +365,27 @@ class Observer(object):
         # Solve for the next transit of that RA after start_unix
         return self.lsa_to_unix(lsa, start_unix)
 
+    @listize()
+    def unix_to_lst(self, unix):
+        """Calculate the apparent Local Sidereal Time for the given UNIX time.
+
+        Parameters
+        ----------
+        unix : float or array of
+            UNIX time in floating point seconds since the epoch.
+
+        Returns
+        -------
+        lst : float or array of
+            The apparent LST in degrees.
+        """
+
+        st = unix_to_skyfield_time(unix)
+
+        return (st.gast * 15.0 + self.longitude) % 360.0
+
+    lst = unix_to_lst
+
     @scalarize()
     def transit_RA(self, time):
         """Transiting RA for the observer at given Unix Time.
