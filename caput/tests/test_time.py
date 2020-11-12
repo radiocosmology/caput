@@ -48,14 +48,14 @@ def test_epoch():
     # Calculate the transit_RA
     unix_epoch = ctime.datetime_to_unix(epoch)
     TRA = obs.transit_RA(unix_epoch)
+    LSA = obs.lsa(unix_epoch)
 
     # Calculate LST
-    t = ctime.unix_to_skyfield_time(unix_epoch)
-    gst = earthlib.sidereal_time(t)
-    lst = (360.0 * gst / 24.0 + obs.longitude) % 360.0
+    lst = obs.lst(unix_epoch)
 
     # Tolerance limited by stellar aberation
     assert lst == approx(TRA, abs=0.01, rel=1e-10)
+    assert lst == approx(LSA, abs=0.01, rel=1e-10)
 
 
 def test_transit_array():
@@ -68,9 +68,7 @@ def test_transit_array():
     obs = ctime.Observer(118.3, 36.1)
 
     # Calculate LST
-    t = ctime.unix_to_skyfield_time(ctime.datetime_to_unix(epoch))
-    gst = earthlib.sidereal_time(t)
-    lst = (360.0 * gst / 24.0 + obs.longitude) % 360.0
+    lst = obs.lst(ctime.datetime_to_unix(epoch))
 
     # Drift rate should be very close to 1 degree/4minutes.
     # Fetch times calculated by ephem
@@ -79,11 +77,13 @@ def test_transit_array():
 
     # Calculate RA using transit_RA
     unix_epoch = ctime.datetime_to_unix(epoch)
-    unix_times = unix_epoch + (delta_deg * 60 * 4 * ctime.SIDEREAL_S)
+    unix_times = unix_epoch + (delta_deg * 60 * 4 * ctime.STELLAR_S)
     TRA = obs.transit_RA(unix_times)
+    LSA = obs.lsa(unix_times)
 
     # Compare
     assert lst == approx(TRA, abs=0.02, rel=1e-10)
+    assert lst == approx(LSA, abs=0.02, rel=1e-10)
 
 
 def test_delta():
@@ -96,11 +96,22 @@ def test_delta():
 
     start = 1383679008.816173
     times = start + delta
+
+    # Test for transit RA
     start_ra = obs.transit_RA(start)
     ra = obs.transit_RA(times)
     delta_ra = ra - start_ra
     expected = delta / 3600.0 * 15.0 / ctime.SIDEREAL_S
     error = ((expected - delta_ra + 180.0) % 360) - 180
+    # Tolerance limited by stellar aberation (40" peak to peak).
+    assert error == approx(0, abs=0.02)
+
+    # Test for lsa
+    start_lsa = obs.lsa(start)
+    lsa = obs.lsa(times)
+    delta_lsa = lsa - start_lsa
+    expected = delta / 3600.0 * 15.0 / ctime.STELLAR_S
+    error = ((expected - delta_lsa + 180.0) % 360) - 180
     # Tolerance limited by stellar aberation (40" peak to peak).
     assert error == approx(0, abs=0.02)
 
