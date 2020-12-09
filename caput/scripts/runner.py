@@ -26,6 +26,23 @@ def cli():
     pass
 
 
+@cli.command("lint")
+@click.argument(
+    "configfile",
+    nargs=-1,
+    type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
+)
+def lint_config(configfile):
+    """Test a pipeline for errors without running it."""
+    from caput.pipeline import Manager
+
+    # nargs=-1 packs multiple arguments (or glob patterns) into tuples
+    if not isinstance(configfile, tuple):
+        configfile = (configfile,)
+    for f in configfile:
+        Manager.from_yaml_file(f)
+
+
 @cli.command()
 @click.argument(
     "configfile",
@@ -104,7 +121,12 @@ def run(configfile, loglevel, profile, profiler):
 @click.option(
     "--submit/--nosubmit", default=True, help="Submit the job to the queue (or not)"
 )
-def queue(configfile, submit=False):
+@click.option(
+    "--lint/--nolint",
+    default=True,
+    help="Check the pipeline for errors before submitting it.",
+)
+def queue(configfile, submit=False, lint=True):
     """Queue a pipeline on a cluster from the given CONFIGFILE.
 
     This queues the job, using parameters from the `cluster` section of the
@@ -155,6 +177,11 @@ def queue(configfile, submit=False):
     import os.path
     import shutil
     import yaml
+
+    if lint:
+        from caput.pipeline import Manager
+
+        Manager.from_yaml_file(configfile)
 
     with open(configfile, "r") as f:
         yconf = yaml.safe_load(f)
