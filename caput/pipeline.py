@@ -628,7 +628,7 @@ class Manager(config.Reader):
                     in_=key_spec.get("in", None),
                     out=key_spec.get("out", None),
                 )
-            except PipelineConfigError as e:
+            except (PipelineConfigError, config.ConfigError) as e:
                 msg = "Setting up task {} caused an error - {}".format(ii, str(e))
                 raise_from(PipelineConfigError(msg), e)
 
