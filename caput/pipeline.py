@@ -698,7 +698,12 @@ class Manager(config.Reader):
         }
 
         # Create and configure the task instance
-        task = task_cls._from_config(task_params)
+        try:
+            task = task_cls._from_config(task_params)
+        except Exception as e:
+            raise PipelineConfigError(
+                "Failed instanciating %s from config: %s" % (task_cls, e)
+            )
 
         return task, key_spec
 
