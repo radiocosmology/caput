@@ -716,6 +716,11 @@ class Manager(config.Reader):
             A pipeline task instance.
         requires, in_, out : list or string
             The names of the task inputs and outputs.
+
+        Raises
+        ------
+        PipelineConfigError
+            If there was an error in the task configuration.
         """
         try:
             task._setup_keys(requires=requires, in_=in_, out=out)
@@ -724,6 +729,25 @@ class Manager(config.Reader):
                 task.__class__.__name__, str(e)
             )
             raise_from(PipelineConfigError(msg), e)
+
+        # Make sure this tasks in/requires values have corresponding out keys from another task
+        for key, value in (["in", in_], ["requires", requires]):
+            if value is not None:
+
+                # list all out keys of other tasks in the pipeline and flatten them to single list
+                out_keys = [t._out_keys for t in self.tasks if t != task]
+                out_keys = [item for sublist in out_keys for item in sublist]
+
+                if isinstance(value, str):
+                    value = [value]
+                for v in value:
+                    if v not in out_keys:
+                        raise PipelineConfigError(
+                            "Value '{}' for task {} has no corresponding 'out' from another task "
+                            "(Value {} is not in {}).".format(
+                                key, type(task), v, out_keys
+                            )
+                        )
 
         self.tasks.append(task)
         logger.debug("Added {} to task list.".format(task.__class__.__name__))
