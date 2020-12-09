@@ -140,6 +140,11 @@ class Property(object):
             The parent object of the Property that we want to update.
         config : dict
             Dictionary of configuration values.
+
+        Raises
+        ------
+        ConfigError
+            If there was an error in the config dict.
         """
 
         self._set_propname(obj)
@@ -148,7 +153,12 @@ class Property(object):
             self.key = self.propname
 
         if self.key in config:
-            val = self.proptype(config[self.key])
+            try:
+                val = self.proptype(config[self.key])
+            except TypeError as e:
+                raise ConfigError(
+                    "Can't read value of '%s' as %s: %s" % (self.key, self.proptype, e)
+                )
             obj.__dict__[self.propname] = val
 
     def _set_propname(self, obj):
