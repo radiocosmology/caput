@@ -512,8 +512,13 @@ class Manager(config.Reader):
         self: Pipeline object
         """
 
-        with open(file_name) as f:
-            yaml_doc = f.read()
+        try:
+            with open(file_name) as f:
+                yaml_doc = f.read()
+        except TypeError as e:
+            raise PipelineConfigError(
+                "Unable to open yaml file ({}): {}".format(file_name, e)
+            )
         return cls.from_yaml_str(yaml_doc)
 
     @classmethod
