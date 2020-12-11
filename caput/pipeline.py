@@ -749,7 +749,7 @@ class Manager(config.Reader):
                 out_keys = [t._out_keys for t in self.tasks if t != task]
                 out_keys = [item for sublist in out_keys for item in sublist]
 
-                if isinstance(value, str):
+                if not isinstance(value, list):
                     value = [value]
                 for v in value:
                     if v not in out_keys:

@@ -54,7 +54,7 @@ def simple_config():
 
 def write_to_file(config_json):
     temp = tempfile.NamedTemporaryFile(mode="w+t", delete=False)
-    temp.write(yaml.dump(config_json))
+    yaml.safe_dump(config_json, temp, encoding="utf-8")
     temp.flush()
     return temp.name
 
