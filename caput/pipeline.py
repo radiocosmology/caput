@@ -260,21 +260,27 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 ... no_params: {}
 ... '''
 
->>> Manager.from_yaml_str(new_spam_config).run()
-Setting up GetEggs.
-Setting up CookEggs.
-Setting up DoNothing.
-Setting up PrintEggs.
-Cooking fried green eggs.
-Cooking fried duck eggs.
-Cooking fried ostrich eggs.
-Finished GetEggs.
-Finished CookEggs.
-Finished DoNothing.
-Spam and green eggs.
-Spam and duck eggs.
-Spam and ostrich eggs.
-Finished PrintEggs.
+The following would error, because the pipeline config is checked for errors, like an 'in' parameter without a
+corresponding 'out'::
+
+    Manager.from_yaml_str(new_spam_config).run()
+
+But this is what it would produce otherwise::
+
+    Setting up GetEggs.
+    Setting up CookEggs.
+    Setting up DoNothing.
+    Setting up PrintEggs.
+    Cooking fried green eggs.
+    Cooking fried duck eggs.
+    Cooking fried ostrich eggs.
+    Finished GetEggs.
+    Finished CookEggs.
+    Finished DoNothing.
+    Spam and green eggs.
+    Spam and duck eggs.
+    Spam and ostrich eggs.
+    Finished PrintEggs.
 
 Notice that :meth:`DoNothing.next` is nerver called, since the pipeline never
 generates its input, 'non_existent_data_product'.  Once everything before
