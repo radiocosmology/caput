@@ -629,19 +629,40 @@ class Manager(config.Reader):
     def _setup_tasks(self):
         """Create and setup all tasks from the task list."""
 
+        all_out_values = set([t.get("out", None) for t in self.task_specs])
+
         # Setup all tasks in the task listk
         for ii, task_spec in enumerate(self.task_specs):
             try:
                 task, key_spec = self._setup_task(task_spec)
+                requires = key_spec.get("requires", None)
+                in_ = key_spec.get("in", None)
+                out = key_spec.get("out", None)
+                self._validate_task(task, in_, requires, all_out_values)
                 self.add_task(
                     task,
-                    requires=key_spec.get("requires", None),
-                    in_=key_spec.get("in", None),
-                    out=key_spec.get("out", None),
+                    requires=requires,
+                    in_=in_,
+                    out=out,
                 )
             except (PipelineConfigError, config.ConfigError) as e:
                 msg = "Setting up task {} caused an error - {}".format(ii, str(e))
                 raise_from(PipelineConfigError(msg), e)
+
+    def _validate_task(self, task, in_, requires, all_out_values):
+        # Make sure this tasks in/requires values have corresponding out keys from another task
+        for key, value in (["in", in_], ["requires", requires]):
+            if value is not None:
+                if not isinstance(value, list):
+                    value = [value]
+                for v in value:
+                    if v not in all_out_values:
+                        raise PipelineConfigError(
+                            "Value '{}' for task {} has no corresponding 'out' from another task "
+                            "(Value {} is not in {}).".format(
+                                key, type(task), v, all_out_values
+                            )
+                        )
 
     def _setup_task(self, task_spec):
         """Set up a pipeline task from the spec given in the tasks list."""
@@ -740,25 +761,6 @@ class Manager(config.Reader):
                 task.__class__.__name__, str(e)
             )
             raise_from(PipelineConfigError(msg), e)
-
-        # Make sure this tasks in/requires values have corresponding out keys from another task
-        for key, value in (["in", in_], ["requires", requires]):
-            if value is not None:
-
-                # list all out keys of other tasks in the pipeline and flatten them to single list
-                out_keys = [t._out_keys for t in self.tasks if t != task]
-                out_keys = [item for sublist in out_keys for item in sublist]
-
-                if not isinstance(value, list):
-                    value = [value]
-                for v in value:
-                    if v not in out_keys:
-                        raise PipelineConfigError(
-                            "Value '{}' for task {} has no corresponding 'out' from another task "
-                            "(Value {} is not in {}).".format(
-                                key, type(task), v, out_keys
-                            )
-                        )
 
         self.tasks.append(task)
         logger.debug("Added {} to task list.".format(task.__class__.__name__))
