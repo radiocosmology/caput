@@ -282,7 +282,7 @@ But this is what it would produce otherwise::
     Spam and ostrich eggs.
     Finished PrintEggs.
 
-Notice that :meth:`DoNothing.next` is nerver called, since the pipeline never
+Notice that :meth:`DoNothing.next` is never called, since the pipeline never
 generates its input, 'non_existent_data_product'.  Once everything before
 :class:`DoNothing` has been executed the pipeline notices that there is no
 opertunity for 'non_existent_data_product' to be generated and forces
