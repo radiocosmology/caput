@@ -10,7 +10,9 @@ from os.path import (
 )
 
 import click
+import sys
 
+from pathlib import Path
 
 products = None
 
@@ -40,7 +42,53 @@ def lint_config(configfile):
     if not isinstance(configfile, tuple):
         configfile = (configfile,)
     for f in configfile:
-        Manager.from_yaml_file(f)
+        load_venv(f)
+
+        try:
+            Manager.from_yaml_file(f)
+        except Exception as e:
+            click.echo(
+                "Found at least one error in '{}'.\n"
+                "Fix and run again to find more problems.".format(f)
+            )
+            click.echo(e)
+            sys.exit(1)
+
+
+def load_venv(configfile):
+    import site
+    import yaml
+
+    with open(configfile, mode="r") as f:
+        conf = yaml.safe_load(f)
+    try:
+        venv_path = conf["cluster"]["venv"]
+    except KeyError:
+        # no 'cluster/venv' entry... nothing to do here
+        return
+
+    click.echo("Activating '{}'...".format(venv_path))
+
+    base = Path(venv_path).absolute()
+    if not base.exists():
+        click.echo("Path defined in 'cluster'/'venv' doesn't exist ({})".format(base))
+        sys.exit(1)
+
+    site_packages = Path(
+        base / "lib" / "python{}".format(sys.version[:3]) / "site-packages"
+    )
+    prev_sys_path = list(sys.path)
+
+    site.addsitedir(site_packages)
+    sys.real_prefix = sys.prefix
+    sys.prefix = base
+    # Move the added items to the front of the path:
+    new_sys_path = []
+    for item in list(sys.path):
+        if item not in prev_sys_path:
+            new_sys_path.append(item)
+            sys.path.remove(item)
+    sys.path[:0] = new_sys_path
 
 
 @cli.command()
