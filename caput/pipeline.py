@@ -651,7 +651,8 @@ class Manager(config.Reader):
                     e,
                 )
 
-    def _validate_task(self, task, in_, requires, all_out_values):
+    @staticmethod
+    def _validate_task(task, in_, requires, all_out_values):
         # Make sure this tasks in/requires values have corresponding out keys from another task
         for key, value in (["in", in_], ["requires", requires]):
             if value is not None:
