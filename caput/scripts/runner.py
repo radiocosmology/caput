@@ -36,6 +36,7 @@ def cli():
 )
 def lint_config(configfile):
     """Test a pipeline for errors without running it."""
+    from caput.config import CaputConfigError
     from caput.pipeline import Manager
 
     # nargs=-1 packs multiple arguments (or glob patterns) into tuples
@@ -46,7 +47,7 @@ def lint_config(configfile):
 
         try:
             Manager.from_yaml_file(f)
-        except Exception as e:
+        except CaputConfigError as e:
             click.echo(
                 "Found at least one error in '{}'.\n"
                 "Fix and run again to find more problems.".format(f)

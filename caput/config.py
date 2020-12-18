@@ -69,15 +69,10 @@ from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 
 import logging
 
-from . import misc
+from yaml.loader import SafeLoader
+
 
 logger = logging.getLogger(__name__)
-
-
-class ConfigError(Exception):
-    """There was an error in the configuration file."""
-
-    pass
 
 
 class Property(object):
@@ -143,7 +138,7 @@ class Property(object):
 
         Raises
         ------
-        ConfigError
+        CaputConfigError
             If there was an error in the config dict.
         """
 
@@ -156,8 +151,9 @@ class Property(object):
             try:
                 val = self.proptype(config[self.key])
             except TypeError as e:
-                raise ConfigError(
-                    "Can't read value of '%s' as %s: %s" % (self.key, self.proptype, e)
+                raise CaputConfigError(
+                    "Can't read value of '%s' as %s: %s" % (self.key, self.proptype, e),
+                    location=config,
                 )
             obj.__dict__[self.propname] = val
 
@@ -201,16 +197,16 @@ class Reader(object):
         ----------
         config : dict
             Dictionary of configuration values.
-        compare_keys : bool
-            If True, a ConfigError is raised if there are unused keys in the
-            config dictionary
+        compare_keys : bool or list[str]
+            If True, a CaputConfigError is raised if there are unused keys in the config dictionary.
+            If a list of strings is given, any unused keys except the ones in the list lead to a CaputConfigError.
         use_defaults : bool
-            If False, a ConfigError is raised if a property is not defined by
+            If False, a CaputConfigError is raised if a property is not defined by
             the config dictionary
 
         Raises
         ------
-        ConfigError
+        CaputConfigError
             If there was an error in the config dict.
         """
         import inspect
@@ -223,16 +219,20 @@ class Reader(object):
                     clsprop._from_config(self, config)
                     prop_keys.append(clsprop.key)
         if compare_keys:
-            if set(config_keys) - set(prop_keys):
-                raise ConfigError(
-                    "Configuration keys [%s] do not have corresponding properties"
-                    % ", ".join(set(config_keys) - set(prop_keys))
+            if isinstance(compare_keys, list):
+                excluded_keys = set(prop_keys + compare_keys)
+            else:
+                excluded_keys = set(prop_keys)
+            if set(config_keys) - excluded_keys:
+                raise CaputConfigError(
+                    "Unused configuration keys: [%s]"
+                    % ", ".join(set(config_keys) - excluded_keys),
                 )
         if not use_defaults:
             if set(prop_keys) - set(config_keys):
-                raise ConfigError(
-                    "Property keys [%s] are not present in configuration dictionary"
-                    % ", ".join(set(prop_keys) - set(config_keys))
+                raise CaputConfigError(
+                    "Missing configuration keys: [%s]"
+                    % ", ".join(set(prop_keys) - set(config_keys)),
                 )
 
         self._finalise_config()
@@ -302,7 +302,7 @@ def float_in_range(start, end, default=None):
         val = float(val)
 
         if val < start or val > end:
-            raise ConfigError("Input %f not in range [%f, %f]" % (val, start, end))
+            raise CaputConfigError("Input %f not in range [%f, %f]" % (val, start, end))
 
         return val
 
@@ -343,7 +343,7 @@ def enum(options, default=None):
     def _prop(val):
 
         if val not in options:
-            raise ConfigError("Input %f not in %s" % (repr(val), repr(options)))
+            raise CaputConfigError("Input %f not in %s" % (repr(val), repr(options)))
 
         return val
 
@@ -393,25 +393,27 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
     def _prop(val):
 
         if not isinstance(val, (list, tuple)):
-            raise ConfigError("Expected to receive a list, but got '%s.'" % repr(val))
+            raise CaputConfigError(
+                "Expected to receive a list, but got '%s.'" % repr(val)
+            )
 
         if type_:
             for ii, item in enumerate(val):
                 if not isinstance(item, type_):
-                    raise ConfigError(
+                    raise CaputConfigError(
                         "Expected to receive a list with items of type %s, but got "
                         "'%s' of type '%s' at position %i"
                         % (type_, item, type(item), ii)
                     )
 
         if length and len(val) != length:
-            raise ConfigError(
+            raise CaputConfigError(
                 "List expected to be of length %i, but was actually length %i"
                 % (length, len(val))
             )
 
         if maxlength and len(val) > maxlength:
-            raise ConfigError(
+            raise CaputConfigError(
                 "Maximum length of list is %i is, but list was actually length %i"
                 % (maxlength, len(val))
             )
@@ -421,7 +423,7 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
     if default:
         try:
             _prop(default)
-        except ConfigError as e:
+        except CaputConfigError as e:
             raise ValueError(
                 "Default value %s does not satisfy property requirements: %s"
                 % (default, repr(e))
@@ -491,6 +493,52 @@ def logging_config(default={}):
     prop = Property(proptype=_prop, default=default)
 
     return prop
+
+
+class SafeLineLoader(SafeLoader):
+    """
+    YAML loader that tracks line numbers.
+
+    Adds the line number information to every YAML block. This is useful for debugging and to describe linting errors.
+    """
+
+    def construct_mapping(self, node, deep=False):
+        mapping = super(SafeLineLoader, self).construct_mapping(node, deep=deep)
+        # Add 1 so numbering starts at 1
+        mapping["__line__"] = node.start_mark.line + 1
+        return mapping
+
+
+class CaputConfigError(Exception):
+    """
+    There was an error in the configuration.
+
+    Parameters
+    ==========
+    message : str
+        Message / description of error
+    file_ : str
+        Configuration file name (optional)
+    location : dict
+        If using :class:`SafeLineLoader` is used, a dict created by that can be passed in here to report the line number
+        where the error occurred.
+    """
+
+    def __init__(self, message, file_=None, location=None):
+        self.message = message
+        self.file = file_
+        if isinstance(location, dict):
+            self.line = location.get("__line__", None)
+        else:
+            self.line = None
+
+    def __str__(self):
+        location = ""
+        if self.line is not None:
+            location = "\nError in block starting at L{}".format(self.line)
+            if self.file is not None:
+                location = "{} ({})".format(location, self.file)
+        return "{}{}".format(self.message, location)
 
 
 if __name__ == "__main__":
