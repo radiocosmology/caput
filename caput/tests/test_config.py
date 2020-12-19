@@ -78,21 +78,21 @@ class TestConfig(unittest.TestCase):
 
         lt = ListTypeTests()
 
-        with self.assertRaises(config.ConfigError):
+        with self.assertRaises(config.CaputConfigError):
             lt.read_config({"list_max_length": [1, 3, 4]})
 
         # Should work fine
         lt = ListTypeTests()
         lt.read_config({"list_max_length": [1, 2]})
 
-        with self.assertRaises(config.ConfigError):
+        with self.assertRaises(config.CaputConfigError):
             lt.read_config({"list_exact_length": [3]})
 
         # Work should fine
         lt = ListTypeTests()
         lt.read_config({"list_exact_length": [1, 2]})
 
-        with self.assertRaises(config.ConfigError):
+        with self.assertRaises(config.CaputConfigError):
             lt.read_config({"list_type": ["hello"]})
 
         # Work should fine

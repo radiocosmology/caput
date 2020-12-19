@@ -12,8 +12,6 @@ from os.path import (
 import click
 import sys
 
-from pathlib import Path
-
 products = None
 
 
@@ -70,13 +68,16 @@ def load_venv(configfile):
 
     click.echo("Activating '{}'...".format(venv_path))
 
-    base = Path(venv_path).absolute()
+    # TODO: python2 - use pathlib
+    import os.path
+
+    base = os.path.abspath(venv_path)
     if not base.exists():
         click.echo("Path defined in 'cluster'/'venv' doesn't exist ({})".format(base))
         sys.exit(1)
 
-    site_packages = Path(
-        base / "lib" / "python{}".format(sys.version[:3]) / "site-packages"
+    site_packages = os.path.join(
+        base, "lib", "python{}".format(sys.version[:3]), "site-packages"
     )
     prev_sys_path = list(sys.path)
 
