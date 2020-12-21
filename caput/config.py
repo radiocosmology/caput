@@ -473,6 +473,11 @@ def logging_config(default={}):
         checked_config = {}
         loglevels = ["DEBUG", "INFO", "WARNING", "ERROR", "NOTSET"]
         for key, level in config.items():
+
+            # ignore hint at yaml file line number
+            if key == "__line__":
+                continue
+
             level = level.upper()
             if level not in loglevels:
                 raise ValueError(
