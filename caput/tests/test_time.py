@@ -14,7 +14,7 @@ from datetime import datetime
 import numpy as np
 import pytest
 from skyfield import earthlib, api
-from pytest import approx
+from pytest import approx, raises
 
 from caput import time as ctime
 
@@ -421,6 +421,21 @@ def test_transit_times(chime, eph):
     # attempts to use the new routines, and seems reasonable enough that I'm not going
     # to track down the difference
     assert times == approx(precalc_times, abs=2)
+
+    # Test automatic step calculation
+    small_times = chime.transit_times(
+        eph["sun"], precalc_times[0] - 300, precalc_times[0] + 60
+    )
+
+    assert small_times == approx(precalc_times[:1], abs=2)
+
+    # end <= start raises ValueError
+    with raises(ValueError):
+        chime.transit_times(eph["sun"], dte, dts)
+
+    # step >= interval raises ValueError
+    with raises(ValueError):
+        chime.transit_times(eph["sun"], dts, dte, step=10)
 
 
 def test_rise_set_times(chime, eph):

@@ -443,7 +443,7 @@ class Observer(object):
         return ra
 
     def transit_times(
-        self, source, t0, t1=None, step=0.2, lower=False, return_dec=False
+        self, source, t0, t1=None, step=None, lower=False, return_dec=False
     ):
         """Find the transit times of the given source in an interval.
 
@@ -461,10 +461,12 @@ class Observer(object):
         t1 : float unix time, or datetime, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float
+        step : float or None, optional
             The initial search step in days. This is used to find the approximate
             location between transits, and should be set to something less than the
-            spacing between transits.
+            spacing between transits.  If None is passed, an initial search step of
+            0.2 days, or else one fifth of the specified interval is used, whichever
+            is smaller.
         lower : bool, optional
             By default this only returns the upper (regular) transit. This will cause
             lower transits to be returned instead.
@@ -493,7 +495,23 @@ class Observer(object):
 
         # Get the ends of the search interval in TT Julian days
         t0 = ensure_unix(t0)
-        t1 = ensure_unix(t1) if t1 is not None else t0 + 24 * 3600.0
+        if t1 is None:
+            t1 = t0 + 24 * 3600.0
+        else:
+            t1 = ensure_unix(t1)
+            if t1 <= t0:
+                raise ValueError(
+                    "End of the search interval (t1) is before the start (t0)"
+                )
+
+        # Calculate the initial search step
+        if step is None:
+            if t1 - t0 >= 24 * 3600.0:
+                step = 0.2
+            else:
+                step = (t1 - t0) / (5 * 24 * 3600.0)
+        elif step * 24 * 3600 >= t1 - t0:
+            raise ValueError("Initial search step is larger than the search interval")
 
         # Convert the UNIX start and end times into Julian Days
         t0jd, t1jd = unix_to_skyfield_time([t0, t1]).tt
