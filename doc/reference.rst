@@ -1,15 +1,4 @@
-Modules
--------
-.. currentmodule:: caput
+API Reference
+-------------
 
-.. autosummary::
-    :toctree: generated/
-
-   memh5
-   config
-   pipeline
-   misc
-   mpiutil
-   mpiarray
-   time
-   tod
+.. automodule:: caput

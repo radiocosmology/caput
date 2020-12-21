@@ -58,13 +58,36 @@ if on_rtd:
 # 'numpydoc' does not ship with sphinx. To get it use `pip install numpydoc`.
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.imgmath",
-    "numpydoc",
     "sphinx.ext.autosummary",
-    "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "sphinx.ext.mathjax",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.autosectionlabel",
 ]
 
+napoleon_google_docstring = False
+napoleon_numpy_docstring = True
+napoleon_include_init_with_doc = False
+napoleon_include_private_with_doc = False
+napoleon_include_special_with_doc = False
+napoleon_use_admonition_for_examples = False
+napoleon_use_admonition_for_notes = False
+napoleon_use_admonition_for_references = False
+napoleon_use_ivar = False
+napoleon_use_param = True
+napoleon_use_rtype = True
+napoleon_type_aliases = None
+napoleon_attr_annotations = True
+
+autoclass_content = "both"  # include both class docstring and __init__
+autodoc_default_options = {
+    # Make sure that any autodoc declarations show the right members
+    "members": True,
+    "show-inheritance": True,
+}
+autosummary_generate = True  # Make _autosummary files and include them
+autosummary_imported_members = False
 
 intersphinx_mapping = {"h5py": ("http://docs.h5py.org/en/latest/", None)}
 intersphinx_cache_limit = 1
@@ -81,12 +104,6 @@ def process_docstring(app, what, name, obj, options, lines):
 
 def setup(app):
     app.connect("autodoc-process-docstring", process_docstring)
-
-
-numpydoc_show_class_members = False
-import glob
-
-autosummary_generate = glob.glob("*.rst")
 
 
 # Add any paths that contain templates here, relative to this directory.

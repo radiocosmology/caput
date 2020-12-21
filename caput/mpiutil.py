@@ -14,32 +14,6 @@ instead of::
     from mpi4py import MPI
 
     MPI.attr
-
-
-**Functions**
-
-.. autosummary::
-    :toctree: generated/
-
-        active_comm
-        active
-        close
-        partition_list
-        partition_list_mpi
-        mpilist
-        mpirange
-        barrier
-        bcast
-        parallel_map
-        typemap
-        split_m
-        split_all
-        split_local
-        gather_local
-        transpose_blocks
-        allocate_hdf5_dataset
-        lock_and_write_buffer
-        parallel_rows_write_hdf5
 """
 
 # === Start Python 2/3 compatibility

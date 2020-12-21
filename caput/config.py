@@ -5,15 +5,6 @@ This module to defines strictly typed attributes of a class, that can be loaded
 from an input dictionary. This is particularly useful for loading a class from
 a YAML document.
 
-Classes
-=======
-
-.. autosummary::
-   :toctree: generated/
-
-   Property
-   Reader
-
 Examples
 ========
 
