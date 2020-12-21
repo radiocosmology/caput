@@ -463,10 +463,9 @@ class Observer(object):
             start time `t0`.
         step : float or None, optional
             The initial search step in days. This is used to find the approximate
-            location between transits, and should be set to something less than the
-            spacing between transits.  If None is passed, an initial search step of
-            0.2 days, or else one fifth of the specified interval is used, whichever
-            is smaller.
+            times of transit, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
         lower : bool, optional
             By default this only returns the upper (regular) transit. This will cause
             lower transits to be returned instead.
@@ -491,9 +490,136 @@ class Observer(object):
             ha = self._source_ha(source, t)
             return ha if not lower else (ha % 360.0) - 180.0
 
-        # Calculate the HA at the initial search points
+        # Convert interval to Julian Days and choose the initial search step if not set
+        t0jd, t1jd, step = self._fixup_interval_and_step(t0, t1, step)
 
-        # Get the ends of the search interval in TT Julian days
+        # Compute transits
+        transits, _ = _solve_all(f, t0jd, t1jd, step, skip_decreasing=True, xtol=1e-8)
+
+        # Convert into UNIX times
+        t_sf = self.skyfield.timescale.tt_jd(transits)
+        t_unix = skyfield_time_to_unix(t_sf)
+
+        if return_dec:
+
+            if len(transits) > 0:
+                pos = self.skyfield_obs().at(t_sf).observe(source)
+                dec = pos.cirs_radec(epoch=t_sf)[1]._degrees
+            else:
+                dec = np.array([], dtype=np.float64)
+
+            return t_unix, dec
+        else:
+            return t_unix
+
+    def rise_set_times(self, source, t0, t1=None, step=None, diameter=0.0):
+        """Find all times a sources rises or sets in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the rising and setting of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of risings and settings, and should be set to something less than the
+            spacing between events.  If None is passed, an initial search step of
+            0.2 days, or else one fifth of the specified interval, is used, whichever
+            is smaller.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise/set times as UNIX epoch times.
+        rising : np.ndarray
+            Boolean array of whether the time corresponds to a rising (True) or
+            setting (False).
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=False, skip_set=False
+        )
+
+    def rise_times(self, source, t0, t1=None, step=None, diameter=0.0):
+        """Find all times a sources rises in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the rising of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of rising, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise times as UNIX epoch times.
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=False, skip_set=True
+        )[0]
+
+    def set_times(self, source, t0, t1=None, step=None, diameter=0.0):
+        """Find all times a sources sets in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the setting of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of setting, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise times as UNIX epoch times.
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=True, skip_set=False
+        )[0]
+
+    def _fixup_interval_and_step(self, t0, t1, step):
+        # Work routine used by _sr_work and transit_times to sanitise the
+        # caller-supplied interval and initial step duration.
+        #
+        # Returns the interval limits converted to TT JD and the computed
+        # initial step size
+
+        # Get the ends of the search interval
         t0 = ensure_unix(t0)
         if t1 is None:
             t1 = t0 + 24 * 3600.0
@@ -516,119 +642,7 @@ class Observer(object):
         # Convert the UNIX start and end times into Julian Days
         t0jd, t1jd = unix_to_skyfield_time([t0, t1]).tt
 
-        transits, _ = _solve_all(f, t0jd, t1jd, step, skip_decreasing=True, xtol=1e-8)
-
-        # Convert into UNIX times
-        t_sf = self.skyfield.timescale.tt_jd(transits)
-        t_unix = skyfield_time_to_unix(t_sf)
-
-        if return_dec:
-
-            if len(transits) > 0:
-                pos = self.skyfield_obs().at(t_sf).observe(source)
-                dec = pos.cirs_radec(epoch=t_sf)[1]._degrees
-            else:
-                dec = np.array([], dtype=np.float64)
-
-            return t_unix, dec
-        else:
-            return t_unix
-
-    def rise_set_times(self, source, t0, t1=None, step=0.2, diameter=0.0):
-        """Find all times a sources rises or sets in an interval.
-
-        Parameters
-        ----------
-        source : skyfield source
-            The source we are calculating the rising and setting of.
-        t0 : float unix time, or datetime
-            The start time to search for. Any type that be converted to a UNIX time
-            by caput.
-        t1 : float unix time, or datetime, optional
-            The end time of the search interval. If not set, this is 1 day after the
-            start time `t0`.
-        step : float
-            The initial search step in days. This is used to find the approximate
-            location between transits, and should be set to something less than the
-            spacing between transits.
-        diameter : float
-            The size of the source in degrees. Use this to ensure the whole source is
-            below the horizon. Also, if the local horizon is higher (i.e. mountains),
-            this can be set to a negative value to account for this.
-
-        Returns
-        -------
-        times : np.ndarray
-            Source rise/set times as UNIX epoch times.
-        rising : np.ndarray
-            Boolean array of whether the time corresponds to a rising (True) or
-            setting (False).
-        """
-        return self._sr_work(
-            source, t0, t1, step, diameter, skip_rise=False, skip_set=False
-        )
-
-    def rise_times(self, source, t0, t1=None, step=0.2, diameter=0.0):
-        """Find all times a sources rises in an interval.
-
-        Parameters
-        ----------
-        source : skyfield source
-            The source we are calculating the rising of.
-        t0 : float unix time, or datetime
-            The start time to search for. Any type that be converted to a UNIX time
-            by caput.
-        t1 : float unix time, or datetime, optional
-            The end time of the search interval. If not set, this is 1 day after the
-            start time `t0`.
-        step : float
-            The initial search step in days. This is used to find the approximate
-            location between rises, and should be set to something less than the
-            spacing between rises.
-        diameter : float
-            The size of the source in degrees. Use this to ensure the whole source is
-            below the horizon. Also, if the local horizon is higher (i.e. mountains),
-            this can be set to a negative value to account for this.
-
-        Returns
-        -------
-        times : np.ndarray
-            Source rise times as UNIX epoch times.
-        """
-        return self._sr_work(
-            source, t0, t1, step, diameter, skip_rise=False, skip_set=True
-        )[0]
-
-    def set_times(self, source, t0, t1=None, step=0.2, diameter=0.0):
-        """Find all times a sources sets in an interval.
-
-        Parameters
-        ----------
-        source : skyfield source
-            The source we are calculating the setting of.
-        t0 : float unix time, or datetime
-            The start time to search for. Any type that be converted to a UNIX time
-            by caput.
-        t1 : float unix time, or datetime, optional
-            The end time of the search interval. If not set, this is 1 day after the
-            start time `t0`.
-        step : float
-            The initial search step in days. This is used to find the approximate
-            location between settings, and should be set to something less than the
-            spacing between settings.
-        diameter : float
-            The size of the source in degrees. Use this to ensure the whole source is
-            below the horizon. Also, if the local horizon is higher (i.e. mountains),
-            this can be set to a negative value to account for this.
-
-        Returns
-        -------
-        times : np.ndarray
-            Source rise times as UNIX epoch times.
-        """
-        return self._sr_work(
-            source, t0, t1, step, diameter, skip_rise=True, skip_set=False
-        )[0]
+        return t0jd, t1jd, step
 
     def _sr_work(self, source, t0, t1, step, diameter, skip_rise=False, skip_set=False):
         # A work routine factoring out common functionality
@@ -638,10 +652,8 @@ class Observer(object):
         def f(t):
             return self._source_alt(source, t) + diameter / 2
 
-        # Get the ends of the search interval in TT Julian days
-        t0 = ensure_unix(t0)
-        t1 = ensure_unix(t1) if t1 is not None else t0 + 24 * 3600.0
-        t0jd, t1jd = unix_to_skyfield_time([t0, t1]).tt
+        # Convert interval to Julian Days and choose the initial search step if not set
+        t0jd, t1jd, step = self._fixup_interval_and_step(t0, t1, step)
 
         times, risings = _solve_all(
             f,
