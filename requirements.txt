@@ -3,6 +3,5 @@ scipy
 h5py
 PyYAML
 skyfield>=1.31
-future
 cython
 click

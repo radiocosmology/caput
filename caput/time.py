@@ -132,15 +132,6 @@ and a complete cycle of ERA.
 
 .. _`IERS constants`: http://hpiers.obspm.fr/eop-pc/models/constants.html
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-
-# === End Python 2/3 compatibility
-
-
-from past.builtins import basestring
 from datetime import datetime
 import warnings
 
@@ -973,7 +964,7 @@ def ensure_unix(time):
 
     if isinstance(time[0], datetime):
         return datetime_to_unix(time)
-    elif isinstance(time[0], basestring):
+    elif isinstance(time[0], str):
         return datetime_to_unix(timestr_to_datetime(time))
     elif isinstance(time[0], timelib.Time):
         return datetime_to_unix(time.utc_datetime())
