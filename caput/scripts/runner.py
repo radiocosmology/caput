@@ -44,7 +44,7 @@ def lint_config(configfile):
         load_venv(f)
 
         try:
-            Manager.from_yaml_file(f)
+            Manager.from_yaml_file(f, lint=True)
         except CaputConfigError as e:
             click.echo(
                 "Found at least one error in '{}'.\n"
@@ -231,7 +231,7 @@ def queue(configfile, submit=False, lint=True):
     if lint:
         from caput.pipeline import Manager
 
-        Manager.from_yaml_file(configfile)
+        Manager.from_yaml_file(configfile, lint=True)
 
     with open(configfile, "r") as f:
         yconf = yaml.safe_load(f)

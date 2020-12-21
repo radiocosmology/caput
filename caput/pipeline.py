@@ -498,13 +498,15 @@ class Manager(config.Reader):
         self.tasks = []
 
     @classmethod
-    def from_yaml_file(cls, file_name):
+    def from_yaml_file(cls, file_name, lint=False):
         """Initialize the pipeline from a YAML configuration file.
 
         Parameters
         ----------
         file_name: string
             Path to YAML pipeline configuration file.
+        lint : bool
+            Instantiate Manager only to lint config. Disables debug logging.
 
         Returns
         -------
@@ -519,16 +521,18 @@ class Manager(config.Reader):
                 "Unable to open yaml file ({}): {}".format(file_name, e),
                 file_=file_name,
             )
-        return cls.from_yaml_str(yaml_doc)
+        return cls.from_yaml_str(yaml_doc, lint)
 
     @classmethod
-    def from_yaml_str(cls, yaml_doc):
+    def from_yaml_str(cls, yaml_doc, lint=False):
         """Initialize the pipeline from a YAML configuration string.
 
         Parameters
         ----------
         yaml_doc: string
             Yaml configuration document.
+        lint : bool
+            Instantiate Manager only to lint config. Disables debug logging.
 
         Returns
         -------
@@ -556,14 +560,28 @@ class Manager(config.Reader):
             "versions": self.versions,
             "pipeline_config": self.all_params if self.save_config else None,
         }
-        self._setup_logging()
+        self._setup_logging(lint)
         self._setup_tasks()
 
         return self
 
-    def _setup_logging(self):
+    def _setup_logging(self, lint=False):
+        """
+        Set up logging based on the config.
+
+        Parameters
+        ----------
+        lint : bool
+            Instantiate Manager only to lint config. Disables debug logging.
+        """
         # set root log level and set up default formatter
-        logging.basicConfig(level=getattr(logging, self.logging.get("root", "WARNING")))
+        loglvl_root = self.logging.get("root", "WARNING")
+
+        # Don't allow INFO log level when linting
+        if lint and loglvl_root == "DEBUG":
+            loglvl_root = "INFO"
+
+        logging.basicConfig(level=getattr(logging, loglvl_root))
         for module, level in self.logging.items():
             if module != "root":
                 logging.getLogger(module).setLevel(getattr(logging, level))
