@@ -1,12 +1,3 @@
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-
-# === End Python 2/3 compatibility
-
-from future.utils import bytes_to_native_str
-
 import os
 import re
 import sysconfig
@@ -42,8 +33,8 @@ else:
 
 extensions = [
     Extension(
-        name=bytes_to_native_str(b"caput.weighted_median"),
-        sources=[bytes_to_native_str(b"caput/weighted_median.pyx")],
+        name="caput.weighted_median",
+        sources=["caput/weighted_median.pyx"],
         include_dirs=[numpy.get_include()],
         language="c++",
         extra_compile_args=(omp_args + ["-std=c++11", "-g0", "-O3"]),
@@ -61,6 +52,7 @@ setup(
         [console_scripts]
         caput-pipeline=caput.scripts.runner:cli
     """,
+    python_requires=">=3.6",
     install_requires=requires,
     extras_require={"mpi": ["mpi4py>=1.3"]},
     setup_requires=["cython"],

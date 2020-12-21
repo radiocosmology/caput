@@ -9,14 +9,6 @@ Routines
 
     vectorize
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-from future.utils import PY3
-from past.builtins import basestring
-
-# === End Python 2/3 compatibility
 
 import collections
 import importlib
@@ -236,7 +228,7 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
 
     has_mpi = h5py.get_config().mpi
 
-    if isinstance(f, basestring):
+    if isinstance(f, str):
         # Open using MPI-IO if we can
         if has_mpi and use_mpi:
             from mpi4py import MPI

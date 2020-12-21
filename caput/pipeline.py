@@ -340,15 +340,6 @@ formats.
 See the documentation for these base classes for more details.
 
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-from future.utils import raise_from
-from past.builtins import basestring
-
-# === End Python 2/3 compatibility
 
 import importlib
 import logging
@@ -432,7 +423,7 @@ def _get_versions(modules):
     -------
     Dict[str, str]
     """
-    if isinstance(modules, basestring):
+    if isinstance(modules, str):
         modules = [modules]
     if not isinstance(modules, list):
         raise Exception(
@@ -442,7 +433,7 @@ def _get_versions(modules):
         )
     versions = {}
     for module in modules:
-        if not isinstance(module, basestring):
+        if not isinstance(module, str):
             raise Exception(
                 "Found value of type '{}' in list 'save_versions' (expected 'str').".format(
                     type(module).__name__
@@ -630,7 +621,7 @@ class Manager(config.Reader):
                 )
             except PipelineConfigError as e:
                 msg = "Setting up task {} caused an error - {}".format(ii, str(e))
-                raise_from(PipelineConfigError(msg), e)
+                raise PipelineConfigError(msg) from e
 
     def _setup_task(self, task_spec):
         """Set up a pipeline task from the spec given in the tasks list."""
@@ -661,7 +652,7 @@ class Manager(config.Reader):
                     e.__class__.__name__,
                     str(e),
                 )
-                raise_from(PipelineConfigError(msg), e)
+                raise PipelineConfigError(msg) from e
 
         # Get the parameters and initialize the class.
         params = {}
@@ -718,7 +709,7 @@ class Manager(config.Reader):
             msg = "Setting up keys for task {} caused an error - {}".format(
                 task.__class__.__name__, str(e)
             )
-            raise_from(PipelineConfigError(msg), e)
+            raise PipelineConfigError(msg) from e
 
         self.tasks.append(task)
         logger.debug("Added {} to task list.".format(task.__class__.__name__))
@@ -1564,7 +1555,7 @@ def _format_product_keys(keys):
 
     # Check that all the keys provided are strings.
     for key in keys:
-        if not isinstance(key, basestring):
+        if not isinstance(key, str):
             msg = "Data product keys must be strings."
             raise PipelineConfigError(msg)
     return keys
