@@ -342,6 +342,7 @@ See the documentation for these base classes for more details.
 """
 
 import importlib
+import inspect
 import logging
 import os
 import queue
@@ -853,7 +854,7 @@ class TaskBase(config.Reader):
         in_ = _format_product_keys(in_)
         out = _format_product_keys(out)
         # Inspect the `setup` method to see how many arguments it takes.
-        setup_argspec = misc.getfullargspec(self.setup)
+        setup_argspec = inspect.getfullargspec(self.setup)
         # Make sure it matches `requires` keys list specified in config.
         n_requires = len(requires)
         try:
@@ -874,7 +875,7 @@ class TaskBase(config.Reader):
             )
             raise PipelineConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
-        next_argspec = misc.getfullargspec(self.next)
+        next_argspec = inspect.getfullargspec(self.next)
         # Make sure it matches `in` keys list specified in config.
         n_in = len(in_)
         try:
@@ -1059,7 +1060,7 @@ class _OneAndOne(TaskBase):
         """Checks inputs and outputs and stuff."""
 
         # Inspect the `process` method to see how many arguments it takes.
-        pro_argspec = misc.getfullargspec(self.process)
+        pro_argspec = inspect.getfullargspec(self.process)
         n_args = len(pro_argspec.args) - 1
         if n_args > 1:
             msg = (
