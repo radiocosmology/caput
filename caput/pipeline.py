@@ -234,23 +234,29 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 ... no_params: {}
 ... '''
 
->>> Manager.from_yaml_str(new_spam_config).run()
-Setting up GetEggs.
-Setting up CookEggs.
-Setting up DoNothing.
-Setting up PrintEggs.
-Cooking fried green eggs.
-Cooking fried duck eggs.
-Cooking fried ostrich eggs.
-Finished GetEggs.
-Finished CookEggs.
-Finished DoNothing.
-Spam and green eggs.
-Spam and duck eggs.
-Spam and ostrich eggs.
-Finished PrintEggs.
+The following would error, because the pipeline config is checked for errors, like an 'in' parameter without a
+corresponding 'out'::
 
-Notice that :meth:`DoNothing.next` is nerver called, since the pipeline never
+    Manager.from_yaml_str(new_spam_config).run()
+
+But this is what it would produce otherwise::
+
+    Setting up GetEggs.
+    Setting up CookEggs.
+    Setting up DoNothing.
+    Setting up PrintEggs.
+    Cooking fried green eggs.
+    Cooking fried duck eggs.
+    Cooking fried ostrich eggs.
+    Finished GetEggs.
+    Finished CookEggs.
+    Finished DoNothing.
+    Spam and green eggs.
+    Spam and duck eggs.
+    Spam and ostrich eggs.
+    Finished PrintEggs.
+
+Notice that :meth:`DoNothing.next` is never called, since the pipeline never
 generates its input, 'non_existent_data_product'.  Once everything before
 :class:`DoNothing` has been executed the pipeline notices that there is no
 opertunity for 'non_existent_data_product' to be generated and forces
@@ -342,12 +348,6 @@ local_tasks = {}
 # ----------
 
 
-class PipelineConfigError(Exception):
-    """Raised when there is an error setting up a pipeline."""
-
-    pass
-
-
 class PipelineRuntimeError(Exception):
     """Raised when there is a pipeline related error at runtime."""
 
@@ -401,7 +401,7 @@ def _get_versions(modules):
     if isinstance(modules, str):
         modules = [modules]
     if not isinstance(modules, list):
-        raise Exception(
+        raise config.CaputConfigError(
             "Value of 'save_versions' is of type '{}' (expected 'str' or 'list(str)').".format(
                 type(modules).__name__
             )
@@ -409,7 +409,7 @@ def _get_versions(modules):
     versions = {}
     for module in modules:
         if not isinstance(module, str):
-            raise Exception(
+            raise config.CaputConfigError(
                 "Found value of type '{}' in list 'save_versions' (expected 'str').".format(
                     type(module).__name__
                 )
@@ -417,7 +417,7 @@ def _get_versions(modules):
         try:
             versions[module] = importlib.import_module(module).__version__
         except ModuleNotFoundError as err:
-            raise Exception(
+            raise config.CaputConfigError(
                 "Failure getting versions requested with config parameter 'save_versions': {}".format(
                     err
                 )
@@ -465,48 +465,61 @@ class Manager(config.Reader):
         self.tasks = []
 
     @classmethod
-    def from_yaml_file(cls, file_name):
+    def from_yaml_file(cls, file_name, lint=False):
         """Initialize the pipeline from a YAML configuration file.
 
         Parameters
         ----------
         file_name: string
             Path to YAML pipeline configuration file.
+        lint : bool
+            Instantiate Manager only to lint config. Disables debug logging.
 
         Returns
         -------
         self: Pipeline object
         """
 
-        with open(file_name) as f:
-            yaml_doc = f.read()
-        return cls.from_yaml_str(yaml_doc)
+        try:
+            with open(file_name) as f:
+                yaml_doc = f.read()
+        except TypeError as e:
+            raise config.CaputConfigError(
+                "Unable to open yaml file ({}): {}".format(file_name, e),
+                file_=file_name,
+            )
+        return cls.from_yaml_str(yaml_doc, lint)
 
     @classmethod
-    def from_yaml_str(cls, yaml_doc):
+    def from_yaml_str(cls, yaml_doc, lint=False):
         """Initialize the pipeline from a YAML configuration string.
 
         Parameters
         ----------
         yaml_doc: string
             Yaml configuration document.
+        lint : bool
+            Instantiate Manager only to lint config. Disables debug logging.
 
         Returns
         -------
         self: Pipeline object
         """
+        from .config import SafeLineLoader
 
-        yaml_params = yaml.safe_load(yaml_doc)
+        yaml_params = yaml.load(yaml_doc, Loader=SafeLineLoader)
         try:
             if not isinstance(yaml_params["pipeline"], dict):
-                raise Exception(
+                raise config.CaputConfigError(
                     "Value 'pipeline' in YAML configuration is of type '{}' (expected a YAML block here).".format(
                         type(yaml_params["pipeline"]).__name__
-                    )
+                    ),
+                    location=yaml_params,
                 )
         except TypeError:
-            raise Exception(
-                "Couldn't find key 'pipeline' in YAML configuration document."
+            raise config.CaputConfigError(
+                "Couldn't find key 'pipeline' in YAML configuration document.",
+                location=yaml_params,
             )
         self = cls.from_config(yaml_params["pipeline"])
         self.all_params = yaml_params
@@ -514,14 +527,28 @@ class Manager(config.Reader):
             "versions": self.versions,
             "pipeline_config": self.all_params if self.save_config else None,
         }
-        self._setup_logging()
+        self._setup_logging(lint)
         self._setup_tasks()
 
         return self
 
-    def _setup_logging(self):
+    def _setup_logging(self, lint=False):
+        """
+        Set up logging based on the config.
+
+        Parameters
+        ----------
+        lint : bool
+            Instantiate Manager only to lint config. Disables debug logging.
+        """
         # set root log level and set up default formatter
-        logging.basicConfig(level=getattr(logging, self.logging.get("root", "WARNING")))
+        loglvl_root = self.logging.get("root", "WARNING")
+
+        # Don't allow INFO log level when linting
+        if lint and loglvl_root == "DEBUG":
+            loglvl_root = "INFO"
+
+        logging.basicConfig(level=getattr(logging, loglvl_root))
         for module, level in self.logging.items():
             if module != "root":
                 logging.getLogger(module).setLevel(getattr(logging, level))
@@ -584,27 +611,51 @@ class Manager(config.Reader):
     def _setup_tasks(self):
         """Create and setup all tasks from the task list."""
 
+        all_out_values = set([t.get("out", None) for t in self.task_specs])
+
         # Setup all tasks in the task listk
         for ii, task_spec in enumerate(self.task_specs):
             try:
                 task, key_spec = self._setup_task(task_spec)
+                requires = key_spec.get("requires", None)
+                in_ = key_spec.get("in", None)
+                out = key_spec.get("out", None)
+                self._validate_task(task, in_, requires, all_out_values)
                 self.add_task(
                     task,
-                    requires=key_spec.get("requires", None),
-                    in_=key_spec.get("in", None),
-                    out=key_spec.get("out", None),
+                    requires=requires,
+                    in_=in_,
+                    out=out,
                 )
-            except PipelineConfigError as e:
-                msg = "Setting up task {} caused an error - {}".format(ii, str(e))
-                raise PipelineConfigError(msg) from e
+            except config.CaputConfigError as e:
+                msg = "Setting up task {} caused an error:\n\t{}".format(ii, str(e))
+                raise config.CaputConfigError(
+                    msg, location=task_spec if e.line is None else e.line
+                ) from e
+
+    @staticmethod
+    def _validate_task(task, in_, requires, all_out_values):
+        # Make sure this tasks in/requires values have corresponding out keys from another task
+        for key, value in (["in", in_], ["requires", requires]):
+            if value is not None:
+                if not isinstance(value, list):
+                    value = [value]
+                for v in value:
+                    if v not in all_out_values:
+                        raise config.CaputConfigError(
+                            "Value '{}' for task {} has no corresponding 'out' from another task "
+                            "(Value {} is not in {}).".format(
+                                key, type(task), v, all_out_values
+                            )
+                        )
 
     def _setup_task(self, task_spec):
         """Set up a pipeline task from the spec given in the tasks list."""
 
         # Check that only the expected keys are in the task spec.
         for key in task_spec.keys():
-            if key not in ["type", "params", "requires", "in", "out"]:
-                raise PipelineConfigError(
+            if key not in ["type", "params", "requires", "in", "out", "__line__"]:
+                raise config.CaputConfigError(
                     "Task got an unexpected key '{}' in 'tasks' list.".format(key)
                 )
 
@@ -612,7 +663,7 @@ class Manager(config.Reader):
         try:
             task_path = task_spec["type"]
         except KeyError:
-            raise PipelineConfigError("'type' not specified for task.")
+            raise config.CaputConfigError("'type' not specified for task.")
 
         # Find the tasks class either in the local set, or by importing a fully
         # qualified class name
@@ -621,13 +672,13 @@ class Manager(config.Reader):
         else:
             try:
                 task_cls = misc.import_class(task_path)
-            except Exception as e:
-                msg = "Loading task '%s' caused error - %s: %s" % (
+            except (config.CaputConfigError, AttributeError) as e:
+                msg = "Loading task '%s' caused error %s:\n\t%s" % (
                     task_path,
                     e.__class__.__name__,
                     str(e),
                 )
-                raise PipelineConfigError(msg) from e
+                raise config.CaputConfigError(msg) from e
 
         # Get the parameters and initialize the class.
         params = {}
@@ -647,12 +698,12 @@ class Manager(config.Reader):
                     param_keys = [param_keys]
 
                 # Locate param sections, and add to dict
-                try:
-                    for param_key in param_keys:
+                for param_key in param_keys:
+                    try:
                         params.update(self.all_params[param_key])
-                except KeyError:
-                    msg = "Parameter group %s not found in config." % param_key
-                    raise PipelineConfigError(msg)
+                    except KeyError:
+                        msg = "Parameter group %s not found in config." % param_key
+                        raise config.CaputConfigError(msg)
 
         # add global params to params
         task_params = deepcopy(self.all_tasks_params)
@@ -664,7 +715,13 @@ class Manager(config.Reader):
         }
 
         # Create and configure the task instance
-        task = task_cls._from_config(task_params)
+        try:
+            task = task_cls._from_config(task_params)
+        except config.CaputConfigError as e:
+            raise config.CaputConfigError(
+                "Failed instantiating %s from config:\n\t%s" % (task_cls, e),
+                location=task_spec.get("params", task_spec),
+            ) from e
 
         return task, key_spec
 
@@ -677,14 +734,19 @@ class Manager(config.Reader):
             A pipeline task instance.
         requires, in_, out : list or string
             The names of the task inputs and outputs.
+
+        Raises
+        ------
+        caput.config.CaputConfigError
+            If there was an error in the task configuration.
         """
         try:
             task._setup_keys(requires=requires, in_=in_, out=out)
         except Exception as e:
-            msg = "Setting up keys for task {} caused an error - {}".format(
+            msg = "Setting up keys for task {} caused an error:\n\t{}".format(
                 task.__class__.__name__, str(e)
             )
-            raise PipelineConfigError(msg) from e
+            raise config.CaputConfigError(msg) from e
 
         self.tasks.append(task)
         logger.debug("Added {} to task list.".format(task.__class__.__name__))
@@ -801,7 +863,10 @@ class TaskBase(config.Reader):
     @classmethod
     def _from_config(cls, config):
         self = cls.__new__(cls)
-        self.read_config(config)
+        # Check for unused keys, but ignore the ones not put there by the user.
+        self.read_config(
+            config, compare_keys=["versions", "pipeline_config", "__line__"]
+        )
         self.__init__()
         return self
 
@@ -828,13 +893,13 @@ class TaskBase(config.Reader):
                 "Didn't get enough 'requires' keys. Expected at least"
                 " %d and only got %d." % (min_req, n_requires)
             )
-            raise PipelineConfigError(msg)
+            raise config.CaputConfigError(msg)
         if n_requires > len(setup_argspec.args) - 1 and setup_argspec.varargs is None:
             msg = "Got too many 'requires' keys. Expected at most %d and" " got %d." % (
                 len(setup_argspec.args) - 1,
                 n_requires,
             )
-            raise PipelineConfigError(msg)
+            raise config.CaputConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
         next_argspec = inspect.getfullargspec(self.next)
         # Make sure it matches `in` keys list specified in config.
@@ -849,13 +914,13 @@ class TaskBase(config.Reader):
                 "Didn't get enough 'in' keys. Expected at least"
                 " %d and only got %d." % (min_in, n_in)
             )
-            raise PipelineConfigError(msg)
+            raise config.CaputConfigError(msg)
         if n_in > len(next_argspec.args) - 1 and next_argspec.varargs is None:
             msg = "Got too many 'in' keys. Expected at most %d and" " got %d." % (
                 len(next_argspec.args) - 1,
                 n_in,
             )
-            raise PipelineConfigError(msg)
+            raise config.CaputConfigError(msg)
         # Now that all data product keys have been verified to be valid, store
         # them on the instance.
         self._requires_keys = requires
@@ -1026,7 +1091,7 @@ class _OneAndOne(TaskBase):
             msg = (
                 "`process` method takes more than 1 argument, which is not" " allowed."
             )
-            raise PipelineConfigError(msg)
+            raise config.CaputConfigError(msg)
         if (
             pro_argspec.varargs
             or pro_argspec.varkw
@@ -1037,7 +1102,7 @@ class _OneAndOne(TaskBase):
                 "`process` method may not have variable length or optional"
                 " arguments."
             )
-            raise PipelineConfigError(msg)
+            raise config.CaputConfigError(msg)
         if n_args == 0:
             self._no_input = True
         else:
@@ -1050,7 +1115,7 @@ class _OneAndOne(TaskBase):
                     "No data to iterate over. 'input_root' is 'None' and"
                     " there are no 'in' keys."
                 )
-                raise PipelineConfigError(msg)
+                raise config.CaputConfigError(msg)
         else:
             if len(self._in) != 0:
                 msg = (
@@ -1058,12 +1123,13 @@ class _OneAndOne(TaskBase):
                     " key.  If not reading to disk, set 'input_root' to"
                     " 'None'."
                 )
-                raise PipelineConfigError(msg)
+                raise config.CaputConfigError(msg)
             if n_args != 1:
                 msg = (
                     "Reading input from disk but `process` method takes no"
                     " arguments."
                 )
+                raise config.CaputConfigError(msg)
 
     def read_process_write(self, input, input_filename, output_filename):
         """Reads input, executes any processing and writes output."""
@@ -1495,7 +1561,7 @@ def _format_product_keys(keys):
     for key in keys:
         if not isinstance(key, str):
             msg = "Data product keys must be strings."
-            raise PipelineConfigError(msg)
+            raise config.CaputConfigError(msg)
     return keys
 
 

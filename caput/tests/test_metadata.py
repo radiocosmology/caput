@@ -19,8 +19,12 @@ class TestConfig(unittest.TestCase):
         self.assertIn("pipeline_config", man.all_tasks_params)
 
         self.assertDictEqual(man.all_tasks_params["versions"], {})
+        # remove line numbers
+        pipeline_config = man.all_tasks_params["pipeline_config"]
+        del pipeline_config["__line__"]
+        del pipeline_config["pipeline"]["__line__"]
         self.assertDictEqual(
-            man.all_tasks_params["pipeline_config"],
+            pipeline_config,
             yaml.load(testconfig, Loader=yaml.SafeLoader),
         )
 
@@ -43,8 +47,13 @@ class TestConfig(unittest.TestCase):
             man.all_tasks_params["versions"],
             {"numpy": numpy.__version__, "caput": caput.__version__},
         )
+
+        # remove line numbers
+        pipeline_config = man.all_tasks_params["pipeline_config"]
+        del pipeline_config["__line__"]
+        del pipeline_config["pipeline"]["__line__"]
         self.assertDictEqual(
-            man.all_tasks_params["pipeline_config"],
+            pipeline_config,
             yaml.load(testconfig, Loader=yaml.SafeLoader),
         )
 
