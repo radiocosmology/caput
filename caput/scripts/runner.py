@@ -10,7 +10,7 @@ from os.path import (
 )
 
 import click
-
+import sys
 
 products = None
 
@@ -24,6 +24,73 @@ def cli():
     documentation for caput.pipeline.
     """
     pass
+
+
+@cli.command("lint")
+@click.argument(
+    "configfile",
+    nargs=-1,
+    type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
+)
+def lint_config(configfile):
+    """Test a pipeline for errors without running it."""
+    from caput.config import CaputConfigError
+    from caput.pipeline import Manager
+
+    # nargs=-1 packs multiple arguments (or glob patterns) into tuples
+    if not isinstance(configfile, tuple):
+        configfile = (configfile,)
+    for f in configfile:
+        load_venv(f)
+
+        try:
+            Manager.from_yaml_file(f, lint=True)
+        except CaputConfigError as e:
+            click.echo(
+                "Found at least one error in '{}'.\n"
+                "Fix and run again to find more problems.".format(f)
+            )
+            click.echo(e)
+            sys.exit(1)
+
+
+def load_venv(configfile):
+    import site
+    import yaml
+
+    with open(configfile, mode="r") as f:
+        conf = yaml.safe_load(f)
+    try:
+        venv_path = conf["cluster"]["venv"]
+    except KeyError:
+        # no 'cluster/venv' entry... nothing to do here
+        return
+
+    click.echo("Activating '{}'...".format(venv_path))
+
+    # TODO: python2 - use pathlib
+    import os.path
+
+    base = os.path.abspath(venv_path)
+    if not base.exists():
+        click.echo("Path defined in 'cluster'/'venv' doesn't exist ({})".format(base))
+        sys.exit(1)
+
+    site_packages = os.path.join(
+        base, "lib", "python{}".format(sys.version[:3]), "site-packages"
+    )
+    prev_sys_path = list(sys.path)
+
+    site.addsitedir(site_packages)
+    sys.real_prefix = sys.prefix
+    sys.prefix = base
+    # Move the added items to the front of the path:
+    new_sys_path = []
+    for item in list(sys.path):
+        if item not in prev_sys_path:
+            new_sys_path.append(item)
+            sys.path.remove(item)
+    sys.path[:0] = new_sys_path
 
 
 @cli.command()
@@ -104,7 +171,12 @@ def run(configfile, loglevel, profile, profiler):
 @click.option(
     "--submit/--nosubmit", default=True, help="Submit the job to the queue (or not)"
 )
-def queue(configfile, submit=False):
+@click.option(
+    "--lint/--nolint",
+    default=True,
+    help="Check the pipeline for errors before submitting it.",
+)
+def queue(configfile, submit=False, lint=True):
     """Queue a pipeline on a cluster from the given CONFIGFILE.
 
     This queues the job, using parameters from the `cluster` section of the
@@ -155,6 +227,11 @@ def queue(configfile, submit=False):
     import os.path
     import shutil
     import yaml
+
+    if lint:
+        from caput.pipeline import Manager
+
+        Manager.from_yaml_file(configfile, lint=True)
 
     with open(configfile, "r") as f:
         yconf = yaml.safe_load(f)
