@@ -1,10 +1,6 @@
-cython
 Sphinx==3.4.2
-numpydoc==0.8
 sphinx_rtd_theme
 # funcsigs required by mock, which apparently does not have its dependancies
 # setup correctly.
 funcsigs
 mock
-PyYAML
-numpy
