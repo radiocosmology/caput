@@ -27,15 +27,7 @@ Functions
     concatenate
 
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
 
-# === End Python 2/3 compatibility
-
-from future.utils import text_type
-from past.builtins import basestring
 import glob
 import inspect
 
@@ -43,7 +35,6 @@ import numpy as np
 import h5py
 
 from . import memh5
-from . import misc
 from . import mpiarray
 
 
@@ -162,7 +153,7 @@ class Reader(object):
     def __init__(self, files):
 
         # If files is a filename, or pattern, turn into list of files.
-        if isinstance(files, basestring):
+        if isinstance(files, str):
             files = sorted(glob.glob(files))
 
         data_empty = self.data_class.from_mult_files(files, datasets=())
@@ -357,7 +348,7 @@ def concatenate(
         def dataset_filter(d):
             return d
 
-    filter_time_slice = len(misc.getfullargspec(dataset_filter).args) == 2
+    filter_time_slice = len(inspect.getfullargspec(dataset_filter).args) == 2
 
     # Inspect first entry in the list to get constant parts..
     first_data = data_list[0]
@@ -573,7 +564,7 @@ def ensure_file_list(files):
 
     if memh5.is_group(files):
         files = [files]
-    elif isinstance(files, basestring):
+    elif isinstance(files, str):
         files = sorted(glob.glob(files))
     elif hasattr(files, "__iter__"):
         # Copy the sequence and make sure it's mutable.

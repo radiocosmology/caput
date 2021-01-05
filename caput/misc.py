@@ -9,18 +9,9 @@ Routines
 
     vectorize
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-from future.utils import PY3
-from past.builtins import basestring
-
-# === End Python 2/3 compatibility
 
 import collections
 import importlib
-import inspect
 import os
 
 import numpy as np
@@ -236,7 +227,7 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
 
     has_mpi = h5py.get_config().mpi
 
-    if isinstance(f, basestring):
+    if isinstance(f, str):
         # Open using MPI-IO if we can
         if has_mpi and use_mpi:
             from mpi4py import MPI
@@ -333,48 +324,23 @@ class lock_file(object):
         return self.tmpfile + ".lock"
 
 
-# Wrapper for getfullargspec
-def getfullargspec(f):
-    """Python 2 compatible implementation of `inspect.getfullargspec`.
+# TODO: remove this. This was to support a patching of this routine to support Python 2
+# that used to exist in here. This will be removed when all other repos are changed to
+# use the version from `inspect`
+def getfullargspec(*args, **kwargs):
+    """See `inspect.getfullargspec`.
 
-    Parameters
-    ----------
-    f : function
-        Callable to inspect.
-
-    Returns
-    -------
-    fullargspec : namedtuple
-        Named tuple with various fields. See `inspect.getfullargspec`.
+    This is a Python 2 patch that will be removed.
     """
+    import inspect
+    import warnings
 
-    if PY3:
-        return inspect.getfullargspec(f)
-    else:
-        argspec = inspect.getargspec(f)
+    warnings.warn(
+        "This patch to support Python 2 is no longer needed and will be removed.",
+        DeprecationWarning,
+    )
 
-        fullargspec_type = collections.namedtuple(
-            "FullArgSpec",
-            [
-                "args",
-                "varargs",
-                "varkw",
-                "defaults",
-                "kwonlyargs",
-                "kwonlydefaults",
-                "annotations",
-            ],
-        )
-
-        return fullargspec_type(
-            args=argspec.args,
-            varargs=argspec.varargs,
-            defaults=argspec.defaults,
-            varkw=argspec.keywords,  # This is the equivalent field
-            kwonlyargs=[],  # KW only args do not exist in Python 2
-            kwonlydefaults=[],
-            annotations=[],  # Annotations do not exist in Python 2
-        )
+    return inspect.getfullargspec(*args, **kwargs)
 
 
 def import_class(class_path):

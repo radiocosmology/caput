@@ -345,17 +345,9 @@ formats.
 See the documentation for these base classes for more details.
 
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-from future.utils import raise_from
-from past.builtins import basestring
-
-# === End Python 2/3 compatibility
 
 import importlib
+import inspect
 import logging
 import os
 import queue
@@ -431,7 +423,7 @@ def _get_versions(modules):
     -------
     Dict[str, str]
     """
-    if isinstance(modules, basestring):
+    if isinstance(modules, str):
         modules = [modules]
     if not isinstance(modules, list):
         raise config.CaputConfigError(
@@ -441,7 +433,7 @@ def _get_versions(modules):
         )
     versions = {}
     for module in modules:
-        if not isinstance(module, basestring):
+        if not isinstance(module, str):
             raise config.CaputConfigError(
                 "Found value of type '{}' in list 'save_versions' (expected 'str').".format(
                     type(module).__name__
@@ -662,12 +654,9 @@ class Manager(config.Reader):
                 )
             except config.CaputConfigError as e:
                 msg = "Setting up task {} caused an error:\n\t{}".format(ii, str(e))
-                raise_from(
-                    config.CaputConfigError(
-                        msg, location=task_spec if e.line is None else e.line
-                    ),
-                    e,
-                )
+                raise config.CaputConfigError(
+                    msg, location=task_spec if e.line is None else e.line
+                ) from e
 
     @staticmethod
     def _validate_task(task, in_, requires, all_out_values):
@@ -714,7 +703,7 @@ class Manager(config.Reader):
                     e.__class__.__name__,
                     str(e),
                 )
-                raise_from(config.CaputConfigError(msg), e)
+                raise config.CaputConfigError(msg) from e
 
         # Get the parameters and initialize the class.
         params = {}
@@ -754,13 +743,10 @@ class Manager(config.Reader):
         try:
             task = task_cls._from_config(task_params)
         except config.CaputConfigError as e:
-            raise_from(
-                config.CaputConfigError(
-                    "Failed instantiating %s from config:\n\t%s" % (task_cls, e),
-                    location=task_spec.get("params", task_spec),
-                ),
-                e,
-            )
+            raise config.CaputConfigError(
+                "Failed instantiating %s from config:\n\t%s" % (task_cls, e),
+                location=task_spec.get("params", task_spec),
+            ) from e
 
         return task, key_spec
 
@@ -785,7 +771,7 @@ class Manager(config.Reader):
             msg = "Setting up keys for task {} caused an error:\n\t{}".format(
                 task.__class__.__name__, str(e)
             )
-            raise_from(config.CaputConfigError(msg), e)
+            raise config.CaputConfigError(msg) from e
 
         self.tasks.append(task)
         logger.debug("Added {} to task list.".format(task.__class__.__name__))
@@ -932,7 +918,7 @@ class TaskBase(config.Reader):
         in_ = _format_product_keys(in_)
         out = _format_product_keys(out)
         # Inspect the `setup` method to see how many arguments it takes.
-        setup_argspec = misc.getfullargspec(self.setup)
+        setup_argspec = inspect.getfullargspec(self.setup)
         # Make sure it matches `requires` keys list specified in config.
         n_requires = len(requires)
         try:
@@ -953,7 +939,7 @@ class TaskBase(config.Reader):
             )
             raise config.CaputConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
-        next_argspec = misc.getfullargspec(self.next)
+        next_argspec = inspect.getfullargspec(self.next)
         # Make sure it matches `in` keys list specified in config.
         n_in = len(in_)
         try:
@@ -1138,7 +1124,7 @@ class _OneAndOne(TaskBase):
         """Checks inputs and outputs and stuff."""
 
         # Inspect the `process` method to see how many arguments it takes.
-        pro_argspec = misc.getfullargspec(self.process)
+        pro_argspec = inspect.getfullargspec(self.process)
         n_args = len(pro_argspec.args) - 1
         if n_args > 1:
             msg = (
@@ -1635,7 +1621,7 @@ def _format_product_keys(keys):
 
     # Check that all the keys provided are strings.
     for key in keys:
-        if not isinstance(key, basestring):
+        if not isinstance(key, str):
             msg = "Data product keys must be strings."
             raise config.CaputConfigError(msg)
     return keys

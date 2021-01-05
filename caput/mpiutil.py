@@ -35,12 +35,6 @@ Functions
    parallel_rows_write_hdf5
 
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-
-# === End Python 2/3 compatibility
 
 import logging
 import sys
@@ -670,9 +664,9 @@ def lock_and_write_buffer(obj, fname, offset, size):
         Size of the region to write to (and lock).
     """
     import os
-    import os.fcntl as fcntl
+    import fcntl
 
-    buf = buffer(obj)
+    buf = memoryview(obj)
 
     if len(buf) > size:
         raise Exception("Size doesn't match array length.")
