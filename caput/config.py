@@ -51,12 +51,6 @@ Richard 40.0
 Richard 40.0 Sooty
 
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-
-# === End Python 2/3 compatibility
 
 import logging
 
@@ -361,7 +355,8 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
                 if not isinstance(item, type_):
                     raise ValueError(
                         "Expected to receive a list with items of type %s, but got "
-                        "'%s.' at position %i" % (type_, val, ii)
+                        "'%s' of type '%s' at position %i"
+                        % (type_, item, type(item), ii)
                     )
 
         if length and len(val) != length:

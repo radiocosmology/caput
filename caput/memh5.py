@@ -27,16 +27,7 @@ creation with the `distributed=True` flag.
     any further issues.
 """
 
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-
-# === End Python 2/3 compatibility
-
-from past.builtins import basestring
-from future.utils import raise_from, text_type
-
+from collections.abc import Mapping
 import datetime
 import sys
 import warnings
@@ -51,12 +42,6 @@ import h5py
 from . import mpiutil
 from . import mpiarray
 from . import misc
-
-# TODO: Python 3 dependent import as the class was moved
-if sys.version_info.major > 2:
-    from collections.abc import Mapping
-else:
-    from collections import Mapping
 
 
 logger = logging.getLogger(__name__)
@@ -1887,7 +1872,7 @@ class BasicCont(MemDiskGroup):
         order = order + [name]
 
         history_group = self._data["history"]
-        history_group.attrs["order"] = text_type(order)
+        history_group.attrs["order"] = str(order)
         history_group.attrs[name] = history
 
     def redistribute(self, dist_axis):
@@ -1929,7 +1914,7 @@ class BasicCont(MemDiskGroup):
                 for axis in dist_axis:
 
                     # Try processing if this is a string
-                    if isinstance(axis, basestring):
+                    if isinstance(axis, str):
                         if "axis" in item.attrs and axis in item.attrs["axis"]:
                             axis = np.argwhere(item.attrs["axis"] == axis)[0, 0]
                         else:
@@ -2017,8 +2002,7 @@ def get_h5py_File(f, **kwargs):
             f = h5py.File(f, **kwargs)
         except IOError as e:
             msg = "Opening file %s caused an error: " % str(f)
-            # TODO: Py3 exception chaining
-            raise_from(IOError(msg + str(e)), e)
+            raise IOError(msg + str(e)) from e
     return f, opened
 
 
@@ -2056,7 +2040,7 @@ def copyattrs(a1, a2, convert_strings=False):
                 value = np.array(value)
 
             if isinstance(value, np.ndarray) and value.dtype.kind == "U":
-                value = value.astype(h5py.special_dtype(vlen=text_type))
+                value = value.astype(h5py.special_dtype(vlen=str))
 
             return value
 
@@ -2566,7 +2550,7 @@ def bytes_to_unicode(s):
         return s.decode("utf8")
 
     if isinstance(s, np.ndarray) and s.dtype.kind == "S":
-        return s.astype(text_type)
+        return s.astype(str)
 
     if isinstance(s, (list, tuple, set)):
         return s.__class__(bytes_to_unicode(t) for t in s)

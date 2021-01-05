@@ -314,17 +314,9 @@ formats.
 See the documentation for these base classes for more details.
 
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-from future.utils import raise_from
-from past.builtins import basestring
-
-# === End Python 2/3 compatibility
 
 import importlib
+import inspect
 import logging
 import os
 import queue
@@ -406,7 +398,7 @@ def _get_versions(modules):
     -------
     Dict[str, str]
     """
-    if isinstance(modules, basestring):
+    if isinstance(modules, str):
         modules = [modules]
     if not isinstance(modules, list):
         raise Exception(
@@ -416,7 +408,7 @@ def _get_versions(modules):
         )
     versions = {}
     for module in modules:
-        if not isinstance(module, basestring):
+        if not isinstance(module, str):
             raise Exception(
                 "Found value of type '{}' in list 'save_versions' (expected 'str').".format(
                     type(module).__name__
@@ -604,7 +596,7 @@ class Manager(config.Reader):
                 )
             except PipelineConfigError as e:
                 msg = "Setting up task {} caused an error - {}".format(ii, str(e))
-                raise_from(PipelineConfigError(msg), e)
+                raise PipelineConfigError(msg) from e
 
     def _setup_task(self, task_spec):
         """Set up a pipeline task from the spec given in the tasks list."""
@@ -635,7 +627,7 @@ class Manager(config.Reader):
                     e.__class__.__name__,
                     str(e),
                 )
-                raise_from(PipelineConfigError(msg), e)
+                raise PipelineConfigError(msg) from e
 
         # Get the parameters and initialize the class.
         params = {}
@@ -692,7 +684,7 @@ class Manager(config.Reader):
             msg = "Setting up keys for task {} caused an error - {}".format(
                 task.__class__.__name__, str(e)
             )
-            raise_from(PipelineConfigError(msg), e)
+            raise PipelineConfigError(msg) from e
 
         self.tasks.append(task)
         logger.debug("Added {} to task list.".format(task.__class__.__name__))
@@ -823,7 +815,7 @@ class TaskBase(config.Reader):
         in_ = _format_product_keys(in_)
         out = _format_product_keys(out)
         # Inspect the `setup` method to see how many arguments it takes.
-        setup_argspec = misc.getfullargspec(self.setup)
+        setup_argspec = inspect.getfullargspec(self.setup)
         # Make sure it matches `requires` keys list specified in config.
         n_requires = len(requires)
         try:
@@ -844,7 +836,7 @@ class TaskBase(config.Reader):
             )
             raise PipelineConfigError(msg)
         # Inspect the `next` method to see how many arguments it takes.
-        next_argspec = misc.getfullargspec(self.next)
+        next_argspec = inspect.getfullargspec(self.next)
         # Make sure it matches `in` keys list specified in config.
         n_in = len(in_)
         try:
@@ -1028,7 +1020,7 @@ class _OneAndOne(TaskBase):
         """Checks inputs and outputs and stuff."""
 
         # Inspect the `process` method to see how many arguments it takes.
-        pro_argspec = misc.getfullargspec(self.process)
+        pro_argspec = inspect.getfullargspec(self.process)
         n_args = len(pro_argspec.args) - 1
         if n_args > 1:
             msg = (
@@ -1336,7 +1328,7 @@ class H5IOMixin(object):
                 out_copy = memh5.MemGroup.from_hdf5(output)
 
                 # Lock file as we write
-                with misc.lock_file(filename) as fn:
+                with misc.lock_file(filename, comm=out_copy.comm) as fn:
                     out_copy.to_hdf5(fn, mode="w")
 
 
@@ -1501,7 +1493,7 @@ def _format_product_keys(keys):
 
     # Check that all the keys provided are strings.
     for key in keys:
-        if not isinstance(key, basestring):
+        if not isinstance(key, str):
             msg = "Data product keys must be strings."
             raise PipelineConfigError(msg)
     return keys

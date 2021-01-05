@@ -90,14 +90,6 @@ Here is an example of this in action::
         mpiutil.barrier()
 
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-
-# === End Python 2/3 compatibility
-
-from past.builtins import basestring
 import os
 import time
 import logging
@@ -666,7 +658,7 @@ class MPIArray(np.ndarray):
         import h5py
 
         if not h5py.get_config().mpi:
-            if isinstance(f, basestring):
+            if isinstance(f, str):
                 self._to_hdf5_serial(f, dataset, create)
                 return
             else:

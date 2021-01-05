@@ -11,6 +11,347 @@ from MedianTree cimport Tree, Data
 cimport numpy as np
 cimport cython
 
+# Define the fused types that can be used for the data or weights in the median routine
+ctypedef fused data_t:
+    int
+    long
+    float
+    double
+
+ctypedef fused weight_t:
+    int
+    long
+    float
+    double
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef data_t _quickselect_weight(data_t[::1] A, weight_t[::1] W, double qs, char method):
+    # A, W: data and weights respectively, both are modified in place
+    # qs: the amount of weight that we are selecting the element at
+    # method: one of l, h or s to indicate whether to take the lower, higher or split
+    #         (average) value if there is a tie
+
+    cdef int i = 0, j = len(A) - 1
+    cdef int ii, jj
+    cdef double weights_left
+    cdef data_t pivot
+
+    cdef data_t min_d, max_d
+    cdef data_t min_w, max_w
+
+    while True:
+        ii = i
+        jj = j
+        pivot = A[(ii + jj) // 2]
+        weights_left = 0
+
+        # Construct a Hoare partition of the array, while summing up the weights of the
+        # left hand partition as we go. Although it would be a bit neater if this was
+        # an external function, explicitly inlining it allows us to calculate the
+        # weight sum as we go
+        while True:
+
+            # Move the left pointer forward until we find a list element which doesn't
+            # satisfy the criterion. For every element that satisfies we need to
+            # accumulate its weight
+            while A[ii] < pivot:
+                weights_left += W[ii]
+                ii += 1
+
+            # Move the right pointer back until we find a list element which doesn't
+            # satisfy the criterion
+            while A[jj] > pivot:
+                jj -= 1
+
+            # If the pointers meet or overlap then we're done
+            if ii >= jj:
+
+                # If the pointers match exactly then this means the last element didn't
+                # get its weight added into the total
+                if ii == jj:
+                    weights_left += W[ii]
+
+                break
+
+            # If, not we need swap the elements and start again, the new left hand
+            # element has it's weight added
+            A[ii], A[jj] = A[jj], A[ii]
+            W[ii], W[jj] = W[jj], W[ii]
+            weights_left += W[ii]
+
+            # Advance to the next elements
+            ii += 1
+            jj -= 1
+
+        # If the total sum of the weights on the left equals the weight target that
+        # means that the target element lies exactly on the boundary. In this case the
+        # standard behaviour is to find the mean of the bounding elements. The easiest
+        # way to do that is to find the maximum element in the left partition and the
+        # minimum of the right
+        if qs == weights_left:
+
+            i = _max_non_zero(A, W, 0, jj)
+            j = _min_non_zero(A, W, jj + 1, len(A) - 1)
+
+            if (W[j] == 0 and W[i] > 0) or method == "l":
+                return A[i]
+            elif (W[i] == 0 and W[j] > 0) or method == "h":
+                return A[j]
+            else:  # method == "s":
+                return <data_t>((A[i] + A[j]) / 2)
+
+        # Otherwise the target element is in the left partition...
+        elif qs <= weights_left:
+            j = jj
+
+        # ... or in the right
+        else:
+            i = jj + 1
+            qs -= weights_left
+
+        # When the list is a single element long, we're done and can just return it
+        if i == j:
+            return A[i]
+
+
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef int _max_non_zero(data_t[::1] d, weight_t[::1] w, int i, int j):
+    # Find the maximum element in the array with non-zero weight. If all elements have
+    # non-zero weight return the maximum of those
+    cdef int ii
+    cdef int cur = i
+
+    for ii in range(i+1, j+1):
+        if (w[cur] > 0) == (w[ii] > 0):
+            if d[ii] > d[cur]:
+                cur = ii
+        elif w[ii] > 0:
+            cur = ii
+
+    return cur
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef int _min_non_zero(data_t[::1] d, weight_t[::1] w, int i, int j):
+    # Find the minimum element in the array with non-zero weight. If all elements have
+    # non-zero weight return the minimum of those
+    cdef int ii
+    cdef int cur = i
+
+    for ii in range(i+1, j+1):
+        if (w[cur] > 0) == (w[ii] > 0):
+            if d[ii] < d[cur]:
+                cur = ii
+        elif w[ii] > 0:
+            cur = ii
+
+    return cur
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef void _quickselect(
+    data_t[:, ::1] A,
+    weight_t[:, ::1] W,
+    double q,
+    char method,
+    data_t[::1] quantile,
+    data_t[::1] At,
+    weight_t[::1] Wt
+):
+    # Worker routine for the weighted quickselect
+
+    cdef double wt, qs
+    cdef int i, j
+
+    for i in range(A.shape[0]):
+
+        wt = 0
+
+        for j in range(A.shape[1]):
+            At[j] = A[i, j]
+            Wt[j] = W[i, j]
+            wt += W[i, j]
+
+        # If all the weights are zero just ensures to do a regular quantile calculation
+        # by using uniform non-zero weights
+        if wt == 0:
+            for j in range(W.shape[1]):
+                Wt[j] = 1
+            wt = W.shape[1]
+
+        qs = wt * q
+
+
+        quantile[i] = _quickselect_weight(At, Wt, qs, method)
+
+
+def quantile(A, W, q, method="split"):
+    """Calculate the weighted quantile of a set of data.
+
+    The weighted quantile is always calculated along the last axis.
+
+    The weights must be postive or zero for the calculation to make sense. This is
+    not checked within this routine, and so you must sanitize the input before
+    calling.
+
+    In the case that all elements have zero weight, a standard uniformly weighted
+    quantile calculation is performed. If there is one, and only one non-zero
+    weighted element that is always returned. For two or more non-zero weighted
+    elements, we can proceed as expected.
+
+    If the quantile is "split", i.e. it lies exactly on the boundary between two
+    elements, we use the bounding non-zero weighted elements to calculate the
+    quantile according to the chosen method.
+
+    Examples of special cases:
+
+    >>> quantile([1.0, 2.0, 3.0, 4.0], [1, 1, 0, 2], 0.5)
+    3.0
+    >>> quantile([1.0, 2.0, 3.0, 4.0], [1, 1, 0, 2], 0.5)
+    3.0
+    >>> quantile([1.0, 2.0, 4.0, 3.0], [0, 0, 0, 0], 0.5)
+    2.5
+
+    Parameters
+    ----------
+    A : array_like
+        The array of data. Only 32 and 64 bit integers and floats are supported.
+    W : array_like
+        The array of weights. Only 32 and 64 bit integers and floats are supported.
+    q : float
+        The quantile as a number from zero to one.
+    method : {"lower", "higher", "split"}:
+        Method to use if the requested quantile is exactly between two elements.
+
+    Returns
+    -------
+    r : np.ndarray or scalar
+        The calculated quantile. This has the same shape as A with the last axis
+        removed. If A was one dimensional the value returned is a scalar.
+
+    Raises
+    ------
+    ValueError
+        If the array shapes do not match, or the quantile value is invalid.
+    TypeError
+        If the array types are not supported.
+    """
+    cdef char methodc = _check_method(method)
+
+    # Ensure that the inputs are numpy arrays
+    if not isinstance(A, np.ndarray):
+        A = np.array(A)
+    if not isinstance(W, np.ndarray):
+        W = np.array(W)
+
+
+    if A.shape != W.shape:
+        raise ValueError("Shapes of A and W much match.")
+
+    if q < 0 or q > 1:
+        raise ValueError("Quantile must be a number between zero and one.")
+
+    # Reshape the arrays to 2D. The last axis is the one along which the quantile will
+    # be calculated
+    Ar = A.reshape(-1, A.shape[-1])
+    Wr = W.reshape(-1, W.shape[-1])
+
+    # Allocate the temporaries and output arrays
+    At = np.ndarray(Ar.shape[-1], dtype=A.dtype)
+    Wt = np.ndarray(Wr.shape[-1], dtype=W.dtype)
+    res = np.ndarray(Ar.shape[0], dtype=Ar.dtype)
+
+    # NOTE: this is super annoying. In theory this is what Cython fused types are meant
+    # to be for, but in practice it seems to be impossible to combine arbitrarily sized
+    # arrays (which require you to treat the arrays as Python objects), and fused
+    # types. Explicitly dispatching to the correct routines seems to be the lesser of
+    # all evils here
+    if A.dtype == np.intc:
+        if W.dtype == np.intc:
+            _quickselect[int, int](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.int:
+            _quickselect[int, long](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.single:
+            _quickselect[int, float](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.double:
+            _quickselect[int, double](Ar, Wr, q, methodc, res, At, Wt)
+        else:
+            raise TypeError("Type of weight array is not supported.")
+    elif A.dtype == np.int:
+        if W.dtype == np.intc:
+            _quickselect[long, int](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.int:
+            _quickselect[long, long](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.single:
+            _quickselect[long, float](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.double:
+            _quickselect[long, double](Ar, Wr, q, methodc, res, At, Wt)
+        else:
+            raise TypeError("Type of weight array is not supported.")
+    elif A.dtype == np.single:
+        if W.dtype == np.intc:
+            _quickselect[float, int](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.int:
+            _quickselect[float, long](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.single:
+            _quickselect[float, float](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.double:
+            _quickselect[float, double](Ar, Wr, q, methodc, res, At, Wt)
+        else:
+            raise TypeError("Type of weight array is not supported.")
+    elif A.dtype == np.double:
+        if W.dtype == np.intc:
+            _quickselect[double, int](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.int:
+            _quickselect[double, long](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.single:
+            _quickselect[double, float](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.double:
+            _quickselect[double, double](Ar, Wr, q, methodc, res, At, Wt)
+        else:
+            raise TypeError("Type of weight array is not supported.")
+    else:
+        raise TypeError("Type of data array is not supported.")
+
+    # If the input was 1D dimensional, the output should be scalar. If it wasn't then
+    # it the output has the same shape as the input without the last axis.
+    if A.ndim == 1:
+        return res[0]
+    else:
+        return res.reshape(A.shape[:-1])
+
+
+def weighted_median(A, W, method="split"):
+    """Calculate the weighted median of a set of data.
+
+    The weighted median is always calculated along the last axis.
+
+    See `quantile` for more information on the behaviour for some special cases.
+
+    Parameters
+    ----------
+    A : np.ndarray
+        The array of data.
+    W : np.ndarray
+        The array of weights.
+    method : {"lower", "higher", "split"}:
+        Method to use if the requested quantile is exactly between two elements.
+
+    Returns
+    -------
+    r : np.ndarray or scalar
+        The calculated median. This has the same shape as A with the last axis
+        removed. If A was one dimensional the value returned is a scalar.
+    """
+    return quantile(A, W, 0.5, method=method)
+
 
 def _check_arrays(data, weights):
 
@@ -32,77 +373,14 @@ def _check_arrays(data, weights):
     return data, weights
 
 
-def weighted_median(data, weights, method="split"):
-    """Compute weighted median for 1 and 2 dimensional arrays.
-
-    Parameters
-    ----------
-    data : array_like
-        The data to compute weighted median for. Can have 1 or 2 dimensions. The data type should
-        be float64 or something that can be converted to float64.
-    weights : array_like
-        The weights for the data. Can have 1 or 2 dimensions. The data type should be
-        float64 or something that can be converted to float64.
-    method : str
-        Either 'split', 'lower' or 'higher'. If multiple values sastisfy the conditions to be the
-        weighted median of a window, this decides what is returned:
-        split: The average of all candidate values is returned.
-        lower: The lowest of all candidate values is returned.
-        higher: The highest of all candidate values is returned.
-
-    Returns
-    -------
-    float64
-        The weighted median.
-
-    Raises
-    ------
-    NotImplementedError
-        If the number of dimensions is not 1 or 2.
-    RuntimeError
-        If there was an internal error in the C++ implementation.
-    """
-    data, weights = _check_arrays(data, weights)
-    cdef char c_method = _check_method(method)
-
-    if data.ndim is 1:
-        return _weighted_median_1D(data, weights, c_method)
-    if data.ndim is 2:
-        return _weighted_median_2D(data, weights, c_method)
-    raise NotImplementedError('weighted_median is only implemented for 1 and 2 dimensions, not {}'
-                              .format(data.ndim))
-
-
-def _weighted_median_1D(np.ndarray[np.float64_t, ndim=1] data,
-                        np.ndarray[np.float64_t, ndim=1] weights, method):
-    cdef Tree[double] avl = Tree[double]()
-
-    for d, w in zip(data, weights):
-        if w != 0:
-            avl.insert(d, w)
-
-    return avl.weighted_median(method)
-
-
-def _weighted_median_2D(np.ndarray[np.float64_t, ndim=2] data,
-                        np.ndarray[np.float64_t, ndim=2] weights, method):
-    cdef Tree[double] avl = Tree[double]()
-
-    for d, w in zip(np.nditer(data), np.nditer(weights)):
-        if w != 0:
-            avl.insert(d, w)
-
-    return avl.weighted_median(method)
-
-
-METHODS = ['split', 'lower', 'higher']
-METHODS_C = ['s', 'l', 'h']
-
-
 def _check_method(method):
+    METHODS = ['split', 'lower', 'higher']
+    METHODS_C = ['s', 'l', 'h']
+
     if method not in METHODS:
         raise ValueError('Method should be one of {}, found {}'.format(METHODS, method))
     return ord(METHODS_C[METHODS.index(method)])
+
 
 def moving_weighted_median(data, weights, size, method="split"):
     """Compute moving weighted median for 1 and 2 dimensional arrays.

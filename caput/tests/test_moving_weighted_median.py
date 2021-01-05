@@ -1,10 +1,4 @@
 """Unit tests for moving weighted average function."""
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-
-# === End Python 2/3 compatibility
 
 import numpy as np
 import time
@@ -160,9 +154,11 @@ class TestMWM(unittest.TestCase):
         )
 
     def test_wm(self):
-        assert (
-            weighted_median([1, 2, 3, 4, 5, 6, 7, 8], [1, 0, 0, 0, 0, 0, 0, 1]) == 4.5
-        )
+
+        # As we return the same type as the input, the split median will get rounded down
+        assert weighted_median(
+            [1, 2, 3, 4, 5, 6, 7, 8], [1, 0, 0, 0, 0, 0, 0, 1]
+        ) == int(4.5)
 
         assert (
             weighted_median(
@@ -226,8 +222,9 @@ class TestMWM(unittest.TestCase):
         )
 
     def test_weighted_median_methods(self):
-        values = [[9, 2], [5, 5], [2, 9]]
-        weights = [[3, 0], [5, 0], [8, 0]]
+        # Note this test
+        values = np.array([9, 2, 5, 5, 2, 9])
+        weights = np.array([3, 0, 5, 0, 8, 0])
         np.testing.assert_equal(weighted_median(values, weights, method="lower"), 2)
         np.testing.assert_equal(weighted_median(values, weights, method="higher"), 5)
 

@@ -100,29 +100,34 @@ and a complete cycle of ERA.
 
 .. _`IERS constants`: http://hpiers.obspm.fr/eop-pc/models/constants.html
 """
-# === Start Python 2/3 compatibility
-from __future__ import absolute_import, division, print_function, unicode_literals
-from future.builtins import *  # noqa  pylint: disable=W0401, W0614
-from future.builtins.disabled import *  # noqa  pylint: disable=W0401, W0614
-
-# === End Python 2/3 compatibility
-
-
-from past.builtins import basestring
 from datetime import datetime
 import warnings
 
 import numpy as np
+from scipy.optimize import brentq
+from skyfield import timelib
+from skyfield.starlib import Star
+from skyfield.units import Angle
 
 from . import config
-from .misc import vectorize
+from .misc import vectorize, scalarize, listize
 
+
+# The approximate length of a UT1 second in SI seconds (i.e. LOD / 86400). This was
+# calculated from the IERS EOP C01 IAU2000 data, by calculating the derivative of UT1 -
+# TAI from 2019.5 to 2020.5. Note that the variations in this are quite substantial,
+# but it's typically 1ms over the source of a day
+UT1_S = 1.00000000205
 
 # Approximate number of seconds in a sidereal second.
-SIDEREAL_S = 1.0 / (1.0 + 1.0 / 365.259636)
+# The exact value used here is from https://hpiers.obspm.fr/eop-pc/models/constants.html
+# but can be derived from USNO Circular 179 Equation 2.12
+SIDEREAL_S = 1.0 / 1.002737909350795 * UT1_S
 
-# Approximate length of a stellar second (in SI seconds)
-STELLAR_S = SIDEREAL_S + 0.0084 / (24 * 3600)
+# Approximate length of a stellar second
+# This comes from the definition of ERA-UT1 (see IERS Conventions TR Chapter 1) giving
+# the first ratio a UT1 and stellar second
+STELLAR_S = 1.0 / 1.00273781191135448 * UT1_S
 
 
 class Observer(object):
@@ -170,6 +175,8 @@ class Observer(object):
         if lsd_start is not None:
             self.lsd_start_day = lsd_start
 
+    _obs = None
+
     def skyfield_obs(self):
         """Create a Skyfield topos object for the current location.
 
@@ -181,14 +188,16 @@ class Observer(object):
 
         earth = self.skyfield.ephemeris["earth"]
 
-        obs = earth + Topos(
-            latitude_degrees=self.latitude,
-            longitude_degrees=self.longitude,
-            elevation_m=self.altitude,
-        )
+        if self._obs is None:
+            self._obs = earth + Topos(
+                latitude_degrees=self.latitude,
+                longitude_degrees=self.longitude,
+                elevation_m=self.altitude,
+            )
 
-        return obs
+        return self._obs
 
+    @listize()
     def unix_to_lsa(self, time):
         """Calculate the Local Stellar Angle.
 
@@ -213,6 +222,7 @@ class Observer(object):
 
     lsa = unix_to_lsa
 
+    @listize()
     def lsa_to_unix(self, lsa, time0):
         """Convert a Local Stellar Angle (LSA) on a given
         day to a UNIX time.
@@ -244,6 +254,7 @@ class Observer(object):
         """
         return self.lsa_to_unix(0.0, self.lsd_start_day)
 
+    @listize()
     def unix_to_lsd(self, time):
         """Calculate the Local Stellar Day (LSD) corresponding to the given time.
 
@@ -276,6 +287,7 @@ class Observer(object):
 
     lsd = unix_to_lsd
 
+    @listize()
     def lsd_to_unix(self, lsd):
         """Calculate the UNIX time corresponding to a given LSD.
 
@@ -301,10 +313,32 @@ class Observer(object):
         # Solve for the next transit of that RA after start_unix
         return self.lsa_to_unix(lsa, start_unix)
 
+    @listize()
+    def unix_to_lst(self, unix):
+        """Calculate the apparent Local Sidereal Time for the given UNIX time.
+
+        Parameters
+        ----------
+        unix : float or array of
+            UNIX time in floating point seconds since the epoch.
+
+        Returns
+        -------
+        lst : float or array of
+            The apparent LST in degrees.
+        """
+
+        st = unix_to_skyfield_time(unix)
+
+        return (st.gast * 15.0 + self.longitude) % 360.0
+
+    lst = unix_to_lst
+
+    @scalarize()
     def transit_RA(self, time):
         """Transiting RA for the observer at given Unix Time.
 
-        Because the RA is defined with repect to the specified epoch (J2000 by
+        Because the RA is defined with respect to the specified epoch (J2000 by
         default), the elevation actually matters here. The elevation of the
         equator is used, which minimizes this effect.
 
@@ -344,27 +378,271 @@ class Observer(object):
         el = 90.0 - self.latitude
         obs.pressure = 0
 
-        # Save the shape for the return value and flatten
-        if hasattr(time, "__len__"):
-            time = np.array(time)
-            sh = time.shape
-            time = time.flatten()
-
         st = unix_to_skyfield_time(time)
         pos = obs.at(st).from_altaz(az_degrees=az, alt_degrees=el)
         ra, dec, dist = pos.radec()  # Fetch ICRS position (effectively J2000)
 
         ra = np.degrees(ra.radians)
 
-        # Reshape to the input shape
-        if hasattr(ra, "__len__"):
-            ra = ra.reshape(sh)
-
         return ra
 
+    def transit_times(
+        self, source, t0, t1=None, step=None, lower=False, return_dec=False
+    ):
+        """Find the transit times of the given source in an interval.
 
+        Parameters
+        ----------
+        source : skyfield source or float
+            The source we are calculating the transit of. This can be any body
+            skyfield can observe, such as a star (`skyfield.api.Star`), planet or
+            moon (`skyfield.vectorlib.VectorSum` or
+            `skyfield.jpllib.ChebyshevPosition`). Additionally if a float is passed,
+            this is equivalent to a body with ICRS RA given by the float, and DEC=0.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that can be converted to a UNIX
+            time by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of transit, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+        lower : bool, optional
+            By default this only returns the upper (regular) transit. This will cause
+            lower transits to be returned instead.
+        return_dec : bool, optional
+            If set, also return the declination of the source at transit.
+
+        Returns
+        -------
+        times : np.ndarray
+            UNIX times of transits.
+        dec : np.ndarray
+            Only returned if `return_dec` is set. Declination of source at transit.
+        """
+
+        if isinstance(source, float):
+            source = skyfield_star_from_ra_dec(source, 0.0)
+
+        # The function to find routes for. For the upper transit we just search for
+        # HA=0, for the lower transit we need to rotate the 180 -> -180 transition to
+        # be at 0.
+        def f(t):
+            ha = self._source_ha(source, t)
+            return ha if not lower else (ha % 360.0) - 180.0
+
+        # Convert interval to Julian Days and choose the initial search step if not set
+        t0jd, t1jd, step = self._fixup_interval_and_step(t0, t1, step)
+
+        # Compute transits
+        transits, _ = _solve_all(f, t0jd, t1jd, step, skip_decreasing=True, xtol=1e-8)
+
+        # Convert into UNIX times
+        t_sf = self.skyfield.timescale.tt_jd(transits)
+        t_unix = skyfield_time_to_unix(t_sf)
+
+        if return_dec:
+
+            if len(transits) > 0:
+                pos = self.skyfield_obs().at(t_sf).observe(source)
+                dec = pos.cirs_radec(epoch=t_sf)[1]._degrees
+            else:
+                dec = np.array([], dtype=np.float64)
+
+            return t_unix, dec
+        else:
+            return t_unix
+
+    def rise_set_times(self, source, t0, t1=None, step=None, diameter=0.0):
+        """Find all times a sources rises or sets in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the rising and setting of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of risings and settings, and should be set to something less than the
+            spacing between events.  If None is passed, an initial search step of
+            0.2 days, or else one fifth of the specified interval, is used, whichever
+            is smaller.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise/set times as UNIX epoch times.
+        rising : np.ndarray
+            Boolean array of whether the time corresponds to a rising (True) or
+            setting (False).
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=False, skip_set=False
+        )
+
+    def rise_times(self, source, t0, t1=None, step=None, diameter=0.0):
+        """Find all times a sources rises in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the rising of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of rising, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise times as UNIX epoch times.
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=False, skip_set=True
+        )[0]
+
+    def set_times(self, source, t0, t1=None, step=None, diameter=0.0):
+        """Find all times a sources sets in an interval.
+
+        Parameters
+        ----------
+        source : skyfield source
+            The source we are calculating the setting of.
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of setting, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+        diameter : float
+            The size of the source in degrees. Use this to ensure the whole source is
+            below the horizon. Also, if the local horizon is higher (i.e. mountains),
+            this can be set to a negative value to account for this.
+
+        Returns
+        -------
+        times : np.ndarray
+            Source rise times as UNIX epoch times.
+        """
+        return self._sr_work(
+            source, t0, t1, step, diameter, skip_rise=True, skip_set=False
+        )[0]
+
+    def _fixup_interval_and_step(self, t0, t1, step):
+        # Work routine used by _sr_work and transit_times to sanitise the
+        # caller-supplied interval and initial step duration.
+        #
+        # Returns the interval limits converted to TT JD and the computed
+        # initial step size
+
+        # Get the ends of the search interval
+        t0 = ensure_unix(t0)
+        if t1 is None:
+            t1 = t0 + 24 * 3600.0
+        else:
+            t1 = ensure_unix(t1)
+            if t1 <= t0:
+                raise ValueError(
+                    "End of the search interval (t1) is before the start (t0)"
+                )
+
+        # Calculate the initial search step
+        if step is None:
+            if t1 - t0 >= 24 * 3600.0:
+                step = 0.2
+            else:
+                step = (t1 - t0) / (5 * 24 * 3600.0)
+        elif step * 24 * 3600 >= t1 - t0:
+            raise ValueError("Initial search step is larger than the search interval")
+
+        # Convert the UNIX start and end times into Julian Days
+        t0jd, t1jd = unix_to_skyfield_time([t0, t1]).tt
+
+        return t0jd, t1jd, step
+
+    def _sr_work(self, source, t0, t1, step, diameter, skip_rise=False, skip_set=False):
+        # A work routine factoring out common functionality
+
+        # The function to find roots for. This is just the altitude of the source with
+        # an offset for it's finite size
+        def f(t):
+            return self._source_alt(source, t) + diameter / 2
+
+        # Convert interval to Julian Days and choose the initial search step if not set
+        t0jd, t1jd, step = self._fixup_interval_and_step(t0, t1, step)
+
+        times, risings = _solve_all(
+            f,
+            t0jd,
+            t1jd,
+            step,
+            skip_increasing=skip_rise,
+            skip_decreasing=skip_set,
+            xtol=1e-6,
+        )
+
+        # Convert into UNIX times
+        times = skyfield_time_to_unix(self.skyfield.timescale.tt_jd(times))
+
+        return times, risings
+
+    def _source_ha(self, source, t):
+        # Calculate the local Hour Angle of a given source
+        time = self.skyfield.timescale.tt_jd(t)
+        lst = time.gast * 15 + self.longitude
+
+        ra = self.skyfield_obs().at(time).observe(source).radec(epoch=time)[0]._degrees
+
+        return (((lst - ra) + 180) % 360) - 180
+
+    def _source_alt(self, source, t):
+        # Calculate the altitude of a given source
+        from skyfield.positionlib import _to_altaz
+
+        time = self.skyfield.timescale.tt_jd(t)
+        pos = self.skyfield_obs().at(time).observe(source)
+
+        # NOTE: we could have used `.apparent().altz()` here, but the corrections for
+        # light travel time are super slow, so we're better off skipping them. To do
+        # this we need to use a private Skyfield method. This isn't a great idea given
+        # how unstable skyfields internal API seems to be, but it saves reinventing the
+        # wheel. We'll see how it goes for now.
+        alt = _to_altaz(pos, None, None)[0].degrees
+
+        return alt
+
+
+@scalarize()
 def unix_to_skyfield_time(unix_time):
-    """Formats the Unix time into a time that can be interpreted by ephem.
+    """Formats the Unix time into a time that can be interpreted by Skyfield.
 
     Parameters
     ----------
@@ -374,12 +652,6 @@ def unix_to_skyfield_time(unix_time):
     Returns
     -------
     time : :class:`skyfield.timelib.Time`
-
-    See Also
-    --------
-    :meth:`datetime.datetime.utcfromtimestamp`
-    :func:`datetime_to_unix`
-
     """
 
     from skyfield import timelib
@@ -398,10 +670,31 @@ def unix_to_skyfield_time(unix_time):
     return t
 
 
+@scalarize()
+def skyfield_time_to_unix(skyfield_time):
+    """Formats the Skyfield time into UNIX times.
+
+    Parameters
+    ----------
+    skyfield_time : `skyfield.timelib.Time`
+        Skyfield time.
+
+    Returns
+    -------
+    time : float or array of
+        UNIX time.
+    """
+    # TODO: I'm surprised there isn't a better way to do this. Needing to convert via a
+    # datetime isn't great, but the only other ways I think can do it use private
+    # routines
+    return ensure_unix(skyfield_time.utc_datetime())
+
+
+@scalarize()
 def unix_to_era(unix_time):
     """Calculate the Earth Rotation Angle for a given time.
 
-    The Earth Rotation Angle is the angle between the Celetial and Terrestrial
+    The Earth Rotation Angle is the angle between the Celestial and Terrestrial
     Intermediate origins, and is a modern replacement for the Greenwich Sidereal
     Time.
 
@@ -425,6 +718,7 @@ def unix_to_era(unix_time):
     return 360.0 * era
 
 
+@scalarize()
 def era_to_unix(era, time0):
     """Calculate the UNIX time for a given Earth Rotation Angle.
 
@@ -457,13 +751,13 @@ def era_to_unix(era, time0):
     # Second.
     diff_time = diff_era_deg * 240.0 * STELLAR_S
 
-    # Calculate if any leap seconds occured between the search start and the final value
+    # Did if any leap seconds occurred between the search start and the final value
     leap_seconds = leap_seconds_between(time0, time0 + diff_time)
 
     return time0 + diff_time - leap_seconds
 
 
-@vectorize()
+@vectorize(otypes=[object])
 def unix_to_datetime(unix_time):
     """Converts unix time to a :class:`~datetime.datetime` object.
 
@@ -489,7 +783,7 @@ def unix_to_datetime(unix_time):
     return naive_datetime_to_utc(dt)
 
 
-@vectorize()
+@vectorize(otypes=[np.float64])
 def datetime_to_unix(dt):
     """Converts a :class:`~datetime.datetime` object to the unix time.
 
@@ -517,6 +811,7 @@ def datetime_to_unix(dt):
     return since_epoch.total_seconds()
 
 
+@vectorize(otypes=[np.unicode])
 def datetime_to_timestr(dt):
     """Converts a :class:`~datetime.datetime` to "YYYYMMDDTHHMMSSZ" format.
 
@@ -540,6 +835,7 @@ def datetime_to_timestr(dt):
     return dt.strftime("%Y%m%dT%H%M%SZ")
 
 
+@vectorize(otypes=[object])
 def timestr_to_datetime(time_str):
     """Converts date "YYYYMMDDTHHMMSS*" to a :class:`~datetime.datetime`.
 
@@ -561,6 +857,7 @@ def timestr_to_datetime(time_str):
     return datetime.strptime(time_str[:15], "%Y%m%dT%H%M%S")
 
 
+@scalarize(dtype=np.int64)
 def leap_seconds_between(time_a, time_b):
     """Determine how many leap seconds occurred between two Unix times.
 
@@ -603,6 +900,7 @@ def leap_seconds_between(time_a, time_b):
     return time_shift_int
 
 
+@scalarize()
 def ensure_unix(time):
     """Convert the input time to Unix time format.
 
@@ -617,34 +915,22 @@ def ensure_unix(time):
         Output time.
     """
 
-    time0 = np.array(time).flatten()[0] if hasattr(time, "__len__") else time
-
-    if isinstance(time0, datetime):
+    if isinstance(time[0], datetime):
         return datetime_to_unix(time)
-    elif isinstance(time0, basestring):
+    elif isinstance(time[0], str):
         return datetime_to_unix(timestr_to_datetime(time))
+    elif isinstance(time[0], timelib.Time):
+        return datetime_to_unix(time.utc_datetime())
+    elif isinstance(time, np.ndarray) and np.issubdtype(time.dtype, np.number):
+        return time.astype(np.float64)
     else:
-
-        # Try and convert a Skyfield time into a UNIX time
-        # Protect the import in case Skyfield is not installed
-        try:
-            from skyfield import timelib
-
-            if isinstance(time0, timelib.Time):
-                return datetime_to_unix(time.utc_datetime())
-        except ImportError:
-            pass
-
-        # Finally try and convert into a float.
-        try:
-            return np.float64(time)
-        except TypeError:
-            raise TypeError("Could not convert %s into a UNIX time" % repr(type(time)))
+        raise TypeError("Could not convert %s into a UNIX time" % repr(type(time)))
 
 
 _warned_utc_datetime = False
 
 
+@vectorize(otypes=[object])
 def naive_datetime_to_utc(dt):
     """Add UTC timezone info to a naive datetime.
 
@@ -705,17 +991,25 @@ class SkyfieldWrapper(object):
         Directory Skyfield should save data in. If not set data will be looked
         for in `$CAPUT_SKYFIELD_PATH` or in `<path to caput>/caput/data`.
     expire : bool, optional
-        Whether to expire existing data. This is `False` by default to avoid
-        unexpected filesystem/network access.
+        Deprecated option. Skyfield no longer has a concept of expiring data. To get
+        updated data you must force an explicit reload of it which can be done via
+        `SkyFieldWrapper.reload`.
     ephemeris : string, optional
         The JPL ephemeris to use. Defaults to `'de421.bsp'`.
     """
 
-    def __init__(self, path=None, expire=False, ephemeris="de421.bsp"):
+    def __init__(self, path=None, expire=None, ephemeris="de421.bsp"):
 
         import os
 
         self._ephemeris_name = ephemeris
+
+        if expire is not None:
+            warnings.warn(
+                "`expiry` argument deprecated as Skyfield has dropped the idea of "
+                "expiring data.",
+                DeprecationWarning,
+            )
 
         if path is None:
 
@@ -729,7 +1023,7 @@ class SkyfieldWrapper(object):
         try:
             from skyfield import api
 
-            self._load = api.Loader(path, expire=expire)
+            self._load = api.Loader(path)
         except ImportError:
             pass
 
@@ -761,19 +1055,8 @@ class SkyfieldWrapper(object):
         if self._timescale:
             return self._timescale
 
-        # Try to load skyfield data (downloading an update if it has expired)
         try:
-            self._timescale = self.load.timescale()
-            return self._timescale
-        except IOError:
-            warnings.warn("Can not update Skyfield data. Trying existing data.")
-
-        # If we are here either the data didn't exist, or the server cannot be
-        # reached. Try to load skyfield data, ignoring any expiry, this should
-        # work provided a file already exisits
-        try:
-            self.load.expire = False
-            self._timescale = self.load.timescale()
+            self._timescale = self.load.timescale(builtin=False)
             return self._timescale
         except IOError:
             raise IOError(
@@ -791,18 +1074,7 @@ class SkyfieldWrapper(object):
         if self._ephemeris:
             return self._ephemeris
 
-        # Try to load skyfield data (downloading an update if it has expired)
         try:
-            self._ephemeris = self.load(self._ephemeris_name)
-            return self._ephemeris
-        except IOError:
-            warnings.warn("Can not update Skyfield data. Trying existing data.")
-
-        # If we are here either the data didn't exist, or the server cannot be
-        # reached. Try to load skyfield data, ignoring any expiry, this should
-        # work provided a file already exisits
-        try:
-            self.load.expire = False
             self._ephemeris = self.load(self._ephemeris_name)
             return self._ephemeris
         except IOError:
@@ -814,16 +1086,94 @@ class SkyfieldWrapper(object):
     def reload(self):
         """Reload the Skyfield data regardless of the `expire` setting."""
 
-        exp_val = self.load.expire
-        self.load.expire = True
-
-        try:
-            self.timescale
-            self.ephemeris
-        finally:
-            self.load.expire = exp_val
+        # Download the timescale file and ephemeris
+        self.load.download("finals2000A.all")
+        self.load.download(self._ephemeris_name)
 
 
 # Set up a module local Skyfield wrapper for time conversion functions in this
 # module to use.
 skyfield_wrapper = SkyfieldWrapper()
+
+
+def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kwargs):
+    """Find all roots of function f, within the interval [x0, x1].
+
+    To find all the roots we need an estimate of the spacing of the roots. This is
+    specified by the parameter `dx`. If this is too large, roots may be missed.
+
+    Parameters
+    ----------
+    f : callable
+        A numpy vectorized function which returns a single value f(x).
+    x0, x1 : float
+        The start and end of the interval to search.
+    dx : float
+        An interval known to be less than the spacing between the closest roots.
+    skip_increasing, skip_decreasing : bool, optional
+        Skip roots where the gradient is positive (or negative).
+    **kwargs
+        Passed to `scipy.optimize.brentq`. `xtol`, `rtol` and `maxiter` are probably
+        the most useful.
+
+    Returns
+    -------
+    roots : np.ndarray[np.float64]
+        The values of the roots found.
+    increasing : np.ndarray[bool]
+        If the gradient at the root is positive.
+    """
+    # Form a grid of points to find intervals to search over
+    x_init = np.linspace(x0, x1, int(np.ceil((x1 - x0) / dx)), endpoint=True)
+    f_init = f(x_init)
+
+    roots = []
+    increasing = []
+
+    # Search through intervals
+    for xa, xb, fa, fb in zip(x_init[:-1], x_init[1:], f_init[:-1], f_init[1:]):
+
+        # Entries are the same sign, so there is no solution in between.
+        # NOTE: we need to deal with the case where one edge might be an exact root,
+        # hence the strictly greater than 0.0
+        if fa * fb > 0.0:
+            continue
+
+        is_increasing = fa < fb
+
+        # Skip positive gradient roots
+        if skip_increasing and is_increasing:
+            continue
+
+        # Skip negative gradient roots
+        if skip_decreasing and not is_increasing:
+            continue
+
+        root = brentq(f, xa, xb, **kwargs)
+
+        roots.append(root)
+        increasing.append(is_increasing)
+
+    return (np.array(roots, dtype=np.float64), np.array(increasing, dtype=np.bool))
+
+
+def skyfield_star_from_ra_dec(ra, dec, name=""):
+    """Create a Skyfield star object from an ICRS position.
+
+    Parameters
+    ----------
+    ra, dec : float
+        The ICRS position in degrees.
+    name : str, optional
+        The name of the body.
+
+    Returns
+    -------
+    body : skyfield.starlib.Star
+        An object representing the body.
+    """
+
+    body = Star(
+        ra=Angle(degrees=ra, preference="hours"), dec=Angle(degrees=dec), names=name
+    )
+    return body
