@@ -10,27 +10,6 @@ This module can:
 - Determine various local time standards (Local Stellar Angle and Day)
 - Generate a nice wrapper for Skyfield to ease the loading of required data.
 
-Time Utilities
-==============
-
-Time conversion routine which are location independent.
-
-.. autosummary::
-    :toctree: generated/
-
-    unix_to_skyfield_time
-    datetime_to_unix
-    unix_to_datetime
-    datetime_to_timestr
-    timestr_to_datetime
-    unix_to_era
-    era_to_unix
-    ensure_unix
-    leap_seconds_between
-    time_of_day
-    naive_datetime_to_utc
-
-
 Local Time Utilities
 ====================
 
@@ -57,11 +36,6 @@ concept of a Stellar Day as a length of time is well established (`IERS
 constants`_), and the Stellar Angle is an older term for the Earth Rotation
 Angle (`NFA Glossary`_).
 
-.. autosummary::
-    :toctree: generated/
-
-    Observer
-
 Skyfield Interface
 ==================
 
@@ -72,12 +46,6 @@ determined by the following (in order):
 - As the wrapper is initialised by passing in a ``path=<path>`` option.
 - By setting the environment variable ``CAPUT_SKYFIELD_PATH``
 - If neither of the above is set, the data is place in ``<path to caput>/caput/data/``
-
-.. autosummary::
-    :toctree: generated/
-
-    SkyfieldWrapper
-
 
 Constants
 =========
@@ -187,20 +155,6 @@ class Observer(object):
     lsd_start_day : float
         UNIX time on the zeroth LSD. The actual zero point is the first time of
         `LSA = 0.0` after the `lsd_start_day`.
-
-    Methods
-    -------
-    unix_to_lsa
-    lsa_to_unix
-    unix_to_lsd
-    lsd_to_unix
-    unix_to_lst
-    transit_RA
-    skyfield_obs
-    transit_times
-    rise_set_times
-    rise_times
-    set_times
     """
 
     longitude = config.float_in_range(-180.0, 180.0, default=0.0)
@@ -402,8 +356,9 @@ class Observer(object):
         -----
 
         It is not clear that this calculation includes nutation and stellar
-        aberration.  See the discussion here_. Some testing does seem to
-        indicate that these effects are accounted for.
+        aberration.  See the discussion
+        `on stackoverflow <http://stackoverflow.com/questions/11970713>`_.
+        Some testing does seem to indicate that these effects are accounted for.
 
         This calculates the RA in the given epoch which by default is J2000, but
         it might be more appropriate to use an epoch that is closer to the
@@ -412,8 +367,6 @@ class Observer(object):
 
         PyEphem uses all geocentric latitudes, which I don't think affects
         this calculation.
-
-        .. _here: http://stackoverflow.com/questions/11970713
         """
 
         # Initialize Skyfield location object.
@@ -1043,17 +996,6 @@ class SkyfieldWrapper(object):
         `SkyFieldWrapper.reload`.
     ephemeris : string, optional
         The JPL ephemeris to use. Defaults to `'de421.bsp'`.
-
-    Attributes
-    ----------
-    timescale
-    ephemeris
-    load
-    path
-
-    Methods
-    -------
-    reload
     """
 
     def __init__(self, path=None, expire=None, ephemeris="de421.bsp"):

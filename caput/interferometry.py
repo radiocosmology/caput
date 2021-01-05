@@ -1,24 +1,5 @@
-"""Useful functions for radio interferometry.
+"""Useful functions for radio interferometry."""
 
-Coordinates
-===========
-
-.. autosummary::
-    :toctree: generated/
-
-    sph_to_ground
-    ground_to_sph
-    project_distance
-
-
-Interferometry
-==============
-
-.. autosummary::
-    :toctree: generated/
-
-    fringestop_phase
-"""
 
 import numpy as np
 
@@ -28,8 +9,8 @@ def sph_to_ground(ha, lat, dec):
 
     All input angles are radians. HA, DEC should be in CIRS coordinates.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     ha : array_like
         The Hour Angle of the source to fringestop too.
     lat : array_like
@@ -55,8 +36,8 @@ def ground_to_sph(x, y, lat):
 
     Latitude is given in radians. Assumes z is positive
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     x : array_like
         The East projection of the angular position
     y : array_like
@@ -85,8 +66,8 @@ def ground_to_sph(x, y, lat):
 def projected_distance(ha, lat, dec, x, y, z=0.0):
     """Return the distance project in the direction of a source.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     ha : array_like
         The Hour Angle of the source to fringestop too.
     lat : array_like
@@ -121,8 +102,8 @@ def fringestop_phase(ha, lat, dec, u, v, w=0.0):
     Note that for a visibility V_{ij} = < E_i E_j^*>, this expects the u, v,
     w coordinates are the components of (d_i - d_j) / lambda.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     ha : array_like
         The Hour Angle of the source to fringestop too.
     lat : array_like

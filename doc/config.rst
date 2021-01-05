@@ -3,6 +3,9 @@
 Configuration
 =============
 
+The caput pipeline runner script accepts a YAML file for configuration. The structure of this file
+is documented in :ref:`config`.
+
 General options
 ---------------
 

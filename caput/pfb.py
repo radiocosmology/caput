@@ -4,25 +4,6 @@ This module can:
 - Evaluate the typical window functions used
 - Evaluate a python model of the PFB
 - Calculate the decorrelation effect for signals offset by a known time delay.
-
-Window functions
-================
-
-.. autosummary::
-    :toctree: generated/
-
-    sinc_window
-    sinc_hanning
-    sinc_hamming
-
-PFB
-===
-
-.. autosummary::
-    :toctree: generated/
-
-    pfb
-    decorrelation_ratio
 """
 
 import numpy as np

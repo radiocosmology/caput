@@ -1,31 +1,10 @@
 """
 Data formats for Time Ordered Data.
 
-.. currentmodule:: caput.tod
-
 This module contains data containers, data formats, and utilities based on
 :mod:`caput.memh5`. The data represented must have an axis representing time,
 and, in particular, concatenating multiple datasets along a time axis must be a
 sensible operation.
-
-Classes
-=======
-
-.. autosummary::
-   :toctree: generated/
-
-   TOData
-   Reader
-
-
-Functions
-=========
-
-.. autosummary::
-   :toctree: generated/
-
-    concatenate
-
 """
 
 import glob
@@ -45,16 +24,6 @@ class TOData(memh5.BasicCont):
     the functionality of its base class but with the concept of a time axis
     which can be concatenated over. Currently the time axis must be the fastest
     varying axis is present.
-
-    Attributes
-    ----------
-    time
-
-    Methods
-    -------
-    from_mult_files
-    convert_time
-
     """
 
     time_axes = ("time",)
@@ -132,18 +101,6 @@ class Reader(object):
     files : filename, `h5py.File` or list there-of or filename pattern
         Files containing data. Filename patterns with wild cards (e.g.
         "foo*.h5") are supported.
-
-    Attributes
-    ----------
-    files
-    time_sel
-    time
-
-    Methods
-    -------
-    select_time_range
-    read
-
     """
 
     # Controls the association between Reader classes and data classes.

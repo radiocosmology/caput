@@ -6,33 +6,8 @@ both what tasks are to be run and the parameters that go to those tasks.
 Included in this package are base classes for simplifying the construction of
 data analysis tasks, as well as the pipeline manager which executes them.
 
-Pipelines are most easily executed using the script in ``caput_pipeline.py`,
+Pipelines are most easily executed using the script in `caput_pipeline.py`,
 which ships with :mod:`caput`.
-
-Flow control classes
-====================
-
-.. autosummary::
-   :toctree: generated/
-
-   Manager
-   PipelineRuntimeError
-   PipelineStopIteration
-
-
-Task base classes
-=================
-
-.. autosummary::
-    :toctree: generated/
-
-   TaskBase
-   SingleBase
-   IterBase
-   H5IOMixin
-   BasicContMixin
-   SingleH5Base
-   IterH5Base
 
 Examples
 ========
@@ -793,19 +768,6 @@ class TaskBase(config.Reader):
     pipeline yaml file when the pipeline is initialized.  The class attributes
     will be overridden with instance attributes with the same name but with the
     values specified in the pipeline file.
-
-    Attributes
-    ----------
-    cacheable
-    embarrassingly_parallelizable
-
-    Methods
-    -------
-    __init__
-    setup
-    next
-    finish
-
     """
 
     # Overridable Attributes
@@ -1108,7 +1070,6 @@ class _OneAndOne(TaskBase):
 
     This is not a user base class and simply holds code that is common to
     `SingleBase` and `IterBase`.
-
     """
 
     input_root = config.Property(default="None", proptype=str)
@@ -1268,17 +1229,6 @@ class SingleBase(_OneAndOne):
     output_filename : string
         Pipeline settable parameter giving the last part of output path. The
         full output path is ``self.output_root + self.output_filename``.
-
-    Methods
-    -------
-    next
-    setup
-    process
-    finish
-    read_input
-    cast_input
-    write_output
-
     """
 
     input_filename = config.Property(default="", proptype=str)
@@ -1338,18 +1288,6 @@ class IterBase(_OneAndOne):
         Pipeline settable parameter giving the last part of output path. The
         full output path is ``self.output_root +
         self.file_middles[self.iteration] + self.output_ext``.
-
-
-    Methods
-    -------
-    next
-    setup
-    process
-    finish
-    read_input
-    cast_input
-    write_output
-
     """
 
     file_middles = config.Property(default=[], proptype=list)

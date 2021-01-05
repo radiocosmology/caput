@@ -1,8 +1,6 @@
 """
 Module for making in-memory mock-ups of :mod:`h5py` objects.
 
-.. currentmodule:: caput.memh5
-
 It is sometimes useful to have a consistent API for data that is independent
 of whether that data lives on disk or in memory. :mod:`h5py` provides this to a
 certain extent, having :class:`h5py.Dataset` objects that act very much like
@@ -27,43 +25,6 @@ creation with the `distributed=True` flag.
     lock up. This was when using macOS using `ompio` of OpenMPI 3.0.
     Switching to `romio` as the MPI-IO backend helped here, but please report
     any further issues.
-
-Basic Classes
-=============
-
-.. autosummary::
-   :toctree: generated/
-
-    ro_dict
-    MemGroup
-    MemAttrs
-    MemDataset
-    MemDatasetCommon
-    MemDatasetDistributed
-
-
-High Level Container
-====================
-
-.. autosummary::
-   :toctree: generated/
-
-    MemDiskGroup
-    BasicCont
-
-
-Utility Functions
-=================
-
-.. autosummary::
-   :toctree: generated/
-
-    attrs2dict
-    is_group
-    get_h5py_File
-    copyattrs
-    deep_group_copy
-
 """
 
 from collections.abc import Mapping
@@ -98,13 +59,12 @@ class ro_dict(Mapping):
     a normal dictionary.
 
     Provides the same interface for reading as the builtin python
-    :class:`dict`s but no methods for writing.
+    :class:`dict` but no methods for writing.
 
     Parameters
     ----------
     d : dict
         Initial data for the new dictionary.
-
     """
 
     def __init__(self, d=None):
@@ -180,21 +140,21 @@ class _StorageRoot(_Storage):
 
 
 class MemAttrs(dict):
-    """In memory implementation of the :class:`h5py.AttributeManager`.
+    """
+    In memory implementation of the :class:`h5py.AttributeManager`.
 
     Currently just a normal dictionary.
-
     """
 
     pass
 
 
 class _MemObjMixin(object):
-    """Mixin represents the identity of an in-memory h5py-like object.
+    """
+    Mixin represents the identity of an in-memory h5py-like object.
 
     Implement a few attributes that all memh5 objects have, such as `parent`,
     and `file`.
-
     """
 
     @property
@@ -239,11 +199,11 @@ class _MemObjMixin(object):
 
 
 class _BaseGroup(_MemObjMixin, Mapping):
-    """Implement the majority of the Group interface.
+    """
+    Implement the majority of the Group interface.
 
     Subclasses must setup the underlying storage in thier constructors, as well
     as implement `create_group` and `create_dataset`.
-
     """
 
     @property
@@ -349,7 +309,8 @@ class _BaseGroup(_MemObjMixin, Mapping):
 
 
 class MemGroup(_BaseGroup):
-    """In memory implementation of the :class:`h5py.Group`.
+    """
+    In memory implementation of the :class:`h5py.Group`.
 
     This class doubles as the memory implementation of :class:`h5py.File`,
     object, since the distinction between a file and a group for in-memory data
@@ -361,25 +322,6 @@ class MemGroup(_BaseGroup):
         Allow memh5 object to hold distributed datasets.
     comm : MPI.Comm, optional
         MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
-
-    Attributes
-    ----------
-    attrs
-    name
-    parent
-    file
-
-    Methods
-    -------
-    __getitem__
-    from_group
-    from_hdf5
-    to_hdf5
-    create_group
-    require_group
-    create_dataset
-    require_dataset
-
     """
 
     def __init__(self, distributed=False, comm=None):
@@ -392,8 +334,7 @@ class MemGroup(_BaseGroup):
     def mode(self):
         """String indicating if group is readonly ("r") or read-write ("r+").
 
-        :class:`MemGroup`s are always read-write.
-
+        :class:`MemGroup` is always read-write.
         """
         return "r+"
 
@@ -859,18 +800,6 @@ class MemDataset(_MemObjMixin):
 
     This is only an abstract base class. Use :class:`MemDatasetCommon` or
     :class:`MemDatasetDistributed`.
-
-    Attributes
-    ----------
-    attrs
-    name
-    parent
-    file
-
-    Methods
-    -------
-    view
-
     """
 
     def __init__(self, **kwargs):
@@ -952,20 +881,6 @@ class MemDatasetCommon(MemDataset):
         Shape of array to initialise.
     dtype : numpy dtype
         Type of array to create.
-
-    Attributes
-    ----------
-    common
-    distributed
-    data
-    local_data
-    shape
-    dtype
-
-    Methods
-    -------
-    from_numpy_array
-
     """
 
     def __init__(
@@ -1106,21 +1021,6 @@ class MemDatasetDistributed(MemDataset):
     comm : MPI.Comm, optional
         MPI communicator to distribute over. If :obj:`None` use
         :obj:`MPI.COMM_WORLD`.
-
-    Attributes
-    ----------
-    common
-    distributed
-    data
-    local_data
-    shape
-    global_shape
-    local_shape
-    local_offset
-    dtype
-    comm
-    distributed_axis
-
     """
 
     def __init__(
@@ -1297,33 +1197,6 @@ class MemDiskGroup(_BaseGroup):
     detect_subclass: boolean, optional
         If *data_group* is specified, whether to inspect for a
         '__memh5_subclass' attribute which specifies a subclass to return.
-
-
-    Attributes
-    ----------
-    attrs
-    name
-    parent
-    file
-    ondisk
-
-    Methods
-    -------
-    __getitem__
-    __delitem__
-    from_file
-    dataset_name_allowed
-    group_name_allowed
-    create_dataset
-    require_dataset
-    create_group
-    require_group
-    to_memory
-    to_disk
-    flush
-    close
-    save
-
     """
 
     def __init__(self, data_group=None, distributed=False, comm=None):
@@ -1845,21 +1718,6 @@ class BasicCont(MemDiskGroup):
     Parameters
     ----------
     Parameters are passed through to the base class constructor.
-
-    Attributes
-    ----------
-    index_map
-    history
-
-    Methods
-    -------
-    group_name_allowed
-    dataset_name_allowed
-    create_index_map
-    del_index_map
-    add_history
-    redistribute
-
     """
 
     def __init__(self, *args, **kwargs):

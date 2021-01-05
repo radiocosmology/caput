@@ -2,38 +2,18 @@
 Utilities for making MPI usage transparent.
 
 This module exposes much of the functionality of :mod:`mpi4py` but will still
-run in serial if mpi is not present on the system.  It is thus useful for
+run in serial if mpi is not present on the system. It is thus useful for
 writing code that can be run in either parallel or serial. Also it exposes all
 attributes of the :mod:`mpi4py.MPI` by the :class:`SelfWrapper` class for
-convenience (You can just use 'mpiutil.attr' instead of 'from mpi4py import MPI;
-MPI.attr').
+convenience. You can just use::
 
-Functions
-=========
+    mpiutil.attr
 
-.. autosummary::
-    :toctree: generated/
+instead of::
 
-   active_comm
-   active
-   close
-   partition_list
-   partition_list_mpi
-   mpilist
-   mpirange
-   barrier
-   bcast
-   parallel_map
-   typemap
-   split_m
-   split_all
-   split_local
-   gather_local
-   transpose_blocks
-   allocate_hdf5_dataset
-   lock_and_write_buffer
-   parallel_rows_write_hdf5
+    from mpi4py import MPI
 
+    MPI.attr
 """
 
 import logging
@@ -132,11 +112,11 @@ def close(aprocs):
 
 
 def partition_list(full_list, i, n, method="con"):
-    """Partition a list into `n` pieces. Return the `i`th partition."""
+    """Partition a list into `n` pieces. Return the `i` th partition."""
 
     def _partition(N, n, i):
-        ### If partiion `N` numbers into `n` pieces,
-        ### return the start and stop of the `i`th piece
+        # If partiion `N` numbers into `n` pieces,
+        # return the start and stop of the `i` th piece
         base = N // n
         rem = N % n
         num_lst = rem * [base + 1] + (n - rem) * [base]
@@ -327,7 +307,7 @@ def split_m(n, m):
 
     See Also
     --------
-    :fun:`split_all`, :fun:`split_local`
+    :func:`split_all`, :func:`split_local`
 
     """
     base = n // m
@@ -362,7 +342,7 @@ def split_all(n, comm=_comm):
 
     See Also
     --------
-    :fun:`split_m`, :fun:`split_local`
+    :func:`split_m`, :func:`split_local`
     """
 
     m = size if comm is None else comm.size
@@ -393,7 +373,7 @@ def split_local(n, comm=_comm):
 
     See Also
     --------
-    :fun:`split_all`, :fun:`split_local`
+    :func:`split_all`, :func:`split_local`
     """
 
     pse = split_all(n, comm=comm)

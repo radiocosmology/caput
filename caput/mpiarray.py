@@ -1,16 +1,6 @@
 """
 An array class for containing MPI distributed array.
 
-.. currentmodule:: caput.mpiarray
-
-Classes
-=======
-
-.. autosummary::
-    :toctree: generated/
-
-    MPIArray
-
 Examples
 ========
 
@@ -48,7 +38,7 @@ Global Slicing
 ==============
 
 The :class:`MPIArray` also supports slicing with the global index using the
-:attribute:`MPIArray.global_slice` property. This can be used for both fetching
+:py:attr:`.MPIArray.global_slice` property. This can be used for both fetching
 and assignment with global indices, supporting the basic slicing notation of
 `numpy`.
 
@@ -269,16 +259,6 @@ class MPIArray(np.ndarray):
         The view of the local numpy array.
     global_slice : object
         Return an objects that presents a view of the array with global slicing.
-
-    Methods
-    -------
-    wrap
-    redistribute
-    enumerate
-    from_hdf5
-    to_hdf5
-    transpose
-    reshape
     """
 
     @property
