@@ -80,10 +80,8 @@ autodoc_default_options = {
     "members": True,
     "show-inheritance": True,
 }
-# Make _autosummary files and include them
-import glob
 
-autosummary_generate = glob.glob("*.rst")
+autosummary_generate = True  # Make _autosummary files and include them
 autosummary_imported_members = False
 
 intersphinx_mapping = {"h5py": ("http://docs.h5py.org/en/latest/", None)}
