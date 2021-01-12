@@ -12,7 +12,7 @@
 # serve to show the default.
 
 
-import sys, os, re
+import os, re
 
 # Check if we are on readthedocs
 on_rtd = os.environ.get("READTHEDOCS", None) == "True"
