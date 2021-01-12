@@ -1,4 +1,17 @@
-"""Useful functions for radio interferometry."""
+"""
+Useful functions for radio interferometry.
+
+
+Coordinates
+===========
+- :py:meth:`sph_to_ground`
+- :py:meth:`ground_to_sph`
+- :py:meth:`project_distance`
+
+Interferometry
+==============
+- :py:meth:`fringestop_phase`
+"""
 
 
 import numpy as np

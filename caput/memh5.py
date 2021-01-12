@@ -25,6 +25,28 @@ creation with the `distributed=True` flag.
     lock up. This was when using macOS using `ompio` of OpenMPI 3.0.
     Switching to `romio` as the MPI-IO backend helped here, but please report
     any further issues.
+
+Basic Classes
+=============
+- :py:class:`ro_dict`
+- :py:class:`MemGroup`
+- :py:class:`MemAttrs`
+- :py:class:`MemDataset`
+- :py:class:`MemDatasetCommon`
+- :py:class:`MemDatasetDistributed`
+
+High Level Container
+====================
+- :py:class:`MemDiskGroup`
+- :py:class:`BasicCont`
+
+Utility Functions
+=================
+- :py:meth:`attrs2dict`
+- :py:meth:`is_group`
+- :py:meth:`get_h5py_File`
+- :py:meth:`copyattrs`
+- :py:meth:`deep_group_copy`
 """
 
 from collections.abc import Mapping

@@ -4,6 +4,17 @@ This module can:
 - Evaluate the typical window functions used
 - Evaluate a python model of the PFB
 - Calculate the decorrelation effect for signals offset by a known time delay.
+
+Window functions
+================
+- :py:meth:`sinc_window`
+- :py:meth:`sinc_hanning`
+- :py:meth:`sinc_hamming`
+
+PFB
+===
+- :py:meth:`pfb`
+- :py:meth:`decorrelation_ratio`
 """
 
 import numpy as np

@@ -9,6 +9,24 @@ data analysis tasks, as well as the pipeline manager which executes them.
 Pipelines are most easily executed using the script in `caput_pipeline.py`,
 which ships with :mod:`caput`.
 
+Flow control classes
+====================
+- :py:class:`Manager`
+- :py:class:`PipelineRuntimeError`
+- :py:class:`PipelineStopIteration`
+
+Task base classes
+=================
+- :py:class:`TaskBase`
+- :py:class:`SingleBase`
+- :py:class:`IterBase`
+- :py:class:`H5IOMixin`
+- :py:class:`BasicContMixin`
+- :py:class:`SingleH5Base`
+- :py:class:`IterH5Base`
+
+
+
 Examples
 ========
 

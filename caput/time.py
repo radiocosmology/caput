@@ -10,10 +10,26 @@ This module can:
 - Determine various local time standards (Local Stellar Angle and Day)
 - Generate a nice wrapper for Skyfield to ease the loading of required data.
 
+Time Utilities
+==============
+Time conversion routine which are location independent.
+
+- :py:meth:`unix_to_skyfield_time`
+- :py:meth:`datetime_to_unix`
+- :py:meth:`unix_to_datetime`
+- :py:meth:`datetime_to_timestr`
+- :py:meth:`timestr_to_datetime`
+- :py:meth:`unix_to_era`
+- :py:meth:`era_to_unix`
+- :py:meth:`ensure_unix`
+- :py:meth:`leap_seconds_between`
+- :py:meth:`time_of_day`
+- :py:meth:`naive_datetime_to_utc`
+
 Local Time Utilities
 ====================
 
-Routines which are location specific are grouped into a location aware class.
+Routines which are location specific are grouped into the location aware class :py:class:`Observer`.
 
 This class can be used to calculate Local Stellar Angle (LSA), and the Local
 Stellar Day (LSD). LSA is an equivalent to the Local Sidereal Time based around
@@ -38,6 +54,8 @@ Angle (`NFA Glossary`_).
 
 Skyfield Interface
 ==================
+
+- :py:class:`SkyfieldWrapper`
 
 This module provides an interface to Skyfield which stores the required datasets
 (timescale data and an ephemeris) in a fixed location. The location is
