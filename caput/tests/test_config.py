@@ -118,7 +118,7 @@ def test_no_line():
     dt.read_config(yaml_params)
 
     assert len(dt.dict_config) == 0
-    assert type(dt.dict_config) == dict
+    assert isinstance(dt.dict_config, dict)
 
     # Test with a non-empty dict
     yaml_str = yaml.dump({"dict_config": {"a": 3}})
@@ -126,5 +126,5 @@ def test_no_line():
     dt.read_config(yaml_params)
 
     assert len(dt.dict_config) == 1
-    assert type(dt.dict_config) == dict
+    assert isinstance(dt.dict_config, dict)
     assert dt.dict_config["a"] == 3

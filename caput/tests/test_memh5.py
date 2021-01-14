@@ -7,9 +7,10 @@ import os
 import glob
 import gc
 import json
+import warnings
+
 import numpy as np
 import h5py
-import warnings
 
 from caput import memh5
 
@@ -140,9 +141,9 @@ class TestH5Files(unittest.TestCase):
         self.assertEqual(set(f.keys()), set(m["/level1"]["/"].keys()))
         self.assertTrue(np.all(f["/level1/large"][:] == m["/level1/large"]))
         gf = f.create_group("/level1/level2/level3/")
-        df = gf.create_dataset("new", data=np.arange(5))
+        gf.create_dataset("new", data=np.arange(5))
         gm = m.create_group("/level1/level2/level3/")
-        dm = gm.create_dataset("new", data=np.arange(5))
+        gm.create_dataset("new", data=np.arange(5))
         self.assertTrue(
             np.all(
                 f["/level1/level2/level3/new"][:] == m["/level1/level2/level3/new"][:]
@@ -184,10 +185,10 @@ class TestMemDiskGroup(unittest.TestCase):
         # self.assertIsInstance(tsc3['dset'].parent, TempSubClass)
         tsc3.close()
 
-        with memh5.MemDiskGroup.from_file(self.fname, mode="r", ondisk=True) as tsc4:
+        with memh5.MemDiskGroup.from_file(self.fname, mode="r", ondisk=True):
             self.assertRaises(IOError, h5py.File, self.fname, "w")
 
-        with memh5.MemDiskGroup.from_file(self.fname, mode="r", ondisk=False) as tsc4:
+        with memh5.MemDiskGroup.from_file(self.fname, mode="r", ondisk=False):
             f = h5py.File(self.fname, "w")
             f.close()
 

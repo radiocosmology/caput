@@ -3,6 +3,7 @@
 import unittest
 import tempfile
 import os
+import pytest
 import shutil
 
 from caput import misc
@@ -43,7 +44,7 @@ class TestLock(unittest.TestCase):
         newfile_name = os.path.join(self.dir, base)
         lockfile_name = os.path.join(self.dir, "." + base + ".lock")
 
-        try:
+        with pytest.raises(RuntimeError):
             with misc.lock_file(newfile_name) as fname:
 
                 # Create a stub file
@@ -51,9 +52,6 @@ class TestLock(unittest.TestCase):
                     fh.write("hello")
 
                 raise RuntimeError("Test error")
-
-        except:
-            pass
 
         # Check that neither the file, nor its lock exists
         self.assertFalse(os.path.exists(newfile_name))
@@ -67,7 +65,7 @@ class TestLock(unittest.TestCase):
         lockfile_name = os.path.join(self.dir, "." + base + ".lock")
         tmpfile_name = os.path.join(self.dir, "." + base)
 
-        try:
+        with pytest.raises(RuntimeError):
             with misc.lock_file(newfile_name, preserve=True) as fname:
 
                 # Create a stub file
@@ -75,9 +73,6 @@ class TestLock(unittest.TestCase):
                     fh.write("hello")
 
                 raise RuntimeError("Test error")
-
-        except:
-            pass
 
         # Check that neither the file, nor its lock exists, but that the
         # temporary file does

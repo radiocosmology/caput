@@ -2,39 +2,28 @@
 
 Needs to be run on 1, 2 or 4 MPI processes.
 """
-from caput import mpiutil, mpiarray
-from caput.memh5 import MemGroup
-
-import pytest
 import glob
-import numpy as np
 import os
 
 from mpi4py import MPI
+import numpy as np
+import pytest
+
+from caput import mpiutil, mpiarray
+from caput.memh5 import MemGroup
+
 
 comm = MPI.COMM_WORLD
 
-len_axis = 8
-
-dset1 = np.arange(len_axis * len_axis * len_axis)
-dset1 = dset1.reshape((len_axis, len_axis, len_axis))
-
-dset2 = np.arange(len_axis * len_axis)
-dset2 = dset2.reshape((len_axis, len_axis))
-
-freqs = np.arange(len_axis)
-inputs = np.arange(len_axis)
-ra = np.arange(len_axis)
-
 
 @pytest.fixture(scope="module")
-def container_on_disk():
+def container_on_disk(datasets):
 
     fname = "tmp_test_memh5_select_parallel.h5"
 
     if comm.rank == 0:
-        m1 = mpiarray.MPIArray.wrap(dset1, axis=0, comm=MPI.COMM_SELF)
-        m2 = mpiarray.MPIArray.wrap(dset2, axis=0, comm=MPI.COMM_SELF)
+        m1 = mpiarray.MPIArray.wrap(datasets[0], axis=0, comm=MPI.COMM_SELF)
+        m2 = mpiarray.MPIArray.wrap(datasets[1], axis=0, comm=MPI.COMM_SELF)
         container = MemGroup(distributed=True, comm=MPI.COMM_SELF)
         container.create_dataset("dset1", data=m1, distributed=True)
         container.create_dataset("dset2", data=m2, distributed=True)
@@ -42,7 +31,7 @@ def container_on_disk():
 
     comm.Barrier()
 
-    yield fname
+    yield fname, datasets
 
     comm.Barrier()
 
@@ -65,13 +54,13 @@ def test_H5FileSelect_distributed(container_on_disk, fsel, isel):
     assert 4 % comm.size == 0
 
     m = MemGroup.from_hdf5(
-        container_on_disk, selections=sel, distributed=True, comm=comm
+        container_on_disk[0], selections=sel, distributed=True, comm=comm
     )
 
-    d1 = dset1[(fsel, isel, slice(None))]
-    d2 = dset2[(fsel, slice(None))]
+    d1 = container_on_disk[1][0][(fsel, isel, slice(None))]
+    d2 = container_on_disk[1][1][(fsel, slice(None))]
 
-    n, s, e = mpiutil.split_local(d1.shape[0], comm=comm)
+    _, s, e = mpiutil.split_local(d1.shape[0], comm=comm)
 
     dslice = slice(s, e)
 

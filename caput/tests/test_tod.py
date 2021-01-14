@@ -1,13 +1,10 @@
 """Unit tests for the tod module."""
 
-
 import unittest
 
 import numpy as np
 
-# import h5py
-
-from caput import tod, memh5
+from caput import tod
 
 
 class TestConcatenation(unittest.TestCase):

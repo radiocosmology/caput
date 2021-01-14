@@ -90,7 +90,7 @@ class TOData(memh5.BasicCont):
         return time
 
 
-class Reader(object):
+class Reader:
     """Provides high level reading of time ordered data.
 
     Parses and stores meta-data from file headers allowing for the
@@ -493,15 +493,14 @@ def concatenate(
                 # numpy treat differently.
                 # Drop down to low level interface. I think this is only
                 # nessisary for pretty old h5py.
-                from h5py import h5t
-                from h5py._hl import selections
-
-                mtype = h5t.py_create(out_dtype)
+                mtype = h5py.h5t.py_create(out_dtype)
                 mdata = dataset.copy().flat[:]
-                mspace = selections.SimpleSelection(
+                mspace = h5py._hl.selections.SimpleSelection(
                     (mdata.size // out_dtype.itemsize,)
                 ).id
-                fspace = selections.select(out_dset.shape, out_slice, out_dset.id).id
+                fspace = h5py._hl.selections.select(
+                    out_dset.shape, out_slice, out_dset.id
+                ).id
                 out_dset.id.write(mspace, fspace, mdata, mtype)
             else:
                 out_dset[out_slice] = dataset[:]

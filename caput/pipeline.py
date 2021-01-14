@@ -346,7 +346,6 @@ import os
 import queue
 import warnings
 from copy import deepcopy
-from os import path
 
 import yaml
 
@@ -376,7 +375,7 @@ class PipelineConfigError(config.CaputConfigError):
             DeprecationWarning,
             2,
         )
-        super(PipelineConfigError, self).__init__(message)
+        super().__init__(message)
 
 
 class PipelineRuntimeError(Exception):
@@ -494,6 +493,8 @@ class Manager(config.Reader):
     def __init__(self):
         # Initialise the list of task instances
         self.tasks = []
+        self.all_params = []
+        self.all_tasks_params = []
 
     @classmethod
     def from_yaml_file(cls, file_name, lint=False):
@@ -547,11 +548,11 @@ class Manager(config.Reader):
                     ),
                     location=yaml_params,
                 )
-        except TypeError:
+        except TypeError as e:
             raise config.CaputConfigError(
                 "Couldn't find key 'pipeline' in YAML configuration document.",
                 location=yaml_params,
-            )
+            ) from e
         self = cls.from_config(yaml_params["pipeline"])
         self.all_params = yaml_params
         self.all_tasks_params = {
@@ -618,7 +619,7 @@ class Manager(config.Reader):
                 elif len(out_keys) == 0:  # Output not handled by pipeline.
                     continue
                 elif len(out_keys) == 1:
-                    if type(out_keys) is tuple:
+                    if isinstance(out_keys, tuple):
                         # In config file, written as `out: out_key`. No
                         # unpacking if `out` is a length 1 sequence.
                         out = (out,)
@@ -642,7 +643,7 @@ class Manager(config.Reader):
     def _setup_tasks(self):
         """Create and setup all tasks from the task list."""
 
-        all_out_values = set([t.get("out", None) for t in self.task_specs])
+        all_out_values = {t.get("out", None) for t in self.task_specs}
 
         # Setup all tasks in the task listk
         for ii, task_spec in enumerate(self.task_specs):
@@ -693,8 +694,8 @@ class Manager(config.Reader):
         # 'type' is a required key.
         try:
             task_path = task_spec["type"]
-        except KeyError:
-            raise config.CaputConfigError("'type' not specified for task.")
+        except KeyError as e:
+            raise config.CaputConfigError("'type' not specified for task.") from e
 
         # Find the tasks class either in the local set, or by importing a fully
         # qualified class name
@@ -732,9 +733,9 @@ class Manager(config.Reader):
                 for param_key in param_keys:
                     try:
                         params.update(self.all_params[param_key])
-                    except KeyError:
+                    except KeyError as e:
                         msg = "Parameter group %s not found in config." % param_key
-                        raise config.CaputConfigError(msg)
+                        raise config.CaputConfigError(msg) from e
 
         # add global params to params
         task_params = deepcopy(self.all_tasks_params)
@@ -780,7 +781,7 @@ class Manager(config.Reader):
             raise config.CaputConfigError(msg) from e
 
         self.tasks.append(task)
-        logger.debug("Added {} to task list.".format(task.__class__.__name__))
+        logger.debug(f"Added {task.__class__.__name__} to task list.")
 
 
 # Pipeline Task Base Classes
@@ -1009,30 +1010,28 @@ class TaskBase(config.Reader):
             for req in self._requires:
                 if req is None:
                     raise _PipelineMissingData()
-            else:
-                msg = "Task %s calling 'setup()'." % self.__class__.__name__
-                logger.debug(msg)
-                out = self.setup(*tuple(self._requires))
-                self._pipeline_advance_state()
-                return out
+            msg = "Task %s calling 'setup()'." % self.__class__.__name__
+            logger.debug(msg)
+            out = self.setup(*tuple(self._requires))
+            self._pipeline_advance_state()
+            return out
         elif self._pipeline_state == "next":
             # Check if we have all the required input data.
             for in_ in self._in:
                 if in_.empty():
                     raise _PipelineMissingData()
-            else:
-                # Get the next set of data to be run.
-                args = ()
-                for in_ in self._in:
-                    args += (in_.get(),)
-                try:
-                    msg = "Task %s calling 'next()'." % self.__class__.__name__
-                    logger.debug(msg)
-                    out = self.next(*args)
-                    return out
-                except PipelineStopIteration:
-                    # Finished iterating `next()`.
-                    self._pipeline_advance_state()
+            # Get the next set of data to be run.
+            args = ()
+            for in_ in self._in:
+                args += (in_.get(),)
+            try:
+                msg = "Task %s calling 'next()'." % self.__class__.__name__
+                logger.debug(msg)
+                out = self.next(*args)
+                return out
+            except PipelineStopIteration:
+                # Finished iterating `next()`.
+                self._pipeline_advance_state()
         elif self._pipeline_state == "finish":
             msg = "Task %s calling 'finish()'." % self.__class__.__name__
             logger.debug(msg)
@@ -1117,9 +1116,7 @@ class _OneAndOne(TaskBase):
         pro_argspec = inspect.getfullargspec(self.process)
         n_args = len(pro_argspec.args) - 1
         if n_args > 1:
-            msg = (
-                "`process` method takes more than 1 argument, which is not" " allowed."
-            )
+            msg = "`process` method takes more than 1 argument, which is not allowed."
             raise config.CaputConfigError(msg)
         if (
             pro_argspec.varargs
@@ -1168,29 +1165,27 @@ class _OneAndOne(TaskBase):
             if input_filename is None:
                 raise RuntimeError("No file to read from.")
             input_filename = self.input_root + input_filename
-            input_filename = path.expanduser(input_filename)
+            input_filename = os.path.expanduser(input_filename)
             logger.info(
-                "%s reading data from file %s."
-                % (self.__class__.__name__, input_filename)
+                "%s reading data from file %s.", self.__class__.__name__, input_filename
             )
             input = self.read_input(input_filename)
         # Analyse.
         if self._no_input:
-            if not input is None:
+            if input is not None:
                 # This should never happen.  Just here to catch bugs.
                 raise RuntimeError("Somehow `input` was set.")
             output = self.process()
         else:
             output = self.process(input)
         # Write output if needed.
-        if self.output_root != "None" and not output is None:
+        if self.output_root != "None" and output is not None:
             if output_filename is None:
                 raise RuntimeError("No file to write to.")
             output_filename = self.output_root + output_filename
-            output_filename = path.expanduser(output_filename)
+            output_filename = os.path.expanduser(output_filename)
             logger.info(
-                "%s writing data to file %s."
-                % (self.__class__.__name__, output_filename)
+                "%s writing data to file %s.", self.__class__.__name__, output_filename
             )
             output_dirname = os.path.dirname(output_filename)
             if not os.path.isdir(output_dirname):
@@ -1354,7 +1349,7 @@ class IterBase(_OneAndOne):
         return output
 
 
-class H5IOMixin(object):
+class H5IOMixin:
     """Provides hdf5 IO for pipeline tasks.
 
     As a mixin, this must be combined (using multiple inheritance) with a
@@ -1397,13 +1392,13 @@ class H5IOMixin(object):
         import h5py
 
         # Ensure parent directory is present.
-        dirname = path.dirname(filename)
-        if not path.isdir(dirname):
+        dirname = os.path.dirname(filename)
+        if not os.path.isdir(dirname):
             try:
                 os.makedirs(dirname)
             except OSError as e:
                 # It's possible the directory was created by another MPI task
-                if not path.isdir(dirname):
+                if not os.path.isdir(dirname):
                     raise e
         # Cases for `output` object type.
         if isinstance(output, memh5.MemGroup):
@@ -1414,7 +1409,9 @@ class H5IOMixin(object):
                 output.to_hdf5(fn, mode="w")
 
         elif isinstance(output, h5py.Group):
-            if path.isfile(filename) and path.samefile(output.file.filename, filename):
+            if os.path.isfile(filename) and os.path.samefile(
+                output.file.filename, filename
+            ):
                 # `output` already lives in this file.
                 output.flush()
             else:
@@ -1427,7 +1424,7 @@ class H5IOMixin(object):
                     out_copy.to_hdf5(fn, mode="w")
 
 
-class BasicContMixin(object):
+class BasicContMixin:
     """Provides IO for BasicCont objects in pipeline tasks.
 
     As a mixin, this must be combined (using multiple inheritance) with a
@@ -1473,13 +1470,13 @@ class BasicContMixin(object):
         from caput import memh5
 
         # Ensure parent directory is present.
-        dirname = path.dirname(filename)
-        if dirname != "" and not path.isdir(dirname):
+        dirname = os.path.dirname(filename)
+        if dirname != "" and not os.path.isdir(dirname):
             try:
                 os.makedirs(dirname)
             except OSError as e:
                 # It's possible the directory was created by another MPI task
-                if not path.isdir(dirname):
+                if not os.path.isdir(dirname):
                     raise e
         # Cases for `output` object type.
         if not isinstance(output, memh5.BasicCont):
@@ -1530,8 +1527,8 @@ class Input(TaskBase):
 
         try:
             return next(self._iter)
-        except StopIteration:
-            raise PipelineStopIteration()
+        except StopIteration as e:
+            raise PipelineStopIteration() from e
 
 
 class Output(TaskBase):

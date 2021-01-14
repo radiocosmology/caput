@@ -170,8 +170,6 @@ class TestMemDiskGroupDistributed(unittest.TestCase):
         # self.assertRaises(NotImplementedError, dg.to_disk, self.fname)
 
         # Test refusal to base off a h5py object when distributed
-        from caput import mpiutil
-
         with h5py.File(self.fname, "r") as f:
             if comm is not None:
                 self.assertRaises(

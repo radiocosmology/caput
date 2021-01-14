@@ -1,5 +1,4 @@
 import os
-import unittest
 import random
 import time
 from datetime import datetime
