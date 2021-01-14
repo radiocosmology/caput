@@ -60,7 +60,7 @@ from yaml.loader import SafeLoader
 logger = logging.getLogger(__name__)
 
 
-class Property(object):
+class Property:
     """Custom property descriptor that can load values from a given dict."""
 
     def __init__(self, default=None, proptype=None, key=None):
@@ -96,13 +96,12 @@ class Property(object):
         # If the value has not been set, return the default, otherwise return the actual value.
         if self.propname not in obj.__dict__:
             return self.proptype(self.default) if self.default is not None else None
-        else:
-            return obj.__dict__[self.propname]
+        return obj.__dict__[self.propname]
 
     def __set__(self, obj, val):
         # Object setter.
         if obj is None:
-            return None
+            return
 
         # Ensure the property name has been found and set
         self._set_propname(obj)
@@ -139,7 +138,7 @@ class Property(object):
                 raise CaputConfigError(
                     "Can't read value of '%s' as %s: %s" % (self.key, self.proptype, e),
                     location=config,
-                )
+                ) from e
             obj.__dict__[self.propname] = val
 
     def _set_propname(self, obj):
@@ -157,7 +156,7 @@ class Property(object):
                         self.propname = propname
 
 
-class Reader(object):
+class Reader:
     """A class that allows the values of Properties to be assigned from a dictionary."""
 
     @classmethod
@@ -198,10 +197,10 @@ class Reader(object):
         """
         import inspect
 
-        config_keys = [x for x in config.keys()]
+        config_keys = list(config.keys())
         prop_keys = []
         for basecls in inspect.getmro(type(self))[::-1]:
-            for propname, clsprop in basecls.__dict__.items():
+            for clsprop in basecls.__dict__.values():
                 if isinstance(clsprop, Property):
                     clsprop._from_config(self, config)
                     prop_keys.append(clsprop.key)
@@ -230,7 +229,6 @@ class Reader(object):
         To be overridden in subclasses if we need to perform some processing
         post configuration.
         """
-        pass
 
 
 def utc_time(default=None):
@@ -251,9 +249,10 @@ def utc_time(default=None):
 
     def _prop(val):
         # Include import here to get around circular import issues
-        from . import time
+        # pylint: disable=R0401
+        from .time import ensure_unix
 
-        return time.ensure_unix(val)
+        return ensure_unix(val)
 
     prop = Property(proptype=_prop, default=default)
 
@@ -279,7 +278,7 @@ def float_in_range(start, end, default=None):
     --------
     Should be used like::
 
-        class Position(object):
+        class Position:
 
             longitude = config.float_in_range(0.0, 360.0, default=90.0)
     """
@@ -322,7 +321,7 @@ def enum(options, default=None):
     --------
     Should be used like::
 
-        class Project(object):
+        class Project:
 
             mode = enum(['forward', 'backward'], default='forward')
     """
@@ -372,7 +371,7 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
     --------
     Should be used like::
 
-        class Project(object):
+        class Project:
 
             mode = list_type(int, length=2, default=[3, 4])
     """
@@ -414,14 +413,14 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
             raise ValueError(
                 "Default value %s does not satisfy property requirements: %s"
                 % (default, repr(e))
-            )
+            ) from e
 
     prop = Property(proptype=_prop, default=default)
 
     return prop
 
 
-def logging_config(default={}):
+def logging_config(default=None):
     """
     A Property type that validates the caput logging config.
 
@@ -442,18 +441,20 @@ def logging_config(default={}):
     --------
     Should be used like::
 
-        class Project(object):
+        class Project:
 
             loglevels = logging_config({"root": "INFO", "annoying.module": "WARNING"})
     """
+    if default is None:
+        default = {}
 
     def _prop(config):
         if isinstance(config, str):
             config = {"root": config}
         elif not isinstance(config, dict):
             raise ValueError(
-                "Expected a string or YAML block for config value 'logging', got "
-                "'{}'.".format(type(config.__name__))
+                f"Expected a string or YAML block for config value 'logging', got "
+                f"'{type(config.__name__)}'."
             )
 
         # check entries, get module names and warn for duplicates when sorting into new
@@ -465,16 +466,14 @@ def logging_config(default={}):
             level = level.upper()
             if level not in loglevels:
                 raise ValueError(
-                    "Expected one of {} for log level of {} (was {}).".format(
-                        loglevels, key, level
-                    )
+                    f"Expected one of {loglevels} for log level of {key} (was {level})."
                 )
 
             already_set_to = checked_config.get(key, None)
             if already_set_to is not None and already_set_to != level:
                 logger.warning(
-                    f"Setting log level for {key} to {level}, but is already set "
-                    f"to {already_set_to}. The old value will get ignored."
+                    f"Setting log level for {key} to {level}, but is already set to "
+                    f"{already_set_to}. The old value will get ignored."
                 )
             checked_config[key] = level
         return checked_config
@@ -499,7 +498,7 @@ class SafeLineLoader(SafeLoader):
     """
 
     def construct_mapping(self, node, deep=False):
-        mapping = super(SafeLineLoader, self).construct_mapping(node, deep=deep)
+        mapping = super().construct_mapping(node, deep=deep)
         mapping = _line_dict(mapping)
 
         # Add 1 so numbering starts at 1
@@ -529,6 +528,7 @@ class CaputConfigError(Exception):
             self.line = location.__line__
         else:
             self.line = None
+        super().__init__(message)
 
     def __str__(self):
         location = ""

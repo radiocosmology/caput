@@ -46,13 +46,13 @@ try:
     if _comm is not None and size > 1:
         logger.debug("Starting MPI rank=%i [size=%i]", rank, size)
 
-    rank0 = True if rank == 0 else False
+    rank0 = rank == 0
 
-    def mpi_excepthook(type, value, traceback):
+    def mpi_excepthook(exc_type, exc_obj, exc_tb):
 
         # Run the standard exception handler, but try to ensure the output if flushed out before
         # aborting
-        sys.__excepthook__(type, value, traceback)
+        sys.__excepthook__(exc_type, exc_obj, exc_tb)
         sys.stdout.flush()
         sys.stderr.flush()
         time.sleep(5)
@@ -66,7 +66,7 @@ except ImportError:
     warnings.warn("Warning: mpi4py not installed.", ImportWarning)
 
 
-class _close_message(object):
+class _close_message:
     def __repr__(self):
         return "<Close message>"
 
@@ -484,11 +484,11 @@ def transpose_blocks(row_array, shape, comm=_comm):
     nc = shape[-1]
     nm = 1 if len(shape) <= 2 else np.prod(shape[1:-1])
 
-    pr, sr, er = split_local(nr, comm=comm) * nm
-    pc, sc, ec = split_local(nc, comm=comm)
+    pr, _, _ = split_local(nr, comm=comm) * nm
+    pc, _, _ = split_local(nc, comm=comm)
 
-    par, sar, ear = split_all(nr, comm=comm) * nm
-    pac, sac, eac = split_all(nc, comm=comm)
+    _, sar, ear = split_all(nr, comm=comm) * nm
+    _, sac, eac = split_all(nc, comm=comm)
 
     row_array = row_array[:nr, ..., :nc].reshape(pr, nc)
 
@@ -545,8 +545,7 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
         if stat.error != MPI.SUCCESS:
             logger.error(
-                "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****"
-                % (ir, ic, comm.rank)
+                "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****", ir, ic, comm.rank
             )
 
     comm.Barrier()
@@ -560,8 +559,7 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
         if stat.error != MPI.SUCCESS:
             logger.error(
-                "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****"
-                % (ir, ir, comm.rank)
+                "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****", ir, ir, comm.rank
             )
 
     return recv_buffer.reshape(shape[:-1] + (pc,))
@@ -651,7 +649,7 @@ def lock_and_write_buffer(obj, fname, offset, size):
     if len(buf) > size:
         raise Exception("Size doesn't match array length.")
 
-    fd = os.open(fname, os.O_RDRW | os.O_CREAT)
+    fd = os.open(fname, os.O_RDWR | os.O_CREAT)
 
     fcntl.lockf(fd, fcntl.LOCK_EX, size, offset, os.SEEK_SET)
 
@@ -668,20 +666,21 @@ def lock_and_write_buffer(obj, fname, offset, size):
 def parallel_rows_write_hdf5(fname, dsetname, local_data, shape, comm=_comm):
     """Write out array (distributed across processes row wise) into a HDF5 in parallel."""
 
-    offset, size = allocate_hdf5_dataset(
+    offset, _ = allocate_hdf5_dataset(
         fname, dsetname, shape, local_data.dtype, comm=comm
     )
 
-    lr, sr, er = split_local(shape[0], comm=comm)
+    lr, sr, _ = split_local(shape[0], comm=comm)
 
     nc = np.prod(shape[1:])
 
     lock_and_write_buffer(local_data, fname, offset + sr * nc, lr * nc)
 
 
-# this is a thin wrapper around THIS module (we patch sys.modules[__name__])
 class SelfWrapper(ModuleType):
-    def __init__(self, self_module, baked_args={}):
+    """A thin wrapper around THIS module (`we patch sys.modules[__name__]`)."""
+
+    def __init__(self, self_module, baked_args=None):
         for attr in [
             "__file__",
             "__hash__",

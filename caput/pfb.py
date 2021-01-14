@@ -78,7 +78,7 @@ def sinc_hamming(ntap, lblock):
     return sinc_window(ntap, lblock) * np.hamming(ntap * lblock)
 
 
-class PFB(object):
+class PFB:
     """Model for the CASPER PFB.
 
     This is the PFB used in CHIME and other experiments.
@@ -123,7 +123,7 @@ class PFB(object):
         nblock = timestream.size // self.lblock - (self.ntap - 1)
 
         # Initialise array for spectrum
-        spec = np.zeros((self.nblock, self.lblock // 2), dtype=np.complex128)
+        spec = np.zeros((nblock, self.lblock // 2), dtype=np.complex128)
 
         # Window function
         w = self.window(self.ntap, self.lblock)

@@ -1,7 +1,6 @@
 """A set of miscellaneous routines that don't really fit anywhere more specific."""
 
 
-import collections
 import importlib
 import os
 
@@ -25,7 +24,7 @@ def vectorize(**base_kwargs):
     vectorized_function : func
     """
 
-    class _vectorize_desc(object):
+    class _vectorize_desc:
         # See
         # http://www.ianbicking.org/blog/2008/10/decorators-and-descriptors.html
         # for a description of this pattern
@@ -42,7 +41,7 @@ def vectorize(**base_kwargs):
             # This gets called whenever the wrapped function is invoked
             arr = np.vectorize(self.func, **base_kwargs)(*args, **kwargs)
 
-            if not len(arr.shape):
+            if not arr.shape:
                 arr = arr.item()
 
             return arr
@@ -74,7 +73,7 @@ def scalarize(dtype=np.float64):
     vectorized_function : func
     """
 
-    class _scalarize_desc(object):
+    class _scalarize_desc:
         # See
         # http://www.ianbicking.org/blog/2008/10/decorators-and-descriptors.html
         # for a description of this pattern
@@ -102,7 +101,8 @@ def scalarize(dtype=np.float64):
 
             return ret
 
-        def _make_array(self, x):
+        @staticmethod
+        def _make_array(x):
             # Change iterables to arrays and scalars into length-1 arrays
 
             from skyfield import timelib
@@ -153,7 +153,7 @@ def listize(**base_kwargs):
     listized_function : func
     """
 
-    class _listize_desc(object):
+    class _listize_desc:
         def __init__(self, func):
             # Save a reference to the function and set various properties so the
             # docstrings etc. get passed through
@@ -239,7 +239,7 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
     return fh
 
 
-class lock_file(object):
+class lock_file:
     """Manage a lock file around a file creation operation.
 
     Parameters
@@ -268,8 +268,6 @@ class lock_file(object):
     """
 
     def __init__(self, name, preserve=False, comm=None):
-
-        from . import mpiutil
 
         if comm is not None and not hasattr(comm, "rank"):
             raise ValueError("comm argument does not seem to be an MPI communicator.")
@@ -307,11 +305,13 @@ class lock_file(object):
 
     @property
     def tmpfile(self):
+        """Full path to the lockfile (without file extension)."""
         base, fname = os.path.split(self.name)
         return os.path.join(base, "." + fname)
 
     @property
     def lockfile(self):
+        """Full path to the lockfile (with file extension)."""
         return self.tmpfile + ".lock"
 
 

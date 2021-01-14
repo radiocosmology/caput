@@ -51,7 +51,6 @@ Utility Functions
 
 from collections.abc import Mapping
 import datetime
-import sys
 import warnings
 import posixpath
 from ast import literal_eval
@@ -105,24 +104,41 @@ class ro_dict(Mapping):
     def __iter__(self):
         return self._dict.__iter__()
 
+    def __eq__(self, other):
+        if not isinstance(other, ro_dict):
+            return False
+        return Mapping.__eq__(self, other) and self._dict == other._dict
+
 
 class _Storage(dict):
     """Underlying container that provides storage backing for in-memory groups."""
 
     def __init__(self, **kwargs):
-        super(_Storage, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._attrs = MemAttrs()
 
     @property
     def attrs(self):
+        """
+        Attributes attached to this object.
+
+        Returns
+        -------
+        attrs : MemAttrs
+        """
         return self._attrs
+
+    def __eq__(self, other):
+        if not isinstance(other, _Storage):
+            return False
+        return dict.__eq__(self, other) and self._attrs == other._attrs
 
 
 class _StorageRoot(_Storage):
     """Root level of the storage tree."""
 
     def __init__(self, distributed=False, comm=None):
-        super(_StorageRoot, self).__init__()
+        super().__init__()
 
         if distributed and comm is None:
             logger.debug(
@@ -135,6 +151,7 @@ class _StorageRoot(_Storage):
 
     @property
     def comm(self):
+        """Reference to the MPI communicator."""
         return self._comm
 
     @property
@@ -145,7 +162,7 @@ class _StorageRoot(_Storage):
         """Implements Hierarchical path lookup."""
 
         if "/" not in key:
-            return super(_StorageRoot, self).__getitem__(key)
+            return super().__getitem__(key)
 
         # Format and split the path.
         key = format_abs_path(key)
@@ -160,6 +177,15 @@ class _StorageRoot(_Storage):
             out = out[part]
         return out
 
+    def __eq__(self, other):
+        if not isinstance(other, _StorageRoot):
+            return False
+        return (
+            _Storage.__eq__(self, other)
+            and self._comm == other._comm
+            and self._distributed == other._distributed
+        )
+
 
 class MemAttrs(dict):
     """
@@ -171,7 +197,7 @@ class MemAttrs(dict):
     pass
 
 
-class _MemObjMixin(object):
+class _MemObjMixin:
     """
     Mixin represents the identity of an in-memory h5py-like object.
 
@@ -186,7 +212,6 @@ class _MemObjMixin(object):
     # Here I have to implement __new__ not __init__ since MemDiskGroup
     # implements new and messes with parameters.
     def __init__(self, storage_root=None, name=""):
-        super(_MemObjMixin, self).__init__()
         self._storage_root = storage_root
         if storage_root is not None and not posixpath.isabs(name):
             # Should never happen, so this is mostly for debugging.
@@ -201,7 +226,7 @@ class _MemObjMixin(object):
     @property
     def parent(self):
         """Parent :class:`MemGroup` that contains this group."""
-        parent_name, myname = posixpath.split(self.name)
+        parent_name, _ = posixpath.split(self.name)
         return self._group_class._from_storage_root(self._storage_root, parent_name)
 
     @property
@@ -243,12 +268,12 @@ class _BaseGroup(_MemObjMixin, Mapping):
 
     @property
     def attrs(self):
-        """Attributes attached to this object.
+        """
+        Attributes attached to this object.
 
         Returns
         -------
         attrs : MemAttrs
-
         """
         return self._get_storage().attrs
 
@@ -350,7 +375,7 @@ class MemGroup(_BaseGroup):
         # Default constructor is only used to create the root group.
         storage_root = _StorageRoot(distributed=distributed, comm=comm)
         name = "/"
-        super(MemGroup, self).__init__(storage_root, name)
+        super().__init__(storage_root, name)
 
     @property
     def mode(self):
@@ -746,8 +771,11 @@ class MemGroup(_BaseGroup):
 
         dset_shape = dset.shape
         dset_type = dset.dtype
+        dset_chunks = dset.chunks
+        dset_compression = dset.compression
+        dset_compression_opts = dset.compression_opts
         dist_len = dset_shape[distributed_axis]
-        ld, sd, ed = mpiutil.split_local(dist_len, comm=self.comm)
+        _, sd, ed = mpiutil.split_local(dist_len, comm=self.comm)
         md = mpiarray.MPIArray(
             dset_shape, axis=distributed_axis, comm=self.comm, dtype=dset_type
         )
@@ -759,9 +787,9 @@ class MemGroup(_BaseGroup):
             name,
             shape=dset_shape,
             dtype=dset_type,
-            chunks=dset.chunks,
-            compression=dset.compression,
-            compression_opts=dset.compression_opts,
+            chunks=dset_chunks,
+            compression=dset_compression,
+            compression_opts=dset_compression_opts,
             data=md,
             distributed=True,
             distributed_axis=distributed_axis,
@@ -792,6 +820,9 @@ class MemGroup(_BaseGroup):
 
         dset_shape = dset.shape
         dset_type = dset.dtype
+        dset_chunks = dset.chunks
+        dset_compression = dset.compression
+        dset_compression_opts = dset.compression_opts
         global_array = np.zeros(dset_shape, dtype=dset_type)
         local_start = dset.local_offset
         nproc = 1 if self.comm is None else self.comm.size
@@ -808,9 +839,9 @@ class MemGroup(_BaseGroup):
             data=global_array,
             shape=dset_shape,
             dtype=dset_type,
-            chunks=dset.chunks,
-            compression=dset.compression,
-            compression_opts=dset.compression_opts,
+            chunks=dset_chunks,
+            compression=dset_compression,
+            compression_opts=dset_compression_opts,
         )
         copyattrs(attr_dict, new_dset.attrs)
 
@@ -825,7 +856,7 @@ class MemDataset(_MemObjMixin):
     """
 
     def __init__(self, **kwargs):
-        super(MemDataset, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self._attrs = MemAttrs()
 
     @property
@@ -888,6 +919,11 @@ class MemDataset(_MemObjMixin):
     def __len__(self):
         raise NotImplementedError("Not implemented in base class.")
 
+    def __eq__(self, other):
+        if not isinstance(other, MemDataset):
+            return False
+        return _MemObjMixin.__eq__(self, other) and self._attrs == other._attrs
+
 
 class MemDatasetCommon(MemDataset):
     """In memory implementation of :class:`h5py.Dataset`.
@@ -914,7 +950,7 @@ class MemDatasetCommon(MemDataset):
         compression_opts=None,
         **kwargs
     ):
-        super(MemDatasetCommon, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._data = np.zeros(shape, dtype)
         self._chunks = chunks
@@ -952,6 +988,7 @@ class MemDatasetCommon(MemDataset):
 
     @property
     def comm(self):
+        """Reference to the MPI communicator."""
         return None
 
     @property
@@ -1023,6 +1060,17 @@ class MemDatasetCommon(MemDataset):
             repr(self.dtype),
         )
 
+    def __eq__(self, other):
+        if not isinstance(other, MemDatasetCommon):
+            return False
+        return (
+            MemDataset.__eq__(self, other)
+            and self._data == other._data
+            and self._chunks == other._chunks
+            and self._compression == other._compression
+            and self._compression_opts == other._compression_opts
+        )
+
 
 class MemDatasetDistributed(MemDataset):
     """Parallel, in-memory implementation of :class:`h5py.Dataset`.
@@ -1056,7 +1104,7 @@ class MemDatasetDistributed(MemDataset):
         compression_opts=None,
         **kwargs
     ):
-        super(MemDatasetDistributed, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self._data = mpiarray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
         self._chunks = chunks
@@ -1145,6 +1193,7 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def comm(self):
+        """Reference to the MPI communicator."""
         return self._data._comm
 
     def redistribute(self, axis):
@@ -1180,6 +1229,17 @@ class MemDatasetDistributed(MemDataset):
                 repr(self.distributed_axis),
                 repr(self.dtype),
             )
+        )
+
+    def __eq__(self, other):
+        if not isinstance(other, MemDatasetDistributed):
+            return False
+        return (
+            MemDataset.__eq__(self, other)
+            and self._data == other._data
+            and self._chunks == other._chunks
+            and self._compression == other._compression
+            and self._compression_opts == other._compression_opts
         )
 
 
@@ -1228,14 +1288,11 @@ class MemDiskGroup(_BaseGroup):
         if comm is None:
             comm = mpiutil.world
 
-        if comm is None:
-            if distributed:
-                warnings.warn(
-                    "Cannot create distributed MemDiskGroup when there is no MPI communicator!!"
-                )
+        if distributed and comm is None:
+            warnings.warn(
+                "Cannot create distributed MemDiskGroup when there is no MPI communicator!!"
+            )
             distributed = False
-        else:
-            distributed = distributed
 
         # If data group is not set, initialise a new MemGroup
         if data_group is None:
@@ -1266,9 +1323,7 @@ class MemDiskGroup(_BaseGroup):
                 )
 
         self._toclose = toclose
-        super(MemDiskGroup, self).__init__(
-            storage_root=data_group, name=data_group.name
-        )
+        super().__init__(storage_root=data_group, name=data_group.name)
 
     def __enter__(self):
         return self
@@ -1352,7 +1407,7 @@ class MemDiskGroup(_BaseGroup):
         The *name* may be a relative or absolute path
         """
 
-        value = super(MemDiskGroup, self).__getitem__(name)
+        value = super().__getitem__(name)
         path = value.name
         if is_group(value):
             if not self.group_name_allowed(path):
@@ -1366,12 +1421,12 @@ class MemDiskGroup(_BaseGroup):
 
     def __len__(self):
         n = 0
-        for key in self:
+        for _ in self:
             n += 1
         return n
 
     def __iter__(self):
-        for key in super(MemDiskGroup, self).__iter__():
+        for key in super().__iter__():
             try:
                 _ = self[key]
             except KeyError:
@@ -1650,7 +1705,7 @@ class MemDiskGroup(_BaseGroup):
         """Return a version of this data that lives on disk."""
 
         if not isinstance(self._data, MemGroup):
-            msg = "This data already lives on disk.  Copying to new file" " anyway."
+            msg = "This data already lives on disk.  Copying to new file anyway."
             warnings.warn(msg)
         elif self._data.distributed:
             raise NotImplementedError(
@@ -1659,12 +1714,6 @@ class MemDiskGroup(_BaseGroup):
 
         self.save(filename)
         return self.__class__.from_file(filename, ondisk=True, **kwargs)
-
-    def close(self):
-        """Close underlying hdf5 file if on disk."""
-
-        if self.ondisk:
-            self._data.close()
 
     def flush(self):
         """Flush the buffers of the underlying hdf5 file if on disk."""
@@ -1743,7 +1792,7 @@ class BasicCont(MemDiskGroup):
     """
 
     def __init__(self, *args, **kwargs):
-        super(BasicCont, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # Initialize new groups only if writable.
         if self._data.file.mode == "r+":
             self._data.require_group("history")
@@ -1844,7 +1893,7 @@ class BasicCont(MemDiskGroup):
         """
 
         parent_name, name = posixpath.split(name)
-        return True if parent_name == "/" else False
+        return parent_name == "/"
 
     def create_index_map(self, axis_name, index_map):
         """Create a new index map."""
@@ -2080,20 +2129,20 @@ def copyattrs(a1, a2, convert_strings=False):
               those to lists and decode byte objects.
             """
 
-            def default(self, v):
-                if isinstance(v, datetime.datetime):
-                    return v.isoformat()
-                elif isinstance(v, np.number):
-                    return v.data
-                elif isinstance(v, np.ndarray):
-                    if len(v) == 1:
-                        return v.tolist()[0]
-                    return v.tolist()
-                elif isinstance(v, bytes):  # pragma: py3
-                    return v.decode()
+            def default(self, o):
+                if isinstance(o, datetime.datetime):
+                    return o.isoformat()
+                elif isinstance(o, np.number):
+                    return o.data
+                elif isinstance(o, np.ndarray):
+                    if len(o) == 1:
+                        return o.tolist()[0]
+                    return o.tolist()
+                elif isinstance(o, bytes):  # pragma: py3
+                    return o.decode()
 
                 # Let the default method raise the TypeError
-                return json.JSONEncoder.default(self, v)
+                return json.JSONEncoder.default(self, o)
 
         if isinstance(value, dict) and isinstance(a2, h5py.AttributeManager):
             # Save to JSON converting datetimes.
@@ -2473,7 +2522,7 @@ def _distributed_group_from_hdf5(
     def _copy_attrs_bcast(h5item, memitem, **kwargs):
         attr_dict = None
         if comm.rank == 0:
-            attr_dict = {k: v for k, v in h5item.attrs.items()}
+            attr_dict = dict(h5item.attrs)
         attr_dict = comm.bcast(attr_dict, root=0)
         copyattrs(attr_dict, memitem.attrs, **kwargs)
 

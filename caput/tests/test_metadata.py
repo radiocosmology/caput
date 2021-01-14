@@ -1,9 +1,8 @@
 import unittest
+import yaml
 
 import numpy
 import caput
-import yaml
-from caput import pipeline
 
 
 class TestConfig(unittest.TestCase):
@@ -13,7 +12,7 @@ class TestConfig(unittest.TestCase):
             bla: "foo"
         """
 
-        man = pipeline.Manager.from_yaml_str(testconfig)
+        man = caput.pipeline.Manager.from_yaml_str(testconfig)
 
         self.assertIn("versions", man.all_tasks_params)
         self.assertIn("pipeline_config", man.all_tasks_params)
@@ -36,7 +35,7 @@ class TestConfig(unittest.TestCase):
             bla: "foo"
         """
 
-        man = pipeline.Manager.from_yaml_str(testconfig)
+        man = caput.pipeline.Manager.from_yaml_str(testconfig)
 
         self.assertIn("versions", man.all_tasks_params)
         self.assertIn("pipeline_config", man.all_tasks_params)
@@ -60,7 +59,7 @@ class TestConfig(unittest.TestCase):
             save_config: False
         """
 
-        man = pipeline.Manager.from_yaml_str(testconfig)
+        man = caput.pipeline.Manager.from_yaml_str(testconfig)
 
         self.assertIn("versions", man.all_tasks_params)
         self.assertIn("pipeline_config", man.all_tasks_params)
