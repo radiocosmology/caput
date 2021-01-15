@@ -1,10 +1,11 @@
-import unittest
-
 import pickle
+
+import pytest
 
 from caput import config
 
 
+### Test classes
 class Person(config.Reader):
     name = config.Property(default="Bill", proptype=str)
     age = config.Property(default=26, proptype=float, key="ageinyears")
@@ -21,73 +22,79 @@ class ListTypeTests(Person):
     list_type = config.list_type(type_=int)
 
 
-class TestConfig(unittest.TestCase):
+### Test data dict
+testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
-    testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
-    def test_default_params(self):
+### Tests
+def test_default_params():
 
-        person1 = Person()
+    person1 = Person()
 
-        self.assertEqual(person1.name, "Bill")
-        self.assertEqual(person1.age, 26.0)
-        self.assertIsInstance(person1.age, float)
+    assert person1.name == "Bill"
+    assert person1.age == 26.0
+    assert isinstance(person1.age, float)
 
-    def test_set_params(self):
 
-        person = Person()
-        person.name = "Mick"
+def test_set_params():
 
-        self.assertEqual(person.name, "Mick")
+    person = Person()
+    person.name = "Mick"
 
-    def test_read_config(self):
+    assert person.name == "Mick"
 
-        person = Person()
-        person.read_config(self.testdict)
 
-        self.assertEqual(person.name, "Richard")
-        self.assertEqual(person.age, 40.0)
+def test_read_config():
 
-    def test_inherit_read_config(self):
+    person = Person()
+    person.read_config(testdict)
 
-        person = PersonWithPet()
-        person.read_config(self.testdict)
+    assert person.name == "Richard"
+    assert person.age == 40.0
 
-        self.assertEqual(person.name, "Richard")
-        self.assertEqual(person.age, 40.0)
-        self.assertEqual(person.petname, "Sooty")
 
-    def test_pickle(self):
+def test_inherit_read_config():
 
-        person = PersonWithPet()
-        person.read_config(self.testdict)
-        person2 = pickle.loads(pickle.dumps(person))
+    person = PersonWithPet()
+    person.read_config(testdict)
 
-        self.assertEqual(person2.name, "Richard")
-        self.assertEqual(person2.age, 40.0)
-        self.assertEqual(person2.petname, "Sooty")
+    assert person.name == "Richard"
+    assert person.age == 40.0
+    assert person.petname == "Sooty"
 
-    def test_list_type(self):
 
-        lt = ListTypeTests()
+def test_pickle():
 
-        with self.assertRaises(config.CaputConfigError):
-            lt.read_config({"list_max_length": [1, 3, 4]})
+    person = PersonWithPet()
+    person.read_config(testdict)
+    person2 = pickle.loads(pickle.dumps(person))
 
-        # Should work fine
-        lt = ListTypeTests()
-        lt.read_config({"list_max_length": [1, 2]})
+    assert person2.name == "Richard"
+    assert person2.age == 40.0
+    assert person2.petname == "Sooty"
 
-        with self.assertRaises(config.CaputConfigError):
-            lt.read_config({"list_exact_length": [3]})
 
-        # Work should fine
-        lt = ListTypeTests()
-        lt.read_config({"list_exact_length": [1, 2]})
+def test_list_type():
 
-        with self.assertRaises(config.CaputConfigError):
-            lt.read_config({"list_type": ["hello"]})
+    lt = ListTypeTests()
 
-        # Work should fine
-        lt = ListTypeTests()
-        lt.read_config({"list_type": [1, 2]})
+    with pytest.raises(config.CaputConfigError):
+        lt.read_config({"list_max_length": [1, 3, 4]})
+
+    # Should work fine
+    lt = ListTypeTests()
+    lt.read_config({"list_max_length": [1, 2]})
+
+    with pytest.raises(config.CaputConfigError):
+        lt.read_config({"list_exact_length": [3]})
+
+    # Work should fine
+    lt = ListTypeTests()
+    lt.read_config({"list_exact_length": [1, 2]})
+
+    with pytest.raises(config.CaputConfigError):
+        lt.read_config({"list_type": ["hello"]})
+
+    # Work should fine
+    lt = ListTypeTests()
+    lt.read_config({"list_type": [1, 2]})
