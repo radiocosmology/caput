@@ -183,8 +183,10 @@ class Reader(object):
         config : dict
             Dictionary of configuration values.
         compare_keys : bool or list[str]
-            If True, a CaputConfigError is raised if there are unused keys in the config dictionary.
-            If a list of strings is given, any unused keys except the ones in the list lead to a CaputConfigError.
+            If True, a CaputConfigError is raised if there are unused keys in the
+            config dictionary.
+            If a list of strings is given, any unused keys except the ones in the
+            list lead to a CaputConfigError.
         use_defaults : bool
             If False, a CaputConfigError is raised if a property is not defined by
             the config dictionary
@@ -225,8 +227,8 @@ class Reader(object):
     def _finalise_config(self):
         """Finish up the configuration.
 
-        To be overriden in subclasses if we need to perform some processing
-        post configutation.
+        To be overridden in subclasses if we need to perform some processing
+        post configuration.
         """
         pass
 
@@ -423,8 +425,8 @@ def logging_config(default={}):
     """
     A Property type that validates the caput logging config.
 
-    Allows the type to be either a string (for backward compatibility) or a dict setting log levels
-    per module.
+    Allows the type to be either a string (for backward compatibility) or a dict
+    setting log levels per module.
 
     Parameters
     ----------
@@ -454,7 +456,8 @@ def logging_config(default={}):
                 "'{}'.".format(type(config.__name__))
             )
 
-        # check entries, get module names and warn for duplicates when sorting into new dict
+        # check entries, get module names and warn for duplicates when sorting into new
+        # dict
         checked_config = {}
         loglevels = ["DEBUG", "INFO", "WARNING", "ERROR", "NOTSET"]
         for key, level in config.items():
@@ -474,8 +477,8 @@ def logging_config(default={}):
             already_set_to = checked_config.get(key, None)
             if already_set_to is not None and already_set_to != level:
                 logger.warning(
-                    "Setting log level for {} to {}, but is already set to {}. The old value will "
-                    "get ignored.".format(key, level, already_set_to)
+                    f"Setting log level for {key} to {level}, but is already set "
+                    f"to {already_set_to}. The old value will get ignored."
                 )
             checked_config[key] = level
         return checked_config
@@ -489,7 +492,8 @@ class SafeLineLoader(SafeLoader):
     """
     YAML loader that tracks line numbers.
 
-    Adds the line number information to every YAML block. This is useful for debugging and to describe linting errors.
+    Adds the line number information to every YAML block. This is useful for
+    debugging and to describe linting errors.
     """
 
     def construct_mapping(self, node, deep=False):
@@ -510,8 +514,8 @@ class CaputConfigError(Exception):
     file_ : str
         Configuration file name (optional)
     location : dict
-        If using :class:`SafeLineLoader` is used, a dict created by that can be passed in here to report the line number
-        where the error occurred.
+        If using :class:`SafeLineLoader` is used, a dict created by that can be
+        passed in here to report the line number where the error occurred.
     """
 
     def __init__(self, message, file_=None, location=None):
