@@ -21,8 +21,6 @@ class TestConfig(unittest.TestCase):
         self.assertDictEqual(man.all_tasks_params["versions"], {})
         # remove line numbers
         pipeline_config = man.all_tasks_params["pipeline_config"]
-        del pipeline_config["__line__"]
-        del pipeline_config["pipeline"]["__line__"]
         self.assertDictEqual(
             pipeline_config,
             yaml.load(testconfig, Loader=yaml.SafeLoader),
@@ -50,8 +48,6 @@ class TestConfig(unittest.TestCase):
 
         # remove line numbers
         pipeline_config = man.all_tasks_params["pipeline_config"]
-        del pipeline_config["__line__"]
-        del pipeline_config["pipeline"]["__line__"]
         self.assertDictEqual(
             pipeline_config,
             yaml.load(testconfig, Loader=yaml.SafeLoader),
