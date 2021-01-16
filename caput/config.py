@@ -462,10 +462,6 @@ def logging_config(default={}):
         loglevels = ["DEBUG", "INFO", "WARNING", "ERROR", "NOTSET"]
         for key, level in config.items():
 
-            # ignore hint at yaml file line number
-            if key == "__line__":
-                continue
-
             level = level.upper()
             if level not in loglevels:
                 raise ValueError(
@@ -488,6 +484,12 @@ def logging_config(default={}):
     return prop
 
 
+class _line_dict(dict):
+    """A private dict subclass that also stores line numbers for debugging."""
+
+    __line__ = None
+
+
 class SafeLineLoader(SafeLoader):
     """
     YAML loader that tracks line numbers.
@@ -498,8 +500,10 @@ class SafeLineLoader(SafeLoader):
 
     def construct_mapping(self, node, deep=False):
         mapping = super(SafeLineLoader, self).construct_mapping(node, deep=deep)
+        mapping = _line_dict(mapping)
+
         # Add 1 so numbering starts at 1
-        mapping["__line__"] = node.start_mark.line + 1
+        mapping.__line__ = node.start_mark.line + 1
         return mapping
 
 
@@ -521,8 +525,8 @@ class CaputConfigError(Exception):
     def __init__(self, message, file_=None, location=None):
         self.message = message
         self.file = file_
-        if isinstance(location, dict):
-            self.line = location.get("__line__", None)
+        if isinstance(location, _line_dict):
+            self.line = location.__line__
         else:
             self.line = None
 

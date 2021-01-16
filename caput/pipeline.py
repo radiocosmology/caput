@@ -672,7 +672,7 @@ class Manager(config.Reader):
 
         # Check that only the expected keys are in the task spec.
         for key in task_spec.keys():
-            if key not in ["type", "params", "requires", "in", "out", "__line__"]:
+            if key not in ["type", "params", "requires", "in", "out"]:
                 raise config.CaputConfigError(
                     "Task got an unexpected key '{}' in 'tasks' list.".format(key)
                 )
@@ -882,9 +882,7 @@ class TaskBase(config.Reader):
     def _from_config(cls, config):
         self = cls.__new__(cls)
         # Check for unused keys, but ignore the ones not put there by the user.
-        self.read_config(
-            config, compare_keys=["versions", "pipeline_config", "__line__"]
-        )
+        self.read_config(config, compare_keys=["versions", "pipeline_config"])
         self.__init__()
         return self
 
