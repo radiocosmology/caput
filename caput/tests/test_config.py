@@ -1,6 +1,7 @@
 import pickle
 
 import pytest
+import yaml
 
 from caput import config
 
@@ -20,6 +21,10 @@ class ListTypeTests(Person):
     list_max_length = config.list_type(maxlength=2)
     list_exact_length = config.list_type(length=2)
     list_type = config.list_type(type_=int)
+
+
+class DictTypeTests(config.Reader):
+    dict_config = config.Property(proptype=dict)
 
 
 ### Test data dict
@@ -98,3 +103,28 @@ def test_list_type():
     # Work should fine
     lt = ListTypeTests()
     lt.read_config({"list_type": [1, 2]})
+
+
+def test_no_line():
+    # This tests that dicts get set as config parameters as expected, and covers a flaw
+    # in an earlier version of the linting code where `__line__` keys were getting
+    # inserted into dict types config properties
+
+    dt = DictTypeTests()
+
+    # Test with an empty dict
+    yaml_str = yaml.dump({"dict_config": {}})
+    yaml_params = yaml.load(yaml_str, Loader=config.SafeLineLoader)
+    dt.read_config(yaml_params)
+
+    assert len(dt.dict_config) == 0
+    assert type(dt.dict_config) == dict
+
+    # Test with a non-empty dict
+    yaml_str = yaml.dump({"dict_config": {"a": 3}})
+    yaml_params = yaml.load(yaml_str, Loader=config.SafeLineLoader)
+    dt.read_config(yaml_params)
+
+    assert len(dt.dict_config) == 1
+    assert type(dt.dict_config) == dict
+    assert dt.dict_config["a"] == 3
