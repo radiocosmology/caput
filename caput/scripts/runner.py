@@ -12,6 +12,8 @@ from os.path import (
 import click
 import sys
 
+from caput.config import CaputConfigError
+
 products = None
 
 
@@ -34,7 +36,6 @@ def cli():
 )
 def lint_config(configfile):
     """Test a pipeline for errors without running it."""
-    from caput.config import CaputConfigError
     from caput.pipeline import Manager
 
     # nargs=-1 packs multiple arguments (or glob patterns) into tuples
@@ -145,8 +146,17 @@ def run(configfile, loglevel, profile, profiler):
             pr = Profiler()
             pr.start()
 
-    P = Manager.from_yaml_file(configfile)
-    P.run()
+    try:
+        P = Manager.from_yaml_file(configfile)
+    except CaputConfigError as e:
+        click.echo(
+            "Found at least one error in '{}'.\n"
+            "Fix and run again to find more problems.".format(configfile)
+        )
+        click.echo(e)
+        sys.exit(1)
+    else:
+        P.run()
 
     if profile:
 
@@ -231,7 +241,17 @@ def queue(configfile, submit=False, lint=True):
     if lint:
         from caput.pipeline import Manager
 
-        Manager.from_yaml_file(configfile, lint=True)
+        load_venv(configfile)
+
+        try:
+            Manager.from_yaml_file(configfile, lint=True)
+        except CaputConfigError as e:
+            click.echo(
+                "Found at least one error in '{}'.\n"
+                "Fix and run again to find more problems.".format(configfile)
+            )
+            click.echo(e)
+            sys.exit(1)
 
     with open(configfile, "r") as f:
         yconf = yaml.safe_load(f)

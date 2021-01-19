@@ -690,7 +690,7 @@ class Manager(config.Reader):
         else:
             try:
                 task_cls = misc.import_class(task_path)
-            except (config.CaputConfigError, AttributeError) as e:
+            except (config.CaputConfigError, AttributeError, ModuleNotFoundError) as e:
                 msg = "Loading task '%s' caused error %s:\n\t%s" % (
                     task_path,
                     e.__class__.__name__,
