@@ -1,10 +1,12 @@
-import unittest
-
 import pickle
+
+import pytest
+import yaml
 
 from caput import config
 
 
+### Test classes
 class Person(config.Reader):
     name = config.Property(default="Bill", proptype=str)
     age = config.Property(default=26, proptype=float, key="ageinyears")
@@ -21,73 +23,108 @@ class ListTypeTests(Person):
     list_type = config.list_type(type_=int)
 
 
-class TestConfig(unittest.TestCase):
+class DictTypeTests(config.Reader):
+    dict_config = config.Property(proptype=dict)
 
-    testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
-    def test_default_params(self):
+### Test data dict
+testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
-        person1 = Person()
 
-        self.assertEqual(person1.name, "Bill")
-        self.assertEqual(person1.age, 26.0)
-        self.assertIsInstance(person1.age, float)
+### Tests
+def test_default_params():
 
-    def test_set_params(self):
+    person1 = Person()
 
-        person = Person()
-        person.name = "Mick"
+    assert person1.name == "Bill"
+    assert person1.age == 26.0
+    assert isinstance(person1.age, float)
 
-        self.assertEqual(person.name, "Mick")
 
-    def test_read_config(self):
+def test_set_params():
 
-        person = Person()
-        person.read_config(self.testdict)
+    person = Person()
+    person.name = "Mick"
 
-        self.assertEqual(person.name, "Richard")
-        self.assertEqual(person.age, 40.0)
+    assert person.name == "Mick"
 
-    def test_inherit_read_config(self):
 
-        person = PersonWithPet()
-        person.read_config(self.testdict)
+def test_read_config():
 
-        self.assertEqual(person.name, "Richard")
-        self.assertEqual(person.age, 40.0)
-        self.assertEqual(person.petname, "Sooty")
+    person = Person()
+    person.read_config(testdict)
 
-    def test_pickle(self):
+    assert person.name == "Richard"
+    assert person.age == 40.0
 
-        person = PersonWithPet()
-        person.read_config(self.testdict)
-        person2 = pickle.loads(pickle.dumps(person))
 
-        self.assertEqual(person2.name, "Richard")
-        self.assertEqual(person2.age, 40.0)
-        self.assertEqual(person2.petname, "Sooty")
+def test_inherit_read_config():
 
-    def test_list_type(self):
+    person = PersonWithPet()
+    person.read_config(testdict)
 
-        lt = ListTypeTests()
+    assert person.name == "Richard"
+    assert person.age == 40.0
+    assert person.petname == "Sooty"
 
-        with self.assertRaises(config.CaputConfigError):
-            lt.read_config({"list_max_length": [1, 3, 4]})
 
-        # Should work fine
-        lt = ListTypeTests()
-        lt.read_config({"list_max_length": [1, 2]})
+def test_pickle():
 
-        with self.assertRaises(config.CaputConfigError):
-            lt.read_config({"list_exact_length": [3]})
+    person = PersonWithPet()
+    person.read_config(testdict)
+    person2 = pickle.loads(pickle.dumps(person))
 
-        # Work should fine
-        lt = ListTypeTests()
-        lt.read_config({"list_exact_length": [1, 2]})
+    assert person2.name == "Richard"
+    assert person2.age == 40.0
+    assert person2.petname == "Sooty"
 
-        with self.assertRaises(config.CaputConfigError):
-            lt.read_config({"list_type": ["hello"]})
 
-        # Work should fine
-        lt = ListTypeTests()
-        lt.read_config({"list_type": [1, 2]})
+def test_list_type():
+
+    lt = ListTypeTests()
+
+    with pytest.raises(config.CaputConfigError):
+        lt.read_config({"list_max_length": [1, 3, 4]})
+
+    # Should work fine
+    lt = ListTypeTests()
+    lt.read_config({"list_max_length": [1, 2]})
+
+    with pytest.raises(config.CaputConfigError):
+        lt.read_config({"list_exact_length": [3]})
+
+    # Work should fine
+    lt = ListTypeTests()
+    lt.read_config({"list_exact_length": [1, 2]})
+
+    with pytest.raises(config.CaputConfigError):
+        lt.read_config({"list_type": ["hello"]})
+
+    # Work should fine
+    lt = ListTypeTests()
+    lt.read_config({"list_type": [1, 2]})
+
+
+def test_no_line():
+    # This tests that dicts get set as config parameters as expected, and covers a flaw
+    # in an earlier version of the linting code where `__line__` keys were getting
+    # inserted into dict types config properties
+
+    dt = DictTypeTests()
+
+    # Test with an empty dict
+    yaml_str = yaml.dump({"dict_config": {}})
+    yaml_params = yaml.load(yaml_str, Loader=config.SafeLineLoader)
+    dt.read_config(yaml_params)
+
+    assert len(dt.dict_config) == 0
+    assert type(dt.dict_config) == dict
+
+    # Test with a non-empty dict
+    yaml_str = yaml.dump({"dict_config": {"a": 3}})
+    yaml_params = yaml.load(yaml_str, Loader=config.SafeLineLoader)
+    dt.read_config(yaml_params)
+
+    assert len(dt.dict_config) == 1
+    assert type(dt.dict_config) == dict
+    assert dt.dict_config["a"] == 3

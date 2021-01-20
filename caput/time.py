@@ -584,7 +584,7 @@ class Observer(object):
         # Get the ends of the search interval
         t0 = ensure_unix(t0)
         if t1 is None:
-            t1 = t0 + 24 * 3600.0
+            t1 = t0 + 24 * 3600.0 * STELLAR_S
         else:
             t1 = ensure_unix(t1)
             if t1 <= t0:

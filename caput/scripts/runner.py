@@ -1,16 +1,11 @@
-from os.path import (
-    normpath,
-    expanduser,
-    expandvars,
-    realpath,
-    abspath,
-    isabs,
-    join,
-    exists,
-)
+import os
+import sys
+
+from pathlib import Path
 
 import click
-import sys
+
+from caput.config import CaputConfigError
 
 products = None
 
@@ -34,7 +29,6 @@ def cli():
 )
 def lint_config(configfile):
     """Test a pipeline for errors without running it."""
-    from caput.config import CaputConfigError
     from caput.pipeline import Manager
 
     # nargs=-1 packs multiple arguments (or glob patterns) into tuples
@@ -68,17 +62,12 @@ def load_venv(configfile):
 
     click.echo("Activating '{}'...".format(venv_path))
 
-    # TODO: python2 - use pathlib
-    import os.path
-
-    base = os.path.abspath(venv_path)
+    base = Path(venv_path).resolve()
     if not base.exists():
         click.echo("Path defined in 'cluster'/'venv' doesn't exist ({})".format(base))
         sys.exit(1)
 
-    site_packages = os.path.join(
-        base, "lib", "python{}".format(sys.version[:3]), "site-packages"
-    )
+    site_packages = base / "lib" / "python{}".format(sys.version[:3]) / "site-packages"
     prev_sys_path = list(sys.path)
 
     site.addsitedir(site_packages)
@@ -145,8 +134,17 @@ def run(configfile, loglevel, profile, profiler):
             pr = Profiler()
             pr.start()
 
-    P = Manager.from_yaml_file(configfile)
-    P.run()
+    try:
+        P = Manager.from_yaml_file(configfile)
+    except CaputConfigError as e:
+        click.echo(
+            "Found at least one error in '{}'.\n"
+            "Fix and run again to find more problems.".format(configfile)
+        )
+        click.echo(e)
+        sys.exit(1)
+    else:
+        P.run()
 
     if profile:
 
@@ -224,14 +222,23 @@ def queue(configfile, submit=False, lint=True):
         same filesystem.
     """
 
-    import os.path
     import shutil
     import yaml
 
     if lint:
         from caput.pipeline import Manager
 
-        Manager.from_yaml_file(configfile, lint=True)
+        load_venv(configfile)
+
+        try:
+            Manager.from_yaml_file(configfile, lint=True)
+        except CaputConfigError as e:
+            click.echo(
+                "Found at least one error in '{}'.\n"
+                "Fix and run again to find more problems.".format(configfile)
+            )
+            click.echo(e)
+            sys.exit(1)
 
     with open(configfile, "r") as f:
         yconf = yaml.safe_load(f)
@@ -259,12 +266,12 @@ def queue(configfile, submit=False, lint=True):
     # If the system is specified update the current config with it
     if "system" in conf:
 
-        sys = conf["system"]
+        system = conf["system"]
 
-        if sys not in system_defaults:
-            raise ValueError('Specified system "%s": is not known.' % sys)
+        if system not in system_defaults:
+            raise ValueError('Specified system "%s": is not known.' % system)
 
-        rconf.update(**system_defaults[sys])
+        rconf.update(**system_defaults[system])
 
     # Update the current config with the rest of the users variables
     rconf.update(**conf)
@@ -281,29 +288,29 @@ def queue(configfile, submit=False, lint=True):
 
     # Construct the working directory
     workdir = expandpath(rconf["temp_directory"])
-    if not isabs(workdir):
+    if not workdir.is_absolute():
         raise ValueError("Working directory path %s must be absolute" % workdir)
 
     # Construct the output directory
     finaldir = expandpath(rconf["directory"])
-    if not isabs(finaldir):
+    if not finaldir.is_absolute():
         raise ValueError("Final output directory path %s must be absolute" % finaldir)
 
     # Create temporary directory if required
-    jobdir = join(workdir, "job/")
-    if not exists(jobdir):
-        os.makedirs(jobdir)
+    jobdir = workdir / "job/"
+    if not jobdir.exists():
+        jobdir.mkdir()
 
     # Copy config file into output directory (check it's not already there first)
     sfile = fixpath(configfile)
-    dfile = fixpath(join(jobdir, "config.yaml"))
+    dfile = fixpath(jobdir / "config.yaml")
     if sfile != dfile:
         shutil.copyfile(sfile, dfile)
 
     # Set up virtualenv
     if "venv" in rconf:
         venvpath = rconf["venv"] + "/bin/activate"
-        if not exists(venvpath):
+        if not venvpath.exists():
             raise ValueError("Could not find virtualenv at path %s" % rconf["venv"])
         rconf["venv"] = venvpath
     else:
@@ -314,9 +321,9 @@ def queue(configfile, submit=False, lint=True):
     rconf["workdir"] = workdir
     rconf["finaldir"] = finaldir
     rconf["scriptpath"] = fixpath(__file__)
-    rconf["logpath"] = join(jobdir, "jobout.log")
-    rconf["configpath"] = join(jobdir, "config.yaml")
-    rconf["statuspath"] = join(jobdir, "STATUS")
+    rconf["logpath"] = jobdir / "jobout.log"
+    rconf["configpath"] = jobdir / "config.yaml"
+    rconf["statuspath"] = jobdir / "STATUS"
     rconf["usetemp"] = 1 if rconf["finaldir"] != rconf["workdir"] else 0
 
     pbs_script = """#!/bin/bash
@@ -409,12 +416,12 @@ fi
 
 def expandpath(path):
     """Expand any variables, user directories in path"""
-    return normpath(expandvars(expanduser(path)))
+    return Path(os.path.expandvars(path)).expanduser().resolve(strict=True)
 
 
 def fixpath(path):
     """Turn path to an absolute path"""
-    return realpath(abspath(path))
+    return Path(path).resolve(strict=True)
 
 
 # This is needed because the queue script calls this file directly.
