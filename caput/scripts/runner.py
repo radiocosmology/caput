@@ -299,7 +299,7 @@ def queue(configfile, submit=False, lint=True):
     # Create temporary directory if required
     jobdir = workdir / "job/"
     if not jobdir.exists():
-        jobdir.mkdir()
+        jobdir.mkdir(parents=True)
 
     # Copy config file into output directory (check it's not already there first)
     sfile = fixpath(configfile)
@@ -309,7 +309,7 @@ def queue(configfile, submit=False, lint=True):
 
     # Set up virtualenv
     if "venv" in rconf:
-        venvpath = rconf["venv"] + "/bin/activate"
+        venvpath = expandpath(rconf["venv"] + "/bin/activate")
         if not venvpath.exists():
             raise ValueError("Could not find virtualenv at path %s" % rconf["venv"])
         rconf["venv"] = venvpath
@@ -408,7 +408,7 @@ fi
     script = script % rconf
 
     # Write and submit the jobscript
-    with open(jobdir + "/jobscript.sh", "w") as f:
+    with open(jobdir / "jobscript.sh", "w") as f:
         f.write(script)
     if submit:
         os.system("cd %s; %s jobscript.sh" % (jobdir, job_command))
@@ -416,12 +416,12 @@ fi
 
 def expandpath(path):
     """Expand any variables, user directories in path"""
-    return Path(os.path.expandvars(path)).expanduser().resolve(strict=True)
+    return Path(os.path.expandvars(path)).expanduser().resolve()
 
 
 def fixpath(path):
     """Turn path to an absolute path"""
-    return Path(path).resolve(strict=True)
+    return Path(path).resolve()
 
 
 # This is needed because the queue script calls this file directly.
