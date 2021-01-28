@@ -72,11 +72,11 @@ jobs:
 
     - name: Run parallel tests
       run: |
-        mpirun -np 4 pytest caput/tests/test_memh5_parallel.py
-        mpirun -np 4 pytest caput/tests/test_mpiarray.py
+        mpirun --oversubscribe -np 4 pytest caput/tests/test_memh5_parallel.py
+        mpirun --oversubscribe -np 4 pytest caput/tests/test_mpiarray.py
         mpirun -np 1 pytest caput/tests/test_selection_parallel.py
-        mpirun -np 2 pytest caput/tests/test_selection_parallel.py
-        mpirun -np 4 pytest caput/tests/test_selection_parallel.py
+        mpirun --oversubscribe -np 2 pytest caput/tests/test_selection_parallel.py
+        mpirun --oversubscribe -np 4 pytest caput/tests/test_selection_parallel.py
 
   build-docs:
 
