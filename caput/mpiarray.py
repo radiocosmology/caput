@@ -1069,6 +1069,75 @@ class MPIArray(np.ndarray):
         slices = [slice(start, end) for start, end in zip(starts, ends)]
         return split_axis, slices
 
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        # we want to ensure that it is a legal operation, convert them both to np.ndarray
+        # then take the return value, and ensure it has the appropriate attributes
+
+        args = []
+        input_mpi = []
+        axis = None
+
+        for input_ in inputs:
+            if isinstance(input_, MPIArray):
+                if axis is None:
+                    axis = input_.axis
+                else:
+                    assert (
+                        axis == input_.axis
+                    ), "The distributed axis for all MPIArrays in an exp should be the same"
+                input_mpi.append(input_)
+                args.append(input_.view(np.ndarray))
+            else:
+                args.append(input_)
+
+        for mpi_array in input_mpi:
+            if hasattr(kwargs, "axis") and (kwargs["axis"] == mpi_array.axis):
+                raise ValueError(
+                    f"operations along the distributed axis (in this case, {mpi_array.axis}) are not allowed."
+                )
+
+        outputs = kwargs.get("out", None)
+        if outputs:
+            out_args = []
+            for output in outputs:
+                if isinstance(output, MPIArray):
+                    out_args.append(output.view(np.ndarray))
+                else:
+                    out_args.append(output)
+            kwargs["out"] = tuple(out_args)
+        else:
+            outputs = (None,) * ufunc.nout
+
+        results = super(MPIArray, self).__array_ufunc__(ufunc, method, *args, **kwargs)
+
+        if results is NotImplemented:
+            return NotImplemented
+
+        if method == "at":
+            # how shall this be handled? is this ever used?
+            return
+
+        if ufunc.nout == 1:
+            results = (results,)
+
+        results = tuple(
+            MPIArray.wrap(result, axis=axis) if output is None else output
+            for result, output in zip(results, outputs)
+        )
+
+        return results[0] if len(results) == 1 else results
+
+    def __array_finalize__(self, obj):
+        # we are in the middle of a constructor, and the attributes
+        # will be set when we return
+        if obj is None:
+            return
+
+        # we are in a ufunc, use the attributes from the original MPIArray
+        # what *will* the attributes actually be? I need other use-cases
+        if isinstance(obj, MPIArray):
+            self.wrap(self, obj.axis, obj.comm)
+
 
 def _partition_sel(sel, split_axis, n, slice_):
     """
