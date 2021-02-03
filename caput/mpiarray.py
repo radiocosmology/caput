@@ -1135,8 +1135,33 @@ class MPIArray(np.ndarray):
 
         # we are in a ufunc, use the attributes from the original MPIArray
         # what *will* the attributes actually be? I need other use-cases
+        # why did obj lose its attributes?
         if isinstance(obj, MPIArray):
-            self.wrap(self, obj.axis, obj.comm)
+            comm = getattr(obj, "comm", mpiutil.world)
+            axis = getattr(obj, "axis", 0)
+
+            # get axis length
+            axlen = self.shape[axis]
+            totallen = mpiutil.allreduce(axlen, comm=comm)
+
+            # Figure out what the distributed layout is
+            local_num, local_start, local_end = mpiutil.split_local(totallen, comm=comm)
+
+            # Get shape and offset
+            lshape = self.shape
+            global_shape = list(lshape)
+            global_shape[axis] = totallen
+
+            loffset = [0] * len(lshape)
+            loffset[axis] = local_start
+
+            # Setup attributes
+            self._global_shape = tuple(global_shape)
+            self._axis = axis
+            self._local_shape = tuple(lshape)
+            self._local_offset = tuple(loffset)
+            self._comm = comm
+        return
 
 
 def _partition_sel(sel, split_axis, n, slice_):
