@@ -1120,12 +1120,18 @@ class MPIArray(np.ndarray):
         if ufunc.nout == 1:
             results = (results,)
 
-        results = tuple(
-            MPIArray.wrap(result, axis=axis) if output is None else output
-            for result, output in zip(results, outputs)
-        )
+        ret = []
 
-        return results[0] if len(results) == 1 else results
+        for result, output in zip(results, outputs):
+            if output is not None: # results were placed in the array specified by `out`
+                ret.append(output)
+            else:
+                if result.shape: # then result is an array; convert it into an MPIArray
+                    ret.append(MPIArray.wrap(result, axis=axis))
+                else: # result is a scalar, return as is
+                    ret.append(result)
+
+        return ret[0] if len(ret) == 1 else tuple(ret)
 
     def __array_finalize__(self, obj):
         # we are in the middle of a constructor, and the attributes
