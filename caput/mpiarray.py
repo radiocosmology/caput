@@ -999,7 +999,7 @@ class MPIArray(np.ndarray):
         return split_axis, slices
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        ''' Handles ufunc operations for MPIArray.
+        """Handles ufunc operations for MPIArray.
 
         In NumPy, ufuncs are the various fundamental operations applied to ndarrays in an element-by-element fashion, such as add() and divide().
         https://numpy.org/doc/stable/reference/ufuncs.html
@@ -1014,11 +1014,11 @@ class MPIArray(np.ndarray):
             tuple of the input arguments to the ufunc. At least one of the inputs is an MPIArray.
         kwargs: dict
             dictionary containing the optional input arguments of the ufunc. Important kwargs considered here are 'out' and 'axis'.
-        '''
+        """
 
         args = []
-        input_mpi = [] # container for original input MPIArrays
-        distr_axis = None # the distributed axis
+        input_mpi = []  # container for original input MPIArrays
+        distr_axis = None  # the distributed axis
 
         # convert all local arrays into ndarrays
         for input_ in inputs:
@@ -1070,12 +1070,16 @@ class MPIArray(np.ndarray):
         ret = []
 
         for result, output in zip(results, outputs):
-            if output is not None: # case: results were placed in the array specified by `out`; return as is
+            if (
+                output is not None
+            ):  # case: results were placed in the array specified by `out`; return as is
                 ret.append(output)
             else:
-                if result.shape: # case: the result is an array; convert back it into an MPIArray
+                if (
+                    result.shape
+                ):  # case: the result is an array; convert back it into an MPIArray
                     ret.append(MPIArray.wrap(result, axis=distr_axis))
-                else: # case: result is a scalar; return as is
+                else:  # case: result is a scalar; return as is
                     ret.append(result)
 
         return ret[0] if len(ret) == 1 else tuple(ret)
@@ -1089,7 +1093,9 @@ class MPIArray(np.ndarray):
         # we are in a ufunc, rebuild the attributes from the original MPIArray
         if isinstance(obj, MPIArray):
             comm = getattr(obj, "comm", mpiutil.world)
-            axis = getattr(obj, "axis", 0) # probably not a good default! How would we find this out?
+            axis = getattr(
+                obj, "axis", 0
+            )  # probably not a good default! How would we find this out?
 
             # get axis length
             axlen = self.shape[axis]
