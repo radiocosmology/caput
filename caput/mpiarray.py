@@ -1106,9 +1106,9 @@ class MPIArray(np.ndarray):
                 args.append(input_)
 
         for mpi_array in input_mpi:
-            if hasattr(kwargs, "axis") and (kwargs["axis"] == mpi_array.axis):
+            if "axis" in kwargs and (kwargs["axis"] == distr_axis):
                 raise ValueError(
-                    f"operations along the distributed axis (in this case, {mpi_array.axis}) are not allowed."
+                    f"operations along the distributed axis (in this case, {distr_axis}) are not allowed."
                 )
 
         # 'out' kwargs contain arrays that the ufunc places the results into
