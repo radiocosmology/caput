@@ -1030,7 +1030,7 @@ class MPIArray(np.ndarray):
                         distr_axis == input_.axis
                     ), "The distributed axis for all MPIArrays in an exp should be the same"
                 input_mpi.append(input_)
-                args.append(input_.view(np.ndarray))
+                args.append(input_.local_array.view(np.ndarray))
             else:
                 args.append(input_)
 
@@ -1045,7 +1045,7 @@ class MPIArray(np.ndarray):
             out_args = []
             for output in outputs:
                 if isinstance(output, MPIArray):
-                    out_args.append(output.view(np.ndarray))
+                    out_args.append(output.local_array.view(np.ndarray))
                 else:
                     out_args.append(output)
             kwargs["out"] = tuple(out_args)
