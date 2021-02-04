@@ -1034,11 +1034,10 @@ class MPIArray(np.ndarray):
             else:
                 args.append(input_)
 
-        for mpi_array in input_mpi:
-            if "axis" in kwargs and (kwargs["axis"] == distr_axis):
-                raise ValueError(
-                    f"operations along the distributed axis (in this case, {distr_axis}) are not allowed."
-                )
+        if "axis" in kwargs and (kwargs["axis"] == distr_axis):
+            raise ValueError(
+                f"operations along the distributed axis (in this case, {distr_axis}) are not allowed."
+            )
 
         # 'out' kwargs contain arrays that the ufunc places the results into
         # this broadcasts the local part of the output arrays into an ndarray
@@ -1059,10 +1058,6 @@ class MPIArray(np.ndarray):
 
         if results is NotImplemented:
             return NotImplemented
-
-        if method == "at":
-            # how shall this be handled? is this ever used?
-            return
 
         if ufunc.nout == 1:
             results = (results,)
