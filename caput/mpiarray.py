@@ -999,20 +999,35 @@ class MPIArray(np.ndarray):
         return split_axis, slices
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-        # we want to ensure that it is a legal operation, convert them both to np.ndarray
-        # then take the return value, and ensure it has the appropriate attributes
+        ''' Handles ufunc operations for MPIArray.
+
+        In NumPy, ufuncs are the various fundamental operations applied to ndarrays in an element-by-element fashion, such as add() and divide().
+        https://numpy.org/doc/stable/reference/ufuncs.html
+
+        Parameters
+        ----------
+        ufunc: <function>
+            ufunc object that was called
+        method: str
+            indicates which ufunc method was called. one of "__call__", "reduce", "reduceat", "accumulate", "outer", "inner"
+        inputs: tuple
+            tuple of the input arguments to the ufunc. At least one of the inputs is an MPIArray.
+        kwargs: dict
+            dictionary containing the optional input arguments of the ufunc. Important kwargs considered here are 'out' and 'axis'.
+        '''
 
         args = []
         input_mpi = []
-        axis = None
+        distr_axis = None # the distributed axis
 
+        # convert all local arrays into ndarrays
         for input_ in inputs:
             if isinstance(input_, MPIArray):
-                if axis is None:
-                    axis = input_.axis
+                if distr_axis is None:
+                    distr_axis = input_.axis
                 else:
                     assert (
-                        axis == input_.axis
+                        distr_axis == input_.axis
                     ), "The distributed axis for all MPIArrays in an exp should be the same"
                 input_mpi.append(input_)
                 args.append(input_.view(np.ndarray))
@@ -1056,7 +1071,7 @@ class MPIArray(np.ndarray):
                 ret.append(output)
             else:
                 if result.shape: # then result is an array; convert it into an MPIArray
-                    ret.append(MPIArray.wrap(result, axis=axis))
+                    ret.append(MPIArray.wrap(result, axis=distr_axis))
                 else: # result is a scalar, return as is
                     ret.append(result)
 
