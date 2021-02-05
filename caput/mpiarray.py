@@ -1074,8 +1074,8 @@ class MPIArray(np.ndarray):
                     result.shape
                 ):  # case: the result is an array; convert back it into an MPIArray
                     ret.append(MPIArray.wrap(result, axis=distr_axis))
-                else:  # case: result is a scalar; return as is
-                    ret.append(result)
+                else:  # case: result is a scalar; convert to 1-d vector, across distributed axis
+                    ret.append(MPIArray.wrap(np.reshape(result, (1, 1)), axis=distr_axis))
 
         return ret[0] if len(ret) == 1 else tuple(ret)
 
