@@ -313,7 +313,7 @@ def split_m(n, m):
     base = n // m
     rem = n % m
 
-    part = base * np.ones(m, dtype=np.int) + (np.arange(m) < rem).astype(np.int)
+    part = base * np.ones(m, dtype=int) + (np.arange(m) < rem).astype(int)
 
     bound = np.cumsum(np.insert(part, 0, 0))
 

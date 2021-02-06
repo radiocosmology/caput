@@ -440,7 +440,7 @@ def test_rise_set_times(chime, eph):
         [1604535925.5065, 1604588383.0504, 1604622231.5790, 1604674881.4216],
         dtype=np.float64,
     )
-    precalc_risings = np.array([False, True, False, True], dtype=np.bool)
+    precalc_risings = np.array([False, True, False, True], dtype=bool)
 
     times, risings = chime.rise_set_times(eph["sun"], dts, dte)
 
