@@ -828,7 +828,7 @@ def datetime_to_unix(dt):
     return since_epoch.total_seconds()
 
 
-@vectorize(otypes=[np.unicode])
+@vectorize(otypes=[str])
 def datetime_to_timestr(dt):
     """Converts a :class:`~datetime.datetime` to "YYYYMMDDTHHMMSSZ" format.
 
@@ -902,7 +902,7 @@ def leap_seconds_between(time_a, time_b):
     # Calculate the shift in timescales which should only happen when leap
     # seconds are added/removed
     time_shift = delta_tt - delta_unix
-    time_shift_int = np.around(time_shift).astype(np.int)
+    time_shift_int = np.around(time_shift).astype(int)
 
     # Check that the shift is an integer number of seconds. I don't know why
     # this wouldn't be true, but if it's not it means things have gone crazy
