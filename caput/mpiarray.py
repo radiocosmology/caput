@@ -1070,6 +1070,11 @@ class MPIArray(np.ndarray):
         if ufunc.nout == 1:
             results = (results,)
 
+        if "reduce" in method:
+            # reduction methods eliminate axes, so the distributed axes might need to be recalculated
+            if len(results[0].shape) < dist_axis + 1:
+                dist_axis -= 1
+
         # Wrapping the results back into MPIArrays, distributed across the appropriate axis
         ret = []
 
@@ -1080,7 +1085,7 @@ class MPIArray(np.ndarray):
                 ret.append(output)
             else:
                 if (
-                    result.shape and
+                    result.shape
                 ):  # case: the result is an array; convert back it into an MPIArray
                     ret.append(MPIArray.wrap(result, axis=dist_axis))
                 else:  # case: result is a scalar; convert to 1-d vector, across distributed axis
