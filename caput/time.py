@@ -148,7 +148,38 @@ SIDEREAL_S = 1.0 / 1.002737909350795 * UT1_S
 STELLAR_S = 1.0 / 1.00273781191135448 * UT1_S
 
 
-class Observer(object):
+def _fixup_interval_and_step(t0, t1, step):
+    # Work routine used by Observer._sr_work and transit_times to sanitise the
+    # caller-supplied interval and initial step duration.
+    #
+    # Returns the interval limits converted to TT JD and the computed
+    # initial step size
+
+    # Get the ends of the search interval
+    t0 = ensure_unix(t0)
+    if t1 is None:
+        t1 = t0 + 24 * 3600.0 * STELLAR_S
+    else:
+        t1 = ensure_unix(t1)
+        if t1 <= t0:
+            raise ValueError("End of the search interval (t1) is before the start (t0)")
+
+    # Calculate the initial search step
+    if step is None:
+        if t1 - t0 >= 24 * 3600.0:
+            step = 0.2
+        else:
+            step = (t1 - t0) / (5 * 24 * 3600.0)
+    elif step * 24 * 3600 >= t1 - t0:
+        raise ValueError("Initial search step is larger than the search interval")
+
+    # Convert the UNIX start and end times into Julian Days
+    t0jd, t1jd = unix_to_skyfield_time([t0, t1]).tt
+
+    return t0jd, t1jd, step
+
+
+class Observer:
     """Time calculations for a local observer.
 
     Parameters
@@ -161,6 +192,8 @@ class Observer(object):
         Altitude of observer in metres.
     lsd_start : float or datetime, optional
         The zeroth LSD. If not set use the J2000 epoch start.
+    sf_wrapper
+        (optional) Skyfield wrapper
 
     Attributes
     ----------
@@ -398,7 +431,7 @@ class Observer(object):
 
         st = unix_to_skyfield_time(time)
         pos = obs.at(st).from_altaz(az_degrees=az, alt_degrees=el)
-        ra, dec, dist = pos.radec()  # Fetch ICRS position (effectively J2000)
+        ra, _, _ = pos.radec()  # Fetch ICRS position (effectively J2000)
 
         ra = np.degrees(ra.radians)
 
@@ -453,7 +486,7 @@ class Observer(object):
             return ha if not lower else (ha % 360.0) - 180.0
 
         # Convert interval to Julian Days and choose the initial search step if not set
-        t0jd, t1jd, step = self._fixup_interval_and_step(t0, t1, step)
+        t0jd, t1jd, step = _fixup_interval_and_step(t0, t1, step)
 
         # Compute transits
         transits, _ = _solve_all(f, t0jd, t1jd, step, skip_decreasing=True, xtol=1e-8)
@@ -574,38 +607,6 @@ class Observer(object):
             source, t0, t1, step, diameter, skip_rise=True, skip_set=False
         )[0]
 
-    def _fixup_interval_and_step(self, t0, t1, step):
-        # Work routine used by _sr_work and transit_times to sanitise the
-        # caller-supplied interval and initial step duration.
-        #
-        # Returns the interval limits converted to TT JD and the computed
-        # initial step size
-
-        # Get the ends of the search interval
-        t0 = ensure_unix(t0)
-        if t1 is None:
-            t1 = t0 + 24 * 3600.0 * STELLAR_S
-        else:
-            t1 = ensure_unix(t1)
-            if t1 <= t0:
-                raise ValueError(
-                    "End of the search interval (t1) is before the start (t0)"
-                )
-
-        # Calculate the initial search step
-        if step is None:
-            if t1 - t0 >= 24 * 3600.0:
-                step = 0.2
-            else:
-                step = (t1 - t0) / (5 * 24 * 3600.0)
-        elif step * 24 * 3600 >= t1 - t0:
-            raise ValueError("Initial search step is larger than the search interval")
-
-        # Convert the UNIX start and end times into Julian Days
-        t0jd, t1jd = unix_to_skyfield_time([t0, t1]).tt
-
-        return t0jd, t1jd, step
-
     def _sr_work(self, source, t0, t1, step, diameter, skip_rise=False, skip_set=False):
         # A work routine factoring out common functionality
 
@@ -615,7 +616,7 @@ class Observer(object):
             return self._source_alt(source, t) + diameter / 2
 
         # Convert interval to Julian Days and choose the initial search step if not set
-        t0jd, t1jd, step = self._fixup_interval_and_step(t0, t1, step)
+        t0jd, t1jd, step = _fixup_interval_and_step(t0, t1, step)
 
         times, risings = _solve_all(
             f,
@@ -671,8 +672,6 @@ def unix_to_skyfield_time(unix_time):
     -------
     time : :class:`skyfield.timelib.Time`
     """
-
-    from skyfield import timelib
 
     ts = skyfield_wrapper.timescale
 
@@ -1000,7 +999,7 @@ def time_of_day(time):
     return (dt - d).total_seconds()
 
 
-class SkyfieldWrapper(object):
+class SkyfieldWrapper:
     """A wrapper to help with loading Skyfield and its data.
 
     Parameters
@@ -1076,11 +1075,11 @@ class SkyfieldWrapper(object):
         try:
             self._timescale = self.load.timescale(builtin=False)
             return self._timescale
-        except IOError:
+        except IOError as e:
             raise IOError(
                 "Could not find existing Skyfield timescale data at %s"
                 % self.load.directory
-            )
+            ) from e
 
     _ephemeris = None
 
@@ -1095,11 +1094,11 @@ class SkyfieldWrapper(object):
         try:
             self._ephemeris = self.load(self._ephemeris_name)
             return self._ephemeris
-        except IOError:
+        except IOError as e:
             raise IOError(
                 "Could not find existing Skyfield ephemeris data at %s"
                 % self.load.directory
-            )
+            ) from e
 
     def reload(self):
         """Reload the Skyfield data regardless of the `expire` setting."""

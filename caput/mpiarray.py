@@ -102,7 +102,7 @@ from caput import mpiutil, misc
 logger = logging.getLogger(__name__)
 
 
-class _global_resolver(object):
+class _global_resolver:
     # Private class implementing the global sampling for MPIArray
 
     def __init__(self, array):
@@ -123,7 +123,7 @@ class _global_resolver(object):
         local_length = self.array.shape[self.axis]
 
         # Expand a single integer or slice index
-        if isinstance(slobj, int) or isinstance(slobj, slice):
+        if isinstance(slobj, (int, slice)):
             slobj = (slobj, Ellipsis)
 
         # Add an ellipsis if length of slice object is too short
@@ -134,7 +134,7 @@ class _global_resolver(object):
         slice_list = []
         for sl in slobj:
             if sl is Ellipsis:
-                for i in range(ndim - len(slobj) + 1):
+                for _ in range(ndim - len(slobj) + 1):
                     slice_list.append(slice(None, None))
             else:
                 slice_list.append(sl)
@@ -226,7 +226,7 @@ class _global_resolver(object):
 
     def __setitem__(self, slobj, value):
 
-        slobj, is_fullslice = self._resolve_slice(slobj)
+        slobj, _ = self._resolve_slice(slobj)
 
         if slobj[self.axis] is None:
             return
@@ -243,46 +243,75 @@ class MPIArray(np.ndarray):
         the specified index.
     axis : integer, optional
         The dimension to distribute the array across.
-
-    Attributes
-    ----------
-    global_shape : tuple
-        Global array shape.
-    local_shape : tuple
-        Shape of local section.
-    axis : integer
-        Axis we are distributed over.
-    local_offset : tuple
-        Offset into global array. This is equivalent to the global-index of
-        the [0, 0, ...] element of the local section.
-    local_array : np.ndarray
-        The view of the local numpy array.
-    global_slice : object
-        Return an objects that presents a view of the array with global slicing.
     """
 
     @property
     def global_shape(self):
+        """
+        Global array shape.
+
+        Returns
+        -------
+        global_shape : tuple
+        """
         return self._global_shape
 
     @property
     def axis(self):
+        """
+        Axis we are distributed over.
+
+        Returns
+        -------
+        axis : integer
+        """
         return self._axis
 
     @property
     def local_shape(self):
+        """
+        Shape of local section.
+
+        Returns
+        -------
+        local_shape : tuple
+        """
         return self._local_shape
 
     @property
     def local_offset(self):
+        """
+        Offset into global array.
+
+        This is equivalent to the global-index of
+        the [0, 0, ...] element of the local section.
+
+        Returns
+        -------
+        local_offset : tuple
+        """
         return self._local_offset
 
     @property
     def local_array(self):
+        """
+        The view of the local numpy array.
+
+        Returns
+        -------
+        local_array : np.ndarray
+        """
         return self.view(np.ndarray)
 
     @property
     def comm(self):
+        """
+        The communicator over which the array is distributed.
+
+        Returns
+        -------
+        comm : MPI.Comm
+        """
         return self._comm
 
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
@@ -294,9 +323,7 @@ class MPIArray(np.ndarray):
             comm = mpiutil.world
 
         # Determine local section of distributed axis
-        local_num, local_start, local_end = mpiutil.split_local(
-            global_shape[axis], comm=comm
-        )
+        local_num, local_start, _ = mpiutil.split_local(global_shape[axis], comm=comm)
 
         # Figure out the local shape and offset
         lshape = list(global_shape)
@@ -319,6 +346,13 @@ class MPIArray(np.ndarray):
 
     @property
     def global_slice(self):
+        """
+        Return an objects that presents a view of the array with global slicing.
+
+        Returns
+        -------
+        global_slice : object
+        """
         return _global_resolver(self)
 
     @classmethod
@@ -355,10 +389,10 @@ class MPIArray(np.ndarray):
         totallen = mpiutil.allreduce(axlen, comm=comm)
 
         # Figure out what the distributed layout should be
-        local_num, local_start, local_end = mpiutil.split_local(totallen, comm=comm)
+        local_num, local_start, _ = mpiutil.split_local(totallen, comm=comm)
 
         # Check the local layout is consistent with what we expect, and send
-        # result to all ranks
+        # result to all ranks.
         layout_issue = mpiutil.allreduce(axlen != local_num, op=mpiutil.MAX, comm=comm)
 
         if layout_issue:
@@ -431,11 +465,11 @@ class MPIArray(np.ndarray):
                     % (self.global_shape, self.shape)
                 )
         else:
-            pc, sc, ec = mpiutil.split_local(arr.shape[axis], comm=self.comm)
-            par, sar, ear = mpiutil.split_all(
+            pc, _, _ = mpiutil.split_local(arr.shape[axis], comm=self.comm)
+            _, sar, ear = mpiutil.split_all(
                 self.global_shape[self.axis], comm=self.comm
             )
-            pac, sac, eac = mpiutil.split_all(arr.shape[axis], comm=self.comm)
+            _, sac, eac = mpiutil.split_all(arr.shape[axis], comm=self.comm)
 
             new_shape = np.asarray(self.global_shape)
             new_shape[axis] = pc
@@ -491,9 +525,7 @@ class MPIArray(np.ndarray):
 
                 if stat.error != mpiutil.MPI.SUCCESS:
                     logger.error(
-                        "**** ERROR in MPI SEND (r: %i c: %i rank: %i) *****".format(
-                            ir, ic, self.comm.rank
-                        )
+                        f"**** ERROR in MPI SEND (r: {ir} c: {ic} rank: {self.comm.rank}) *****"
                     )
 
             self.comm.Barrier()
@@ -508,9 +540,7 @@ class MPIArray(np.ndarray):
 
                 if stat.error != mpiutil.MPI.SUCCESS:
                     logger.error(
-                        "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****".format(
-                            ir, ir, self.comm.rank
-                        )
+                        f"**** ERROR in MPI RECV (r: {ir} c: {ic} rank: {self.comm.rank}) *****"
                     )
 
             # Put together the blocks we received
@@ -568,7 +598,7 @@ class MPIArray(np.ndarray):
         -------
         array : MPIArray
         """
-        # Don't both using MPI where the axis is not zero. It's probably just slower.
+        # Don't bother using MPI where the axis is not zero. It's probably just slower.
         # TODO: with tuning this might not be true. Keep an eye on this.
         use_mpi = axis > 0
 
@@ -721,13 +751,15 @@ class MPIArray(np.ndarray):
         if fh.opened:
             fh.close()
 
-    def transpose(self, axes):
+    def transpose(self, *axes):
         """Transpose the array axes.
 
         Parameters
         ----------
-        axes : tuple
-            Tuple of axes permutations.
+        axes : None, tuple of ints, or n ints
+            - None or no argument: reverses the order of the axes.
+            - tuple of ints: i in the j-th place in the tuple means a’s i-th axis becomes a.transpose()’s j-th axis.
+            - n ints: same as an n-tuple of the same ints (this form is intended simply as a “convenience” alternative to the tuple form)
 
         Returns
         -------
@@ -735,7 +767,12 @@ class MPIArray(np.ndarray):
             Transposed MPIArray as a view of the original data.
         """
 
-        tdata = np.ndarray.transpose(self, axes)
+        tdata = np.ndarray.transpose(self, *axes)
+
+        if len(axes) == 1 and isinstance(axes[0], (tuple, list)):
+            axes = axes[0]
+        elif axes is None or axes == ():
+            axes = list(range(self.ndim - 1, -1, -1))
 
         tdata._global_shape = tuple([self.global_shape[ax] for ax in axes])
         tdata._local_shape = tuple([self.local_shape[ax] for ax in axes])
@@ -847,8 +884,9 @@ class MPIArray(np.ndarray):
 
                 if stat.error != mpiutil.MPI.SUCCESS:
                     logger.error(
-                        "**** ERROR in MPI RECV (source: %i,  dest rank: %i) *****"
-                        % (ri, rank)
+                        "**** ERROR in MPI RECV (source: %i,  dest rank: %i) *****",
+                        ri,
+                        rank,
                     )
 
                 # Put the data into the correct location
@@ -993,7 +1031,7 @@ class MPIArray(np.ndarray):
         logger.debug("Splitting along axis %i, %i ways", split_axis, num_split)
 
         # Figure out the start and end of the splits and return
-        nums, starts, ends = mpiutil.split_m(self.global_shape[split_axis], num_split)
+        _, starts, ends = mpiutil.split_m(self.global_shape[split_axis], num_split)
 
         slices = [slice(start, end) for start, end in zip(starts, ends)]
         return split_axis, slices
@@ -1150,14 +1188,26 @@ class MPIArray(np.ndarray):
 
 
 def _partition_sel(sel, split_axis, n, slice_):
-    # Take a selection (a tuple of slices) and re-slice along the split_axis
-    # (which has length n)
-    #
-    # Returns the new selections for the initial (pre-selection) space and the final
-    # (post-selection) space.
+    """
+    Re-slice a selection along a new axis.
 
-    l = _len_slice(sel[split_axis], n)
+    Take a selection (a tuple of slices) and re-slice along the split_axis (which has length n).
 
+    Parameters
+    ----------
+    sel : Tuple[slice]
+        Selection
+    split_axis : int
+        New split axis
+    n : int
+        Length of split axis
+    slice_
+
+    Returns
+    -------
+    Tuple[List[slice], Tuple[slice]]
+        The new selections for the initial (pre-selection) space and the final (post-selection) space.
+    """
     # Reconstruct the slice for the split axis
     slice_init = _reslice(sel[split_axis], n, slice_)
 
@@ -1205,7 +1255,7 @@ def _expand_sel(sel, naxis):
     return list(sel)
 
 
-class DummyContext(object):
+class DummyContext:
     """A completely dummy context manager."""
 
     def __enter__(self):

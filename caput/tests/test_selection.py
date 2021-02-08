@@ -1,23 +1,11 @@
 """Serial version of the selection tests."""
-from caput.memh5 import MemGroup
-
-import pytest
 import glob
-import numpy as np
 import os
+import pytest
 
+import numpy as np
 
-len_axis = 8
-
-dset1 = np.arange(len_axis * len_axis * len_axis)
-dset1 = dset1.reshape((len_axis, len_axis, len_axis))
-
-dset2 = np.arange(len_axis * len_axis)
-dset2 = dset2.reshape((len_axis, len_axis))
-
-freqs = np.arange(len_axis)
-inputs = np.arange(len_axis)
-ra = np.arange(len_axis)
+from caput.memh5 import MemGroup
 
 fsel = slice(1, 8, 2)
 isel = slice(1, 4)
@@ -25,13 +13,13 @@ sel = {"dset1": (fsel, isel, slice(None)), "dset2": (fsel, slice(None))}
 
 
 @pytest.fixture
-def container_on_disk():
+def container_on_disk(datasets):
     fname = "tmp_test_memh5_select.h5"
     container = MemGroup()
-    container.create_dataset("dset1", data=dset1.view())
-    container.create_dataset("dset2", data=dset2.view())
+    container.create_dataset("dset1", data=datasets[0].view())
+    container.create_dataset("dset2", data=datasets[1].view())
     container.to_hdf5(fname)
-    yield fname
+    yield fname, datasets
 
     # tear down
     file_names = glob.glob(fname + "*")
@@ -42,6 +30,6 @@ def container_on_disk():
 def test_H5FileSelect(container_on_disk):
     """Tests that makes hdf5 objects and tests selecting on their axes."""
 
-    m = MemGroup.from_hdf5(container_on_disk, selections=sel)
-    assert np.all(m["dset1"][:] == dset1[(fsel, isel, slice(None))])
-    assert np.all(m["dset2"][:] == dset2[(fsel, slice(None))])
+    m = MemGroup.from_hdf5(container_on_disk[0], selections=sel)
+    assert np.all(m["dset1"][:] == container_on_disk[1][0][(fsel, isel, slice(None))])
+    assert np.all(m["dset2"][:] == container_on_disk[1][1][(fsel, slice(None))])

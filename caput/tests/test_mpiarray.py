@@ -12,15 +12,13 @@ import numpy as np
 
 from caput import mpiutil, mpiarray
 
-import sys
-
 
 class TestMPIArray(unittest.TestCase):
     def test_construction(self):
 
         arr = mpiarray.MPIArray((10, 11), axis=1)
 
-        l, s, e = mpiutil.split_local(11)
+        l, s, _ = mpiutil.split_local(11)
 
         # Check that global shape is set correctly
         assert arr.global_shape == (10, 11)
@@ -37,9 +35,9 @@ class TestMPIArray(unittest.TestCase):
         nelem = np.prod(gshape)
         garr = np.arange(nelem).reshape(gshape)
 
-        l0, s0, e0 = mpiutil.split_local(11)
-        l1, s1, e1 = mpiutil.split_local(14)
-        l2, s2, e2 = mpiutil.split_local(4)
+        _, s0, e0 = mpiutil.split_local(11)
+        _, s1, e1 = mpiutil.split_local(14)
+        _, s2, e2 = mpiutil.split_local(4)
 
         arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
         arr[:] = garr[:, s0:e0]
@@ -79,14 +77,14 @@ class TestMPIArray(unittest.TestCase):
 
         df = np.fft.rfft(ds, axis=1)
 
-        assert type(df) == np.ndarray
+        assert isinstance(df, np.ndarray)
 
         da = mpiarray.MPIArray.wrap(df, axis=0)
 
-        assert type(da) == mpiarray.MPIArray
+        assert isinstance(da, mpiarray.MPIArray)
         assert da.global_shape == (10, 9)
 
-        l0, s0, e0 = mpiutil.split_local(10)
+        l0, _, _ = mpiutil.split_local(10)
 
         assert da.local_shape == (l0, 9)
 
@@ -115,7 +113,7 @@ class TestMPIArray(unittest.TestCase):
 
         ga = np.arange(np.prod(gshape)).reshape(gshape)
 
-        l0, s0, e0 = mpiutil.split_local(gshape[0])
+        _, s0, e0 = mpiutil.split_local(gshape[0])
         ds[:] = ga[s0:e0]
 
         ds.redistribute(axis=1).to_hdf5(fname, "testds", create=True)
@@ -175,11 +173,11 @@ class TestMPIArray(unittest.TestCase):
 
         gshape = (1, 11, 2, 14)
 
-        l0, s0, e0 = mpiutil.split_local(11)
+        l0, s0, _ = mpiutil.split_local(11)
 
         arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
 
-        arr2 = arr.transpose((1, 3, 0, 2))
+        arr2 = arr.transpose(1, 3, 0, 2)
 
         # Check type
         assert isinstance(arr2, mpiarray.MPIArray)
@@ -196,11 +194,47 @@ class TestMPIArray(unittest.TestCase):
         # Check axis
         assert arr2.axis == 0
 
+        # Do the same test with a tuple as argument to transpose
+        arr3 = arr.transpose((1, 3, 0, 2))
+
+        # Check type
+        assert isinstance(arr3, mpiarray.MPIArray)
+
+        # Check global shape
+        assert arr3.global_shape == (11, 14, 1, 2)
+
+        # Check local shape
+        assert arr3.local_shape == (l0, 14, 1, 2)
+
+        # Check local offset
+        assert arr3.local_offset == (s0, 0, 0, 0)
+
+        # Check axis
+        assert arr3.axis == 0
+
+        # Do the same test with None as argument to transpose
+        arr4 = arr.transpose()
+
+        # Check type
+        assert isinstance(arr4, mpiarray.MPIArray)
+
+        # Check global shape
+        assert arr4.global_shape == (14, 2, 11, 1)
+
+        # Check local shape
+        assert arr4.local_shape == (14, 2, l0, 1)
+
+        # Check local offset
+        assert arr4.local_offset == (0, 0, s0, 0)
+
+        # Check axis
+        assert arr4.axis == 2
+
     def test_reshape(self):
 
         gshape = (1, 11, 2, 14)
 
-        l0, s0, e0 = mpiutil.split_local(11)
+        l0, s0, _ = mpiutil.split_local(11)
 
         arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
 
@@ -229,7 +263,7 @@ class TestMPIArray(unittest.TestCase):
         darr = mpiarray.MPIArray((size * 5, 20), axis=0)
 
         # Initialise the distributed array
-        for li, gi in darr.enumerate(axis=0):
+        for li, _ in darr.enumerate(axis=0):
             darr[li] = 10 * (10 * rank + li) + np.arange(20)
 
         # Construct numpy array which should be equivalent to the global array
@@ -320,7 +354,7 @@ class TestMPIArray(unittest.TestCase):
         darr = mpiarray.MPIArray((size * 5, 20), axis=0)
 
         # Initialise the distributed array
-        for li, gi in darr.enumerate(axis=0):
+        for li, _ in darr.enumerate(axis=0):
             darr[li] = 10 * (10 * rank + li) + np.arange(20)
 
         # Construct numpy array which should be equivalent to the global array

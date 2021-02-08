@@ -1,8 +1,9 @@
 """Unit tests for moving weighted average function."""
 
-import numpy as np
 import time
 import unittest
+
+import numpy as np
 
 from caput.weighted_median import weighted_median, moving_weighted_median
 
@@ -113,7 +114,7 @@ def py_mwm_nd(values, weights, size):
     r = np.floor_divide(size, 2).astype(int)
 
     # iterate over n-dim array
-    for index, value in np.ndenumerate(values):
+    for index, _ in np.ndenumerate(values):
 
         # get the edge indides of the window
         lbound = np.subtract(index, r, dtype=int)
@@ -270,8 +271,8 @@ class TestMWM(unittest.TestCase):
         moving_weighted_median(values, weights, (N_w, N_w))
         t_cython = time.time() - t0
         print(
-            "2D moving {}x{} weighted median with {}x{} elements took {}s".format(
-                N_w, N_w, N, N, t_cython
+            "2D moving {0}x{0} weighted median with {1}x{1} elements took {2}s".format(
+                N_w, N, t_cython
             )
         )
 

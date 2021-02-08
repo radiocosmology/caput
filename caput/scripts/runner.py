@@ -49,6 +49,7 @@ def lint_config(configfile):
 
 
 def load_venv(configfile):
+    """Load the venv specified under cluster/venv in the give configfile."""
     import site
     import yaml
 

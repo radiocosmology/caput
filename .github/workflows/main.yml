@@ -10,21 +10,36 @@ on:
 jobs:
 
   lint-code:
-
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+      - uses: actions/checkout@v2
 
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v1
-      with:
-        python-version: 3.9
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v1
+        with:
+          python-version: 3.9
 
-    - name: Install black
-      run: pip install black
+      - name: Install apt dependencies
+        run: |
+          sudo apt-get install -y libopenmpi-dev openmpi-bin
 
-    - name: Check code with black
-      run: black --check .
+      - name: Install pip dependencies
+        run: |
+          pip install pylint pylint-ignore flake8 pytest black mpi4py pyinstrument
+          pip install -r requirements.txt
+          python setup.py develop
+
+      - name: Run flake8
+        run: flake8 --show-source --exit-zero --ignore=E501,E741,E203,W503,E266 caput
+
+      - name: Run pylint
+        run: >
+          pylint-ignore -d
+          line-too-long,invalid-name,import-outside-toplevel,logging-fstring-interpolation,unnecessary-pass,no-else-return
+          --extension-pkg-whitelist=mpi4py,caput.weighted_median,h5py caput
+
+      - name: Check code with black
+        run: black --check .
 
   run-tests:
 
@@ -57,11 +72,11 @@ jobs:
 
     - name: Run parallel tests
       run: |
-        mpirun -np 4 pytest caput/tests/test_memh5_parallel.py
-        mpirun -np 4 pytest caput/tests/test_mpiarray.py
+        mpirun --oversubscribe -np 4 pytest caput/tests/test_memh5_parallel.py
+        mpirun --oversubscribe -np 4 pytest caput/tests/test_mpiarray.py
         mpirun -np 1 pytest caput/tests/test_selection_parallel.py
-        mpirun -np 2 pytest caput/tests/test_selection_parallel.py
-        mpirun -np 4 pytest caput/tests/test_selection_parallel.py
+        mpirun --oversubscribe -np 2 pytest caput/tests/test_selection_parallel.py
+        mpirun --oversubscribe -np 4 pytest caput/tests/test_selection_parallel.py
 
   build-docs:
 
