@@ -1004,6 +1004,14 @@ class MPIArray(np.ndarray):
         In NumPy, ufuncs are the various fundamental operations applied to ndarrays in an element-by-element fashion, such as add() and divide().
         https://numpy.org/doc/stable/reference/ufuncs.html
 
+        ndarray has lots of built-in ufuncs. In order to use them, the MPIArrays need to be converted into ndarrays, otherwise NumPy reports a NotImplemented error.
+
+        The distributed axis for all input MPIArrays, is expected to be the same. Operations across the distributed axis, will not be permitted.
+
+        The new array will ehter be be distributed over that axis, or possibly one axis down for `reduce` methods, if they eliminate the distributed axis.
+
+        For operations that normally return a scalar, the scalars will be wrapped into a 1D array, distributed across axis 0.
+
         Parameters
         ----------
         ufunc: <function>
@@ -1018,25 +1026,25 @@ class MPIArray(np.ndarray):
 
         args = []
         input_mpi = []  # container for original input MPIArrays
-        distr_axis = None  # the distributed axis
+        dist_axis = None  # the distributed axis
 
         # convert all local arrays into ndarrays
         for input_ in inputs:
             if isinstance(input_, MPIArray):
-                if distr_axis is None:
-                    distr_axis = input_.axis
+                if dist_axis is None:
+                    dist_axis = input_.axis
                 else:
                     assert (
-                        distr_axis == input_.axis
+                        dist_axis == input_.axis
                     ), "The distributed axis for all MPIArrays in an expression should be the same"
                 input_mpi.append(input_)
                 args.append(input_.local_array.view(np.ndarray))
             else:
                 args.append(input_)
 
-        if "axis" in kwargs and (kwargs["axis"] == distr_axis):
+        if "axis" in kwargs and (kwargs["axis"] == dist_axis):
             raise ValueError(
-                f"operations along the distributed axis (in this case, {distr_axis}) are not allowed."
+                f"operations along the distributed axis (in this case, {dist_axis}) are not allowed."
             )
 
         # 'out' kwargs contain arrays that the ufunc places the results into
@@ -1062,6 +1070,7 @@ class MPIArray(np.ndarray):
         if ufunc.nout == 1:
             results = (results,)
 
+        # Wrapping the results back into MPIArrays, distributed across the appropriate axis
         ret = []
 
         for result, output in zip(results, outputs):
@@ -1071,17 +1080,29 @@ class MPIArray(np.ndarray):
                 ret.append(output)
             else:
                 if (
-                    result.shape
+                    result.shape and
                 ):  # case: the result is an array; convert back it into an MPIArray
-                    ret.append(MPIArray.wrap(result, axis=distr_axis))
+                    ret.append(MPIArray.wrap(result, axis=dist_axis))
                 else:  # case: result is a scalar; convert to 1-d vector, across distributed axis
-                    ret.append(MPIArray.wrap(np.reshape(result, (1, 1)), axis=distr_axis))
+                    ret.append(MPIArray.wrap(np.reshape(result, (1, 1)), axis=dist_axis))
 
         return ret[0] if len(ret) == 1 else tuple(ret)
 
     def __array_finalize__(self, obj):
+        """
+        Finalizes the creation of the MPIArray, when viewed.
+
+        In NumPy, ndarrays only go through the `__new__` when being instantiated.
+        For views and broadcast, they go through __array_finalize__.
+        https://numpy.org/doc/stable/user/basics.subclassing.html#the-role-of-array-finalize
+
+        Parameters
+        ----------
+        obj : MPIArray or None
+            The original MPIArray being viewed or broadcast. When in the middle of a constructor, obj is set to None.
+        """
         # we are in the middle of a constructor, and the attributes
-        # will be set when we return
+        # will be set when we return to it
         if obj is None:
             return
 
@@ -1092,8 +1113,11 @@ class MPIArray(np.ndarray):
                 obj, "axis", 0
             )  # probably not a good default! How would we find this out?
 
-            # get axis length
-            axlen = self.shape[axis]
+            # get length of distributed axis
+            try:
+                axlen = self.shape[axis]
+            except IndexError:
+                raise Exception(f"Axis {axis} does not exist in array , and cannot be distributed over.")
             totallen = mpiutil.allreduce(axlen, comm=comm)
 
             # Figure out what the distributed layout is
