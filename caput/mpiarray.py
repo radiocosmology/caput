@@ -1089,7 +1089,9 @@ class MPIArray(np.ndarray):
                 ):  # case: the result is an array; convert back it into an MPIArray
                     ret.append(MPIArray.wrap(result, axis=dist_axis))
                 else:  # case: result is a scalar; convert to 1-d vector, across distributed axis
-                    ret.append(MPIArray.wrap(np.reshape(result, (1, 1)), axis=dist_axis))
+                    ret.append(
+                        MPIArray.wrap(np.reshape(result, (1, 1)), axis=dist_axis)
+                    )
 
         return ret[0] if len(ret) == 1 else tuple(ret)
 
@@ -1122,7 +1124,9 @@ class MPIArray(np.ndarray):
             try:
                 axlen = self.shape[axis]
             except IndexError:
-                raise Exception(f"Axis {axis} does not exist in array , and cannot be distributed over.")
+                raise Exception(
+                    f"Axis {axis} does not exist in array , and cannot be distributed over."
+                )
             totallen = mpiutil.allreduce(axlen, comm=comm)
 
             # Figure out what the distributed layout is
