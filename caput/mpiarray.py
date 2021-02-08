@@ -1110,7 +1110,7 @@ class MPIArray(np.ndarray):
 
         if "reduce" in method:
             # reduction methods eliminate axes, so the distributed axes might need to be recalculated
-            if len(results[0].shape) < dist_axis + 1:
+            if results[0].shape and len(results[0].shape) < dist_axis + 1:
                 dist_axis -= 1
 
         # Wrapping the results back into MPIArrays, distributed across the appropriate axis
