@@ -1036,6 +1036,42 @@ class MPIArray(np.ndarray):
         slices = [slice(start, end) for start, end in zip(starts, ends)]
         return split_axis, slices
 
+    @staticmethod
+    def _mpi_to_ndarray(inputs):
+        """Ensure a list with mixed MPIArrays and ndarrays are all ndarrays.
+
+        Additionally, ensure that all of the MPIArrays were are all distributed along the same axes.
+
+        Parameters
+        ----------
+        inputs : list of MPIArrays and ndarrays
+            All MPIArrays should be distributed along the same axes.
+
+        Returns
+        -------
+        args : list of ndarrays
+            The ndarrays are built from the local view of inputted MPIArrays.
+        dist_axis : int
+            The axis that all of the MPIArrays were distributed on.
+        """
+        args = []
+        dist_axis = None
+
+        for array in inputs:
+            if isinstance(array, MPIArray):
+                if dist_axis is None:
+                    dist_axis = array._axis
+                else:
+                    assert (
+                        dist_axis == array._axis
+                    ), "The distributed axis for all MPIArrays in an expression should be the same"
+
+                args.append(array.local_array.view(np.ndarray))
+            else:
+                args.append(array)
+
+        return (args, dist_axis)
+
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         """Handles ufunc operations for MPIArray.
 
@@ -1063,22 +1099,9 @@ class MPIArray(np.ndarray):
         """
 
         args = []
-        input_mpi = []  # container for original input MPIArrays
-        dist_axis = None  # the distributed axis
 
         # convert all local arrays into ndarrays
-        for input_ in inputs:
-            if isinstance(input_, MPIArray):
-                if dist_axis is None:
-                    dist_axis = input_.axis
-                else:
-                    assert (
-                        dist_axis == input_.axis
-                    ), "The distributed axis for all MPIArrays in an expression should be the same"
-                input_mpi.append(input_)
-                args.append(input_.local_array.view(np.ndarray))
-            else:
-                args.append(input_)
+        args, dist_axis = MPIArray._mpi_to_ndarray(inputs)
 
         if "axis" in kwargs and (kwargs["axis"] == dist_axis):
             raise ValueError(
@@ -1090,20 +1113,12 @@ class MPIArray(np.ndarray):
         # that the ufunc knows how to work with
         outputs = kwargs.get("out", None)
         if outputs:
-            out_args = []
-            for output in outputs:
-                if isinstance(output, MPIArray):
-                    out_args.append(output.local_array.view(np.ndarray))
-                else:
-                    out_args.append(output)
+            out_args, _ = MPIArray._mpi_to_ndarray(outputs)
             kwargs["out"] = tuple(out_args)
         else:
             outputs = (None,) * ufunc.nout
 
-        results = super(MPIArray, self).__array_ufunc__(ufunc, method, *args, **kwargs)
-
-        if results is NotImplemented:
-            return NotImplemented
+        results = super().__array_ufunc__(ufunc, method, *args, **kwargs)
 
         if ufunc.nout == 1:
             results = (results,)
@@ -1126,12 +1141,12 @@ class MPIArray(np.ndarray):
                     result.shape
                 ):  # case: the result is an array; convert back it into an MPIArray
                     ret.append(MPIArray.wrap(result, axis=dist_axis))
-                else:  # case: result is a scalar; convert to 1-d vector, across distributed axis
+                else:  # case: result is a scalar; convert to 1-d vector, distributed across axis 0
                     ret.append(
-                        MPIArray.wrap(np.reshape(result, (1, 1)), axis=dist_axis)
+                        MPIArray.wrap(np.reshape(result, (1, 1)), axis=0)
                     )
 
-        return ret[0] if len(ret) == 1 else tuple(ret)
+        return ret[0] if ufunc.nout == 1 else tuple(ret)
 
     def __array_finalize__(self, obj):
         """
@@ -1161,10 +1176,10 @@ class MPIArray(np.ndarray):
             # get length of distributed axis
             try:
                 axlen = self.shape[axis]
-            except IndexError:
+            except IndexError as e:
                 raise Exception(
                     f"Axis {axis} does not exist in array , and cannot be distributed over."
-                )
+                ) from e
             totallen = mpiutil.allreduce(axlen, comm=comm)
 
             # Figure out what the distributed layout is
