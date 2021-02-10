@@ -1093,10 +1093,10 @@ class MPIArray(np.ndarray):
         for array in inputs:
             if isinstance(array, MPIArray):
                 if dist_axis is None:
-                    dist_axis = array._axis
+                    dist_axis = array.axis
                 else:
                     assert (
-                        dist_axis == array._axis
+                        dist_axis == array.axis
                     ), "The distributed axis for all MPIArrays in an expression should be the same"
 
                 args.append(array.local_array.view(np.ndarray))
@@ -1151,7 +1151,14 @@ class MPIArray(np.ndarray):
         else:
             outputs = (None,) * ufunc.nout
 
-        results = super().__array_ufunc__(ufunc, method, *args, **kwargs)
+        results = super().__array_ufunc__(ufunc, method, *args, **kwargs) # pylint: disable=no-member
+
+        if results is NotImplemented:
+            return NotImplemented
+
+        # operation is performed in-place, so we can just return
+        if method == 'at':
+            return
 
         if ufunc.nout == 1:
             results = (results,)
@@ -1179,7 +1186,7 @@ class MPIArray(np.ndarray):
                         MPIArray.wrap(np.reshape(result, (1, 1)), axis=0)
                     )
 
-        return ret[0] if ufunc.nout == 1 else tuple(ret)
+        return ret[0] if len(ret) == 1 else tuple(ret)
 
     def __array_finalize__(self, obj):
         """
