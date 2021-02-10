@@ -1105,6 +1105,10 @@ class MPIArray(np.ndarray):
 
         return (args, dist_axis)
 
+    # pylint: disable=inconsistent-return-statements
+    # array_ufunc is a special general function
+    # which facilitates the use of a diverse set of ufuncs
+    # some which return nothing, and some which return something
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         """Handles ufunc operations for MPIArray.
 
@@ -1130,6 +1134,8 @@ class MPIArray(np.ndarray):
         kwargs: dict
             dictionary containing the optional input arguments of the ufunc. Important kwargs considered here are 'out' and 'axis'.
         """
+        # pylint: disable=no-member
+        # known problem with super().__array_ufunc__
 
         args = []
 
@@ -1151,13 +1157,13 @@ class MPIArray(np.ndarray):
         else:
             outputs = (None,) * ufunc.nout
 
-        results = super().__array_ufunc__(ufunc, method, *args, **kwargs) # pylint: disable=no-member
+        results = super().__array_ufunc__(ufunc, method, *args, **kwargs)
 
         if results is NotImplemented:
             return NotImplemented
 
         # operation is performed in-place, so we can just return
-        if method == 'at':
+        if method == "at":
             return
 
         if ufunc.nout == 1:
@@ -1182,11 +1188,11 @@ class MPIArray(np.ndarray):
                 ):  # case: the result is an array; convert back it into an MPIArray
                     ret.append(MPIArray.wrap(result, axis=dist_axis))
                 else:  # case: result is a scalar; convert to 1-d vector, distributed across axis 0
-                    ret.append(
-                        MPIArray.wrap(np.reshape(result, (1, 1)), axis=0)
-                    )
+                    ret.append(MPIArray.wrap(np.reshape(result, (1, 1)), axis=0))
 
         return ret[0] if len(ret) == 1 else tuple(ret)
+
+    # pylint: enable=inconsistent-return-statements
 
     def __array_finalize__(self, obj):
         """
