@@ -1170,9 +1170,9 @@ class MPIArray(np.ndarray):
             results = (results,)
 
         if "reduce" in method:
-            # reduction methods eliminate axes, so the distributed axes might need to be recalculated
+            # reduction methods eliminate axes, so the distributed axes needs to be recalculated
             if results[0].shape and len(results[0].shape) < dist_axis + 1:
-                dist_axis -= 1
+                dist_axis = len(results[0].shape) - 1
 
         # Wrapping the results back into MPIArrays, distributed across the appropriate axis
         ret = []
@@ -1218,6 +1218,11 @@ class MPIArray(np.ndarray):
             axis = getattr(
                 obj, "axis", 0
             )  # probably not a good default! How would we find this out?
+
+            # if the array has been reduced, re-calibrate the distr axes
+            axis -= len(obj.shape) - len(self.shape)
+
+            axis = 0 if axis < 0 else axis
 
             # get length of distributed axis
             try:
