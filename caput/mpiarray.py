@@ -1220,26 +1220,14 @@ class MPIArray(np.ndarray):
             )  # probably not a good default! How would we find this out?
 
             # if the array has been reduced, re-calibrate the distr axes
-            axis -= len(obj.shape) - len(self.shape)
-
-            axis = 0 if axis < 0 else axis
-
-            # get length of distributed axis
-            try:
-                axlen = self.shape[axis]
-            except IndexError as e:
-                raise Exception(
-                    f"Axis {axis} does not exist in array , and cannot be distributed over."
-                ) from e
-            totallen = mpiutil.allreduce(axlen, comm=comm)
-
-            # Figure out what the distributed layout is
-            _, local_start, _ = mpiutil.split_local(totallen, comm=comm)
+            if len(self.shape) < axis + 1:
+                axis = len(self.shape) - 1
 
             # Get shape and offset
             lshape = self.shape
             global_shape = list(lshape)
-            global_shape[axis] = totallen
+
+            _, local_start, _ = mpiutil.split_local(global_shape[axis], comm=comm)
 
             loffset = [0] * len(lshape)
             loffset[axis] = local_start
