@@ -481,6 +481,11 @@ class Manager(config.Reader):
     save_config : bool
         If this is True, the global pipeline configuration is attached to output
         metadata. Default: True.
+
+    Parameters
+    ----------
+    psutil_profiling : bool
+        Use psutil to profile CPU and memory usage. Default `False`.
     """
 
     logging = config.logging_config(default={"root": "WARNING"})
@@ -492,14 +497,22 @@ class Manager(config.Reader):
     versions = config.Property(default=[], proptype=_get_versions, key="save_versions")
     save_config = config.Property(default=True, proptype=bool)
 
-    def __init__(self):
+    def __init__(self, psutil_profiling=False):
         # Initialise the list of task instances
         self.tasks = []
         self.all_params = []
         self.all_tasks_params = []
 
+        self._psutil_profiling = psutil_profiling
+        if self._psutil_profiling:
+            self._profiler = misc.PSUtilProfiler()
+
+        logger.debug(
+            "CPU and memory profiling using psutil {self._psutil_profiling ? 'enabled' : 'disabled'}."
+        )
+
     @classmethod
-    def from_yaml_file(cls, file_name, lint=False):
+    def from_yaml_file(cls, file_name, lint=False, psutil_profiling=False):
         """Initialize the pipeline from a YAML configuration file.
 
         Parameters
@@ -508,6 +521,8 @@ class Manager(config.Reader):
             Path to YAML pipeline configuration file.
         lint : bool
             Instantiate Manager only to lint config. Disables debug logging.
+        psutil_profiling : bool
+            Use psutil to profile CPU and memory usage.
 
         Returns
         -------
@@ -522,10 +537,10 @@ class Manager(config.Reader):
                 "Unable to open yaml file ({}): {}".format(file_name, e),
                 file_=file_name,
             )
-        return cls.from_yaml_str(yaml_doc, lint)
+        return cls.from_yaml_str(yaml_doc, lint, psutil_profiling)
 
     @classmethod
-    def from_yaml_str(cls, yaml_doc, lint=False):
+    def from_yaml_str(cls, yaml_doc, lint=False, psutil_profiling=False):
         """Initialize the pipeline from a YAML configuration string.
 
         Parameters
@@ -534,6 +549,8 @@ class Manager(config.Reader):
             Yaml configuration document.
         lint : bool
             Instantiate Manager only to lint config. Disables debug logging.
+        psutil_profiling : bool
+            Use psutil to profile CPU and memory usage.
 
         Returns
         -------
@@ -555,7 +572,9 @@ class Manager(config.Reader):
                 "Couldn't find key 'pipeline' in YAML configuration document.",
                 location=yaml_params,
             ) from e
-        self = cls.from_config(yaml_params["pipeline"])
+        self = cls.from_config(
+            yaml_params["pipeline"], psutil_profiling=psutil_profiling
+        )
         self.all_params = yaml_params
         self.all_tasks_params = {
             "versions": self.versions,
@@ -578,7 +597,7 @@ class Manager(config.Reader):
         # set root log level and set up default formatter
         loglvl_root = self.logging.get("root", "WARNING")
 
-        # Don't allow INFO log level when linting
+        # Don't allow DEBUG log level when linting
         if lint and loglvl_root == "DEBUG":
             loglvl_root = "INFO"
 
@@ -598,6 +617,10 @@ class Manager(config.Reader):
         # Run the pipeline.
         while self.tasks:
             for task in list(self.tasks):  # Copy list so we can alter it.
+                if self._psutil_profiling:
+                    name_profiling = f"{task.__class__.__name__}.{task._pipeline_state}"
+                    self._profiler.start(name_profiling)
+
                 # These lines control the flow of the pipeline.
                 try:
                     out = task._pipeline_next()
@@ -613,6 +636,10 @@ class Manager(config.Reader):
                 except _PipelineFinished:
                     self.tasks.remove(task)
                     continue
+                finally:
+                    if self._psutil_profiling:
+                        self._profiler.stop(name_profiling)
+
                 # Now pass the output data products to any task that needs
                 # them.
                 out_keys = task._out_keys
