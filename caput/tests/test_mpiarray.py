@@ -296,6 +296,9 @@ class TestMPIArray(unittest.TestCase):
         res = local_array[:, 3]
         assert (arr == res).all()
 
+        # Check that slices contain MPIArray attributes
+        assert hasattr(arr, "comm") and (arr.comm == darr.comm)
+
         # These tests denpend on the size being at least 2.
         if size > 1:
             # Check a slice on the parallel axis
