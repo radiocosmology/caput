@@ -397,6 +397,49 @@ class TestMPIArray(unittest.TestCase):
 
         assert (darr == local_array).all()
 
+    def test_outer_ufunc(self):
+        rank = mpiutil.rank
+        size = mpiutil.size
+
+        dist_arr = mpiarray.MPIArray((size, 4), axis=0)
+        dist_arr[:] = rank
+
+        dist_arr_scalar = mpiarray.MPIArray((size, 4), axis=0)
+        dist_arr_scalar[:] = rank * 2
+
+        dist_arr_add = dist_arr + dist_arr
+
+        # Check that you can add two numpy arrays,
+        # if they are distributed along the same axes
+        # Check that you can multiple a numpy array against a scalar
+        assert (dist_arr_add == dist_arr_scalar).all()
+
+        # Check that basic output MPI attributes are correct
+        assert hasattr(dist_arr_add, "axis") and hasattr(dist_arr_add, "comm")
+
+        assert dist_arr_add.axis == 0
+
+        assert dist_arr_add.comm is dist_arr.comm
+
+    def test_reduce(self):
+        rank = mpiutil.rank
+        size = mpiutil.size
+
+        dist_array = mpiarray.MPIArray((size, 4, 3), axis=0)
+        dist_array[:] = rank
+
+        # sums across non-distributed axes should be permitted, and work as usual
+        assert (dist_array.sum(axis=1) == 4 * rank).all()
+
+        # sum() should reduce across all non-distributed axes
+        sum_all = dist_array.sum()
+        assert (sum_all == 4 * 3 * rank).all()
+
+        assert sum_all.local_shape == (1, 1)
+
+        assert sum_all.global_shape == (size, 1)
+
+
 
 #
 # class Testmpiarray(unittest.TestCase):
