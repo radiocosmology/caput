@@ -1146,10 +1146,14 @@ class MPIArray(np.ndarray):
         if ufunc.nout == 1:
             results = (results,)
 
-        if "reduce" in method:
-            # reduction methods eliminate axes, so the distributed axes needs to be recalculated
-            if results[0].shape and len(results[0].shape) < dist_axis + 1:
-                dist_axis = len(results[0].shape) - 1
+        if "reduce" in method and results[0].shape:
+            # reduction methods eliminate axes, so the distributed axes
+            # might need to be recalculated
+            # except when the user explicitly specifies keepdims
+            if not kwargs.get("keepdims", False):
+                reduction_axis = kwargs["axis"]
+                if reduction_axis < dist_axis:
+                    dist_axis -= 1
 
         # Wrapping the results back into MPIArrays, distributed across the appropriate axis
         ret = []
