@@ -1193,9 +1193,11 @@ class MPIArray(np.ndarray):
         # we are in a ufunc, rebuild the attributes from the original MPIArray
         if isinstance(obj, MPIArray):
             comm = getattr(obj, "comm", mpiutil.world)
-            axis = getattr(
-                obj, "axis", 0
-            )  # probably not a good default! How would we find this out?
+            if hasattr(obj, "axis"):
+                axis = obj.axis
+            else:
+                raise Exception("Cannot construct output axis")
+
 
             # if the array has been reduced, re-calibrate the distr axes
             if len(self.shape) < axis + 1:
