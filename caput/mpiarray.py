@@ -1229,30 +1229,27 @@ class MPIArray(np.ndarray):
         # we are in a ufunc, rebuild the attributes from the original MPIArray
         if isinstance(obj, MPIArray):
             comm = getattr(obj, "comm", mpiutil.world)
-            if hasattr(obj, "axis"):
-                axis = obj.axis
-            else:
-                raise Exception("Cannot construct output axis")
 
-            # if the array has been reduced, re-calibrate the distr axes
-            if len(self.shape) < axis + 1:
-                axis = len(self.shape) - 1
+        if hasattr(obj, "axis"):
+            axis = obj.axis
+        else:
+            raise Exception("Cannot construct output axis")
 
-            # Get shape and offset
-            lshape = self.shape
-            global_shape = list(lshape)
+        # Get shape and offset
+        lshape = self.shape
+        global_shape = list(lshape)
 
-            _, local_start, _ = mpiutil.split_local(global_shape[axis], comm=comm)
+        _, local_start, _ = mpiutil.split_local(global_shape[axis], comm=comm)
 
-            loffset = [0] * len(lshape)
-            loffset[axis] = local_start
+        loffset = [0] * len(lshape)
+        loffset[axis] = local_start
 
-            # Setup attributes
-            self._global_shape = tuple(global_shape)
-            self._axis = axis
-            self._local_shape = tuple(lshape)
-            self._local_offset = tuple(loffset)
-            self._comm = comm
+        # Setup attributes
+        self._global_shape = tuple(global_shape)
+        self._axis = axis
+        self._local_shape = tuple(lshape)
+        self._local_offset = tuple(loffset)
+        self._comm = comm
         return
 
 
