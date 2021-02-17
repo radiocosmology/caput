@@ -431,8 +431,8 @@ class TestMPIArray(unittest.TestCase):
         # check that subtracting arrays with two different distributed axis fails
         self.assertRaises(ValueError, np.subtract, mpiarray.MPIArray((size, 4), axis=0), mpiarray.MPIArray((size, 4), axis=1))
 
-
-        # check that adding arrays that cannot be broadcast fails
+        # check that outer ufunc on arrays that cannot be broadcast fails
+        self.assertRaises(ValueError, np.multiply, mpiarray.MPIArray((size, 3), axis=0), mpiarray.MPIArray((size, 4), axis=0))
 
     def test_reduce(self):
         rank = mpiutil.rank
