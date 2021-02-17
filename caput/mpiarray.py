@@ -1233,7 +1233,9 @@ class MPIArray(np.ndarray):
         if hasattr(obj, "axis"):
             axis = obj.axis
         else:
-            raise Exception("Cannot construct output axis")
+            # in the middle of an np.ndarray.view()
+            # user will have to set the attributes themselves
+            return
 
         # Get shape and offset
         lshape = self.shape
