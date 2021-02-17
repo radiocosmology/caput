@@ -1096,7 +1096,9 @@ class MPIArray(np.ndarray):
                     dist_axis = array.axis
                 else:
                     if dist_axis != array.axis:
-                        raise ValueError("The distributed axis for all MPIArrays in an expression should be the same")
+                        raise ValueError(
+                            "The distributed axis for all MPIArrays in an expression should be the same"
+                        )
 
                 args.append(array.local_array.view(np.ndarray))
             else:
@@ -1111,27 +1113,36 @@ class MPIArray(np.ndarray):
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         """Handles ufunc operations for MPIArray.
 
-        In NumPy, ufuncs are the various fundamental operations applied to ndarrays in an element-by-element fashion, such as add() and divide().
+        In NumPy, ufuncs are the various fundamental operations applied to
+        ndarrays in an element-by-element fashion, such as add() and divide().
         https://numpy.org/doc/stable/reference/ufuncs.html
 
-        ndarray has lots of built-in ufuncs. In order to use them, the MPIArrays need to be converted into ndarrays, otherwise NumPy reports a NotImplemented error.
+        ndarray has lots of built-in ufuncs. In order to use them, the MPIArrays
+        need to be converted into ndarrays, otherwise NumPy reports a
+        NotImplemented error.
 
-        The distributed axis for all input MPIArrays, is expected to be the same. Operations across the distributed axis, will not be permitted.
+        The distributed axis for all input MPIArrays, is expected to be the same.
+        Operations across the distributed axis, will not be permitted.
 
-        The new array will ehter be be distributed over that axis, or possibly one axis down for `reduce` methods, if they eliminate the distributed axis.
+        The new array will ehter be be distributed over that axis, or possibly
+        one axis down for `reduce` methods, if they eliminate the distributed axis.
 
-        For operations that normally return a scalar, the scalars will be wrapped into a 1D array, distributed across axis 0.
+        For operations that normally return a scalar, the scalars will be
+        wrapped into a 1D array, distributed across axis 0.
 
         Parameters
         ----------
         ufunc: <function>
             ufunc object that was called
         method: str
-            indicates which ufunc method was called. one of "__call__", "reduce", "reduceat", "accumulate", "outer", "inner"
+            indicates which ufunc method was called.
+            one of "__call__", "reduce", "reduceat", "accumulate", "outer", "inner"
         inputs: tuple
-            tuple of the input arguments to the ufunc. At least one of the inputs is an MPIArray.
+            tuple of the input arguments to the ufunc.
+            At least one of the inputs is an MPIArray.
         kwargs: dict
-            dictionary containing the optional input arguments of the ufunc. Important kwargs considered here are 'out' and 'axis'.
+            dictionary containing the optional input arguments of the ufunc.
+            Important kwargs considered here are 'out' and 'axis'.
         """
         # pylint: disable=no-member
         # known problem with super().__array_ufunc__
@@ -1204,7 +1215,8 @@ class MPIArray(np.ndarray):
         Parameters
         ----------
         obj : MPIArray or None
-            The original MPIArray being viewed or broadcast. When in the middle of a constructor, obj is set to None.
+            The original MPIArray being viewed or broadcast.
+            When in the middle of a constructor, obj is set to None.
         """
         # we are in the middle of a constructor, and the attributes
         # will be set when we return to it
