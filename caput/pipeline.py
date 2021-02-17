@@ -618,7 +618,7 @@ class Manager(config.Reader):
         while self.tasks:
             for task in list(self.tasks):  # Copy list so we can alter it.
                 if self._psutil_profiling:
-                    name_profiling = f"{task.__class__.__name__}.{task._pipeline_state}"
+                    name_profiling = f"{task.__class__.__name__}.{task.pipeline_state}"
                     self._profiler.start(name_profiling)
 
                 # These lines control the flow of the pipeline.
@@ -993,6 +993,18 @@ class TaskBase(config.Reader):
         self._in_keys = in_
         self._in = [queue.Queue() for i in range(n_in)]
         self._out_keys = out
+
+    @property
+    def pipeline_state(self):
+        """
+        Get state of the task.
+
+        Returns
+        -------
+        pipeline_state : str
+            One of 'setup', 'next', 'finish' or 'raise'.
+        """
+        return self._pipeline_state
 
     def _pipeline_advance_state(self):
         """Advance this pipeline task to the next stage.
