@@ -614,9 +614,11 @@ class Manager(config.Reader):
         This function initializes all pipeline tasks and runs the pipeline
         through to completion.
 
+        Raises
+        ------
+        PipelineRuntimeError
+            If a task stage returns the wrong number of outputs.
         """
-
-        # Run the pipeline.
         while self.tasks:
             for task in list(self.tasks):  # Copy list so we can alter it.
                 if self._psutil_profiling:
@@ -642,34 +644,51 @@ class Manager(config.Reader):
                     if self._psutil_profiling:
                         self._profiler.stop(name_profiling)
 
-                # Now pass the output data products to any task that needs
-                # them.
-                out_keys = task._out_keys
-                if out is None:  # This iteration supplied no output.
+                # Now pass the output data products to any task that needs them.
+                out = self._check_task_output(out, task)
+                if out is None:
                     continue
-                elif len(out_keys) == 0:  # Output not handled by pipeline.
-                    continue
-                elif len(out_keys) == 1:
-                    if isinstance(out_keys, tuple):
-                        # In config file, written as `out: out_key`. No
-                        # unpacking if `out` is a length 1 sequence.
-                        out = (out,)
-                    else:  # `out_keys` is a list.
-                        # In config file, written as `out: [out_key,]`.
-                        # `out` must be a length 1 sequence.
-                        pass
-                elif len(out_keys) != len(out):
-                    msg = (
-                        "Found unexpected number of outputs in %s (got %i expected %i)"
-                        % (task.__class__.__name__, len(out), len(out_keys))
-                    )
-                    raise PipelineRuntimeError(msg)
-                keys = str(out_keys)
+                keys = str(task.out_keys)
                 msg = "%s produced output data product with keys %s."
                 msg = msg % (task.__class__.__name__, keys)
                 logger.debug(msg)
                 for receiving_task in self.tasks:
-                    receiving_task._pipeline_inspect_queue_product(out_keys, out)
+                    receiving_task._pipeline_inspect_queue_product(task.out_keys, out)
+
+    @staticmethod
+    def _check_task_output(out, task):
+        """
+        Check if task stage's output is as expected.
+
+        Returns
+        -------
+        out : Same as `TaskBase.next` or None
+            Pipeline product. None if there's no output of that task stage that has to be handled further.
+
+        Raises
+        ------
+        PipelineRuntimeError
+            If a task stage returns the wrong number of outputs.
+        """
+        if out is None:  # This iteration supplied no output.
+            return None
+        elif len(task.out_keys) == 0:  # Output not handled by pipeline.
+            return None
+        elif len(task.out_keys) == 1:
+            if isinstance(task.out_keys, tuple):
+                # In config file, written as `out: out_key`. No
+                # unpacking if `out` is a length 1 sequence.
+                return (out,)
+            else:  # `out_keys` is a list.
+                # In config file, written as `out: [out_key,]`.
+                # `out` must be a length 1 sequence.
+                return out
+        elif len(task.out_keys) != len(out):
+            raise PipelineRuntimeError(
+                f"Found unexpected number of outputs in {task.__class__.__name__}"
+                f"(got {len(out)} expected {len(task.out_keys)})"
+            )
+        return out
 
     def _setup_tasks(self):
         """Create and setup all tasks from the task list."""
@@ -995,6 +1014,11 @@ class TaskBase(config.Reader):
         self._in_keys = in_
         self._in = [queue.Queue() for i in range(n_in)]
         self._out_keys = out
+
+    @property
+    def out_keys(self):
+        """Get names of outputs of this task."""
+        return self._out_keys
 
     @property
     def pipeline_state(self):
