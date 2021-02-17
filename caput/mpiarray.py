@@ -1155,16 +1155,15 @@ class MPIArray(np.ndarray):
         ret = []
 
         for result, output in zip(results, outputs):
-            if (
-                output is not None
-            ):  # case: results were placed in the array specified by `out`; return as is
+            # case: results were placed in the array specified by `out`; return as is
+            if output is not None:
                 ret.append(output)
             else:
-                if (
-                    result.shape
-                ):  # case: the result is an array; convert back it into an MPIArray
+                # case: the result is an array; convert back it into an MPIArray
+                if result.shape:
                     ret.append(MPIArray.wrap(result, axis=dist_axis))
-                else:  # case: result is a scalar; convert to 1-d vector, distributed across axis 0
+                # case: result is a scalar; convert to 1-d vector, distributed across axis 0
+                else:
                     ret.append(MPIArray.wrap(np.reshape(result, (1, 1)), axis=0))
 
         return ret[0] if len(ret) == 1 else tuple(ret)
@@ -1197,7 +1196,6 @@ class MPIArray(np.ndarray):
                 axis = obj.axis
             else:
                 raise Exception("Cannot construct output axis")
-
 
             # if the array has been reduced, re-calibrate the distr axes
             if len(self.shape) < axis + 1:
