@@ -1095,9 +1095,8 @@ class MPIArray(np.ndarray):
                 if dist_axis is None:
                     dist_axis = array.axis
                 else:
-                    assert (
-                        dist_axis == array.axis
-                    ), "The distributed axis for all MPIArrays in an expression should be the same"
+                    if dist_axis != array.axis:
+                        raise ValueError("The distributed axis for all MPIArrays in an expression should be the same")
 
                 args.append(array.local_array.view(np.ndarray))
             else:

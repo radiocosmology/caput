@@ -404,15 +404,16 @@ class TestMPIArray(unittest.TestCase):
         dist_arr = mpiarray.MPIArray((size, 4), axis=0)
         dist_arr[:] = rank
 
-        dist_arr_scalar = mpiarray.MPIArray((size, 4), axis=0)
-        dist_arr_scalar[:] = rank * 2
-
         dist_arr_add = dist_arr + dist_arr
 
-        # Check that you can add two numpy arrays,
-        # if they are distributed along the same axes
-        # Check that you can multiple a numpy array against a scalar
-        assert (dist_arr_add == dist_arr_scalar).all()
+        dist_arr_add = dist_arr + dist_arr
+        dist_arr_mul = 2 * dist_arr
+
+        # check that you can add two MPIArrays with the same shape
+        assert (dist_arr_add == 2 * rank).all()
+
+        # Check that you can multiply an MPIArray against a scalar
+        assert (dist_arr_mul == 2 * rank).all()
 
         # Check that basic output MPI attributes are correct
         assert hasattr(dist_arr_add, "axis") and hasattr(dist_arr_add, "comm")
@@ -420,6 +421,18 @@ class TestMPIArray(unittest.TestCase):
         assert dist_arr_add.axis == 0
 
         assert dist_arr_add.comm is dist_arr.comm
+
+        # add differently shaped MPIArrays, with broadcasting
+        dist_arr_2 = mpiarray.MPIArray((size, 1), axis=0)
+        dist_arr_2[:] = rank - 1
+        assert (dist_arr + dist_arr_2 == 2 * rank -1).all()
+        assert (dist_arr + dist_arr_2).axis == 0
+
+        # check that subtracting arrays with two different distributed axis fails
+        self.assertRaises(ValueError, np.subtract, mpiarray.MPIArray((size, 4), axis=0), mpiarray.MPIArray((size, 4), axis=1))
+
+
+        # check that adding arrays that cannot be broadcast fails
 
     def test_reduce(self):
         rank = mpiutil.rank
@@ -447,7 +460,7 @@ class TestMPIArray(unittest.TestCase):
 
         assert (dist_array.sum(axis=0)).axis == 1
 
-        assert(dist_array.sum(axis=0, keepdims=True).axis == 1)
+        assert dist_array.sum(axis=0, keepdims=True).axis == 1
 
         sum_all = dist_array.sum()
         assert (sum_all == 4 * 3 * rank).all()
