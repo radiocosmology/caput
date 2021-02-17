@@ -453,12 +453,14 @@ class TestMPIArray(unittest.TestCase):
         assert sum_all.global_shape == (size, 1)
 
         # sum across a smaller numbered axes
+        # this will result in an axes reduction
         dist_array = mpiarray.MPIArray((size, 4, 3), axis=1)
         dist_array[:] = rank
 
         assert (dist_array.sum(axis=0) == 4 * rank).all()
 
-        assert (dist_array.sum(axis=0)).axis == 1
+        # check that the new axes was calculated accordingly
+        assert (dist_array.sum(axis=0)).axis == 0
 
         assert dist_array.sum(axis=0, keepdims=True).axis == 1
 
@@ -472,7 +474,8 @@ class TestMPIArray(unittest.TestCase):
         dist_array = mpiarray.MPIArray((size, 4), axis=1)
         dist_array[:] = rank
 
-        assert (dist_array.sum(axis=0)).axis == 0
+        assert mpiarray.MPIArray((size, 4), axis=1).sum(axis=0).axis == 0
+
 #
 # class Testmpiarray(unittest.TestCase):
 #
