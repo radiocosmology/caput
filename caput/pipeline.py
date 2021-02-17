@@ -505,7 +505,9 @@ class Manager(config.Reader):
 
         self._psutil_profiling = psutil_profiling
         if self._psutil_profiling:
-            self._profiler = misc.PSUtilProfiler()
+            from .misc.profiling import PSUtilProfiler
+
+            self._profiler = PSUtilProfiler()
 
         logger.debug(
             "CPU and memory profiling using psutil {self._psutil_profiling ? 'enabled' : 'disabled'}."
