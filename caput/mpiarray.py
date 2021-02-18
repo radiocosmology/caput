@@ -1193,16 +1193,14 @@ class MPIArray(np.ndarray):
         if obj is None:
             return
 
-        # we are in a ufunc, rebuild the attributes from the original MPIArray
-        if isinstance(obj, MPIArray):
-            comm = getattr(obj, "comm", mpiutil.world)
-
-        if hasattr(obj, "axis"):
-            axis = obj.axis
-        else:
-            # in the middle of an np.ndarray.view()
-            # user will have to set the attributes themselves
+        if not isinstance(obj, MPIArray):
+            # in the middle of an np.ndarray.view() in the wrap()
             return
+
+        # we are in a slice, rebuild the attributes from the original MPIArray
+        comm = getattr(obj, "comm", mpiutil.world)
+
+        axis = obj.axis
 
         # Get shape and offset
         lshape = self.shape
