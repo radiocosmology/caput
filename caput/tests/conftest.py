@@ -1,9 +1,12 @@
 """Pytest fixtures and simple tasks that can be used by all unit tests."""
 
+import tempfile
+
 import numpy as np
 import pytest
 
 from caput.pipeline import PipelineStopIteration, TaskBase, IterBase
+from caput.scripts.runner import cli
 from caput import config
 
 
@@ -88,3 +91,51 @@ class CookEggs(IterBase):
 
     def write_output(self, filename, output):
         raise NotImplementedError()
+
+
+eggs_pipeline_conf = """
+---
+pipeline:
+  tasks:
+    - type: caput.tests.conftest.PrintEggs
+      params: eggs_params
+    - type: caput.tests.conftest.GetEggs
+      params: eggs_params
+      out: egg
+    - type: caput.tests.conftest.CookEggs
+      params: cook_params
+      in: egg
+eggs_params:
+  eggs: ['green', 'duck', 'ostrich']
+cook_params:
+  style: 'fried'
+"""
+
+
+def run_pipeline(parameters=None, configstr=eggs_pipeline_conf):
+    """
+    Run `caput.scripts.runner run` with given parameters and config.
+
+    Parameters
+    ----------
+    parameters : List[str]
+        Parameters to pass to the cli, for example `["--profile"]` (see `--help`).
+    configstr : str
+        YAML string to use as a config. This function will write it to a file that is then passed to the cli.
+
+    Returns
+    -------
+    result : `click.testing.Result`
+        Holds the captured result. Try accessing e.g. `result.exit_code`, `result.output`.
+
+    """
+    with tempfile.NamedTemporaryFile("w+") as configfile:
+        configfile.write(configstr)
+        configfile.flush()
+        from click.testing import CliRunner
+
+        runner = CliRunner()
+        if parameters is None:
+            return runner.invoke(cli, ["run", configfile.name])
+        else:
+            return runner.invoke(cli, ["run", *parameters, configfile.name])
