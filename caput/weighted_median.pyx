@@ -276,7 +276,7 @@ def quantile(A, W, q, method="split"):
     if A.dtype == np.intc:
         if W.dtype == np.intc:
             _quickselect[int, int](Ar, Wr, q, methodc, res, At, Wt)
-        elif W.dtype == np.int:
+        elif W.dtype == int:
             _quickselect[int, long](Ar, Wr, q, methodc, res, At, Wt)
         elif W.dtype == np.single:
             _quickselect[int, float](Ar, Wr, q, methodc, res, At, Wt)
@@ -284,10 +284,10 @@ def quantile(A, W, q, method="split"):
             _quickselect[int, double](Ar, Wr, q, methodc, res, At, Wt)
         else:
             raise TypeError("Type of weight array is not supported.")
-    elif A.dtype == np.int:
+    elif A.dtype == int:
         if W.dtype == np.intc:
             _quickselect[long, int](Ar, Wr, q, methodc, res, At, Wt)
-        elif W.dtype == np.int:
+        elif W.dtype == int:
             _quickselect[long, long](Ar, Wr, q, methodc, res, At, Wt)
         elif W.dtype == np.single:
             _quickselect[long, float](Ar, Wr, q, methodc, res, At, Wt)
@@ -298,7 +298,7 @@ def quantile(A, W, q, method="split"):
     elif A.dtype == np.single:
         if W.dtype == np.intc:
             _quickselect[float, int](Ar, Wr, q, methodc, res, At, Wt)
-        elif W.dtype == np.int:
+        elif W.dtype == int:
             _quickselect[float, long](Ar, Wr, q, methodc, res, At, Wt)
         elif W.dtype == np.single:
             _quickselect[float, float](Ar, Wr, q, methodc, res, At, Wt)
@@ -309,7 +309,7 @@ def quantile(A, W, q, method="split"):
     elif A.dtype == np.double:
         if W.dtype == np.intc:
             _quickselect[double, int](Ar, Wr, q, methodc, res, At, Wt)
-        elif W.dtype == np.int:
+        elif W.dtype == int:
             _quickselect[double, long](Ar, Wr, q, methodc, res, At, Wt)
         elif W.dtype == np.single:
             _quickselect[double, float](Ar, Wr, q, methodc, res, At, Wt)
