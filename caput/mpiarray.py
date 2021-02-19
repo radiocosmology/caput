@@ -385,7 +385,13 @@ class MPIArray(np.ndarray):
             comm = mpiutil.world
 
         # Get axis length, both locally, and globally
-        axlen = array.shape[axis]
+        try:
+            axlen = array.shape[axis]
+        except:
+            raise AxisException(
+                f"Distributed axis {axis} does not exist in global shape {shape}"
+            )
+
         totallen = mpiutil.allreduce(axlen, comm=comm)
 
         # Figure out what the distributed layout should be
@@ -1206,7 +1212,14 @@ class MPIArray(np.ndarray):
         lshape = self.shape
         global_shape = list(lshape)
 
-        _, local_start, _ = mpiutil.split_local(global_shape[axis], comm=comm)
+        try:
+            axlen = global_shape[axis]
+        except:
+            raise AxisException(
+                f"Distributed axis {axis} does not exist in global shape {global_shape}"
+            )
+
+        _, local_start, _ = mpiutil.split_local(axlen, comm=comm)
 
         loffset = [0] * len(lshape)
         loffset[axis] = local_start
@@ -1296,3 +1309,8 @@ class DummyContext:
 
     def __exit__(self, *exc):
         return False
+
+
+class AxisException(Exception):
+    def __init__(self, message):
+        self.message = message
