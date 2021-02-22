@@ -214,15 +214,17 @@ class _global_resolver:
             slobj = tuple(slice(None, None, None) if sl is None else sl for sl in slobj)
 
             # Return an MPIArray view
-            arr = self.array[slobj]
-
             # Figure out which is the distributed axis after the slicing, by
             # removing slice axes which are just ints from the mapping
             dist_axis = [
                 index for index, sl in enumerate(slobj) if not isinstance(sl, int)
             ].index(self.axis)
 
-            return MPIArray.wrap(arr, axis=dist_axis, comm=self.array._comm)
+            return MPIArray.wrap(
+                self.array.view(np.ndarray)[slobj],
+                axis=dist_axis,
+                comm=self.array._comm,
+            )
 
     def __setitem__(self, slobj, value):
 
@@ -1194,7 +1196,6 @@ class MPIArray(np.ndarray):
                 if reduction_axis < dist_axis:
                     dist_axis -= 1
 
-        # Wrapping the results back into MPIArrays, distributed across the appropriate axis
         ret = []
 
         for result, output in zip(results, outputs):
