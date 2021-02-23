@@ -274,6 +274,8 @@ class TestUnicodeDataset(unittest.TestCase):
         )
 
         with h5py.File(self.fname, "r") as fh:
+            # pylint warns here that "Instance of 'Group' has no 'dtype' member"
+            # pylint: disable=E1101
             self.assertEqual(fh["udata"].dtype.kind, "S")
             self.assertEqual(fh["sdata"].dtype.kind, "S")
 
