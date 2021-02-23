@@ -1040,6 +1040,7 @@ class TaskBase(config.Reader):
             except PipelineStopIteration:
                 # Finished iterating `next()`.
                 self._pipeline_advance_state()
+                return None
         elif self._pipeline_state == "finish":
             msg = "Task %s calling 'finish()'." % self.__class__.__name__
             logger.debug(msg)

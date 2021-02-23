@@ -25,12 +25,12 @@ jobs:
 
       - name: Install pip dependencies
         run: |
-          pip install pylint pylint-ignore flake8 pytest black mpi4py pyinstrument
+          pip install pylint==2.7.0 pylint-ignore flake8 pytest black mpi4py pyinstrument
           pip install -r requirements.txt
           python setup.py develop
 
       - name: Run flake8
-        run: flake8 --show-source --exit-zero --ignore=E501,E741,E203,W503,E266 caput
+        run: flake8 --show-source --ignore=E501,E741,E203,W503,E266 caput
 
       - name: Run pylint
         run: >
