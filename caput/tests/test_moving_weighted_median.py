@@ -124,7 +124,7 @@ def py_mwm_nd(values, weights, size):
         lbound = np.maximum(lbound, 0)
         hbound = np.minimum(hbound, np.shape(values))
 
-        window = tuple([slice(i, j, 1) for (i, j) in zip(lbound, hbound)])
+        window = tuple(slice(i, j, 1) for (i, j) in zip(lbound, hbound))
         medians[index] = py_weighted_median(
             values[window].flatten(), weights[window].flatten()
         )

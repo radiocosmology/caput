@@ -23,18 +23,17 @@ The recommended approach to using `pylint-ignore` is:
 
 # Overview
 
- - [E1101: no-member (32x)](#e1101-no-member)
+ - [E1101: no-member (30x)](#e1101-no-member)
  - [E1102: not-callable (1x)](#e1102-not-callable)
  - [E1111: assignment-from-no-return (2x)](#e1111-assignment-from-no-return)
  - [E1120: no-value-for-parameter (1x)](#e1120-no-value-for-parameter)
  - [E1121: too-many-function-args (1x)](#e1121-too-many-function-args)
  - [E1137: unsupported-assignment-operation (1x)](#e1137-unsupported-assignment-operation)
  - [W0201: attribute-defined-outside-init (18x)](#w0201-attribute-defined-outside-init)
- - [W0212: protected-access (48x)](#w0212-protected-access)
+ - [W0212: protected-access (45x)](#w0212-protected-access)
  - [W0221: arguments-differ (3x)](#w0221-arguments-differ)
- - [W0222: signature-differs (1x)](#w0222-signature-differs)
  - [W0223: abstract-method (6x)](#w0223-abstract-method)
- - [W0231: super-init-not-called (3x)](#w0231-super-init-not-called)
+ - [W0231: super-init-not-called (1x)](#w0231-super-init-not-called)
  - [W0511: fixme (14x)](#w0511-fixme)
  - [W0603: global-statement (1x)](#w0603-global-statement)
  - [W0613: unused-argument (8x)](#w0613-unused-argument)
@@ -554,128 +553,94 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 396 - E1101 (no-member)
+## File caput/mpiarray.py - Line 429 - E1101 (no-member)
 
 - `message: Module 'caput.mpiutil' has no 'MAX' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  359:     def wrap(cls, array, axis, comm=None):
+  392:     def wrap(cls, array, axis, comm=None):
   ...
-  394:         # Check the local layout is consistent with what we expect, and send
-  395:         # result to all ranks.
-> 396:         layout_issue = mpiutil.allreduce(axlen != local_num, op=mpiutil.MAX, comm=comm)
-  397:
-  398:         if layout_issue:
-```
-
-
-## File caput/memh5.py - Line 871 - E1101 (no-member)
-
-- `message: Instance of 'MemDataset' has no '_data' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  866:     def view(self):
-  ...
-  869:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
-  870:         out._attrs = self._attrs
-> 871:         out._data = self._data
-  872:         out.chunks = self.chunks
-  873:         out.compression = self.compression
-```
-
-
-## File caput/memh5.py - Line 1054 - E1101 (no-member)
-
-- `message: Instance of 'ndarray' has no '__iter__' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1051:     def __iter__(self):
-  ...
-  1052:         # This needs to be implemented to stop craziness happening when doing
-  1053:         # np.array(dset)
-> 1054:         return self._data.__iter__()
-  1055:
-  1056:     def __repr__(self):
+  427:         # Check the local layout is consistent with what we expect, and send
+  428:         # result to all ranks.
+> 429:         layout_issue = mpiutil.allreduce(axlen != local_num, op=mpiutil.MAX, comm=comm)
+  430:
+  431:         if layout_issue:
 ```
 
 
 # E1102: not-callable
 
-## File caput/pipeline.py - Line 1030 - E1102 (not-callable)
+## File caput/pipeline.py - Line 1038 - E1102 (not-callable)
 
 - `message: self.next is not callable`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-   999:     def _pipeline_next(self):
+  1007:     def _pipeline_next(self):
   ...
-  1028:                 msg = "Task %s calling 'next()'." % self.__class__.__name__
-  1029:                 logger.debug(msg)
-> 1030:                 out = self.next(*args)
-  1031:                 return out
-  1032:             except PipelineStopIteration:
+  1036:                 msg = "Task %s calling 'next()'." % self.__class__.__name__
+  1037:                 logger.debug(msg)
+> 1038:                 out = self.next(*args)
+  1039:                 return out
+  1040:             except PipelineStopIteration:
 ```
 
 
 # E1111: assignment-from-no-return
 
-## File caput/pipeline.py - Line 1015 - E1111 (assignment-from-no-return)
+## File caput/pipeline.py - Line 1023 - E1111 (assignment-from-no-return)
 
 - `message: Assigning result of a function call, where the function has no return`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-   999:     def _pipeline_next(self):
+  1007:     def _pipeline_next(self):
   ...
-  1013:             msg = "Task %s calling 'setup()'." % self.__class__.__name__
-  1014:             logger.debug(msg)
-> 1015:             out = self.setup(*tuple(self._requires))
-  1016:             self._pipeline_advance_state()
-  1017:             return out
+  1021:             msg = "Task %s calling 'setup()'." % self.__class__.__name__
+  1022:             logger.debug(msg)
+> 1023:             out = self.setup(*tuple(self._requires))
+  1024:             self._pipeline_advance_state()
+  1025:             return out
 ```
 
 
-## File caput/pipeline.py - Line 1038 - E1111 (assignment-from-no-return)
+## File caput/pipeline.py - Line 1047 - E1111 (assignment-from-no-return)
 
 - `message: Assigning result of a function call, where the function has no return`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-   999:     def _pipeline_next(self):
+  1007:     def _pipeline_next(self):
   ...
-  1036:             msg = "Task %s calling 'finish()'." % self.__class__.__name__
-  1037:             logger.debug(msg)
-> 1038:             out = self.finish()
-  1039:             self._pipeline_advance_state()
-  1040:             return out
+  1045:             msg = "Task %s calling 'finish()'." % self.__class__.__name__
+  1046:             logger.debug(msg)
+> 1047:             out = self.finish()
+  1048:             self._pipeline_advance_state()
+  1049:             return out
 ```
 
 
 # E1120: no-value-for-parameter
 
-## File caput/pipeline.py - Line 1178 - E1120 (no-value-for-parameter)
+## File caput/pipeline.py - Line 1204 - E1120 (no-value-for-parameter)
 
 - `message: No value for argument 'input' in method call`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1160:     def read_process_write(self, input, input_filename, output_filename):
+  1186:     def read_process_write(self, input, input_filename, output_filename):
   ...
-  1176:                 # This should never happen.  Just here to catch bugs.
-  1177:                 raise RuntimeError("Somehow `input` was set.")
-> 1178:             output = self.process()
-  1179:         else:
-  1180:             output = self.process(input)
+  1202:                 # This should never happen.  Just here to catch bugs.
+  1203:                 raise RuntimeError("Somehow `input` was set.")
+> 1204:             output = self.process()
+  1205:         else:
+  1206:             output = self.process(input)
 ```
 
 
@@ -821,207 +786,207 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 956 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 964 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_requires_keys' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  903:     def _setup_keys(self, in_=None, out=None, requires=None):
+  911:     def _setup_keys(self, in_=None, out=None, requires=None):
   ...
-  954:         # Now that all data product keys have been verified to be valid, store
-  955:         # them on the instance.
-> 956:         self._requires_keys = requires
-  957:         self._requires = [None] * n_requires
-  958:         self._in_keys = in_
+  962:         # Now that all data product keys have been verified to be valid, store
+  963:         # them on the instance.
+> 964:         self._requires_keys = requires
+  965:         self._requires = [None] * n_requires
+  966:         self._in_keys = in_
 ```
 
 
-## File caput/pipeline.py - Line 957 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 965 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_requires' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  903:     def _setup_keys(self, in_=None, out=None, requires=None):
+  911:     def _setup_keys(self, in_=None, out=None, requires=None):
   ...
-  955:         # them on the instance.
-  956:         self._requires_keys = requires
-> 957:         self._requires = [None] * n_requires
-  958:         self._in_keys = in_
-  959:         self._in = [queue.Queue() for i in range(n_in)]
+  963:         # them on the instance.
+  964:         self._requires_keys = requires
+> 965:         self._requires = [None] * n_requires
+  966:         self._in_keys = in_
+  967:         self._in = [queue.Queue() for i in range(n_in)]
 ```
 
 
-## File caput/pipeline.py - Line 958 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 966 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_in_keys' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  903:     def _setup_keys(self, in_=None, out=None, requires=None):
+  911:     def _setup_keys(self, in_=None, out=None, requires=None):
   ...
-  956:         self._requires_keys = requires
-  957:         self._requires = [None] * n_requires
-> 958:         self._in_keys = in_
-  959:         self._in = [queue.Queue() for i in range(n_in)]
-  960:         self._out_keys = out
+  964:         self._requires_keys = requires
+  965:         self._requires = [None] * n_requires
+> 966:         self._in_keys = in_
+  967:         self._in = [queue.Queue() for i in range(n_in)]
+  968:         self._out_keys = out
 ```
 
 
-## File caput/pipeline.py - Line 959 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 967 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_in' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  903:     def _setup_keys(self, in_=None, out=None, requires=None):
+  911:     def _setup_keys(self, in_=None, out=None, requires=None):
   ...
-  957:         self._requires = [None] * n_requires
-  958:         self._in_keys = in_
-> 959:         self._in = [queue.Queue() for i in range(n_in)]
-  960:         self._out_keys = out
-  961:
+  965:         self._requires = [None] * n_requires
+  966:         self._in_keys = in_
+> 967:         self._in = [queue.Queue() for i in range(n_in)]
+  968:         self._out_keys = out
+  969:
 ```
 
 
-## File caput/pipeline.py - Line 960 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 968 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_out_keys' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  903:     def _setup_keys(self, in_=None, out=None, requires=None):
+  911:     def _setup_keys(self, in_=None, out=None, requires=None):
   ...
-  958:         self._in_keys = in_
-  959:         self._in = [queue.Queue() for i in range(n_in)]
-> 960:         self._out_keys = out
-  961:
-  962:     def _pipeline_advance_state(self):
+  966:         self._in_keys = in_
+  967:         self._in = [queue.Queue() for i in range(n_in)]
+> 968:         self._out_keys = out
+  969:
+  970:     def _pipeline_advance_state(self):
 ```
 
 
-## File caput/pipeline.py - Line 974 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 982 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_pipeline_state' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  962:     def _pipeline_advance_state(self):
+  970:     def _pipeline_advance_state(self):
   ...
-  972:
-  973:         if not hasattr(self, "_pipeline_state"):
-> 974:             self._pipeline_state = "setup"
-  975:         elif self._pipeline_state == "setup":
-  976:             # Delete inputs to free memory.
+  980:
+  981:         if not hasattr(self, "_pipeline_state"):
+> 982:             self._pipeline_state = "setup"
+  983:         elif self._pipeline_state == "setup":
+  984:             # Delete inputs to free memory.
 ```
 
 
-## File caput/pipeline.py - Line 977 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 985 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_requires' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  962:     def _pipeline_advance_state(self):
+  970:     def _pipeline_advance_state(self):
   ...
-  975:         elif self._pipeline_state == "setup":
-  976:             # Delete inputs to free memory.
-> 977:             self._requires = None
-  978:             self._pipeline_state = "next"
-  979:         elif self._pipeline_state == "next":
+  983:         elif self._pipeline_state == "setup":
+  984:             # Delete inputs to free memory.
+> 985:             self._requires = None
+  986:             self._pipeline_state = "next"
+  987:         elif self._pipeline_state == "next":
 ```
 
 
-## File caput/pipeline.py - Line 978 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 986 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_pipeline_state' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  962:     def _pipeline_advance_state(self):
+  970:     def _pipeline_advance_state(self):
   ...
-  976:             # Delete inputs to free memory.
-  977:             self._requires = None
-> 978:             self._pipeline_state = "next"
-  979:         elif self._pipeline_state == "next":
-  980:             # Make sure input queues are empty then delete them so no more data
+  984:             # Delete inputs to free memory.
+  985:             self._requires = None
+> 986:             self._pipeline_state = "next"
+  987:         elif self._pipeline_state == "next":
+  988:             # Make sure input queues are empty then delete them so no more data
 ```
 
 
-## File caput/pipeline.py - Line 990 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 998 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_in' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  962:     def _pipeline_advance_state(self):
+   970:     def _pipeline_advance_state(self):
   ...
-  988:                     warnings.warn(msg)
-  989:
-> 990:             self._in = None
-  991:             self._pipeline_state = "finish"
-  992:         elif self._pipeline_state == "finish":
+   996:                     warnings.warn(msg)
+   997:
+>  998:             self._in = None
+   999:             self._pipeline_state = "finish"
+  1000:         elif self._pipeline_state == "finish":
 ```
 
 
-## File caput/pipeline.py - Line 991 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 999 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_pipeline_state' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  962:     def _pipeline_advance_state(self):
+   970:     def _pipeline_advance_state(self):
   ...
-  989:
-  990:             self._in = None
-> 991:             self._pipeline_state = "finish"
-  992:         elif self._pipeline_state == "finish":
-  993:             self._pipeline_state = "raise"
+   997:
+   998:             self._in = None
+>  999:             self._pipeline_state = "finish"
+  1000:         elif self._pipeline_state == "finish":
+  1001:             self._pipeline_state = "raise"
 ```
 
 
-## File caput/pipeline.py - Line 993 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 1001 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute '_pipeline_state' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  962:     def _pipeline_advance_state(self):
+   970:     def _pipeline_advance_state(self):
   ...
-  991:             self._pipeline_state = "finish"
-  992:         elif self._pipeline_state == "finish":
-> 993:             self._pipeline_state = "raise"
-  994:         elif self._pipeline_state == "raise":
-  995:             pass
+   999:             self._pipeline_state = "finish"
+  1000:         elif self._pipeline_state == "finish":
+> 1001:             self._pipeline_state = "raise"
+  1002:         elif self._pipeline_state == "raise":
+  1003:             pass
 ```
 
 
-## File caput/pipeline.py - Line 1269 - W0201 (attribute-defined-outside-init)
+## File caput/pipeline.py - Line 1295 - W0201 (attribute-defined-outside-init)
 
 - `message: Attribute 'done' defined outside __init__`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1261:     def next(self, input=None):
+  1287:     def next(self, input=None):
   ...
-  1267:                 raise PipelineStopIteration()
-  1268:         except AttributeError:
-> 1269:             self.done = True
-  1270:
-  1271:         if input:
+  1293:                 raise PipelineStopIteration()
+  1294:         except AttributeError:
+> 1295:             self.done = True
+  1296:
+  1297:         if input:
 ```
 
 
@@ -1157,88 +1122,88 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 411 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 444 - W0212 (protected-access)
 
 - `message: Access to a protected member _global_shape of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  359:     def wrap(cls, array, axis, comm=None):
+  392:     def wrap(cls, array, axis, comm=None):
   ...
-  409:         # Setup attributes of class
-  410:         dist_arr = array.view(cls)
-> 411:         dist_arr._global_shape = tuple(global_shape)
-  412:         dist_arr._axis = axis
-  413:         dist_arr._local_shape = tuple(lshape)
+  442:         # Setup attributes of class
+  443:         dist_arr = array.view(cls)
+> 444:         dist_arr._global_shape = tuple(global_shape)
+  445:         dist_arr._axis = axis
+  446:         dist_arr._local_shape = tuple(lshape)
 ```
 
 
-## File caput/mpiarray.py - Line 412 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 445 - W0212 (protected-access)
 
 - `message: Access to a protected member _axis of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  359:     def wrap(cls, array, axis, comm=None):
+  392:     def wrap(cls, array, axis, comm=None):
   ...
-  410:         dist_arr = array.view(cls)
-  411:         dist_arr._global_shape = tuple(global_shape)
-> 412:         dist_arr._axis = axis
-  413:         dist_arr._local_shape = tuple(lshape)
-  414:         dist_arr._local_offset = tuple(loffset)
+  443:         dist_arr = array.view(cls)
+  444:         dist_arr._global_shape = tuple(global_shape)
+> 445:         dist_arr._axis = axis
+  446:         dist_arr._local_shape = tuple(lshape)
+  447:         dist_arr._local_offset = tuple(loffset)
 ```
 
 
-## File caput/mpiarray.py - Line 413 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 446 - W0212 (protected-access)
 
 - `message: Access to a protected member _local_shape of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  359:     def wrap(cls, array, axis, comm=None):
+  392:     def wrap(cls, array, axis, comm=None):
   ...
-  411:         dist_arr._global_shape = tuple(global_shape)
-  412:         dist_arr._axis = axis
-> 413:         dist_arr._local_shape = tuple(lshape)
-  414:         dist_arr._local_offset = tuple(loffset)
-  415:         dist_arr._comm = comm
+  444:         dist_arr._global_shape = tuple(global_shape)
+  445:         dist_arr._axis = axis
+> 446:         dist_arr._local_shape = tuple(lshape)
+  447:         dist_arr._local_offset = tuple(loffset)
+  448:         dist_arr._comm = comm
 ```
 
 
-## File caput/mpiarray.py - Line 414 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 447 - W0212 (protected-access)
 
 - `message: Access to a protected member _local_offset of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  359:     def wrap(cls, array, axis, comm=None):
+  392:     def wrap(cls, array, axis, comm=None):
   ...
-  412:         dist_arr._axis = axis
-  413:         dist_arr._local_shape = tuple(lshape)
-> 414:         dist_arr._local_offset = tuple(loffset)
-  415:         dist_arr._comm = comm
-  416:
+  445:         dist_arr._axis = axis
+  446:         dist_arr._local_shape = tuple(lshape)
+> 447:         dist_arr._local_offset = tuple(loffset)
+  448:         dist_arr._comm = comm
+  449:
 ```
 
 
-## File caput/mpiarray.py - Line 415 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 448 - W0212 (protected-access)
 
 - `message: Access to a protected member _comm of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  359:     def wrap(cls, array, axis, comm=None):
+  392:     def wrap(cls, array, axis, comm=None):
   ...
-  413:         dist_arr._local_shape = tuple(lshape)
-  414:         dist_arr._local_offset = tuple(loffset)
-> 415:         dist_arr._comm = comm
-  416:
-  417:         return dist_arr
+  446:         dist_arr._local_shape = tuple(lshape)
+  447:         dist_arr._local_offset = tuple(loffset)
+> 448:         dist_arr._comm = comm
+  449:
+  450:         return dist_arr
 ```
 
 
@@ -1293,54 +1258,54 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 562 - W0212 (protected-access)
+## File caput/pipeline.py - Line 564 - W0212 (protected-access)
 
 - `message: Access to a protected member _setup_logging of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  526:     def from_yaml_str(cls, yaml_doc, lint=False):
+  528:     def from_yaml_str(cls, yaml_doc, lint=False):
   ...
-  560:             "pipeline_config": self.all_params if self.save_config else None,
-  561:         }
-> 562:         self._setup_logging(lint)
-  563:         self._setup_tasks()
-  564:
+  562:             "pipeline_config": self.all_params if self.save_config else None,
+  563:         }
+> 564:         self._setup_logging(lint)
+  565:         self._setup_tasks()
+  566:
 ```
 
 
-## File caput/pipeline.py - Line 563 - W0212 (protected-access)
+## File caput/pipeline.py - Line 565 - W0212 (protected-access)
 
 - `message: Access to a protected member _setup_tasks of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  526:     def from_yaml_str(cls, yaml_doc, lint=False):
+  528:     def from_yaml_str(cls, yaml_doc, lint=False):
   ...
-  561:         }
-  562:         self._setup_logging(lint)
-> 563:         self._setup_tasks()
-  564:
-  565:         return self
+  563:         }
+  564:         self._setup_logging(lint)
+> 565:         self._setup_tasks()
+  566:
+  567:         return self
 ```
 
 
-## File caput/pipeline.py - Line 601 - W0212 (protected-access)
+## File caput/pipeline.py - Line 603 - W0212 (protected-access)
 
 - `message: Access to a protected member _pipeline_next of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  588:     def run(self):
+  590:     def run(self):
   ...
-  599:                 # These lines control the flow of the pipeline.
-  600:                 try:
-> 601:                     out = task._pipeline_next()
-  602:                 except _PipelineMissingData:
-  603:                     if self.tasks.index(task) == 0:
+  601:                 # These lines control the flow of the pipeline.
+  602:                 try:
+> 603:                     out = task._pipeline_next()
+  604:                 except _PipelineMissingData:
+  605:                     if self.tasks.index(task) == 0:
 ```
 
 
@@ -1361,54 +1326,37 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 609 - W0212 (protected-access)
+## File caput/pipeline.py - Line 611 - W0212 (protected-access)
 
 - `message: Access to a protected member _pipeline_advance_state of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  588:     def run(self):
+  590:     def run(self):
   ...
-  607:                         )
-  608:                         logger.debug(msg)
-> 609:                         task._pipeline_advance_state()
-  610:                     break
-  611:                 except _PipelineFinished:
+  609:                         )
+  610:                         logger.debug(msg)
+> 611:                         task._pipeline_advance_state()
+  612:                     break
+  613:                 except _PipelineFinished:
 ```
 
 
-## File caput/pipeline.py - Line 616 - W0212 (protected-access)
+## File caput/pipeline.py - Line 618 - W0212 (protected-access)
 
 - `message: Access to a protected member _out_keys of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  588:     def run(self):
+  590:     def run(self):
   ...
-  614:                 # Now pass the output data products to any task that needs
-  615:                 # them.
-> 616:                 out_keys = task._out_keys
-  617:                 if out is None:  # This iteration supplied no output.
-  618:                     continue
-```
-
-
-## File caput/mpiarray.py - Line 639 - W0212 (protected-access)
-
-- `message: Access to a protected member _partition_io of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  577:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
-  ...
-  637:
-  638:         # Split the axis to get the IO size under ~2GB (only if MPI-IO)
-> 639:         split_axis, partitions = dist_arr._partition_io(skip=(not fh.is_mpi))
-  640:
-  641:         # Check that there are no null slices, otherwise we need to turn off
+  616:                 # Now pass the output data products to any task that needs
+  617:                 # them.
+> 618:                 out_keys = task._out_keys
+  619:                 if out is None:  # This iteration supplied no output.
+  620:                     continue
 ```
 
 
@@ -1429,415 +1377,381 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 641 - W0212 (protected-access)
+## File caput/pipeline.py - Line 643 - W0212 (protected-access)
 
 - `message: Access to a protected member _pipeline_inspect_queue_product of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  588:     def run(self):
+  590:     def run(self):
   ...
-  639:                 logger.debug(msg)
-  640:                 for receiving_task in self.tasks:
-> 641:                     receiving_task._pipeline_inspect_queue_product(out_keys, out)
-  642:
-  643:     def _setup_tasks(self):
+  641:                 logger.debug(msg)
+  642:                 for receiving_task in self.tasks:
+> 643:                     receiving_task._pipeline_inspect_queue_product(out_keys, out)
+  644:
+  645:     def _setup_tasks(self):
 ```
 
 
-## File caput/pipeline.py - Line 751 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 672 - W0212 (protected-access)
+
+- `message: Access to a protected member _partition_io of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
+  ...
+  670:
+  671:         # Split the axis to get the IO size under ~2GB (only if MPI-IO)
+> 672:         split_axis, partitions = dist_arr._partition_io(skip=(not fh.is_mpi))
+  673:
+  674:         # Check that there are no null slices, otherwise we need to turn off
+```
+
+
+## File caput/pipeline.py - Line 753 - W0212 (protected-access)
 
 - `message: Access to a protected member _from_config of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  684:     def _setup_task(self, task_spec):
+  686:     def _setup_task(self, task_spec):
   ...
-  749:         # Create and configure the task instance
-  750:         try:
-> 751:             task = task_cls._from_config(task_params)
-  752:         except config.CaputConfigError as e:
-  753:             raise config.CaputConfigError(
+  751:         # Create and configure the task instance
+  752:         try:
+> 753:             task = task_cls._from_config(task_params)
+  754:         except config.CaputConfigError as e:
+  755:             raise config.CaputConfigError(
 ```
 
 
-## File caput/pipeline.py - Line 776 - W0212 (protected-access)
+## File caput/pipeline.py - Line 778 - W0212 (protected-access)
 
 - `message: Access to a protected member _setup_keys of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  760:     def add_task(self, task, requires=None, in_=None, out=None):
+  762:     def add_task(self, task, requires=None, in_=None, out=None):
   ...
-  774:         """
-  775:         try:
-> 776:             task._setup_keys(requires=requires, in_=in_, out=out)
-  777:         except Exception as e:
-  778:             msg = "Setting up keys for task {} caused an error:\n\t{}".format(
+  776:         """
+  777:         try:
+> 778:             task._setup_keys(requires=requires, in_=in_, out=out)
+  779:         except Exception as e:
+  780:             msg = "Setting up keys for task {} caused an error:\n\t{}".format(
 ```
 
 
-## File caput/mpiarray.py - Line 777 - W0212 (protected-access)
-
-- `message: Access to a protected member _global_shape of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  754:     def transpose(self, *axes):
-  ...
-  775:             axes = list(range(self.ndim - 1, -1, -1))
-  776:
-> 777:         tdata._global_shape = tuple([self.global_shape[ax] for ax in axes])
-  778:         tdata._local_shape = tuple([self.local_shape[ax] for ax in axes])
-  779:         tdata._local_offset = tuple([self.local_offset[ax] for ax in axes])
-```
-
-
-## File caput/mpiarray.py - Line 778 - W0212 (protected-access)
-
-- `message: Access to a protected member _local_shape of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  754:     def transpose(self, *axes):
-  ...
-  776:
-  777:         tdata._global_shape = tuple([self.global_shape[ax] for ax in axes])
-> 778:         tdata._local_shape = tuple([self.local_shape[ax] for ax in axes])
-  779:         tdata._local_offset = tuple([self.local_offset[ax] for ax in axes])
-  780:
-```
-
-
-## File caput/mpiarray.py - Line 779 - W0212 (protected-access)
-
-- `message: Access to a protected member _local_offset of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  754:     def transpose(self, *axes):
-  ...
-  777:         tdata._global_shape = tuple([self.global_shape[ax] for ax in axes])
-  778:         tdata._local_shape = tuple([self.local_shape[ax] for ax in axes])
-> 779:         tdata._local_offset = tuple([self.local_offset[ax] for ax in axes])
-  780:
-  781:         tdata._axis = list(axes).index(self.axis)
-```
-
-
-## File caput/mpiarray.py - Line 781 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 814 - W0212 (protected-access)
 
 - `message: Access to a protected member _axis of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  754:     def transpose(self, *axes):
+  787:     def transpose(self, *axes):
   ...
-  779:         tdata._local_offset = tuple([self.local_offset[ax] for ax in axes])
-  780:
-> 781:         tdata._axis = list(axes).index(self.axis)
-  782:         tdata._comm = self._comm
-  783:
+  812:         tdata.local_offset = tuple(self.local_offset[ax] for ax in axes)
+  813:
+> 814:         tdata._axis = list(axes).index(self.axis)
+  815:         tdata._comm = self._comm
+  816:
 ```
 
 
-## File caput/mpiarray.py - Line 782 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 815 - W0212 (protected-access)
 
 - `message: Access to a protected member _comm of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  754:     def transpose(self, *axes):
+  787:     def transpose(self, *axes):
   ...
-  780:
-  781:         tdata._axis = list(axes).index(self.axis)
-> 782:         tdata._comm = self._comm
-  783:
-  784:         return tdata
+  813:
+  814:         tdata._axis = list(axes).index(self.axis)
+> 815:         tdata._comm = self._comm
+  816:
+  817:         return tdata
 ```
 
 
-## File caput/mpiarray.py - Line 824 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 857 - W0212 (protected-access)
 
 - `message: Access to a protected member _axis of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  786:     def reshape(self, *shape):
+  819:     def reshape(self, *shape):
   ...
-  822:         rdata = np.ndarray.reshape(self, local_shape)
-  823:
-> 824:         rdata._axis = new_axis
-  825:         rdata._comm = self._comm
-  826:         rdata._local_shape = tuple(local_shape)
+  855:         rdata = np.ndarray.reshape(self, local_shape)
+  856:
+> 857:         rdata._axis = new_axis
+  858:         rdata._comm = self._comm
+  859:         rdata._local_shape = tuple(local_shape)
 ```
 
 
-## File caput/mpiarray.py - Line 825 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 858 - W0212 (protected-access)
 
 - `message: Access to a protected member _comm of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  786:     def reshape(self, *shape):
+  819:     def reshape(self, *shape):
   ...
-  823:
-  824:         rdata._axis = new_axis
-> 825:         rdata._comm = self._comm
-  826:         rdata._local_shape = tuple(local_shape)
-  827:         rdata._global_shape = tuple(global_shape)
+  856:
+  857:         rdata._axis = new_axis
+> 858:         rdata._comm = self._comm
+  859:         rdata._local_shape = tuple(local_shape)
+  860:         rdata._global_shape = tuple(global_shape)
 ```
 
 
-## File caput/mpiarray.py - Line 826 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 859 - W0212 (protected-access)
 
 - `message: Access to a protected member _local_shape of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  786:     def reshape(self, *shape):
+  819:     def reshape(self, *shape):
   ...
-  824:         rdata._axis = new_axis
-  825:         rdata._comm = self._comm
-> 826:         rdata._local_shape = tuple(local_shape)
-  827:         rdata._global_shape = tuple(global_shape)
-  828:         rdata._local_offset = tuple(local_offset)
+  857:         rdata._axis = new_axis
+  858:         rdata._comm = self._comm
+> 859:         rdata._local_shape = tuple(local_shape)
+  860:         rdata._global_shape = tuple(global_shape)
+  861:         rdata._local_offset = tuple(local_offset)
 ```
 
 
-## File caput/mpiarray.py - Line 827 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 860 - W0212 (protected-access)
 
 - `message: Access to a protected member _global_shape of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  786:     def reshape(self, *shape):
+  819:     def reshape(self, *shape):
   ...
-  825:         rdata._comm = self._comm
-  826:         rdata._local_shape = tuple(local_shape)
-> 827:         rdata._global_shape = tuple(global_shape)
-  828:         rdata._local_offset = tuple(local_offset)
-  829:
+  858:         rdata._comm = self._comm
+  859:         rdata._local_shape = tuple(local_shape)
+> 860:         rdata._global_shape = tuple(global_shape)
+  861:         rdata._local_offset = tuple(local_offset)
+  862:
 ```
 
 
-## File caput/mpiarray.py - Line 828 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 861 - W0212 (protected-access)
 
 - `message: Access to a protected member _local_offset of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  786:     def reshape(self, *shape):
+  819:     def reshape(self, *shape):
   ...
-  826:         rdata._local_shape = tuple(local_shape)
-  827:         rdata._global_shape = tuple(global_shape)
-> 828:         rdata._local_offset = tuple(local_offset)
-  829:
-  830:         return rdata
+  859:         rdata._local_shape = tuple(local_shape)
+  860:         rdata._global_shape = tuple(global_shape)
+> 861:         rdata._local_offset = tuple(local_offset)
+  862:
+  863:         return rdata
 ```
 
 
-## File caput/memh5.py - Line 870 - W0212 (protected-access)
+## File caput/memh5.py - Line 873 - W0212 (protected-access)
 
 - `message: Access to a protected member _attrs of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  866:     def view(self):
+  869:     def view(self):
   ...
-  868:         out = cls.__new__(cls)
-  869:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
-> 870:         out._attrs = self._attrs
-  871:         out._data = self._data
-  872:         out.chunks = self.chunks
+  871:         out = cls.__new__(cls)
+  872:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
+> 873:         out._attrs = self._attrs
+  874:         out._data = self._data
+  875:         out.chunks = self.chunks
 ```
 
 
-## File caput/memh5.py - Line 871 - W0212 (protected-access)
+## File caput/memh5.py - Line 874 - W0212 (protected-access)
 
 - `message: Access to a protected member _data of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  866:     def view(self):
+  869:     def view(self):
   ...
-  869:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
-  870:         out._attrs = self._attrs
-> 871:         out._data = self._data
-  872:         out.chunks = self.chunks
-  873:         out.compression = self.compression
+  872:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
+  873:         out._attrs = self._attrs
+> 874:         out._data = self._data
+  875:         out.chunks = self.chunks
+  876:         out.compression = self.compression
 ```
 
 
-## File caput/memh5.py - Line 1124 - W0212 (protected-access)
+## File caput/memh5.py - Line 1127 - W0212 (protected-access)
 
 - `message: Access to a protected member _data of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1115:     def from_mpi_array(
+  1118:     def from_mpi_array(
   ...
-  1122:         super(MemDatasetDistributed, self).__init__(**kwargs)
-  1123:
-> 1124:         self._data = data
-  1125:         self._chunks = chunks
-  1126:         self._compression = compression
+  1125:         super(MemDatasetDistributed, self).__init__(**kwargs)
+  1126:
+> 1127:         self._data = data
+  1128:         self._chunks = chunks
+  1129:         self._compression = compression
 ```
 
 
-## File caput/memh5.py - Line 1125 - W0212 (protected-access)
+## File caput/memh5.py - Line 1128 - W0212 (protected-access)
 
 - `message: Access to a protected member _chunks of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1115:     def from_mpi_array(
+  1118:     def from_mpi_array(
   ...
-  1123:
-  1124:         self._data = data
-> 1125:         self._chunks = chunks
-  1126:         self._compression = compression
-  1127:         self._compression_opts = compression_opts
+  1126:
+  1127:         self._data = data
+> 1128:         self._chunks = chunks
+  1129:         self._compression = compression
+  1130:         self._compression_opts = compression_opts
 ```
 
 
-## File caput/memh5.py - Line 1126 - W0212 (protected-access)
+## File caput/memh5.py - Line 1129 - W0212 (protected-access)
 
 - `message: Access to a protected member _compression of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1115:     def from_mpi_array(
+  1118:     def from_mpi_array(
   ...
-  1124:         self._data = data
-  1125:         self._chunks = chunks
-> 1126:         self._compression = compression
-  1127:         self._compression_opts = compression_opts
-  1128:         return self
+  1127:         self._data = data
+  1128:         self._chunks = chunks
+> 1129:         self._compression = compression
+  1130:         self._compression_opts = compression_opts
+  1131:         return self
 ```
 
 
-## File caput/memh5.py - Line 1127 - W0212 (protected-access)
+## File caput/memh5.py - Line 1130 - W0212 (protected-access)
 
 - `message: Access to a protected member _compression_opts of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1115:     def from_mpi_array(
+  1118:     def from_mpi_array(
   ...
-  1125:         self._chunks = chunks
-  1126:         self._compression = compression
-> 1127:         self._compression_opts = compression_opts
-  1128:         return self
-  1129:
+  1128:         self._chunks = chunks
+  1129:         self._compression = compression
+> 1130:         self._compression_opts = compression_opts
+  1131:         return self
+  1132:
 ```
 
 
-## File caput/memh5.py - Line 1197 - W0212 (protected-access)
+## File caput/memh5.py - Line 1200 - W0212 (protected-access)
 
 - `message: Access to a protected member _comm of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1195:     def comm(self):
-  1196:         """Reference to the MPI communicator."""
-> 1197:         return self._data._comm
-  1198:
-  1199:     def redistribute(self, axis):
+  1198:     def comm(self):
+  1199:         """Reference to the MPI communicator."""
+> 1200:         return self._data._comm
+  1201:
+  1202:     def redistribute(self, axis):
 ```
 
 
-## File caput/memh5.py - Line 1572 - W0212 (protected-access)
+## File caput/memh5.py - Line 1575 - W0212 (protected-access)
 
 - `message: Access to a protected member _finish_setup of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1466:     def from_file(
+  1469:     def from_file(
   ...
-  1570:
-  1571:         # ... skip the class initialisation, and use a special method
-> 1572:         self._finish_setup()
   1573:
-  1574:         self._toclose = toclose
+  1574:         # ... skip the class initialisation, and use a special method
+> 1575:         self._finish_setup()
+  1576:
+  1577:         self._toclose = toclose
 ```
 
 
-## File caput/memh5.py - Line 1574 - W0212 (protected-access)
+## File caput/memh5.py - Line 1577 - W0212 (protected-access)
 
 - `message: Access to a protected member _toclose of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1466:     def from_file(
+  1469:     def from_file(
   ...
-  1572:         self._finish_setup()
-  1573:
-> 1574:         self._toclose = toclose
-  1575:         return self
+  1575:         self._finish_setup()
   1576:
+> 1577:         self._toclose = toclose
+  1578:         return self
+  1579:
 ```
 
 
-## File caput/memh5.py - Line 1694 - W0212 (protected-access)
+## File caput/memh5.py - Line 1697 - W0212 (protected-access)
 
 - `message: Access to a protected member _from_storage_root of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1686:     def create_group(self, name):
+  1689:     def create_group(self, name):
   ...
-  1692:             raise ValueError(msg)
-  1693:         self._data.create_group(path)
-> 1694:         return self._group_class._from_storage_root(self._data, path)
-  1695:
-  1696:     def to_memory(self):
+  1695:             raise ValueError(msg)
+  1696:         self._data.create_group(path)
+> 1697:         return self._group_class._from_storage_root(self._data, path)
+  1698:
+  1699:     def to_memory(self):
 ```
 
 
-## File caput/memh5.py - Line 1966 - W0212 (protected-access)
+## File caput/memh5.py - Line 1969 - W0212 (protected-access)
 
 - `message: Access to a protected member _storage_root of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1949:     def redistribute(self, dist_axis):
+  1952:     def redistribute(self, dist_axis):
   ...
-  1964:             dist_axis = [dist_axis]
-  1965:
-> 1966:         stack = list(self._data._storage_root.items())
-  1967:
-  1968:         # Crawl over the dataset tree and redistribute any matching datasets.
+  1967:             dist_axis = [dist_axis]
+  1968:
+> 1969:         stack = list(self._data._storage_root.items())
+  1970:
+  1971:         # Crawl over the dataset tree and redistribute any matching datasets.
 ```
 
 
 # W0221: arguments-differ
 
-## File caput/mpiarray.py - Line 832 - W0221 (arguments-differ)
+## File caput/mpiarray.py - Line 865 - W0221 (arguments-differ)
 
 - `message: Parameters differ from overridden 'copy' method`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -1846,209 +1760,156 @@ The recommended approach to using `pylint-ignore` is:
 ```
   236: class MPIArray(np.ndarray):
   ...
-  830:         return rdata
-  831:
-> 832:     def copy(self):
-  833:         """Return a copy of the MPIArray.
-  834:
+  863:         return rdata
+  864:
+> 865:     def copy(self):
+  866:         """Return a copy of the MPIArray.
+  867:
 ```
 
 
-## File caput/pipeline.py - Line 1522 - W0221 (arguments-differ)
+## File caput/pipeline.py - Line 1549 - W0221 (arguments-differ)
 
 - `message: Parameters differ from overridden 'next' method`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1515: class Input(TaskBase):
+  1541: class Input(TaskBase):
   ...
-  1520:         self._iter = None
-  1521:
-> 1522:     def next(self):
-  1523:         """Pop and return the first element of inputs."""
-  1524:
+  1547:         self._iter = None
+  1548:
+> 1549:     def next(self):
+  1550:         """Pop and return the first element of inputs."""
+  1551:
 ```
 
 
-## File caput/pipeline.py - Line 1553 - W0221 (arguments-differ)
+## File caput/pipeline.py - Line 1581 - W0221 (arguments-differ)
 
 - `message: Parameters differ from overridden 'next' method`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1534: class Output(TaskBase):
+  1561: class Output(TaskBase):
   ...
-  1551:         self.callback = callback
-  1552:
-> 1553:     def next(self, in_):
-  1554:         """Pop and return the first element of inputs."""
-  1555:
-```
-
-
-# W0222: signature-differs
-
-## File caput/mpiarray.py - Line 786 - W0222 (signature-differs)
-
-- `message: Signature differs from overridden 'reshape' method`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  784:         return tdata
-  785:
-> 786:     def reshape(self, *shape):
-  787:         """Reshape the array.
-  788:
+  1579:         self.callback = callback
+  1580:
+> 1581:     def next(self, in_):
+  1582:         """Pop and return the first element of inputs."""
+  1583:
 ```
 
 
 # W0223: abstract-method
 
-## File caput/pipeline.py - Line 1221 - W0223 (abstract-method)
+## File caput/pipeline.py - Line 1247 - W0223 (abstract-method)
 
 - `message: Method 'read_input' is abstract in class '_OneAndOne' but is not overridden`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1219:
-  1220:
-> 1221: class SingleBase(_OneAndOne):
-  1222:     """Base class for non-iterating tasks with at most one input and output.
-  1223:
+  1245:
+  1246:
+> 1247: class SingleBase(_OneAndOne):
+  1248:     """Base class for non-iterating tasks with at most one input and output.
+  1249:
 ```
 
 
-## File caput/pipeline.py - Line 1221 - W0223 (abstract-method)
+## File caput/pipeline.py - Line 1247 - W0223 (abstract-method)
 
 - `message: Method 'read_output' is abstract in class '_OneAndOne' but is not overridden`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1219:
-  1220:
-> 1221: class SingleBase(_OneAndOne):
-  1222:     """Base class for non-iterating tasks with at most one input and output.
-  1223:
+  1245:
+  1246:
+> 1247: class SingleBase(_OneAndOne):
+  1248:     """Base class for non-iterating tasks with at most one input and output.
+  1249:
 ```
 
 
-## File caput/pipeline.py - Line 1221 - W0223 (abstract-method)
+## File caput/pipeline.py - Line 1247 - W0223 (abstract-method)
 
 - `message: Method 'write_output' is abstract in class '_OneAndOne' but is not overridden`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1219:
-  1220:
-> 1221: class SingleBase(_OneAndOne):
-  1222:     """Base class for non-iterating tasks with at most one input and output.
-  1223:
+  1245:
+  1246:
+> 1247: class SingleBase(_OneAndOne):
+  1248:     """Base class for non-iterating tasks with at most one input and output.
+  1249:
 ```
 
 
-## File caput/pipeline.py - Line 1276 - W0223 (abstract-method)
+## File caput/pipeline.py - Line 1302 - W0223 (abstract-method)
 
 - `message: Method 'read_input' is abstract in class '_OneAndOne' but is not overridden`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1274:
-  1275:
-> 1276: class IterBase(_OneAndOne):
-  1277:     """Base class for iterating tasks with at most one input and one output.
-  1278:
+  1300:
+  1301:
+> 1302: class IterBase(_OneAndOne):
+  1303:     """Base class for iterating tasks with at most one input and one output.
+  1304:
 ```
 
 
-## File caput/pipeline.py - Line 1276 - W0223 (abstract-method)
+## File caput/pipeline.py - Line 1302 - W0223 (abstract-method)
 
 - `message: Method 'read_output' is abstract in class '_OneAndOne' but is not overridden`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1274:
-  1275:
-> 1276: class IterBase(_OneAndOne):
-  1277:     """Base class for iterating tasks with at most one input and one output.
-  1278:
+  1300:
+  1301:
+> 1302: class IterBase(_OneAndOne):
+  1303:     """Base class for iterating tasks with at most one input and one output.
+  1304:
 ```
 
 
-## File caput/pipeline.py - Line 1276 - W0223 (abstract-method)
+## File caput/pipeline.py - Line 1302 - W0223 (abstract-method)
 
 - `message: Method 'write_output' is abstract in class '_OneAndOne' but is not overridden`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1274:
-  1275:
-> 1276: class IterBase(_OneAndOne):
-  1277:     """Base class for iterating tasks with at most one input and one output.
-  1278:
+  1300:
+  1301:
+> 1302: class IterBase(_OneAndOne):
+  1303:     """Base class for iterating tasks with at most one input and one output.
+  1304:
 ```
 
 
 # W0231: super-init-not-called
 
-## File caput/pipeline.py - Line 1112 - W0231 (super-init-not-called)
+## File caput/pipeline.py - Line 1115 - W0231 (super-init-not-called)
 
 - `message: __init__ method from base class 'TaskBase' is not called`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1096: class _OneAndOne(TaskBase):
+  1105: class _OneAndOne(TaskBase):
   ...
-  1110:         return output
-  1111:
-> 1112:     def __init__(self):
-  1113:         """Checks inputs and outputs and stuff."""
+  1113:     output_root = config.Property(default="None", proptype=str)
   1114:
-```
-
-
-## File caput/pipeline.py - Line 1518 - W0231 (super-init-not-called)
-
-- `message: __init__ method from base class 'TaskBase' is not called`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1515: class Input(TaskBase):
-  ...
-  1516:     """Pass inputs into the pipeline from outside."""
-  1517:
-> 1518:     def __init__(self, inputs=None):
-  1519:         self.inputs = inputs or []
-  1520:         self._iter = None
-```
-
-
-## File caput/pipeline.py - Line 1549 - W0231 (super-init-not-called)
-
-- `message: __init__ method from base class 'TaskBase' is not called`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1534: class Output(TaskBase):
-  ...
-  1547:     """
-  1548:
-> 1549:     def __init__(self, callback=None):
-  1550:         self.outputs = []
-  1551:         self.callback = callback
+> 1115:     def __init__(self):
+  1116:         # Inspect the `process` method to see how many arguments it takes.
+  1117:         pro_argspec = inspect.getfullargspec(self.process)
 ```
 
 
@@ -2133,23 +1994,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 602 - W0511 (fixme)
-
-- `message: TODO: with tuning this might not be true. Keep an eye on this.`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  577:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
-  ...
-  600:         """
-  601:         # Don't bother using MPI where the axis is not zero. It's probably just slower.
-> 602:         # TODO: with tuning this might not be true. Keep an eye on this.
-  603:         use_mpi = axis > 0
-  604:
-```
-
-
 ## File caput/memh5.py - Line 624 - W0511 (fixme)
 
 - `message: XXX In future could accept extra arguments and use them if`
@@ -2167,20 +2011,37 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 651 - W0511 (fixme)
+## File caput/mpiarray.py - Line 635 - W0511 (fixme)
+
+- `message: TODO: with tuning this might not be true. Keep an eye on this.`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
+  ...
+  633:         """
+  634:         # Don't bother using MPI where the axis is not zero. It's probably just slower.
+> 635:         # TODO: with tuning this might not be true. Keep an eye on this.
+  636:         use_mpi = axis > 0
+  637:
+```
+
+
+## File caput/mpiarray.py - Line 684 - W0511 (fixme)
 
 - `message: TODO: do we need collective IO to read chunked data?`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  577:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
+  610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
   ...
-  649:         # TODO: change if h5py bug fixed
-  650:         # TODO: better would be a test on contiguous IO size
-> 651:         # TODO: do we need collective IO to read chunked data?
-  652:         use_collective = fh.is_mpi and no_null_slices and axis > 0
-  653:
+  682:         # TODO: change if h5py bug fixed
+  683:         # TODO: better would be a test on contiguous IO size
+> 684:         # TODO: do we need collective IO to read chunked data?
+  685:         use_collective = fh.is_mpi and no_null_slices and axis > 0
+  686:
 ```
 
 
@@ -2201,88 +2062,88 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 722 - W0511 (fixme)
+## File caput/mpiarray.py - Line 755 - W0511 (fixme)
 
 - `message: TODO: change if h5py bug fixed`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  669:     def to_hdf5(
+  702:     def to_hdf5(
   ...
-  720:         #   collective IO which is usually slow
-  721:         # - unless we want to use compression/chunking
-> 722:         # TODO: change if h5py bug fixed
-  723:         # TODO: better would be a test on contiguous IO size
-  724:         use_collective = (
+  753:         #   collective IO which is usually slow
+  754:         # - unless we want to use compression/chunking
+> 755:         # TODO: change if h5py bug fixed
+  756:         # TODO: better would be a test on contiguous IO size
+  757:         use_collective = (
 ```
 
 
-## File caput/mpiarray.py - Line 723 - W0511 (fixme)
+## File caput/mpiarray.py - Line 756 - W0511 (fixme)
 
 - `message: TODO: better would be a test on contiguous IO size`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  669:     def to_hdf5(
+  702:     def to_hdf5(
   ...
-  721:         # - unless we want to use compression/chunking
-  722:         # TODO: change if h5py bug fixed
-> 723:         # TODO: better would be a test on contiguous IO size
-  724:         use_collective = (
-  725:             fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
+  754:         # - unless we want to use compression/chunking
+  755:         # TODO: change if h5py bug fixed
+> 756:         # TODO: better would be a test on contiguous IO size
+  757:         use_collective = (
+  758:             fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
 ```
 
 
-## File caput/pipeline.py - Line 1419 - W0511 (fixme)
+## File caput/pipeline.py - Line 1445 - W0511 (fixme)
 
 - `message: XXX This can be made much more efficient using a direct copy.`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1381:     def write_output(self, filename, output):
+  1407:     def write_output(self, filename, output):
   ...
-  1417:             else:
-  1418:                 # Copy to memory then to disk
-> 1419:                 # XXX This can be made much more efficient using a direct copy.
-  1420:                 out_copy = memh5.MemGroup.from_hdf5(output)
-  1421:
+  1443:             else:
+  1444:                 # Copy to memory then to disk
+> 1445:                 # XXX This can be made much more efficient using a direct copy.
+  1446:                 out_copy = memh5.MemGroup.from_hdf5(output)
+  1447:
 ```
 
 
-## File caput/pipeline.py - Line 1438 - W0511 (fixme)
+## File caput/pipeline.py - Line 1464 - W0511 (fixme)
 
 - `message: TODO, implement reading on disk (i.e. no copy to memory).`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1427: class BasicContMixin:
+  1453: class BasicContMixin:
   ...
-  1436:     """
-  1437:
-> 1438:     # TODO, implement reading on disk (i.e. no copy to memory).
-  1439:     # ondisk = config.Property(default=False, proptype=bool)
-  1440:
+  1462:     """
+  1463:
+> 1464:     # TODO, implement reading on disk (i.e. no copy to memory).
+  1465:     # ondisk = config.Property(default=False, proptype=bool)
+  1466:
 ```
 
 
-## File caput/memh5.py - Line 1834 - W0511 (fixme)
+## File caput/memh5.py - Line 1837 - W0511 (fixme)
 
 - `message: TODO: this seems like a trememndous hack. I've changed it to a safer version of`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1806:     def history(self):
+  1809:     def history(self):
   ...
-  1832:             out[name] = value
-  1833:
-> 1834:         # TODO: this seems like a trememndous hack. I've changed it to a safer version of
-  1835:         # eval, but this should probably be removed
-  1836:         out["order"] = literal_eval(
+  1835:             out[name] = value
+  1836:
+> 1837:         # TODO: this seems like a trememndous hack. I've changed it to a safer version of
+  1838:         # eval, but this should probably be removed
+  1839:         out["order"] = literal_eval(
 ```
 
 
@@ -2356,86 +2217,86 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 1445 - W0613 (unused-argument)
+## File caput/memh5.py - Line 1448 - W0613 (unused-argument)
 
 - `message: Unused argument 'sel_args'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1250: class MemDiskGroup(_BaseGroup):
+  1253: class MemDiskGroup(_BaseGroup):
   ...
-  1443:
-  1444:     @classmethod
-> 1445:     def _make_selections(cls, sel_args):
-  1446:         """
-  1447:         Overwrite this method in your subclass if you want to implement downselection
+  1446:
+  1447:     @classmethod
+> 1448:     def _make_selections(cls, sel_args):
+  1449:         """
+  1450:         Overwrite this method in your subclass if you want to implement downselection
 ```
 
 
-## File caput/memh5.py - Line 1579 - W0613 (unused-argument)
+## File caput/memh5.py - Line 1582 - W0613 (unused-argument)
 
 - `message: Unused argument 'name'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1250: class MemDiskGroup(_BaseGroup):
+  1253: class MemDiskGroup(_BaseGroup):
   ...
-  1577:     # Methods for manipulating and building the class. #
-  1578:
-> 1579:     def group_name_allowed(self, name):
-  1580:         """Used by subclasses to restrict creation of and access to groups.
+  1580:     # Methods for manipulating and building the class. #
   1581:
+> 1582:     def group_name_allowed(self, name):
+  1583:         """Used by subclasses to restrict creation of and access to groups.
+  1584:
 ```
 
 
-## File caput/memh5.py - Line 1603 - W0613 (unused-argument)
+## File caput/memh5.py - Line 1606 - W0613 (unused-argument)
 
 - `message: Unused argument 'name'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1250: class MemDiskGroup(_BaseGroup):
+  1253: class MemDiskGroup(_BaseGroup):
   ...
-  1601:         return True
-  1602:
-> 1603:     def dataset_name_allowed(self, name):
-  1604:         """Used by subclasses to restrict creation of and access to datasets.
+  1604:         return True
   1605:
+> 1606:     def dataset_name_allowed(self, name):
+  1607:         """Used by subclasses to restrict creation of and access to datasets.
+  1608:
 ```
 
 
-## File caput/memh5.py - Line 2402 - W0613 (unused-argument)
+## File caput/memh5.py - Line 2405 - W0613 (unused-argument)
 
 - `message: Unused argument 'kwargs'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  2400:
-  2401: def _distributed_group_to_hdf5_parallel(
-> 2402:     group,
-  2403:     fname,
-  2404:     mode,
+  2403:
+  2404: def _distributed_group_to_hdf5_parallel(
+> 2405:     group,
+  2406:     fname,
+  2407:     mode,
 ```
 
 
-## File caput/memh5.py - Line 2502 - W0613 (unused-argument)
+## File caput/memh5.py - Line 2505 - W0613 (unused-argument)
 
 - `message: Unused argument 'hints'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  2499: def _distributed_group_from_hdf5(
+  2502: def _distributed_group_from_hdf5(
   ...
-  2500:     fname,
-  2501:     comm=None,
-> 2502:     hints=True,
-  2503:     convert_dataset_strings=False,
-  2504:     convert_attribute_strings=True,
+  2503:     fname,
+  2504:     comm=None,
+> 2505:     hints=True,
+  2506:     convert_dataset_strings=False,
+  2507:     convert_attribute_strings=True,
 ```
 
 
@@ -2736,20 +2597,20 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 896 - W0621 (redefined-outer-name)
+## File caput/pipeline.py - Line 904 - W0621 (redefined-outer-name)
 
-- `message: Redefining name 'config' from outer scope (line 352)`
+- `message: Redefining name 'config' from outer scope (line 354)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  791: class TaskBase(config.Reader):
+  796: class TaskBase(config.Reader):
   ...
-  894:
-  895:     @classmethod
-> 896:     def _from_config(cls, config):
-  897:         self = cls.__new__(cls)
-  898:         # Check for unused keys, but ignore the ones not put there by the user.
+  902:
+  903:     @classmethod
+> 904:     def _from_config(cls, config):
+  905:         self = cls.__new__(cls)
+  906:         # Check for unused keys, but ignore the ones not put there by the user.
 ```
 
 
@@ -2772,77 +2633,77 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 1106 - W0622 (redefined-builtin)
+## File caput/pipeline.py - Line 1124 - W0622 (redefined-builtin)
 
 - `message: Redefining built-in 'input'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1096: class _OneAndOne(TaskBase):
+  1105: class _OneAndOne(TaskBase):
   ...
-  1104:     output_root = config.Property(default="None", proptype=str)
-  1105:
-> 1106:     def process(self, input):
-  1107:         """Override this method with your data processing task."""
-  1108:
+  1122:             self._no_input = False
+  1123:
+> 1124:     def process(self, input):
+  1125:         """Override this method with your data processing task."""
+  1126:
 ```
 
 
-## File caput/pipeline.py - Line 1160 - W0622 (redefined-builtin)
+## File caput/pipeline.py - Line 1186 - W0622 (redefined-builtin)
 
 - `message: Redefining built-in 'input'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1096: class _OneAndOne(TaskBase):
+  1105: class _OneAndOne(TaskBase):
   ...
-  1158:                 raise config.CaputConfigError(msg)
-  1159:
-> 1160:     def read_process_write(self, input, input_filename, output_filename):
-  1161:         """Reads input, executes any processing and writes output."""
-  1162:
+  1184:                 raise config.CaputConfigError(msg)
+  1185:
+> 1186:     def read_process_write(self, input, input_filename, output_filename):
+  1187:         """Reads input, executes any processing and writes output."""
+  1188:
 ```
 
 
-## File caput/pipeline.py - Line 1201 - W0622 (redefined-builtin)
+## File caput/pipeline.py - Line 1227 - W0622 (redefined-builtin)
 
 - `message: Redefining built-in 'input'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1096: class _OneAndOne(TaskBase):
+  1105: class _OneAndOne(TaskBase):
   ...
-  1199:         raise NotImplementedError()
-  1200:
-> 1201:     def cast_input(self, input):
-  1202:         """Override to support accepting pipeline inputs of variouse types."""
-  1203:
+  1225:         raise NotImplementedError()
+  1226:
+> 1227:     def cast_input(self, input):
+  1228:         """Override to support accepting pipeline inputs of variouse types."""
+  1229:
 ```
 
 
-## File caput/pipeline.py - Line 1325 - W0622 (redefined-builtin)
+## File caput/pipeline.py - Line 1351 - W0622 (redefined-builtin)
 
 - `message: Redefining built-in 'input'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1276: class IterBase(_OneAndOne):
+  1302: class IterBase(_OneAndOne):
   ...
-  1323:         self.iteration = 0
-  1324:
-> 1325:     def next(self, input=None):
-  1326:         """Should not need to override."""
-  1327:
+  1349:         self.iteration = 0
+  1350:
+> 1351:     def next(self, input=None):
+  1352:         """Should not need to override."""
+  1353:
 ```
 
 
 # W1113: keyword-arg-before-vararg
 
-## File caput/mpiarray.py - Line 317 - W1113 (keyword-arg-before-vararg)
+## File caput/mpiarray.py - Line 350 - W1113 (keyword-arg-before-vararg)
 
 - `message: Keyword argument before variable positional arguments list in the definition of __new__ function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -2851,11 +2712,11 @@ The recommended approach to using `pylint-ignore` is:
 ```
   236: class MPIArray(np.ndarray):
   ...
-  315:         return self._comm
-  316:
-> 317:     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
-  318:
-  319:         # if mpiutil.world is None:
+  348:         return self._comm
+  349:
+> 350:     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
+  351:
+  352:         # if mpiutil.world is None:
 ```
 
 
@@ -4578,7 +4439,7 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 866 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 869 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -4587,15 +4448,15 @@ The recommended approach to using `pylint-ignore` is:
 ```
   851: class MemDataset(_MemObjMixin):
   ...
-  864:         return MemGroup
-  865:
-> 866:     def view(self):
-  867:         cls = self.__class__
-  868:         out = cls.__new__(cls)
+  867:         return MemGroup
+  868:
+> 869:     def view(self):
+  870:         cls = self.__class__
+  871:         out = cls.__new__(cls)
 ```
 
 
-## File caput/memh5.py - Line 888 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 891 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -4604,15 +4465,15 @@ The recommended approach to using `pylint-ignore` is:
 ```
   851: class MemDataset(_MemObjMixin):
   ...
-  886:         return self._attrs
-  887:
-> 888:     def resize(self):
-  889:         # h5py datasets reshape() is different from numpy reshape.
-  890:         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
+  889:         return self._attrs
+  890:
+> 891:     def resize(self):
+  892:         # h5py datasets reshape() is different from numpy reshape.
+  893:         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
 ```
 
 
-## File caput/memh5.py - Line 894 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 897 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -4621,15 +4482,15 @@ The recommended approach to using `pylint-ignore` is:
 ```
   851: class MemDataset(_MemObjMixin):
   ...
-  892:
-  893:     @property
-> 894:     def shape(self):
-  895:         raise NotImplementedError("Not implemented in base class.")
-  896:
+  895:
+  896:     @property
+> 897:     def shape(self):
+  898:         raise NotImplementedError("Not implemented in base class.")
+  899:
 ```
 
 
-## File caput/memh5.py - Line 898 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 901 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -4638,15 +4499,15 @@ The recommended approach to using `pylint-ignore` is:
 ```
   851: class MemDataset(_MemObjMixin):
   ...
-  896:
-  897:     @property
-> 898:     def dtype(self):
-  899:         raise NotImplementedError("Not implemented in base class.")
-  900:
+  899:
+  900:     @property
+> 901:     def dtype(self):
+  902:         raise NotImplementedError("Not implemented in base class.")
+  903:
 ```
 
 
-## File caput/memh5.py - Line 902 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 905 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -4655,15 +4516,15 @@ The recommended approach to using `pylint-ignore` is:
 ```
   851: class MemDataset(_MemObjMixin):
   ...
-  900:
-  901:     @property
-> 902:     def chunks(self):
-  903:         raise NotImplementedError("Not implemented in base class.")
-  904:
+  903:
+  904:     @property
+> 905:     def chunks(self):
+  906:         raise NotImplementedError("Not implemented in base class.")
+  907:
 ```
 
 
-## File caput/memh5.py - Line 906 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 909 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -4672,15 +4533,15 @@ The recommended approach to using `pylint-ignore` is:
 ```
   851: class MemDataset(_MemObjMixin):
   ...
-  904:
-  905:     @property
-> 906:     def compression(self):
-  907:         raise NotImplementedError("Not implemented in base class.")
-  908:
+  907:
+  908:     @property
+> 909:     def compression(self):
+  910:         raise NotImplementedError("Not implemented in base class.")
+  911:
 ```
 
 
-## File caput/memh5.py - Line 910 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 913 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -4689,164 +4550,164 @@ The recommended approach to using `pylint-ignore` is:
 ```
   851: class MemDataset(_MemObjMixin):
   ...
-  908:
-  909:     @property
-> 910:     def compression_opts(self):
-  911:         raise NotImplementedError("Not implemented in base class.")
-  912:
+  911:
+  912:     @property
+> 913:     def compression_opts(self):
+  914:         raise NotImplementedError("Not implemented in base class.")
+  915:
 ```
 
 
-## File caput/memh5.py - Line 1115 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1118 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1113:
-  1114:     @classmethod
-> 1115:     def from_mpi_array(
-  1116:         cls, data, chunks=None, compression=None, compression_opts=None, **kwargs
-  1117:     ):
+  1116:
+  1117:     @classmethod
+> 1118:     def from_mpi_array(
+  1119:         cls, data, chunks=None, compression=None, compression_opts=None, **kwargs
+  1120:     ):
 ```
 
 
-## File caput/memh5.py - Line 1131 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1134 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1129:
-  1130:     @property
-> 1131:     def common(self):
-  1132:         return False
-  1133:
+  1132:
+  1133:     @property
+> 1134:     def common(self):
+  1135:         return False
+  1136:
 ```
 
 
-## File caput/memh5.py - Line 1135 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1138 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1133:
-  1134:     @property
-> 1135:     def distributed(self):
-  1136:         return True
-  1137:
+  1136:
+  1137:     @property
+> 1138:     def distributed(self):
+  1139:         return True
+  1140:
 ```
 
 
-## File caput/memh5.py - Line 1139 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1142 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1137:
-  1138:     @property
-> 1139:     def data(self):
-  1140:         return self._data
-  1141:
+  1140:
+  1141:     @property
+> 1142:     def data(self):
+  1143:         return self._data
+  1144:
 ```
 
 
-## File caput/memh5.py - Line 1143 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1146 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1141:
-  1142:     @property
-> 1143:     def local_data(self):
-  1144:         return self._data.local_array
-  1145:
+  1144:
+  1145:     @property
+> 1146:     def local_data(self):
+  1147:         return self._data.local_array
+  1148:
 ```
 
 
-## File caput/memh5.py - Line 1151 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1154 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1149:
-  1150:     @property
-> 1151:     def global_shape(self):
-  1152:         return self._data.global_shape
-  1153:
+  1152:
+  1153:     @property
+> 1154:     def global_shape(self):
+  1155:         return self._data.global_shape
+  1156:
 ```
 
 
-## File caput/memh5.py - Line 1155 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1158 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1153:
-  1154:     @property
-> 1155:     def local_shape(self):
-  1156:         return self._data.local_shape
-  1157:
+  1156:
+  1157:     @property
+> 1158:     def local_shape(self):
+  1159:         return self._data.local_shape
+  1160:
 ```
 
 
-## File caput/memh5.py - Line 1159 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1162 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1157:
-  1158:     @property
-> 1159:     def local_offset(self):
-  1160:         return self._data.local_offset
-  1161:
+  1160:
+  1161:     @property
+> 1162:     def local_offset(self):
+  1163:         return self._data.local_offset
+  1164:
 ```
 
 
-## File caput/memh5.py - Line 1191 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1194 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1189:
-  1190:     @property
-> 1191:     def distributed_axis(self):
-  1192:         return self._data.axis
-  1193:
+  1192:
+  1193:     @property
+> 1194:     def distributed_axis(self):
+  1195:         return self._data.axis
+  1196:
 ```
 
 
@@ -4854,7 +4715,7 @@ The recommended approach to using `pylint-ignore` is:
 
 ## File caput/mpiarray.py - Line 1 - C0302 (too-many-lines)
 
-- `message: Too many lines in module (1115/1000)`
+- `message: Too many lines in module (1148/1000)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
@@ -4880,7 +4741,7 @@ The recommended approach to using `pylint-ignore` is:
 
 ## File caput/pipeline.py - Line 1 - C0302 (too-many-lines)
 
-- `message: Too many lines in module (1597/1000)`
+- `message: Too many lines in module (1625/1000)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
@@ -4893,7 +4754,7 @@ The recommended approach to using `pylint-ignore` is:
 
 ## File caput/memh5.py - Line 1 - C0302 (too-many-lines)
 
-- `message: Too many lines in module (2842/1000)`
+- `message: Too many lines in module (2845/1000)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
@@ -5310,24 +5171,24 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 833 - R0201 (no-self-use)
+## File caput/pipeline.py - Line 841 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  791: class TaskBase(config.Reader):
+  796: class TaskBase(config.Reader):
   ...
-  831:         pass
-  832:
-> 833:     def next(self, input=None):
-  834:         """Iterative analysis stage of pipeline task.
-  835:
+  839:         """Validate the task after instantiation."""
+  840:
+> 841:     def next(self, input=None):
+  842:         """Iterative analysis stage of pipeline task.
+  843:
 ```
 
 
-## File caput/memh5.py - Line 888 - R0201 (no-self-use)
+## File caput/memh5.py - Line 891 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -5336,130 +5197,130 @@ The recommended approach to using `pylint-ignore` is:
 ```
   851: class MemDataset(_MemObjMixin):
   ...
-  886:         return self._attrs
-  887:
-> 888:     def resize(self):
-  889:         # h5py datasets reshape() is different from numpy reshape.
-  890:         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
+  889:         return self._attrs
+  890:
+> 891:     def resize(self):
+  892:         # h5py datasets reshape() is different from numpy reshape.
+  893:         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
 ```
 
 
-## File caput/pipeline.py - Line 1106 - R0201 (no-self-use)
+## File caput/pipeline.py - Line 1124 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1096: class _OneAndOne(TaskBase):
+  1105: class _OneAndOne(TaskBase):
   ...
-  1104:     output_root = config.Property(default="None", proptype=str)
-  1105:
-> 1106:     def process(self, input):
-  1107:         """Override this method with your data processing task."""
-  1108:
+  1122:             self._no_input = False
+  1123:
+> 1124:     def process(self, input):
+  1125:         """Override this method with your data processing task."""
+  1126:
 ```
 
 
-## File caput/pipeline.py - Line 1201 - R0201 (no-self-use)
+## File caput/pipeline.py - Line 1227 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1096: class _OneAndOne(TaskBase):
+  1105: class _OneAndOne(TaskBase):
   ...
-  1199:         raise NotImplementedError()
-  1200:
-> 1201:     def cast_input(self, input):
-  1202:         """Override to support accepting pipeline inputs of variouse types."""
-  1203:
+  1225:         raise NotImplementedError()
+  1226:
+> 1227:     def cast_input(self, input):
+  1228:         """Override to support accepting pipeline inputs of variouse types."""
+  1229:
 ```
 
 
-## File caput/pipeline.py - Line 1366 - R0201 (no-self-use)
+## File caput/pipeline.py - Line 1392 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1352: class H5IOMixin:
+  1378: class H5IOMixin:
   ...
-  1364:     # ondisk = config.Property(default=False, proptype=bool)
-  1365:
-> 1366:     def read_input(self, filename):
-  1367:         """Method for reading hdf5 input."""
-  1368:
+  1390:     # ondisk = config.Property(default=False, proptype=bool)
+  1391:
+> 1392:     def read_input(self, filename):
+  1393:         """Method for reading hdf5 input."""
+  1394:
 ```
 
 
-## File caput/pipeline.py - Line 1373 - R0201 (no-self-use)
+## File caput/pipeline.py - Line 1399 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1352: class H5IOMixin:
+  1378: class H5IOMixin:
   ...
-  1371:         return memh5.MemGroup.from_hdf5(filename, mode="r")
-  1372:
-> 1373:     def read_output(self, filename):
-  1374:         """Method for reading hdf5 output (from caches)."""
-  1375:
+  1397:         return memh5.MemGroup.from_hdf5(filename, mode="r")
+  1398:
+> 1399:     def read_output(self, filename):
+  1400:         """Method for reading hdf5 output (from caches)."""
+  1401:
 ```
 
 
-## File caput/pipeline.py - Line 1464 - R0201 (no-self-use)
+## File caput/pipeline.py - Line 1490 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1427: class BasicContMixin:
+  1453: class BasicContMixin:
   ...
-  1462:         )
-  1463:
-> 1464:     def write_output(self, filename, output):
-  1465:         """Method for writing hdf5 output.
-  1466:
+  1488:         )
+  1489:
+> 1490:     def write_output(self, filename, output):
+  1491:         """Method for writing hdf5 output.
+  1492:
 ```
 
 
-## File caput/memh5.py - Line 1579 - R0201 (no-self-use)
+## File caput/memh5.py - Line 1582 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1250: class MemDiskGroup(_BaseGroup):
+  1253: class MemDiskGroup(_BaseGroup):
   ...
-  1577:     # Methods for manipulating and building the class. #
-  1578:
-> 1579:     def group_name_allowed(self, name):
-  1580:         """Used by subclasses to restrict creation of and access to groups.
+  1580:     # Methods for manipulating and building the class. #
   1581:
+> 1582:     def group_name_allowed(self, name):
+  1583:         """Used by subclasses to restrict creation of and access to groups.
+  1584:
 ```
 
 
-## File caput/memh5.py - Line 1603 - R0201 (no-self-use)
+## File caput/memh5.py - Line 1606 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1250: class MemDiskGroup(_BaseGroup):
+  1253: class MemDiskGroup(_BaseGroup):
   ...
-  1601:         return True
-  1602:
-> 1603:     def dataset_name_allowed(self, name):
-  1604:         """Used by subclasses to restrict creation of and access to datasets.
+  1604:         return True
   1605:
+> 1606:     def dataset_name_allowed(self, name):
+  1607:         """Used by subclasses to restrict creation of and access to datasets.
+  1608:
 ```
 
 
@@ -5510,48 +5371,48 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/config.py - Line 491 - R0901 (too-many-ancestors)
+## File caput/config.py - Line 492 - R0901 (too-many-ancestors)
 
 - `message: Too many ancestors (10/7)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  489:
   490:
-> 491: class SafeLineLoader(SafeLoader):
-  492:     """
-  493:     YAML loader that tracks line numbers.
+  491:
+> 492: class SafeLineLoader(SafeLoader):
+  493:     """
+  494:     YAML loader that tracks line numbers.
 ```
 
 
-## File caput/memh5.py - Line 1250 - R0901 (too-many-ancestors)
+## File caput/memh5.py - Line 1253 - R0901 (too-many-ancestors)
 
 - `message: Too many ancestors (8/7)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1248:
-  1249:
-> 1250: class MemDiskGroup(_BaseGroup):
-  1251:     """Container whose data may either be stored on disk or in memory.
+  1251:
   1252:
+> 1253: class MemDiskGroup(_BaseGroup):
+  1254:     """Container whose data may either be stored on disk or in memory.
+  1255:
 ```
 
 
-## File caput/memh5.py - Line 1775 - R0901 (too-many-ancestors)
+## File caput/memh5.py - Line 1778 - R0901 (too-many-ancestors)
 
 - `message: Too many ancestors (9/7)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1773:
-  1774:
-> 1775: class BasicCont(MemDiskGroup):
-  1776:     """Basic high level data container.
+  1776:
   1777:
+> 1778: class BasicCont(MemDiskGroup):
+  1779:     """Basic high level data container.
+  1780:
 ```
 
 
@@ -5638,7 +5499,7 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 419 - R0912 (too-many-branches)
+## File caput/mpiarray.py - Line 452 - R0912 (too-many-branches)
 
 - `message: Too many branches (15/12)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -5647,11 +5508,11 @@ The recommended approach to using `pylint-ignore` is:
 ```
   236: class MPIArray(np.ndarray):
   ...
-  417:         return dist_arr
-  418:
-> 419:     def redistribute(self, axis):
-  420:         """Change the axis that the array is distributed over.
-  421:
+  450:         return dist_arr
+  451:
+> 452:     def redistribute(self, axis):
+  453:         """Change the axis that the array is distributed over.
+  454:
 ```
 
 
@@ -5672,35 +5533,35 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 684 - R0912 (too-many-branches)
+## File caput/pipeline.py - Line 686 - R0912 (too-many-branches)
 
 - `message: Too many branches (13/12)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  458: class Manager(config.Reader):
+  460: class Manager(config.Reader):
   ...
-  682:                         )
-  683:
-> 684:     def _setup_task(self, task_spec):
-  685:         """Set up a pipeline task from the spec given in the tasks list."""
-  686:
+  684:                         )
+  685:
+> 686:     def _setup_task(self, task_spec):
+  687:         """Set up a pipeline task from the spec given in the tasks list."""
+  688:
 ```
 
 
-## File caput/memh5.py - Line 2269 - R0912 (too-many-branches)
+## File caput/memh5.py - Line 2272 - R0912 (too-many-branches)
 
 - `message: Too many branches (17/12)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  2267:
-  2268:
-> 2269: def _distributed_group_to_hdf5_serial(
-  2270:     group,
-  2271:     fname,
+  2270:
+  2271:
+> 2272: def _distributed_group_to_hdf5_serial(
+  2273:     group,
+  2274:     fname,
 ```
 
 
@@ -5932,23 +5793,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 577 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  575:
-  576:     @classmethod
-> 577:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
-  578:         """Read MPIArray from an HDF5 dataset in parallel.
-  579:
-```
-
-
 ## File caput/time.py - Line 578 - R0913 (too-many-arguments)
 
 - `message: Too many arguments (6/5)`
@@ -5963,6 +5807,23 @@ The recommended approach to using `pylint-ignore` is:
 > 578:     def set_times(self, source, t0, t1=None, step=None, diameter=0.0):
   579:         """Find all times a sources sets in an interval.
   580:
+```
+
+
+## File caput/mpiarray.py - Line 610 - R0913 (too-many-arguments)
+
+- `message: Too many arguments (6/5)`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  236: class MPIArray(np.ndarray):
+  ...
+  608:
+  609:     @classmethod
+> 610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
+  611:         """Read MPIArray from an HDF5 dataset in parallel.
+  612:
 ```
 
 
@@ -5983,7 +5844,7 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 669 - R0913 (too-many-arguments)
+## File caput/mpiarray.py - Line 702 - R0913 (too-many-arguments)
 
 - `message: Too many arguments (7/5)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -5992,45 +5853,45 @@ The recommended approach to using `pylint-ignore` is:
 ```
   236: class MPIArray(np.ndarray):
   ...
-  667:         return dist_arr
-  668:
-> 669:     def to_hdf5(
-  670:         self,
-  671:         f,
+  700:         return dist_arr
+  701:
+> 702:     def to_hdf5(
+  703:         self,
+  704:         f,
 ```
 
 
-## File caput/memh5.py - Line 944 - R0913 (too-many-arguments)
+## File caput/memh5.py - Line 947 - R0913 (too-many-arguments)
 
 - `message: Too many arguments (6/5)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  928: class MemDatasetCommon(MemDataset):
+  931: class MemDatasetCommon(MemDataset):
   ...
-  942:     """
-  943:
-> 944:     def __init__(
-  945:         self,
-  946:         shape,
+  945:     """
+  946:
+> 947:     def __init__(
+  948:         self,
+  949:         shape,
 ```
 
 
-## File caput/memh5.py - Line 1096 - R0913 (too-many-arguments)
+## File caput/memh5.py - Line 1099 - R0913 (too-many-arguments)
 
 - `message: Too many arguments (8/5)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1075: class MemDatasetDistributed(MemDataset):
+  1078: class MemDatasetDistributed(MemDataset):
   ...
-  1094:     """
-  1095:
-> 1096:     def __init__(
-  1097:         self,
-  1098:         shape,
+  1097:     """
+  1098:
+> 1099:     def __init__(
+  1100:         self,
+  1101:         shape,
 ```
 
 
@@ -6049,50 +5910,50 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 1466 - R0913 (too-many-arguments)
+## File caput/memh5.py - Line 1469 - R0913 (too-many-arguments)
 
 - `message: Too many arguments (8/5)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1250: class MemDiskGroup(_BaseGroup):
+  1253: class MemDiskGroup(_BaseGroup):
   ...
-  1464:
-  1465:     @classmethod
-> 1466:     def from_file(
-  1467:         cls,
-  1468:         file_,
+  1467:
+  1468:     @classmethod
+> 1469:     def from_file(
+  1470:         cls,
+  1471:         file_,
 ```
 
 
-## File caput/memh5.py - Line 2269 - R0913 (too-many-arguments)
+## File caput/memh5.py - Line 2272 - R0913 (too-many-arguments)
 
 - `message: Too many arguments (6/5)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  2267:
-  2268:
-> 2269: def _distributed_group_to_hdf5_serial(
-  2270:     group,
-  2271:     fname,
+  2270:
+  2271:
+> 2272: def _distributed_group_to_hdf5_serial(
+  2273:     group,
+  2274:     fname,
 ```
 
 
-## File caput/memh5.py - Line 2401 - R0913 (too-many-arguments)
+## File caput/memh5.py - Line 2404 - R0913 (too-many-arguments)
 
 - `message: Too many arguments (6/5)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  2399:
-  2400:
-> 2401: def _distributed_group_to_hdf5_parallel(
-  2402:     group,
-  2403:     fname,
+  2402:
+  2403:
+> 2404: def _distributed_group_to_hdf5_parallel(
+  2405:     group,
+  2406:     fname,
 ```
 
 
@@ -6192,23 +6053,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 419 - R0914 (too-many-locals)
-
-- `message: Too many local variables (24/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  417:         return dist_arr
-  418:
-> 419:     def redistribute(self, axis):
-  420:         """Change the axis that the array is distributed over.
-  421:
-```
-
-
 ## File caput/time.py - Line 440 - R0914 (too-many-locals)
 
 - `message: Too many local variables (16/15)`
@@ -6241,6 +6085,23 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
+## File caput/mpiarray.py - Line 452 - R0914 (too-many-locals)
+
+- `message: Too many local variables (24/15)`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  236: class MPIArray(np.ndarray):
+  ...
+  450:         return dist_arr
+  451:
+> 452:     def redistribute(self, axis):
+  453:         """Change the axis that the array is distributed over.
+  454:
+```
+
+
 ## File caput/memh5.py - Line 566 - R0914 (too-many-locals)
 
 - `message: Too many local variables (17/15)`
@@ -6258,7 +6119,7 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 577 - R0914 (too-many-locals)
+## File caput/mpiarray.py - Line 610 - R0914 (too-many-locals)
 
 - `message: Too many local variables (25/15)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -6267,15 +6128,15 @@ The recommended approach to using `pylint-ignore` is:
 ```
   236: class MPIArray(np.ndarray):
   ...
-  575:
-  576:     @classmethod
-> 577:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
-  578:         """Read MPIArray from an HDF5 dataset in parallel.
-  579:
+  608:
+  609:     @classmethod
+> 610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
+  611:         """Read MPIArray from an HDF5 dataset in parallel.
+  612:
 ```
 
 
-## File caput/mpiarray.py - Line 669 - R0914 (too-many-locals)
+## File caput/mpiarray.py - Line 702 - R0914 (too-many-locals)
 
 - `message: Too many local variables (21/15)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
@@ -6284,11 +6145,11 @@ The recommended approach to using `pylint-ignore` is:
 ```
   236: class MPIArray(np.ndarray):
   ...
-  667:         return dist_arr
-  668:
-> 669:     def to_hdf5(
-  670:         self,
-  671:         f,
+  700:         return dist_arr
+  701:
+> 702:     def to_hdf5(
+  703:         self,
+  704:         f,
 ```
 
 
@@ -6447,90 +6308,90 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 1073 - R1720 (no-else-raise)
+## File caput/pipeline.py - Line 1082 - R1720 (no-else-raise)
 
 - `message: Unnecessary "else" after "raise"`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1046:     def _pipeline_inspect_queue_product(self, keys, products):
+  1055:     def _pipeline_inspect_queue_product(self, keys, products):
   ...
-  1071:                         )
-  1072:                         raise PipelineRuntimeError(msg)
-> 1073:                     if not self._requires[jj] is None:
-  1074:                         msg = "'requires' data product set more than once."
-  1075:                         raise PipelineRuntimeError(msg)
+  1080:                         )
+  1081:                         raise PipelineRuntimeError(msg)
+> 1082:                     if not self._requires[jj] is None:
+  1083:                         msg = "'requires' data product set more than once."
+  1084:                         raise PipelineRuntimeError(msg)
 ```
 
 
-## File caput/pipeline.py - Line 1085 - R1720 (no-else-raise)
+## File caput/pipeline.py - Line 1094 - R1720 (no-else-raise)
 
 - `message: Unnecessary "else" after "raise"`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1046:     def _pipeline_inspect_queue_product(self, keys, products):
+  1055:     def _pipeline_inspect_queue_product(self, keys, products):
   ...
-  1083:                     logger.debug(msg)
-  1084:                     # Check that task is still accepting inputs.
-> 1085:                     if self._in is None:
-  1086:                         msg = (
-  1087:                             "Tried to queue 'requires' data product, but"
+  1092:                     logger.debug(msg)
+  1093:                     # Check that task is still accepting inputs.
+> 1094:                     if self._in is None:
+  1095:                         msg = (
+  1096:                             "Tried to queue 'requires' data product, but"
 ```
 
 
-## File caput/memh5.py - Line 1308 - R1720 (no-else-raise)
+## File caput/memh5.py - Line 1311 - R1720 (no-else-raise)
 
 - `message: Unnecessary "elif" after "raise"`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1284:     def __init__(self, data_group=None, distributed=False, comm=None):
+  1287:     def __init__(self, data_group=None, distributed=False, comm=None):
   ...
-  1306:             data_group, toclose = get_h5py_File(data_group, mode="a")
-  1307:
-> 1308:         if distributed and isinstance(data_group, h5py.Group):
-  1309:             raise ValueError(
-  1310:                 "Distributed MemDiskGroup cannot be created around h5py objects."
+  1309:             data_group, toclose = get_h5py_File(data_group, mode="a")
+  1310:
+> 1311:         if distributed and isinstance(data_group, h5py.Group):
+  1312:             raise ValueError(
+  1313:                 "Distributed MemDiskGroup cannot be created around h5py objects."
 ```
 
 
-## File caput/pipeline.py - Line 1330 - R1720 (no-else-raise)
+## File caput/pipeline.py - Line 1356 - R1720 (no-else-raise)
 
 - `message: Unnecessary "else" after "raise"`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1325:     def next(self, input=None):
+  1351:     def next(self, input=None):
   ...
-  1328:         # Sort out filenames.
-  1329:         if self.iteration >= len(self.file_middles):
-> 1330:             if not self.input_root == "None":
-  1331:                 # We are iterating over input files and have run out.
-  1332:                 raise PipelineStopIteration()
+  1354:         # Sort out filenames.
+  1355:         if self.iteration >= len(self.file_middles):
+> 1356:             if not self.input_root == "None":
+  1357:                 # We are iterating over input files and have run out.
+  1358:                 raise PipelineStopIteration()
 ```
 
 
 # R1724: no-else-continue
 
-## File caput/pipeline.py - Line 617 - R1724 (no-else-continue)
+## File caput/pipeline.py - Line 619 - R1724 (no-else-continue)
 
 - `message: Unnecessary "elif" after "continue"`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  588:     def run(self):
+  590:     def run(self):
   ...
-  615:                 # them.
-  616:                 out_keys = task._out_keys
-> 617:                 if out is None:  # This iteration supplied no output.
-  618:                     continue
-  619:                 elif len(out_keys) == 0:  # Output not handled by pipeline.
+  617:                 # them.
+  618:                 out_keys = task._out_keys
+> 619:                 if out is None:  # This iteration supplied no output.
+  620:                     continue
+  621:                 elif len(out_keys) == 0:  # Output not handled by pipeline.
 ```
 
 
@@ -6551,37 +6412,37 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 981 - R1725 (super-with-arguments)
+## File caput/memh5.py - Line 984 - R1725 (super-with-arguments)
 
 - `message: Consider using Python 3 style super() without arguments`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  961:     def from_numpy_array(
+  964:     def from_numpy_array(
   ...
-  979:
-  980:         self = cls.__new__(cls)
-> 981:         super(MemDatasetCommon, self).__init__(**kwargs)
   982:
-  983:         self._data = data
+  983:         self = cls.__new__(cls)
+> 984:         super(MemDatasetCommon, self).__init__(**kwargs)
+  985:
+  986:         self._data = data
 ```
 
 
-## File caput/memh5.py - Line 1122 - R1725 (super-with-arguments)
+## File caput/memh5.py - Line 1125 - R1725 (super-with-arguments)
 
 - `message: Consider using Python 3 style super() without arguments`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1115:     def from_mpi_array(
+  1118:     def from_mpi_array(
   ...
-  1120:
-  1121:         self = cls.__new__(cls)
-> 1122:         super(MemDatasetDistributed, self).__init__(**kwargs)
   1123:
-  1124:         self._data = data
+  1124:         self = cls.__new__(cls)
+> 1125:         super(MemDatasetDistributed, self).__init__(**kwargs)
+  1126:
+  1127:         self._data = data
 ```
 
 

@@ -232,7 +232,7 @@ class TestBasicCont(unittest.TestCase):
             f["history"].create_group("old_history_format")
             f["history/old_history_format"].attrs["foo"] = "bar"
 
-        with memh5.MemDiskGroup.from_file(self.fname) as m:
+        with memh5.BasicCont.from_file(self.fname) as m:
             with warnings.catch_warnings(record=True) as w:
                 # Cause all warnings to always be triggered.
                 warnings.simplefilter("always")

@@ -256,6 +256,17 @@ class MPIArray(np.ndarray):
         """
         return self._global_shape
 
+    @global_shape.setter
+    def global_shape(self, var):
+        """
+        Set global array shape.
+
+        Parameters
+        ----------
+        var : tuple
+        """
+        self._global_shape = var
+
     @property
     def axis(self):
         """
@@ -278,6 +289,17 @@ class MPIArray(np.ndarray):
         """
         return self._local_shape
 
+    @local_shape.setter
+    def local_shape(self, var):
+        """
+        Set shape of local section.
+
+        Parameters
+        ----------
+        var : tuple
+        """
+        self._local_shape = var
+
     @property
     def local_offset(self):
         """
@@ -291,6 +313,17 @@ class MPIArray(np.ndarray):
         local_offset : tuple
         """
         return self._local_offset
+
+    @local_offset.setter
+    def local_offset(self, var):
+        """
+        Set offset into global array.
+
+        Parameters
+        ----------
+        var : tuple
+        """
+        self._local_offset = var
 
     @property
     def local_array(self):
@@ -774,9 +807,9 @@ class MPIArray(np.ndarray):
         elif axes is None or axes == ():
             axes = list(range(self.ndim - 1, -1, -1))
 
-        tdata._global_shape = tuple([self.global_shape[ax] for ax in axes])
-        tdata._local_shape = tuple([self.local_shape[ax] for ax in axes])
-        tdata._local_offset = tuple([self.local_offset[ax] for ax in axes])
+        tdata.global_shape = tuple(self.global_shape[ax] for ax in axes)
+        tdata.local_shape = tuple(self.local_shape[ax] for ax in axes)
+        tdata.local_offset = tuple(self.local_offset[ax] for ax in axes)
 
         tdata._axis = list(axes).index(self.axis)
         tdata._comm = self._comm

@@ -859,6 +859,9 @@ class MemDataset(_MemObjMixin):
         super().__init__(**kwargs)
         self._attrs = MemAttrs()
 
+        # Must be implemented by child classes
+        self._data = NotImplemented
+
     @property
     def _group_class(self):
         return MemGroup
