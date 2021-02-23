@@ -30,7 +30,7 @@ jobs:
           python setup.py develop
 
       - name: Run flake8
-        run: flake8 --show-source --exit-zero --ignore=E501,E741,E203,W503,E266 caput
+        run: flake8 --show-source --ignore=E501,E741,E203,W503,E266 caput
 
       - name: Run pylint
         run: >
