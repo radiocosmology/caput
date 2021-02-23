@@ -425,14 +425,24 @@ class TestMPIArray(unittest.TestCase):
         # add differently shaped MPIArrays, with broadcasting
         dist_arr_2 = mpiarray.MPIArray((size, 1), axis=0)
         dist_arr_2[:] = rank - 1
-        assert (dist_arr + dist_arr_2 == 2 * rank -1).all()
+        assert (dist_arr + dist_arr_2 == 2 * rank - 1).all()
         assert (dist_arr + dist_arr_2).axis == 0
 
         # check that subtracting arrays with two different distributed axis fails
-        self.assertRaises(ValueError, np.subtract, mpiarray.MPIArray((size, 4), axis=0), mpiarray.MPIArray((size, 4), axis=1))
+        self.assertRaises(
+            ValueError,
+            np.subtract,
+            mpiarray.MPIArray((size, 4), axis=0),
+            mpiarray.MPIArray((size, 4), axis=1),
+        )
 
         # check that outer ufunc on arrays that cannot be broadcast fails
-        self.assertRaises(ValueError, np.multiply, mpiarray.MPIArray((size, 3), axis=0), mpiarray.MPIArray((size, 4), axis=0))
+        self.assertRaises(
+            ValueError,
+            np.multiply,
+            mpiarray.MPIArray((size, 3), axis=0),
+            mpiarray.MPIArray((size, 4), axis=0),
+        )
 
     def test_reduce(self):
         rank = mpiutil.rank
@@ -475,6 +485,7 @@ class TestMPIArray(unittest.TestCase):
         dist_array[:] = rank
 
         assert mpiarray.MPIArray((size, 4), axis=1).sum(axis=0).axis == 0
+
 
 #
 # class Testmpiarray(unittest.TestCase):
