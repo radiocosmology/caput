@@ -220,11 +220,17 @@ class _global_resolver:
                 index for index, sl in enumerate(slobj) if not isinstance(sl, int)
             ].index(self.axis)
 
-            return MPIArray.wrap(
-                self.array.view(np.ndarray)[slobj],
-                axis=dist_axis,
-                comm=self.array._comm,
-            )
+            if dist_axis != self.axis:
+
+                return MPIArray.wrap(
+                    self.array.view(np.ndarray)[slobj],
+                    axis=dist_axis,
+                    comm=self.array._comm,
+                )
+            else:
+                return MPIArray.wrap(
+                    self.array[slobj], axis=dist_axis, comm=self.array._comm
+                )
 
     def __setitem__(self, slobj, value):
 
