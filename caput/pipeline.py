@@ -63,6 +63,7 @@ trivial but fully implemented task:
 ...     eggs = config.Property(proptype=list)
 ...
 ...     def __init__(self):
+...         super().__init__()
 ...         self.i = 0
 ...
 ...     def setup(self):
@@ -88,6 +89,7 @@ that are designed to operate in this manner.
 ...     eggs = config.Property(proptype=list)
 ...
 ...     def __init__(self):
+...         super().__init__()
 ...         self.i = 0
 ...
 ...     def setup(self):
@@ -780,6 +782,9 @@ class Manager(config.Reader):
             )
             raise config.CaputConfigError(msg) from e
 
+        # The tasks own custom validation method
+        task.validate()
+
         self.tasks.append(task)
         logger.debug(f"Added {task.__class__.__name__} to task list.")
 
@@ -829,6 +834,9 @@ class TaskBase(config.Reader):
         """
 
         pass
+
+    def validate(self):
+        """Validate the task after instantiation."""
 
     def next(self, input=None):
         """Iterative analysis stage of pipeline task.
@@ -1103,18 +1111,39 @@ class _OneAndOne(TaskBase):
     input_root = config.Property(default="None", proptype=str)
     output_root = config.Property(default="None", proptype=str)
 
+    def __init__(self):
+        # Inspect the `process` method to see how many arguments it takes.
+        pro_argspec = inspect.getfullargspec(self.process)
+        n_args = len(pro_argspec.args) - 1
+        if n_args == 0:
+            self._no_input = True
+        else:
+            self._no_input = False
+
     def process(self, input):
         """Override this method with your data processing task."""
 
         output = input
         return output
 
-    def __init__(self):
-        """Checks inputs and outputs and stuff."""
+    def validate(self):
+        """
+        Validate the task after instantiation.
 
+        May be overriden to add any special task validation before the task is run.
+        This is called by the :py:class:`Manager` after it's added to the pipeline and has special attributes like
+        `_requires_keys`, `_requires`, `_in_keys`, `_in`, `-_out_keys` set.
+        Call `super().validate()` if you overwrite this.
+
+        Raises
+        ------
+        caput.config.CaputConfigError
+            If there was an error in the task configuration.
+        """
         # Inspect the `process` method to see how many arguments it takes.
         pro_argspec = inspect.getfullargspec(self.process)
         n_args = len(pro_argspec.args) - 1
+
         if n_args > 1:
             msg = "`process` method takes more than 1 argument, which is not allowed."
             raise config.CaputConfigError(msg)
@@ -1129,10 +1158,6 @@ class _OneAndOne(TaskBase):
                 " arguments."
             )
             raise config.CaputConfigError(msg)
-        if n_args == 0:
-            self._no_input = True
-        else:
-            self._no_input = False
 
         # Make sure we know where to get the data from.
         if self.input_root == "None":
@@ -1319,7 +1344,7 @@ class IterBase(_OneAndOne):
     output_ext = config.Property(default="", proptype=str)
 
     def __init__(self):
-        _OneAndOne.__init__(self)
+        super().__init__()
         self.iteration = 0
 
     def next(self, input=None):
@@ -1516,6 +1541,7 @@ class Input(TaskBase):
     """Pass inputs into the pipeline from outside."""
 
     def __init__(self, inputs=None):
+        super().__init__()
         self.inputs = inputs or []
         self._iter = None
 
@@ -1547,6 +1573,7 @@ class Output(TaskBase):
     """
 
     def __init__(self, callback=None):
+        super().__init__()
         self.outputs = []
         self.callback = callback
 
