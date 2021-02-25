@@ -213,24 +213,8 @@ class _global_resolver:
             # Fix up slobj for axes where there is no data
             slobj = tuple(slice(None, None, None) if sl is None else sl for sl in slobj)
 
-            # Return an MPIArray view
-            # Figure out which is the distributed axis after the slicing, by
-            # removing slice axes which are just ints from the mapping
-            dist_axis = [
-                index for index, sl in enumerate(slobj) if not isinstance(sl, int)
-            ].index(self.axis)
+            return self.array[slobj]
 
-            if dist_axis != self.axis:
-
-                return MPIArray.wrap(
-                    self.array.view(np.ndarray)[slobj],
-                    axis=dist_axis,
-                    comm=self.array._comm,
-                )
-            else:
-                return MPIArray.wrap(
-                    self.array[slobj], axis=dist_axis, comm=self.array._comm
-                )
 
     def __setitem__(self, slobj, value):
 
@@ -252,6 +236,29 @@ class MPIArray(np.ndarray):
     axis : integer, optional
         The dimension to distribute the array across.
     """
+
+    def __getitem__(self, v):
+        # Return an MPIArray view
+
+        if not isinstance(v, tuple):
+            return super().__getitem__(v)
+
+        # Figure out which is the distributed axis after the slicing, by
+        # removing slice axes which are just ints from the mapping
+        dist_axis = [
+            index for index, sl in enumerate(v) if not isinstance(sl, int)
+        ].index(self.axis)
+
+        if dist_axis != self.axis:
+
+            return MPIArray.wrap(
+                self.view(np.ndarray).__getitem__(v),
+                axis=dist_axis,
+                comm=self._comm,
+            )
+        else:
+            return super().__getitem__(v)
+
 
     @property
     def global_shape(self):
