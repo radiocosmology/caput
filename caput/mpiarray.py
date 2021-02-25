@@ -1253,11 +1253,13 @@ class MPIArray(np.ndarray):
         global_shape = list(lshape)
 
         try:
-            axlen = global_shape[axis]
+            axlen = obj.global_shape[axis]
         except:
             raise AxisException(
                 f"Distributed axis {axis} does not exist in global shape {global_shape}"
             )
+
+        global_shape[axis] = axlen
 
         _, local_start, _ = mpiutil.split_local(axlen, comm=comm)
 
