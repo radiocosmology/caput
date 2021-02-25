@@ -245,15 +245,31 @@ class MPIArray(np.ndarray):
 
         # Figure out which is the distributed axis after the slicing, by
         # removing slice axes which are just ints from the mapping
-        dist_axis = [
-            index for index, sl in enumerate(v) if not isinstance(sl, int)
-        ].index(self.axis)
+        try:
+            dist_axis = [
+                index for index, sl in enumerate(v) if not isinstance(sl, int)
+            ].index(self.axis)
+        except ValueError:
+            raise AxisException(
+                "Cannot sub-slice distributed axes; use global_slice instead"
+            )
 
+        # the MPIArray view assumes that the output distributed axis
+        # is the same as the source
+        # since the number for the distributed axes has changed, we
+        # will need a fresh MPIArray object
         if dist_axis != self.axis:
 
             arr = self.view(np.ndarray).__getitem__(v)
+
+            # determine the shape of the new array
+            # grab the length of the distributed axes from the original
+            # instead of performing an mpi.allreduce
             global_shape = list(arr.shape)
             global_shape[dist_axis] = self.global_shape[self.axis]
+
+            # create an mpi array, with the appropriate parameters
+            # fill it with the contents of the slice
             arr_mpi = MPIArray(tuple(global_shape), axis=dist_axis, comm=self._comm)
             arr_mpi[:] = arr[:]
             return arr_mpi
