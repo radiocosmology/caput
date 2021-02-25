@@ -251,11 +251,12 @@ class MPIArray(np.ndarray):
 
         if dist_axis != self.axis:
 
-            return MPIArray.wrap(
-                self.view(np.ndarray).__getitem__(v),
-                axis=dist_axis,
-                comm=self._comm,
-            )
+            arr = self.view(np.ndarray).__getitem__(v)
+            global_shape = list(arr.shape)
+            global_shape[dist_axis] = self.global_shape[self.axis]
+            arr_mpi = MPIArray(tuple(global_shape), axis=dist_axis, comm=self._comm)
+            arr_mpi[:] = arr[:]
+            return arr_mpi
         else:
             return super().__getitem__(v)
 
