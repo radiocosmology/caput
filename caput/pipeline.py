@@ -510,7 +510,7 @@ class Manager(config.Reader):
             self._profiler = PSUtilProfiler()
 
         logger.debug(
-            "CPU and memory profiling using psutil {self._psutil_profiling ? 'enabled' : 'disabled'}."
+            f"CPU and memory profiling using psutil {'enabled' if self._psutil_profiling else 'disabled'}."
         )
 
     @classmethod

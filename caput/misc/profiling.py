@@ -21,7 +21,7 @@ class PSUtilProfiler(psutil.Process):
 
         super().__init__()
 
-        logger.warning(f"Profiling pipeline: {self.cpu_count} cores available.")
+        logger.info(f"Profiling pipeline: {self.cpu_count} cores available.")
 
     def __eq__(self, other):
         if not isinstance(other, psutil.Process):
@@ -117,7 +117,7 @@ class PSUtilProfiler(psutil.Process):
         time_s = stop_time - self._start_time.pop(name)
 
         if time_s < 0.1:
-            logger.warning(
+            logger.info(
                 f"{name} ran for {time_s:.4f} < 0.1s, results might be inaccurate."
             )
 
