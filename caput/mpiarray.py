@@ -215,7 +215,6 @@ class _global_resolver:
 
             return self.array[slobj]
 
-
     def __setitem__(self, slobj, value):
 
         slobj, _ = self._resolve_slice(slobj)
@@ -266,6 +265,9 @@ class MPIArray(np.ndarray):
             # grab the length of the distributed axes from the original
             # instead of performing an mpi.allreduce
             global_shape = list(arr.shape)
+            # if a single value
+            if not global_shape:
+                return arr
             global_shape[dist_axis] = self.global_shape[self.axis]
 
             # create an mpi array, with the appropriate parameters
@@ -275,7 +277,6 @@ class MPIArray(np.ndarray):
             return arr_mpi
         else:
             return super().__getitem__(v)
-
 
     @property
     def global_shape(self):

@@ -335,6 +335,18 @@ class TestMPIArray(unittest.TestCase):
         assert dslice.global_shape == (10, size * 5)
         assert dslice.local_shape == (10, 5)
 
+        # Check that directly slicing into distributed axis is blocked
+        darr = mpiarray.MPIArray((20, size * 5), axis=1)
+        with self.assertRaises(mpiarray.AxisException):
+            darr[2, 0]
+
+        # But, you can directly index with global_slice
+        dslice = darr.global_slice[2, 0]
+        if rank != 0:
+            assert dslice is None
+        else:
+            assert dslice == 10.0
+
         # Check ellipsis and slice at the end
         darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
         dslice = darr.global_slice[..., 4:9]
@@ -348,6 +360,8 @@ class TestMPIArray(unittest.TestCase):
 
         assert dslice.global_shape == (size, 136, 41)
         assert dslice.local_shape == (1, 136, 41)
+
+
 
     def test_global_setslice(self):
 
