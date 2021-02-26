@@ -278,6 +278,13 @@ class MPIArray(np.ndarray):
         else:
             return super().__getitem__(v)
 
+    def __repr__(self):
+        return self.local_array.__repr__()
+
+    def __str__(self):
+        return self.local_array.__str__()
+
+
     @property
     def global_shape(self):
         """
