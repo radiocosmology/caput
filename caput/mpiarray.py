@@ -206,7 +206,7 @@ class _global_resolver:
             if slobj[self.axis] is None:
                 return None
             else:
-                return self.array[slobj].view(np.ndarray)
+                return self.array.local_array[slobj]
 
         else:
 
@@ -243,16 +243,10 @@ class MPIArray(np.ndarray):
             return super().__getitem__(v)
 
         try:
-            # global_slice handles indexing into the distributed axis
-            # if the distributed axis index is of type `int`, it means
-            # the user is not using global_slice
-            # global_slice replaces `int` with `np.int64`
             dist_axis_index = v[self.axis]
-            if isinstance(dist_axis_index, int):
-                raise AxisException(
-                        "Use global_slice to index distributed axis"
-                    )
-            if isinstance(dist_axis_index, slice) and (dist_axis_index != slice(None, None, None)) and (dist_axis_index != slice(0, self.global_shape[self.axis], None)):
+            if (dist_axis_index == slice(None, None, None)) or (dist_axis_index == slice(0, self.local_shape[self.axis]-1, None)):
+                pass
+            else:
                 raise AxisException(
                         "Cannot sub-slice distributed axes"
                 )
@@ -261,10 +255,9 @@ class MPIArray(np.ndarray):
 
         # Figure out which is the distributed axis after the slicing, by
         # removing slice axes which are just ints from the mapping
+        dist_axis = [index for index, sl in enumerate(v) if not isinstance(sl, int) and not isinstance(sl, np.int64)]
         try:
-            dist_axis = [
-                index for index, sl in enumerate(v) if not isinstance(sl, int)
-            ].index(self.axis)
+            dist_axis = dist_axis.index(self.axis)
         except ValueError:
             raise AxisException(
                 "Cannot sub-slice distributed axes; use global_slice instead"
@@ -276,7 +269,7 @@ class MPIArray(np.ndarray):
         # will need a fresh MPIArray object
         if dist_axis != self.axis:
 
-            arr = self.view(np.ndarray).__getitem__(v)
+            arr = self.local_array.__getitem__(v)
 
             # determine the shape of the new array
             # grab the length of the distributed axes from the original
