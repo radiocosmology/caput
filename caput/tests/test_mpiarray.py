@@ -14,6 +14,8 @@ from caput import mpiutil, mpiarray
 
 
 class TestMPIArray(unittest.TestCase):
+    # pylint: disable=missing-function-docstring
+    # pylint: disable=no-member
     def test_construction(self):
 
         arr = mpiarray.MPIArray((10, 11), axis=1)
@@ -255,6 +257,7 @@ class TestMPIArray(unittest.TestCase):
         # Check axis
         assert arr2.axis == 0
 
+    # pylint: disable=too-many-statements
     def test_global_getslice(self):
 
         rank = mpiutil.rank
@@ -340,7 +343,7 @@ class TestMPIArray(unittest.TestCase):
         darr = mpiarray.MPIArray((20, size * 5), axis=1)
         darr[:] = rank
         with self.assertRaises(mpiarray.AxisException):
-            darr[2, 0]
+            darr[2, 0]  # pylint: disable=pointless-statement
 
         # But, you can directly index with global_slice
         if size >= 2:
@@ -381,10 +384,7 @@ class TestMPIArray(unittest.TestCase):
         assert dslice.global_shape == (size, 136, 41)
         assert dslice.local_shape == (1, 136, 41)
 
-
-
     def test_global_setslice(self):
-
         rank = mpiutil.rank
         size = mpiutil.size
 
