@@ -242,6 +242,23 @@ class MPIArray(np.ndarray):
         if not isinstance(v, tuple):
             return super().__getitem__(v)
 
+        try:
+            # global_slice handles indexing into the distributed axis
+            # if the distributed axis index is of type `int`, it means
+            # the user is not using global_slice
+            # global_slice replaces `int` with `np.int64`
+            dist_axis_index = v[self.axis]
+            if isinstance(dist_axis_index, int):
+                raise AxisException(
+                        "Use global_slice to index distributed axis"
+                    )
+            if isinstance(dist_axis_index, slice) and (dist_axis_index != slice(None, None, None)) and (dist_axis_index != slice(0, self.global_shape[self.axis], None)):
+                raise AxisException(
+                        "Cannot sub-slice distributed axes"
+                )
+        except IndexError:
+            pass
+
         # Figure out which is the distributed axis after the slicing, by
         # removing slice axes which are just ints from the mapping
         try:

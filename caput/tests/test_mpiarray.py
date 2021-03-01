@@ -339,6 +339,8 @@ class TestMPIArray(unittest.TestCase):
         darr = mpiarray.MPIArray((20, size * 5), axis=1)
         with self.assertRaises(mpiarray.AxisException):
             darr[2, 0]
+        with self.assertRaises(mpiarray.AxisException):
+            darr.global_slice[2, 0:3]
 
         # But, you can directly index with global_slice
         dslice = darr.global_slice[2, 0]
