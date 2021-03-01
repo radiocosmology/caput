@@ -343,11 +343,29 @@ class TestMPIArray(unittest.TestCase):
             darr[2, 0]
 
         # But, you can directly index with global_slice
-        dslice = darr.global_slice[2, 0]
-        if rank != 0:
-            assert dslice is None
-        else:
-            assert dslice == rank
+        if size >= 2:
+            dslice = darr.global_slice[2, 6]
+            if rank != 1:
+                assert dslice is None
+            else:
+                assert (dslice == rank).all()
+
+        # Check that printing the array does not trigger
+        # an exception
+        assert str(darr)
+
+        # the global slice should return a numpy array on rank=1, and None everywhere else
+        if size >= 2:
+            darr = mpiarray.MPIArray((20, 10, size * 5), axis=2)
+            darr[:] = rank
+            dslice = darr.global_slice[:, :, 6]
+            if rank != 1:
+                assert dslice is None
+            else:
+                nparr = np.ndarray((20, 10))
+                nparr[:] = rank
+                assert isinstance(dslice, np.ndarray)
+                assert (dslice == nparr).all()
 
         # Check ellipsis and slice at the end
         darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
