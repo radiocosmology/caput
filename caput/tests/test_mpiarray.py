@@ -338,6 +338,7 @@ class TestMPIArray(unittest.TestCase):
 
         # Check that directly slicing into distributed axis is blocked
         darr = mpiarray.MPIArray((20, size * 5), axis=1)
+        darr[:] = rank
         with self.assertRaises(mpiarray.AxisException):
             darr[2, 0]
 
@@ -346,7 +347,7 @@ class TestMPIArray(unittest.TestCase):
         if rank != 0:
             assert dslice is None
         else:
-            assert dslice == 10.0
+            assert dslice == rank
 
         # Check ellipsis and slice at the end
         darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
