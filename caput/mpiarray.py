@@ -262,10 +262,10 @@ class MPIArray(np.ndarray):
         ]
         try:
             dist_axis = dist_axis.index(self.axis)
-        except ValueError:
+        except ValueError as e:
             raise AxisException(
                 "Cannot sub-slice distributed axes; use global_slice instead"
-            )
+            ) from e
 
         # the MPIArray view assumes that the output distributed axis
         # is the same as the source
@@ -476,10 +476,10 @@ class MPIArray(np.ndarray):
         # Get axis length, both locally, and globally
         try:
             axlen = array.shape[axis]
-        except:
+        except IndexError as e:
             raise AxisException(
-                f"Distributed axis {axis} does not exist in global shape {shape}"
-            )
+                f"Distributed axis {axis} does not exist in global shape {array.shape}"
+            ) from e
 
         totallen = mpiutil.allreduce(axlen, comm=comm)
 
@@ -1231,9 +1231,6 @@ class MPIArray(np.ndarray):
 
         results = super().__array_ufunc__(ufunc, method, *args, **kwargs)
 
-        if results is NotImplemented:
-            return NotImplemented
-
         # operation is performed in-place, so we can just return
         if method == "at":
             return
@@ -1302,10 +1299,10 @@ class MPIArray(np.ndarray):
 
         try:
             axlen = obj.global_shape[axis]
-        except:
+        except IndexError as e:
             raise AxisException(
                 f"Distributed axis {axis} does not exist in global shape {global_shape}"
-            )
+            ) from e
 
         global_shape[axis] = axlen
 
@@ -1408,5 +1405,8 @@ class DummyContext:
 
 
 class AxisException(Exception):
+    """Exception for distributed axes related errors with MPIArrays."""
+
     def __init__(self, message):
         self.message = message
+        super().__init__(self.message)
