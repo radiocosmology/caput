@@ -244,18 +244,22 @@ class MPIArray(np.ndarray):
 
         try:
             dist_axis_index = v[self.axis]
-            if (dist_axis_index == slice(None, None, None)) or (dist_axis_index == slice(0, self.local_shape[self.axis]-1, None)):
+            if dist_axis_index == slice(None, None, None) or dist_axis_index == slice(
+                0, self.local_array.shape[self.axis], None
+            ):
                 pass
             else:
-                raise AxisException(
-                        "Cannot sub-slice distributed axes"
-                )
+                raise AxisException("Cannot sub-slice distributed axes")
         except IndexError:
             pass
 
         # Figure out which is the distributed axis after the slicing, by
         # removing slice axes which are just ints from the mapping
-        dist_axis = [index for index, sl in enumerate(v) if not isinstance(sl, int) and not isinstance(sl, np.int64)]
+        dist_axis = [
+            index
+            for index, sl in enumerate(v)
+            if not isinstance(sl, int) and not isinstance(sl, np.int64)
+        ]
         try:
             dist_axis = dist_axis.index(self.axis)
         except ValueError:
@@ -288,12 +292,14 @@ class MPIArray(np.ndarray):
         else:
             return super().__getitem__(v)
 
+    def __setitem__(self, slobj, value):
+        self.local_array.__setitem__(slobj, value)
+
     def __repr__(self):
         return self.local_array.__repr__()
 
     def __str__(self):
         return self.local_array.__str__()
-
 
     @property
     def global_shape(self):
