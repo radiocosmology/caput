@@ -340,6 +340,10 @@ class TestMPIArray(unittest.TestCase):
         assert dslice.axis == 1
 
         # Check that directly slicing into distributed axis is blocked
+        darr = mpiarray.MPIArray((size,), axis=0)
+        with self.assertRaises(mpiarray.AxisException):
+            darr[0]  # pylint: disable=pointless-statement
+
         darr = mpiarray.MPIArray((20, size * 5), axis=1)
         darr[:] = rank
         with self.assertRaises(mpiarray.AxisException):
