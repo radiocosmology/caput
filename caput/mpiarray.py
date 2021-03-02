@@ -239,16 +239,17 @@ class MPIArray(np.ndarray):
     def __getitem__(self, v):
         # Return an MPIArray view
 
-        if not isinstance(v, tuple):
+        # single index into axis 0
+        if isinstance(v, int):
+            if self.axis == 0:
+                raise AxisException("Cannot directly index distributed axes; use global_slice instead")
             return super().__getitem__(v)
 
         try:
             dist_axis_index = v[self.axis]
-            if dist_axis_index == slice(None, None, None) or dist_axis_index == slice(
-                0, self.local_array.shape[self.axis], None
-            ):
-                pass
-            else:
+            if dist_axis_index != slice(None, None, None) and dist_axis_index != slice(0, self.local_array.shape[self.axis], None):
+                if isinstance(dist_axis_index, int):
+                    raise AxisException("Cannot directly index distributed axes; use global_slice instead")
                 raise AxisException("Cannot sub-slice distributed axes")
         except IndexError:
             pass
@@ -264,7 +265,7 @@ class MPIArray(np.ndarray):
             dist_axis = dist_axis.index(self.axis)
         except ValueError as e:
             raise AxisException(
-                "Cannot sub-slice distributed axes; use global_slice instead"
+                "Cannot directly index distributed axes; use global_slice instead"
             ) from e
 
         # the MPIArray view assumes that the output distributed axis
