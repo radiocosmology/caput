@@ -348,6 +348,7 @@ class TestMPIArray(unittest.TestCase):
         darr = mpiarray.MPIArray((4, size), axis=1)
         darr[:] = rank
         assert(darr[0] == rank).all()
+        assert(darr[0].axis == 0)
 
         darr = mpiarray.MPIArray((20, size * 5), axis=1)
         darr[:] = rank

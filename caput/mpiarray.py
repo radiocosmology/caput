@@ -202,7 +202,7 @@ class _global_resolver:
         # If not a full slice, return a numpy array (or None)
         if not is_fullslice:
 
-            # If the parallel axis has a None, that means there is no data on this rank
+            # If the distributed axis has a None, that means there is no data at that index on this rank
             if slobj[self.axis] is None:
                 return None
             else:
@@ -219,6 +219,7 @@ class _global_resolver:
 
         slobj, _ = self._resolve_slice(slobj)
 
+        # If the distributed axis has a None, that means that index is not available on this rank
         if slobj[self.axis] is None:
             return
         self.array[slobj] = value
@@ -240,59 +241,67 @@ class MPIArray(np.ndarray):
         # Return an MPIArray view
 
         # ensure slobj is a tuple, with one entry for every axis
-        # if too short, extend with `slice(None, None, None)
+        # if smaller than number of axes, extend with `slice(None, None, None)`
         if not isinstance(v, tuple):
-            v = (v, )
+            v = (v,)
         if len(v) < len(self.global_shape):
-            v = v + (slice(None, None, None), ) * (len(self.global_shape) - len(v))
+            v = v + (slice(None, None, None),) * (len(self.global_shape) - len(v))
 
-        try:
-            dist_axis_index = v[self.axis]
-            if dist_axis_index != slice(None, None, None) and dist_axis_index != slice(0, self.local_array.shape[self.axis], None):
-                if isinstance(dist_axis_index, int):
-                    raise AxisException("Cannot directly index distributed axes; use global_slice instead")
-                raise AxisException("Cannot sub-slice distributed axes")
-        except IndexError:
-            pass
+        # __getitem__ should not be receiving sub-slices or direct indexes on the distributed axis
+        # global_slice should be used for indexing into distributed axis
+        dist_axis_index = v[self.axis]
+        if dist_axis_index != slice(None, None, None) and dist_axis_index != slice(
+            0, self.local_array.shape[self.axis], None
+        ):
+            if isinstance(dist_axis_index, int):
+                raise AxisException(
+                    "Cannot directly index distributed axis; use global_slice instead"
+                )
+            raise AxisException("Cannot sub-slice distributed axis")
 
-        # Figure out which is the distributed axis after the slicing, by
-        # removing slice axes which are just ints from the mapping
+        # Figure out which is the axis number for the distributed axis after the slicing
+        # by removing slice axes which are just ints from the mapping.
+        # int slices will result in that axis being reduced
+        # and the distributed axis number dropping by 1.
         dist_axis = [
             index
             for index, sl in enumerate(v)
             if not isinstance(sl, int) and not isinstance(sl, np.int64)
         ]
+
         try:
             dist_axis = dist_axis.index(self.axis)
         except ValueError as e:
             raise AxisException(
-                "Cannot directly index distributed axes; use global_slice instead"
+                "Failed to calculate new distributed axis for output of this slice"
             ) from e
 
-        # the MPIArray view assumes that the output distributed axis
+        if dist_axis == self.axis:
+            return super().__getitem__(v)
+
+        # the MPIArray array_finalize assumes that the output distributed axis
         # is the same as the source
         # since the number for the distributed axes has changed, we
         # will need a fresh MPIArray object
-        if dist_axis != self.axis:
 
-            arr = self.local_array.__getitem__(v)
+        arr_sliced = self.local_array.__getitem__(v)
 
-            # determine the shape of the new array
-            # grab the length of the distributed axes from the original
-            # instead of performing an mpi.allreduce
-            global_shape = list(arr.shape)
-            # if a single value
-            if not global_shape:
-                return arr
-            global_shape[dist_axis] = self.global_shape[self.axis]
+        # determine the shape of the new array
+        # grab the length of the distributed axes from the original
+        # instead of performing an mpi.allreduce
+        new_global_shape = list(arr_sliced.shape)
 
-            # create an mpi array, with the appropriate parameters
-            # fill it with the contents of the slice
-            arr_mpi = MPIArray(tuple(global_shape), axis=dist_axis, comm=self._comm)
-            arr_mpi[:] = arr[:]
-            return arr_mpi
-        else:
-            return super().__getitem__(v)
+        # if a single value, not an array, just return
+        if not new_global_shape:
+            return arr_sliced
+
+        new_global_shape[dist_axis] = self.global_shape[self.axis]
+
+        # create an mpi array, with the appropriate parameters
+        # fill it with the contents of the slice
+        arr_mpi = MPIArray(tuple(new_global_shape), axis=dist_axis, comm=self._comm)
+        arr_mpi[:] = arr_sliced[:]
+        return arr_mpi
 
     def __setitem__(self, slobj, value):
         self.local_array.__setitem__(slobj, value)
@@ -1137,17 +1146,17 @@ class MPIArray(np.ndarray):
     def _mpi_to_ndarray(inputs):
         """Ensure a list with mixed MPIArrays and ndarrays are all ndarrays.
 
-        Additionally, ensure that all of the MPIArrays were are all distributed along the same axes.
+        Additionally, ensure that all of the MPIArrays are distributed along the same axis.
 
         Parameters
         ----------
         inputs : list of MPIArrays and ndarrays
-            All MPIArrays should be distributed along the same axes.
+            All MPIArrays should be distributed along the same axis.
 
         Returns
         -------
         args : list of ndarrays
-            The ndarrays are built from the local view of inputted MPIArrays.
+            The ndarrays are built from the local view of inputed MPIArrays.
         dist_axis : int
             The axis that all of the MPIArrays were distributed on.
         """
@@ -1164,7 +1173,7 @@ class MPIArray(np.ndarray):
                             "The distributed axis for all MPIArrays in an expression should be the same"
                         )
 
-                args.append(array.local_array.view(np.ndarray))
+                args.append(array.local_array)
             else:
                 args.append(array)
 
@@ -1188,8 +1197,8 @@ class MPIArray(np.ndarray):
         The distributed axis for all input MPIArrays, is expected to be the same.
         Operations across the distributed axis, will not be permitted.
 
-        The new array will ehter be be distributed over that axis, or possibly
-        one axis down for `reduce` methods, if they eliminate the distributed axis.
+        The new array will either be distributed over that axis, or possibly
+        one axis down for `reduce` methods.
 
         For operations that normally return a scalar, the scalars will be
         wrapped into a 1D array, distributed across axis 0.
@@ -1222,7 +1231,7 @@ class MPIArray(np.ndarray):
             )
 
         # 'out' kwargs contain arrays that the ufunc places the results into
-        # this broadcasts the local part of the output arrays into an ndarray
+        # this views the local part of the output arrays into an ndarray
         # that the ufunc knows how to work with
         outputs = kwargs.get("out", None)
         if outputs:
@@ -1233,10 +1242,11 @@ class MPIArray(np.ndarray):
 
         results = super().__array_ufunc__(ufunc, method, *args, **kwargs)
 
+        # that ufunc was not implemented for ndarrays
         if results is NotImplemented:
             raise NotImplemented
 
-        # operation is performed in-place, so we can just return
+        # operation was performed in-place, so we can just return
         if method == "at":
             return
 
@@ -1244,7 +1254,7 @@ class MPIArray(np.ndarray):
             results = (results,)
 
         if "reduce" in method and results[0].shape:
-            # reduction methods eliminate axes, so the distributed axes
+            # reduction methods eliminate axes, so the distributed axis
             # might need to be recalculated
             # except when the user explicitly specifies keepdims
             if not kwargs.get("keepdims", False):
@@ -1259,7 +1269,7 @@ class MPIArray(np.ndarray):
             if output is not None:
                 ret.append(output)
             else:
-                # case: the result is an array; convert back it into an MPIArray
+                # case: the result is an ndarray; wrap it into an MPIArray
                 if result.shape:
                     ret.append(MPIArray.wrap(result, axis=dist_axis))
                 # case: result is a scalar; convert to 1-d vector, distributed across axis 0
@@ -1274,19 +1284,24 @@ class MPIArray(np.ndarray):
         """
         Finalizes the creation of the MPIArray, when viewed.
 
+        Note: If you wish to create an MPIArray from an ndarray, please use wrap().
+        Do not use ndarray.view(MPIArray).
+
         In NumPy, ndarrays only go through the `__new__` when being instantiated.
         For views and broadcast, they go through __array_finalize__.
         https://numpy.org/doc/stable/user/basics.subclassing.html#the-role-of-array-finalize
 
         Parameters
         ----------
-        obj : MPIArray or None
-            The original MPIArray being viewed or broadcast.
+        obj : MPIArray, ndarray or None
+            The original array being viewed or broadcast.
             When in the middle of a constructor, obj is set to None.
+        self : MPIArray or ndarray
+            The array which will be created
         """
-        # we are in the middle of a constructor, and the attributes
-        # will be set when we return to it
         if obj is None:
+            # we are in the middle of a constructor, and the attributes
+            # will be set when we return to it
             return
 
         if not isinstance(obj, MPIArray):
@@ -1298,10 +1313,11 @@ class MPIArray(np.ndarray):
 
         axis = obj.axis
 
-        # Get shape and offset
+        # Get local shape
         lshape = self.shape
         global_shape = list(lshape)
 
+        # Obtaining length of distributed axis, without using an mpi.allreduce
         try:
             axlen = obj.global_shape[axis]
         except IndexError as e:
@@ -1311,6 +1327,7 @@ class MPIArray(np.ndarray):
 
         global_shape[axis] = axlen
 
+        # Get offset
         _, local_start, _ = mpiutil.split_local(axlen, comm=comm)
 
         loffset = [0] * len(lshape)
