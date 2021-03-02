@@ -344,6 +344,11 @@ class TestMPIArray(unittest.TestCase):
         with self.assertRaises(mpiarray.AxisException):
             darr[0]  # pylint: disable=pointless-statement
 
+        # Check that a single index works
+        darr = mpiarray.MPIArray((4, size), axis=1)
+        darr[:] = rank
+        assert(darr[0] == rank).all()
+
         darr = mpiarray.MPIArray((20, size * 5), axis=1)
         darr[:] = rank
         with self.assertRaises(mpiarray.AxisException):
@@ -468,7 +473,7 @@ class TestMPIArray(unittest.TestCase):
 
         # check that subtracting arrays with two different distributed axis fails
         self.assertRaises(
-            ValueError,
+            mpiarray.AxisException,
             np.subtract,
             mpiarray.MPIArray((size, 4), axis=0),
             mpiarray.MPIArray((size, 4), axis=1),
