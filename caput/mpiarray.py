@@ -239,11 +239,12 @@ class MPIArray(np.ndarray):
     def __getitem__(self, v):
         # Return an MPIArray view
 
-        # single index into axis 0
-        if isinstance(v, int):
-            if self.axis == 0:
-                raise AxisException("Cannot directly index distributed axes; use global_slice instead")
-            return super().__getitem__(v)
+        # ensure slobj is a tuple, with one entry for every axis
+        # if too short, extend with `slice(None, None, None)
+        if not isinstance(v, tuple):
+            v = (v, )
+        if len(v) < len(self.global_shape):
+            v = v + (slice(None, None, None), ) * (len(self.global_shape) - len(v))
 
         try:
             dist_axis_index = v[self.axis]
@@ -1231,6 +1232,9 @@ class MPIArray(np.ndarray):
             outputs = (None,) * ufunc.nout
 
         results = super().__array_ufunc__(ufunc, method, *args, **kwargs)
+
+        if results is NotImplemented:
+            raise NotImplemented
 
         # operation is performed in-place, so we can just return
         if method == "at":
