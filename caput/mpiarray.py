@@ -708,7 +708,7 @@ class MPIArray(np.ndarray):
 
         # Check that the axis is valid and wrap to an actual position
         if axis < -naxis or axis >= naxis:
-            raise ValueError(
+            raise AxisException(
                 "Distributed axis %i not in range (%i, %i)" % (axis, -naxis, naxis - 1)
             )
         axis = naxis + axis if axis < 0 else axis
@@ -1159,7 +1159,7 @@ class MPIArray(np.ndarray):
                     dist_axis = array.axis
                 else:
                     if dist_axis != array.axis:
-                        raise ValueError(
+                        raise AxisException(
                             "The distributed axis for all MPIArrays in an expression should be the same"
                         )
 
@@ -1216,7 +1216,7 @@ class MPIArray(np.ndarray):
         args, dist_axis = MPIArray._mpi_to_ndarray(inputs)
 
         if "axis" in kwargs and (kwargs["axis"] == dist_axis):
-            raise ValueError(
+            raise AxisException(
                 f"operations along the distributed axis (in this case, {dist_axis}) are not allowed."
             )
 
