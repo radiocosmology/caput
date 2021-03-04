@@ -248,16 +248,18 @@ class MPIArray(np.ndarray):
             v = v + (slice(None, None, None),) * (len(self.global_shape) - len(v))
 
         # __getitem__ should not be receiving sub-slices or direct indexes on the distributed axis
-        # global_slice should be used for indexing into distributed axis
+        # global_slice should be used for both
         dist_axis_index = v[self.axis]
-        if dist_axis_index != slice(None, None, None) and dist_axis_index != slice(
-            0, self.local_array.shape[self.axis], None
+        if (dist_axis_index != slice(None, None, None)) and (
+            dist_axis_index != slice(0, self.local_array.shape[self.axis], None)
         ):
             if isinstance(dist_axis_index, int):
                 raise AxisException(
                     "Cannot directly index distributed axis; use global_slice instead"
                 )
-            raise AxisException("Cannot sub-slice distributed axis")
+            raise AxisException(
+                "Cannot directly sub-slice distributed axis; use global_slice instead"
+            )
 
         # Figure out which is the axis number for the distributed axis after the slicing
         # by removing slice axes which are just ints from the mapping.
