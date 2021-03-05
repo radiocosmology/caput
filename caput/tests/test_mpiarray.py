@@ -85,6 +85,7 @@ class TestMPIArray(unittest.TestCase):
 
         assert isinstance(da, mpiarray.MPIArray)
         assert da.global_shape == (10, 9)
+        assert da.axis == 0
 
         l0, _, _ = mpiutil.split_local(10)
 
@@ -292,6 +293,7 @@ class TestMPIArray(unittest.TestCase):
         res = local_array[:, 3:5]
 
         assert isinstance(arr, mpiarray.MPIArray)
+        assert arr.axis == 0
         assert (arr == res).all()
 
         # Check a single element extracted from the non-parallel axis
@@ -302,7 +304,7 @@ class TestMPIArray(unittest.TestCase):
         # Check that slices contain MPIArray attributes
         assert hasattr(arr, "comm") and (arr.comm == darr.comm)
 
-        # These tests denpend on the size being at least 2.
+        # These tests depend on the size being at least 2.
         if size > 1:
             # Check a slice on the parallel axis
             arr = darr.global_slice[:7, 3:5]
@@ -339,24 +341,25 @@ class TestMPIArray(unittest.TestCase):
         assert dslice.local_shape == (10, 5)
         assert dslice.axis == 1
 
-        # Check that directly slicing into distributed axis is blocked
+        # Check that directly indexing into distributed axis is blocked
         darr = mpiarray.MPIArray((size,), axis=0)
         with self.assertRaises(mpiarray.AxisException):
             darr[0]  # pylint: disable=pointless-statement
 
-        # Check that a single index works
+        # Check that a single index into a non-parallel axis works
         darr = mpiarray.MPIArray((4, size), axis=1)
         darr[:] = rank
         assert(darr[0] == rank).all()
         assert(darr[0].axis == 0)
-
-        darr = mpiarray.MPIArray((20, size * 5), axis=1)
-        darr[:] = rank
+        # again that direct indexing into distributed axis is blocked
         with self.assertRaises(mpiarray.AxisException):
             darr[2, 0]  # pylint: disable=pointless-statement
 
+
+        darr = mpiarray.MPIArray((20, size * 5), axis=1)
+        darr[:] = rank
         # But, you can directly index with global_slice
-        if size >= 2:
+        if size > 1:
             dslice = darr.global_slice[2, 6]
             if rank != 1:
                 assert dslice is None
@@ -367,6 +370,7 @@ class TestMPIArray(unittest.TestCase):
         # an exception
         assert str(darr)
 
+        # more direct indexing into distributed with global_slice
         # the global slice should return a numpy array on rank=1, and None everywhere else
         if size >= 2:
             darr = mpiarray.MPIArray((20, 10, size * 5), axis=2)
@@ -379,6 +383,10 @@ class TestMPIArray(unittest.TestCase):
                 nparr[:] = rank
                 assert isinstance(dslice, np.ndarray)
                 assert (dslice == nparr).all()
+
+            # check that directly slicing a distributed axis is blocked
+            with self.assertRaises(mpiarray.AxisException):
+                darr[:, :, 2:3]
 
         # Check ellipsis and slice at the end
         darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
