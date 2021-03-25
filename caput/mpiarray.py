@@ -253,13 +253,20 @@ class MPIArray(np.ndarray):
         if (dist_axis_index != slice(None, None, None)) and (
             dist_axis_index != slice(0, self.local_array.shape[self.axis], None)
         ):
+            import warnings
             if isinstance(dist_axis_index, int):
-                raise AxisException(
-                    "Cannot directly index distributed axis; use global_slice instead"
+                warnings.warn(
+                    "You are indexing directly into the distributed axis."
+                    "Returning a view into the local array."
+                    "Please use global_slice, or .local_array before indexing instead."
                 )
-            raise AxisException(
-                "Cannot directly sub-slice distributed axis; use global_slice instead"
-            )
+
+                return self.local_array.__getitem__(v)
+            warnings.warn(
+                    "You are directly sub-slicing the distributed axis."
+                    "Returning a view into the local array."
+                    "Please use global_slice, or .local_array before indexing.")
+            return self.local_array.__getitem__(v)
 
         # Figure out which is the axis number for the distributed axis after the slicing
         # by removing slice axes which are just ints from the mapping.

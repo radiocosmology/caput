@@ -341,19 +341,17 @@ class TestMPIArray(unittest.TestCase):
         assert dslice.local_shape == (10, 5)
         assert dslice.axis == 1
 
-        # Check that directly indexing into distributed axis is blocked
+        # Check that directly indexing into distributed axis returns a numpy array equal to local array indexing
         darr = mpiarray.MPIArray((size,), axis=0)
-        with self.assertRaises(mpiarray.AxisException):
-            darr[0]  # pylint: disable=pointless-statement
+        assert (darr[0] == darr.local_array[0]).all()
 
         # Check that a single index into a non-parallel axis works
         darr = mpiarray.MPIArray((4, size), axis=1)
         darr[:] = rank
         assert(darr[0] == rank).all()
         assert(darr[0].axis == 0)
-        # again that direct indexing into distributed axis is blocked
-        with self.assertRaises(mpiarray.AxisException):
-            darr[2, 0]  # pylint: disable=pointless-statement
+        # check that direct slicing into distributed axis returns a numpy array for local array slicing
+        assert (darr[2, 0] == darr.local_array[2, 0]).all()
 
 
         darr = mpiarray.MPIArray((20, size * 5), axis=1)
@@ -384,9 +382,8 @@ class TestMPIArray(unittest.TestCase):
                 assert isinstance(dslice, np.ndarray)
                 assert (dslice == nparr).all()
 
-            # check that directly slicing a distributed axis is blocked
-            with self.assertRaises(mpiarray.AxisException):
-                darr[:, :, 2:3]
+            # check that directly slicing a distributed axis returns a local array
+            assert(darr[:, :, 2:3] == darr.local_array[:, :, 2:3]).all()
 
         # Check ellipsis and slice at the end
         darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
