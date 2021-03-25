@@ -348,11 +348,10 @@ class TestMPIArray(unittest.TestCase):
         # Check that a single index into a non-parallel axis works
         darr = mpiarray.MPIArray((4, size), axis=1)
         darr[:] = rank
-        assert(darr[0] == rank).all()
-        assert(darr[0].axis == 0)
+        assert (darr[0] == rank).all()
+        assert darr[0].axis == 0
         # check that direct slicing into distributed axis returns a numpy array for local array slicing
         assert (darr[2, 0] == darr.local_array[2, 0]).all()
-
 
         darr = mpiarray.MPIArray((20, size * 5), axis=1)
         darr[:] = rank
@@ -383,7 +382,7 @@ class TestMPIArray(unittest.TestCase):
                 assert (dslice == nparr).all()
 
             # check that directly slicing a distributed axis returns a local array
-            assert(darr[:, :, 2:3] == darr.local_array[:, :, 2:3]).all()
+            assert (darr[:, :, 2:3] == darr.local_array[:, :, 2:3]).all()
 
         # Check ellipsis and slice at the end
         darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)

@@ -254,6 +254,7 @@ class MPIArray(np.ndarray):
             dist_axis_index != slice(0, self.local_array.shape[self.axis], None)
         ):
             import warnings
+
             if isinstance(dist_axis_index, int):
                 warnings.warn(
                     "You are indexing directly into the distributed axis."
@@ -263,9 +264,10 @@ class MPIArray(np.ndarray):
 
                 return self.local_array.__getitem__(v)
             warnings.warn(
-                    "You are directly sub-slicing the distributed axis."
-                    "Returning a view into the local array."
-                    "Please use global_slice, or .local_array before indexing.")
+                "You are directly sub-slicing the distributed axis."
+                "Returning a view into the local array."
+                "Please use global_slice, or .local_array before indexing."
+            )
             return self.local_array.__getitem__(v)
 
         # Figure out which is the axis number for the distributed axis after the slicing
@@ -1253,7 +1255,7 @@ class MPIArray(np.ndarray):
 
         # that ufunc was not implemented for ndarrays
         if results is NotImplemented:
-            raise NotImplemented
+            raise NotImplementedError
 
         # operation was performed in-place, so we can just return
         if method == "at":
@@ -1266,10 +1268,8 @@ class MPIArray(np.ndarray):
             # reduction methods eliminate axes, so the distributed axis
             # might need to be recalculated
             # except when the user explicitly specifies keepdims
-            if not kwargs.get("keepdims", False):
-                reduction_axis = kwargs["axis"]
-                if reduction_axis < dist_axis:
-                    dist_axis -= 1
+            if not kwargs.get("keepdims", False) and (kwargs["axis"] < dist_axis):
+                dist_axis -= 1
 
         ret = []
 
