@@ -216,6 +216,11 @@ def queue(configfile, submit=False, lint=True):
         *processors* on a node.
     ``venv``
         Path to a virtual environment to load before running.
+    ``modules``
+        Only used for slurm.
+        A list of modules environments to load before running a job.
+        If set, a module purge will occur before loading the specified modules.
+        If not set, the current environment is used.
     ``temp_directory``
         If set, save the output to a temporary location while running and
         then move to a final location if the job successfully finishes. This
@@ -308,6 +313,19 @@ def queue(configfile, submit=False, lint=True):
     if sfile != dfile:
         shutil.copyfile(sfile, dfile)
 
+    # TODO Can we somehow check that modules exist?
+    # using module avail's return value 0 or spider?
+    if "modules" in rconf:
+        modstr = "module purge\n"
+        modules = rconf["modules"]
+        modules = (modules,) if isinstance(modules, str) else modules
+        for mod in modules:
+            modstr += "module load %s\n" % mod
+    else:
+        modstr = ""
+
+    rconf["modules"] = modstr
+
     # Set up virtualenv
     if "venv" in rconf:
         venvpath = expandpath(rconf["venv"] + "/bin/activate")
@@ -370,6 +388,8 @@ fi
 #SBATCH --job-name=%(name)s
 
 echo RUNNING > %(statuspath)s
+
+%(modules)s
 
 source %(venv)s
 
