@@ -258,7 +258,7 @@ def queue(configfile, submit=False, lint=True):
     # cedar)
     system_defaults = {
         "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
-        "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-krs"},
+        "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
     }
 
     # Start to generate the full resolved config
