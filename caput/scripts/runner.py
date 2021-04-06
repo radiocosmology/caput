@@ -1,7 +1,8 @@
+import itertools
 import os
 import sys
-
 from pathlib import Path
+import tempfile
 
 import click
 
@@ -136,6 +137,61 @@ def run(configfile, loglevel, profile, profiler):
             sys.exit(1)
         else:
             P.run()
+
+
+@cli.command()
+@click.argument(
+    "templatefile",
+    type=click.File(mode="r"),
+)
+@click.option(
+    "--var",
+    multiple=True,
+    help=(
+        "The template variable value(s). This option can be given multiple times, once "
+        "for each variable to be substituted."
+    ),
+    metavar="<NAME>=<VALUE>[,<VALUE2>...]",
+)
+def template_run(templatefile, var):
+    """Run a pipeline immediately from the given TEMPLATEFILE.
+
+    Template variable substitutions are specified with `--var <varname>=<val>`
+    arguments, with one for each variable. `<val>` may be a comma separated list, in
+    which case item represents a separate value that is processed. Values *must* not
+    contain a comma themselves. If multiple variables are specified, each with multiple
+    substitutions the outer product of all possible values is generated.
+    """
+    from caput.pipeline import Manager
+
+    # Parse all the specified variables into a dictionary, with lists for the values
+    # taken by each variable
+    vardict = {}
+    for v in var:
+        varname, vals = v.split("=", 1)
+        vardict[varname] = vals.split(",")
+
+    template_string = templatefile.read()
+
+    # Loop over the outer product of all the variables
+    for vars_single in itertools.product(*vardict.values()):
+
+        # Construct a dict mapping each variable name to its value
+        vardict_single = dict(zip(vardict.keys(), vars_single))
+
+        with tempfile.NamedTemporaryFile("w") as tfh:
+
+            # Output the set of variable values used in this iteratin
+            var_string = " ".join([f"{k}={v}" for k, v in vardict_single.items()])
+            click.echo(f"Running script with {var_string}")
+
+            # Expand and save the job script
+            expanded_string = template_string.format(**vardict_single)
+            tfh.write(expanded_string)
+            tfh.flush()
+
+            # Run the pipeline
+            Manager.from_yaml_file(tfh.name).run()
 
 
 @cli.command()

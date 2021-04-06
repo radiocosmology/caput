@@ -93,7 +93,8 @@ class Property:
         # Ensure the property name has been found and set
         self._set_propname(obj)
 
-        # If the value has not been set, return the default, otherwise return the actual value.
+        # If the value has not been set, return the default, otherwise return the
+        # actual value.
         if self.propname not in obj.__dict__:
             return self.proptype(self.default) if self.default is not None else None
         return obj.__dict__[self.propname]
