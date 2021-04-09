@@ -313,14 +313,11 @@ def queue(configfile, submit=False, lint=True):
     if sfile != dfile:
         shutil.copyfile(sfile, dfile)
 
-    # TODO Can we somehow check that modules exist?
-    # using module avail's return value 0 or spider?
-    if "modules" in rconf:
-        modstr = "module purge\n"
+    if "modules" in rconf and rconf["modules"]:
         modules = rconf["modules"]
         modules = (modules,) if isinstance(modules, str) else modules
-        for mod in modules:
-            modstr += "module load %s\n" % mod
+        modstr = "module purge\nmodule load "
+        modstr += "\nmodule load ".join(modules)
     else:
         modstr = ""
 
