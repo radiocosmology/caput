@@ -354,6 +354,9 @@ def queue(configfile, submit=False, lint=True):
 #PBS -l walltime=%(time)s
 #PBS -N %(name)s
 
+# exit if a command returns non-zero code
+set -e
+
 source %(venv)s
 
 cd %(workdir)s
@@ -386,6 +389,9 @@ fi
 #SBATCH --mem=%(mem)s # memory per node
 #SBATCH --time=%(time)s
 #SBATCH --job-name=%(name)s
+
+# exit if a command returns non-zero code
+set -e
 
 echo RUNNING > %(statuspath)s
 
