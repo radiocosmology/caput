@@ -354,6 +354,8 @@ def queue(configfile, submit=False, lint=True):
 # exit if a command returns non-zero code
 set -e
 
+%(module)s
+
 source %(venv)s
 
 cd %(workdir)s
