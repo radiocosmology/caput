@@ -1264,7 +1264,9 @@ class MPIArray(np.ndarray):
         if ufunc.nout == 1:
             results = (results,)
 
-        if "reduce" in method and results[0].shape:
+        if "reduce" in method and (
+            results[0].shape or getattr(outputs[0], "shape", None)
+        ):
             # reduction methods eliminate axes, so the distributed axis
             # might need to be recalculated
             # except when the user explicitly specifies keepdims
@@ -1276,6 +1278,10 @@ class MPIArray(np.ndarray):
         for result, output in zip(results, outputs):
             # case: results were placed in the array specified by `out`; return as is
             if output is not None:
+                if hasattr(output, "axis") and output.axis != dist_axis:
+                    raise AxisException(
+                        f"provided output MPIArray's distributed axis is not consistent with expected output distributed axis. Expected {dist_axis}; Actual {output.axis}"
+                    )
                 ret.append(output)
             else:
                 # case: the result is an ndarray; wrap it into an MPIArray
