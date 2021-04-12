@@ -1153,42 +1153,6 @@ class MPIArray(np.ndarray):
         slices = [slice(start, end) for start, end in zip(starts, ends)]
         return split_axis, slices
 
-    @staticmethod
-    def _mpi_to_ndarray(inputs):
-        """Ensure a list with mixed MPIArrays and ndarrays are all ndarrays.
-
-        Additionally, ensure that all of the MPIArrays are distributed along the same axis.
-
-        Parameters
-        ----------
-        inputs : list of MPIArrays and ndarrays
-            All MPIArrays should be distributed along the same axis.
-
-        Returns
-        -------
-        args : list of ndarrays
-            The ndarrays are built from the local view of inputed MPIArrays.
-        dist_axis : int
-            The axis that all of the MPIArrays were distributed on.
-        """
-        args = []
-        dist_axis = None
-
-        for array in inputs:
-            if isinstance(array, MPIArray):
-                if dist_axis is None:
-                    dist_axis = array.axis
-                else:
-                    if dist_axis != array.axis:
-                        raise AxisException(
-                            "The distributed axis for all MPIArrays in an expression should be the same"
-                        )
-
-                args.append(array.local_array)
-            else:
-                args.append(array)
-
-        return (args, dist_axis)
 
     # pylint: disable=inconsistent-return-statements
     # array_ufunc is a special general function
@@ -1234,7 +1198,7 @@ class MPIArray(np.ndarray):
         args = []
 
         # convert all local arrays into ndarrays
-        args, dist_axis = MPIArray._mpi_to_ndarray(inputs)
+        args, dist_axis = _mpi_to_ndarray(inputs)
 
         if "axis" in kwargs and (kwargs["axis"] == dist_axis):
             raise AxisException(
@@ -1246,7 +1210,7 @@ class MPIArray(np.ndarray):
         # that the ufunc knows how to work with
         outputs = kwargs.get("out", None)
         if outputs:
-            out_args, _ = MPIArray._mpi_to_ndarray(outputs)
+            out_args, _ = _mpi_to_ndarray(outputs)
             kwargs["out"] = tuple(out_args)
         else:
             outputs = (None,) * ufunc.nout
@@ -1429,6 +1393,42 @@ def _expand_sel(sel, naxis):
     if len(sel) < naxis:
         sel = list(sel) + [slice(None)] * (naxis - len(sel))
     return list(sel)
+
+def _mpi_to_ndarray(inputs):
+    """Ensure a list with mixed MPIArrays and ndarrays are all ndarrays.
+
+    Additionally, ensure that all of the MPIArrays are distributed along the same axis.
+
+    Parameters
+    ----------
+    inputs : list of MPIArrays and ndarrays
+        All MPIArrays should be distributed along the same axis.
+
+    Returns
+    -------
+    args : list of ndarrays
+        The ndarrays are built from the local view of inputed MPIArrays.
+    dist_axis : int
+        The axis that all of the MPIArrays were distributed on.
+    """
+    args = []
+    dist_axis = None
+
+    for array in inputs:
+        if isinstance(array, MPIArray):
+            if dist_axis is None:
+                dist_axis = array.axis
+            else:
+                if dist_axis != array.axis:
+                    raise AxisException(
+                        "The distributed axis for all MPIArrays in an expression should be the same"
+                    )
+
+            args.append(array.local_array)
+        else:
+            args.append(array)
+
+    return (args, dist_axis)
 
 
 class DummyContext:
