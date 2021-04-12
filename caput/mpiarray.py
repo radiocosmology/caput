@@ -1255,7 +1255,7 @@ class MPIArray(np.ndarray):
 
         # that ufunc was not implemented for ndarrays
         if results is NotImplemented:
-            raise NotImplementedError
+            return NotImplemented
 
         # operation was performed in-place, so we can just return
         if method == "at":
