@@ -34,6 +34,9 @@ Fourier transforming each of these two axes of the distributed array::
     # Perform the lag transform on the frequency direction.
     darr4 = MPIArray.wrap(np.fft.irfft(darr3, axis=0), axis=1)
 
+Note: If a user wishes to create an MPIArray from an ndarray, they should use :py:meth:`MPIArray.wrap`. They should not use `ndarray.view(MPIArray)`.
+Attributes will not be set correctly, if they do.
+
 Global Slicing
 ==============
 
@@ -53,7 +56,6 @@ It's important to note that it never communicates data between ranks. It only
 ever operates on data held on the current rank.
 
 Example
--------
 
 Here is an example of this in action::
 
@@ -88,6 +90,97 @@ Here is an example of this in action::
         if ri == mpiutil.rank:
             print(ri, arr3)
         mpiutil.barrier()
+
+Direct Slicing
+==============
+
+`MPIArray` supports direct slicing using `[...]` (implemented via :py:meth:`__getitem__` ).
+This can be used for both fetching and assignment. It is recommended
+to only index into the non-parallel axis or to do a full slice `[:]`.
+
+Behaviour
+
+- A full slice `[:]` will return a :class:`MPIArray` on fetching, with
+  identical properties to the original array.
+- Any indexing or slicing into the non-parallel axis, will also return a
+  :class:`MPIArray`. The number associated with the parallel axis,
+  will be adjusted if a slice results in an axis reduction.
+- Any indexing into the parallel axis will result into a local index on each rank,
+  returning a regular `numpy` array.
+
+Example
+
+    import numpy as np
+    from caput import mpiarray, mpiutil
+
+    # Direct indexing into parallel axis returns a numpy array
+    # equal to local array indexing
+
+    darr = mpiarray.MPIArray((mpiutil.size,), axis=0)
+    assert (darr[0] == darr.local_array[0]).all()
+    assert not hasattr(darr[0], "axis")
+
+    # indexing into non-parallel axes returns an MPIArray
+    # with appropriate attributes
+    # Slicing could result in a reduction of axis, and a lower
+    # parallel axis number
+    darr = mpiarray.MPIArray((4, size), axis=1)
+    darr[:] = mpiutil.rank
+
+    assert darr[0] == mpiutil.rank
+    assert darr[0].axis == 0
+
+ufunc
+=====
+
+In NumPy, universal functions (or ufuncs) are functions that operate on ndarrays
+in an element-by-element fashion. :class:`MPIArray` supports all ufunc calculations,
+except along the parallel axis.
+
+Requirements
+
+- All input :class:`MPIArray` *must* be distributed along the same axis.
+- If you pass a kwarg `axis` to the ufunc, it must not be the parallel axis.
+
+Behaviour
+
+- If no output are provided, the results are converted back to MPIArrays. The new array
+  will either be parallel over the same axis as the input MPIArrays, or possibly one axis
+  down if the `ufunc` is applied via a `reduce` method (i.e. the shape of the array is reduced
+  by one axis).
+- For operations that normally return a scalar, the scalars will be wrapped into a 1D array,
+  parallel across axis 0.
+- shape related attributes will be re-calculated
+
+Example
+
+    import numpy as np
+    from caput import mpiarray, mpiutil
+
+    dist_arr = mpiarray.MPIArray((mpiutil.size, 4), axis=0)
+    dist_arr[:] = mpiutil.rank
+
+    assert (dist_arr + dist_arr == 2 * mpiutil.rank).all()
+
+    assert (dist_arr * 2 == 2 * mpiutil.rank).all()
+
+    assert (dist_arr + dist_arr).axis == 0
+
+    # will result in an exception
+    # because the two arrays have different parallel axes
+    # mpiarray.MPIArray((mpiutil.size, 4, axis=0) - mpiarray.MPIArray((mpiutil.size, 4), axis=1)
+
+    # sums across any non-parallel axes
+    assert (dist_arr.sum(axis=1) == 4 * mpiutil.rank).all()
+
+    # sum reduces across all non-paralle axes
+    assert (dist_arr.sum() == 4 * 3 * mpiutil.rank).all()
+    (dist_arr.sum().local_shape) == (1, 1)
+    (dist_arr.sum().global_shape) == (mpiutil.size, 1)
+
+    # reduce methods might result in a decrease in the distributed axis number
+    dist_arr = mpiarray.MPIArray((mpiutil.size, 4, 3), axis=1)
+    assert dist_arr.sum(axis=0).axis == 0
 
 """
 import os
