@@ -1246,11 +1246,11 @@ class MPIArray(np.ndarray):
         slices = [slice(start, end) for start, end in zip(starts, ends)]
         return split_axis, slices
 
-
     # pylint: disable=inconsistent-return-statements
     # array_ufunc is a special general function
     # which facilitates the use of a diverse set of ufuncs
     # some which return nothing, and some which return something
+
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         """Handles ufunc operations for MPIArray.
 
@@ -1486,6 +1486,7 @@ def _expand_sel(sel, naxis):
     if len(sel) < naxis:
         sel = list(sel) + [slice(None)] * (naxis - len(sel))
     return list(sel)
+
 
 def _mpi_to_ndarray(inputs):
     """Ensure a list with mixed MPIArrays and ndarrays are all ndarrays.
