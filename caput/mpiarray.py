@@ -559,6 +559,8 @@ class MPIArray(np.ndarray):
         """
         return _global_resolver(self)
 
+
+    # pylint: disable=protected-access
     @classmethod
     def wrap(cls, array, axis, comm=None):
         """Turn a set of numpy arrays into a distributed MPIArray object.
@@ -626,6 +628,7 @@ class MPIArray(np.ndarray):
 
         return dist_arr
 
+    # pylint: enable=protected-access
     def redistribute(self, axis):
         """Change the axis that the array is distributed over.
 
@@ -1247,6 +1250,7 @@ class MPIArray(np.ndarray):
         return split_axis, slices
 
     # pylint: disable=inconsistent-return-statements
+    # pylint: disable=too-many-branches
     # array_ufunc is a special general function
     # which facilitates the use of a diverse set of ufuncs
     # some which return nothing, and some which return something
@@ -1351,6 +1355,7 @@ class MPIArray(np.ndarray):
         return ret[0] if len(ret) == 1 else tuple(ret)
 
     # pylint: enable=inconsistent-return-statements
+    # pylint: enable=too-many-branches
 
     def __array_finalize__(self, obj):
         """
