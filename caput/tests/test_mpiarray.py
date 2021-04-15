@@ -30,6 +30,7 @@ def test_construction():
 
     assert arr.local_shape == (10, l)
 
+
 def test_redistribution():
 
     gshape = (1, 11, 2, 14, 3, 4)
@@ -48,6 +49,7 @@ def test_redistribution():
 
     arr3 = arr.redistribute(axis=5)
     assert (arr3 == garr[:, :, :, :, :, s2:e2]).view(np.ndarray).all()
+
 
 def test_gather():
 
@@ -71,6 +73,7 @@ def test_gather():
         assert (ga == global_array).all()
     else:
         assert ga is None
+
 
 def test_wrap():
 
@@ -96,6 +99,7 @@ def test_wrap():
     if mpiutil.size > 1:
         with pytest.raises(Exception):
             mpiarray.MPIArray.wrap(df, axis=0)
+
 
 def test_io():
 
@@ -171,6 +175,7 @@ def test_io():
     if mpiutil.rank0 and os.path.exists(fname):
         os.remove(fname)
 
+
 def test_transpose():
 
     gshape = (1, 11, 2, 14)
@@ -232,6 +237,7 @@ def test_transpose():
     # Check axis
     assert arr4.axis == 2
 
+
 def test_reshape():
 
     gshape = (1, 11, 2, 14)
@@ -256,6 +262,7 @@ def test_reshape():
 
     # Check axis
     assert arr2.axis == 0
+
 
 # pylint: disable=too-many-statements
 def test_global_getslice():
@@ -397,6 +404,7 @@ def test_global_getslice():
     assert dslice.global_shape == (size, 136, 41)
     assert dslice.local_shape == (1, 136, 41)
 
+
 def test_global_setslice():
     rank = mpiutil.rank
     size = mpiutil.size
@@ -444,6 +452,7 @@ def test_global_setslice():
 
     assert (darr == local_array).all()
 
+
 def test_outer_ufunc():
     rank = mpiutil.rank
     size = mpiutil.size
@@ -482,6 +491,7 @@ def test_outer_ufunc():
     # check that outer ufunc on arrays that cannot be broadcast fails
     with pytest.raises(ValueError):
         np.multiply(mpiarray.MPIArray((size, 3), axis=0), mpiarray.MPIArray((size, 4), axis=0))
+
 
 def test_reduce():
 
