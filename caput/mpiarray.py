@@ -559,8 +559,8 @@ class MPIArray(np.ndarray):
         """
         return _global_resolver(self)
 
-
     # pylint: disable=protected-access
+
     @classmethod
     def wrap(cls, array, axis, comm=None):
         """Turn a set of numpy arrays into a distributed MPIArray object.
