@@ -485,12 +485,16 @@ def test_outer_ufunc():
     assert (dist_arr + dist_arr_2).axis == 0
 
     # check that subtracting arrays with two different distributed axis fails
+    # pylint: disable=expression-not-assigned
     with pytest.raises(mpiarray.AxisException):
         mpiarray.MPIArray((size, 4), axis=0) - mpiarray.MPIArray((size, 4), axis=1)
 
     # check that outer ufunc on arrays that cannot be broadcast fails
     with pytest.raises(ValueError):
-        np.multiply(mpiarray.MPIArray((size, 3), axis=0), mpiarray.MPIArray((size, 4), axis=0))
+        np.multiply(
+            mpiarray.MPIArray((size, 3), axis=0), mpiarray.MPIArray((size, 4), axis=0)
+        )
+    # pylint: enable=expression-not-assigned
 
 
 def test_reduce():

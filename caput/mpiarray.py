@@ -1010,8 +1010,8 @@ class MPIArray(np.ndarray):
         tdata.local_shape = tuple(self.local_shape[ax] for ax in axes)
         tdata.local_offset = tuple(self.local_offset[ax] for ax in axes)
 
-        tdata._axis = list(axes).index(self.axis)
-        tdata._comm = self._comm
+        tdata.axis = list(axes).index(self.axis)
+        tdata.comm = self._comm
 
         return tdata
 
@@ -1053,11 +1053,11 @@ class MPIArray(np.ndarray):
 
         rdata = np.ndarray.reshape(self, local_shape)
 
-        rdata._axis = new_axis
-        rdata._comm = self._comm
-        rdata._local_shape = tuple(local_shape)
-        rdata._global_shape = tuple(global_shape)
-        rdata._local_offset = tuple(local_offset)
+        rdata.axis = new_axis
+        rdata.comm = self._comm
+        rdata.local_shape = tuple(local_shape)
+        rdata.global_shape = tuple(global_shape)
+        rdata.local_offset = tuple(local_offset)
 
         return rdata
 
