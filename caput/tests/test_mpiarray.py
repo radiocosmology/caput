@@ -512,9 +512,9 @@ def test_reduce():
     sum_all = dist_array.sum()
     assert (sum_all == 4 * 3 * rank).all()
 
-    assert sum_all.local_shape == (1, 1)
+    assert sum_all.local_shape == (1,)
 
-    assert sum_all.global_shape == (size, 1)
+    assert sum_all.global_shape == (size,)
 
     # sum across a smaller numbered axes
     # this will result in an axes reduction
@@ -531,9 +531,9 @@ def test_reduce():
     sum_all = dist_array.sum()
     assert (sum_all == 4 * 3 * rank).all()
 
-    assert sum_all.local_shape == (1, 1)
+    assert sum_all.local_shape == (1,)
 
-    assert sum_all.global_shape == (size, 1)
+    assert sum_all.global_shape == (size,)
 
     dist_array = mpiarray.MPIArray((size, 4), axis=1)
     dist_array[:] = rank

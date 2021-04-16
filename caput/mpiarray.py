@@ -1375,7 +1375,7 @@ class MPIArray(np.ndarray):
                     ret.append(MPIArray.wrap(result, axis=dist_axis))
                 # case: result is a scalar; convert to 1-d vector, distributed across axis 0
                 else:
-                    ret.append(MPIArray.wrap(np.reshape(result, (1, 1)), axis=0))
+                    ret.append(MPIArray.wrap(np.reshape(result, (1,)), axis=0))
 
         return ret[0] if len(ret) == 1 else tuple(ret)
 
