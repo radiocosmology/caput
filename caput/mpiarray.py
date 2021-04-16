@@ -16,7 +16,7 @@ Fourier transforming each of these two axes of the distributed array::
     nprod = 2
     ntime = 32
 
-    # Initalise array with (nfreq, nprod, ntime) global shape
+    Initialise array with (nfreq, nprod, ntime) global shape
     darr1 = MPIArray((nfreq, nprod, ntime), dtype=np.float64)
 
     # Load in data into parallel array
@@ -110,20 +110,33 @@ Direct Slicing Behaviour
 - Any indexing or slicing into the non-parallel axis, will also return a
   :class:`MPIArray`. The number associated with the parallel axis,
   will be adjusted if a slice results in an axis reduction.
-- Any indexing into the parallel axis will result into a local index on each rank,
-  returning a regular `numpy` array.
+- Any indexing into the parallel axis is discouraged. This behaviour is
+  deprecated. For now, it will result into a local index on each rank,
+  returning a regular `numpy` array, along with a warning.
+  In the future, it is encouraged to index into the local array
+  :py:attr:`MPIArray.local_array`, if you wish to locally index into
+  the parallel axis
 
 Direct Slicing Examples
 -----------------------
 
-    Direct indexing into parallel axis returns a numpy array
-    equal to local array indexing
+    Direct indexing into parallel axis is DEPRECATED.
+    For now, it will return a numpy array
+    equal to local array indexing, along with a warning.
+    This behaviour will be removed in the future.
 
     >>> darr = mpiarray.MPIArray((mpiutil.size,), axis=0)
     >>> (darr[0] == darr.local_array[0]).all()
     True
     >>> not hasattr(darr[0], "axis")
     True
+
+    If you wish to index into the parallel axis in a local array,
+    index into the local array.
+
+    >>> darr[:] = 1.0
+    >>> darr.local_array[0]
+    1.0
 
     indexing into non-parallel axes returns an MPIArray
     with appropriate attributes
@@ -180,7 +193,7 @@ ufunc Examples
     because the two arrays have different parallel axes
     >>> mpiarray.MPIArray((mpiutil.size, 4), axis=0) - mpiarray.MPIArray((mpiutil.size, 4), axis=1)
     Traceback (most recent call last):
-        ...
+    ...
     caput.mpiarray.AxisException: The distributed axis for all MPIArrays in an expression should be the same
 
 
