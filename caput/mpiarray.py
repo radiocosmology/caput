@@ -55,7 +55,8 @@ Its behaviour changes depending on the exact slice it gets:
 It's important to note that it never communicates data between ranks. It only
 ever operates on data held on the current rank.
 
-Example
+Global Slicing Examples
+-----------------------
 
 Here is an example of this in action::
 
@@ -98,7 +99,8 @@ Direct Slicing
 This can be used for both fetching and assignment. It is recommended
 to only index into the non-parallel axis or to do a full slice `[:]`.
 
-Behaviour
+Direct Slicing Behaviour
+------------------------
 
 - A full slice `[:]` will return a :class:`MPIArray` on fetching, with
   identical properties to the original array.
@@ -108,7 +110,8 @@ Behaviour
 - Any indexing into the parallel axis will result into a local index on each rank,
   returning a regular `numpy` array.
 
-Example
+Direct Slicing Examples
+-----------------------
 
     import numpy as np
     from caput import mpiarray, mpiutil
@@ -137,12 +140,14 @@ In NumPy, universal functions (or ufuncs) are functions that operate on ndarrays
 in an element-by-element fashion. :class:`MPIArray` supports all ufunc calculations,
 except along the parallel axis.
 
-Requirements
+ufunc Requirements
+------------------
 
 - All input :class:`MPIArray` *must* be distributed along the same axis.
 - If you pass a kwarg `axis` to the ufunc, it must not be the parallel axis.
 
-Behaviour
+ufunc Behaviour
+---------------
 
 - If no output are provided, the results are converted back to MPIArrays. The new array
   will either be parallel over the same axis as the input MPIArrays, or possibly one axis
@@ -152,7 +157,8 @@ Behaviour
   parallel across axis 0.
 - shape related attributes will be re-calculated
 
-Example
+ufunc Examples
+--------------
 
     import numpy as np
     from caput import mpiarray, mpiutil
