@@ -449,6 +449,17 @@ class MPIArray(np.ndarray):
         """
         return self._axis
 
+    @axis.setter
+    def axis(self, var):
+        """
+        Set axis we are distributed over.
+
+        Parameters
+        ----------
+        var : int
+        """
+        self._axis = var
+
     @property
     def local_shape(self):
         """
@@ -518,6 +529,17 @@ class MPIArray(np.ndarray):
         """
         return self._comm
 
+    @comm.setter
+    def comm(self, var):
+        """
+        Set the communicator over which the array is distributed.
+
+        Parameters
+        ----------
+        var : MPI.Comm
+        """
+        self._comm = var
+
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
 
         # if mpiutil.world is None:
@@ -558,8 +580,6 @@ class MPIArray(np.ndarray):
         global_slice : object
         """
         return _global_resolver(self)
-
-    # pylint: disable=protected-access
 
     @classmethod
     def wrap(cls, array, axis, comm=None):
@@ -620,15 +640,14 @@ class MPIArray(np.ndarray):
 
         # Setup attributes of class
         dist_arr = array.view(cls)
-        dist_arr._global_shape = tuple(global_shape)
-        dist_arr._axis = axis
-        dist_arr._local_shape = tuple(lshape)
-        dist_arr._local_offset = tuple(loffset)
-        dist_arr._comm = comm
+        dist_arr.global_shape = tuple(global_shape)
+        dist_arr.axis = axis
+        dist_arr.local_shape = tuple(lshape)
+        dist_arr.local_offset = tuple(loffset)
+        dist_arr.comm = comm
 
         return dist_arr
 
-    # pylint: enable=protected-access
     def redistribute(self, axis):
         """Change the axis that the array is distributed over.
 
