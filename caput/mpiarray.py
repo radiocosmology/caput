@@ -60,37 +60,40 @@ Global Slicing Examples
 
 Here is an example of this in action::
 
-    import numpy as np
-    from caput import mpiarray, mpiutil
+    >>> import numpy as np
+    >>> from caput import mpiarray, mpiutil
 
-    arr = mpiarray.MPIArray((mpiutil.size, 3), dtype=np.float64)
-    arr[:] = 0.0
+    >>> arr = mpiarray.MPIArray((mpiutil.size, 3), dtype=np.float64)
+    >>> arr[:] = 0.0
 
-    for ri in range(mpiutil.size):
-        if ri == mpiutil.rank:
-            print(ri, arr)
-        mpiutil.barrier()
+    >>> for ri in range(mpiutil.size):
+    ...    if ri == mpiutil.rank:
+    ...        print(ri, arr)
+    ...    mpiutil.barrier()
+    0 [[0. 0. 0.]]
 
-    # Use a global index to assign to the array
-    arr.global_slice[3] = 17
+    Use a global index to assign to the array
+    >>> arr.global_slice[3] = 17
 
-    # Fetch a view of the whole array with a full slice
-    arr2 = arr.global_slice[:, 2]
+    Fetch a view of the whole array with a full slice
+    >>> arr2 = arr.global_slice[:, 2]
 
-    # This should be the third column of the array
-    for ri in range(mpiutil.size):
-        if ri == mpiutil.rank:
-            print(ri, arr2)
-        mpiutil.barrier()
+    This should be the third column of the array
+    >>> for ri in range(mpiutil.size):
+    ...    if ri == mpiutil.rank:
+    ...        print(ri, arr2)
+    ...    mpiutil.barrier()
+    0 [0.]
 
-    # Fetch a view of the whole array with a partial slice
-    arr3 = arr.global_slice[:2, 2]
+    Fetch a view of the whole array with a partial slice
+    >>> arr3 = arr.global_slice[:2, 2]
 
-    # The final two ranks should be None
-    for ri in range(mpiutil.size):
-        if ri == mpiutil.rank:
-            print(ri, arr3)
-        mpiutil.barrier()
+    The final two ranks should be None
+    >>> for ri in range(mpiutil.size):
+    ...    if ri == mpiutil.rank:
+    ...        print(ri, arr3)
+    ...    mpiutil.barrier()
+    0 [0.]
 
 Direct Slicing
 ==============
@@ -113,25 +116,26 @@ Direct Slicing Behaviour
 Direct Slicing Examples
 -----------------------
 
-    import numpy as np
-    from caput import mpiarray, mpiutil
+    Direct indexing into parallel axis returns a numpy array
+    equal to local array indexing
 
-    # Direct indexing into parallel axis returns a numpy array
-    # equal to local array indexing
+    >>> darr = mpiarray.MPIArray((mpiutil.size,), axis=0)
+    >>> (darr[0] == darr.local_array[0]).all()
+    True
+    >>> not hasattr(darr[0], "axis")
+    True
 
-    darr = mpiarray.MPIArray((mpiutil.size,), axis=0)
-    assert (darr[0] == darr.local_array[0]).all()
-    assert not hasattr(darr[0], "axis")
+    indexing into non-parallel axes returns an MPIArray
+    with appropriate attributes
+    Slicing could result in a reduction of axis, and a lower
+    parallel axis number
+    >>> darr = mpiarray.MPIArray((4, mpiutil.size), axis=1)
+    >>> darr[:] = mpiutil.rank
 
-    # indexing into non-parallel axes returns an MPIArray
-    # with appropriate attributes
-    # Slicing could result in a reduction of axis, and a lower
-    # parallel axis number
-    darr = mpiarray.MPIArray((4, size), axis=1)
-    darr[:] = mpiutil.rank
-
-    assert darr[0] == mpiutil.rank
-    assert darr[0].axis == 0
+    >>> (darr[0] == mpiutil.rank).all()
+    array([ True])
+    >>> darr[0].axis == 0
+    True
 
 ufunc
 =====
@@ -160,33 +164,42 @@ ufunc Behaviour
 ufunc Examples
 --------------
 
-    import numpy as np
-    from caput import mpiarray, mpiutil
+    >>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4), axis=0)
+    >>> dist_arr[:] = mpiutil.rank
 
-    dist_arr = mpiarray.MPIArray((mpiutil.size, 4), axis=0)
-    dist_arr[:] = mpiutil.rank
+    >>> (dist_arr + dist_arr == 2 * mpiutil.rank).all()
+    array([ True])
 
-    assert (dist_arr + dist_arr == 2 * mpiutil.rank).all()
+    >>> (dist_arr * 2 == 2 * mpiutil.rank).all()
+    array([ True])
 
-    assert (dist_arr * 2 == 2 * mpiutil.rank).all()
+    >>> (dist_arr + dist_arr).axis == 0
+    True
 
-    assert (dist_arr + dist_arr).axis == 0
+    will result in an exception
+    because the two arrays have different parallel axes
+    >>> mpiarray.MPIArray((mpiutil.size, 4), axis=0) - mpiarray.MPIArray((mpiutil.size, 4), axis=1)
+    Traceback (most recent call last):
+        ...
+    caput.mpiarray.AxisException: The distributed axis for all MPIArrays in an expression should be the same
 
-    # will result in an exception
-    # because the two arrays have different parallel axes
-    # mpiarray.MPIArray((mpiutil.size, 4, axis=0) - mpiarray.MPIArray((mpiutil.size, 4), axis=1)
 
-    # sums across any non-parallel axes
-    assert (dist_arr.sum(axis=1) == 4 * mpiutil.rank).all()
+    sums across any non-parallel axes
+    >>> (dist_arr.sum(axis=1) == 4 * mpiutil.rank).all()
+    array([ True])
 
-    # sum reduces across all non-paralle axes
-    assert (dist_arr.sum() == 4 * 3 * mpiutil.rank).all()
-    (dist_arr.sum().local_shape) == (1, 1)
-    (dist_arr.sum().global_shape) == (mpiutil.size, 1)
+    sum reduces across all non-parallel axes
+    >>> (dist_arr.sum() == 4 * 3 * mpiutil.rank).all()
+    array([ True])
+    >>> (dist_arr.sum().local_shape) == (1,)
+    True
+    >>> (dist_arr.sum().global_shape) == (mpiutil.size,)
+    True
 
-    # reduce methods might result in a decrease in the distributed axis number
-    dist_arr = mpiarray.MPIArray((mpiutil.size, 4, 3), axis=1)
-    assert dist_arr.sum(axis=0).axis == 0
+    reduce methods might result in a decrease in the distributed axis number
+    >>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4, 3), axis=1)
+    >>> dist_arr.sum(axis=0).axis == 0
+    True
 
 """
 import os
