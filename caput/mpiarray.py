@@ -34,8 +34,9 @@ Fourier transforming each of these two axes of the distributed array::
     # Perform the lag transform on the frequency direction.
     darr4 = MPIArray.wrap(np.fft.irfft(darr3, axis=0), axis=1)
 
-Note: If a user wishes to create an MPIArray from an ndarray, they should use :py:meth:`MPIArray.wrap`. They should not use `ndarray.view(MPIArray)`.
-Attributes will not be set correctly, if they do.
+Note: If a user wishes to create an MPIArray from an ndarray, they should use
+:py:meth:`MPIArray.wrap`. They should not use `ndarray.view(MPIArray)`.
+Attributes will not be set correctly if they do.
 
 Global Slicing
 ==============
@@ -58,49 +59,50 @@ ever operates on data held on the current rank.
 Global Slicing Examples
 -----------------------
 
-Here is an example of this in action::
+Here is an example of this in action. Create and set an MPI array:
 
-    >>> import numpy as np
-    >>> from caput import mpiarray, mpiutil
+>>> import numpy as np
+>>> from caput import mpiarray, mpiutil
+>>>
+>>> arr = mpiarray.MPIArray((mpiutil.size, 3), dtype=np.float64)
+>>> arr[:] = 0.0
 
-    >>> arr = mpiarray.MPIArray((mpiutil.size, 3), dtype=np.float64)
-    >>> arr[:] = 0.0
+>>> for ri in range(mpiutil.size):
+...    if ri == mpiutil.rank:
+...        print(ri, arr)
+...    mpiutil.barrier()
+0 [[0. 0. 0.]]
 
-    >>> for ri in range(mpiutil.size):
-    ...    if ri == mpiutil.rank:
-    ...        print(ri, arr)
-    ...    mpiutil.barrier()
-    0 [[0. 0. 0.]]
+Use a global index to assign to the array
 
-    Use a global index to assign to the array
-    >>> arr.global_slice[3] = 17
+>>> arr.global_slice[3] = 17
 
-    Fetch a view of the whole array with a full slice
-    >>> arr2 = arr.global_slice[:, 2]
+Fetch a view of the whole array with a full slice
 
-    This should be the third column of the array
-    >>> for ri in range(mpiutil.size):
-    ...    if ri == mpiutil.rank:
-    ...        print(ri, arr2)
-    ...    mpiutil.barrier()
-    0 [0.]
+>>> arr2 = arr.global_slice[:, 2]
 
-    Fetch a view of the whole array with a partial slice
-    >>> arr3 = arr.global_slice[:2, 2]
+Print the third column of the array on all ranks
 
-    The final two ranks should be None
-    >>> for ri in range(mpiutil.size):
-    ...    if ri == mpiutil.rank:
-    ...        print(ri, arr3)
-    ...    mpiutil.barrier()
-    0 [0.]
+>>> for ri in range(mpiutil.size):
+...    if ri == mpiutil.rank:
+...        print(ri, arr2)
+...    mpiutil.barrier()
+0 [0.]
+
+Fetch a view of the whole array with a partial slice. The final two ranks should be None
+>>> arr3 = arr.global_slice[:2, 2]
+>>> for ri in range(mpiutil.size):
+...    if ri == mpiutil.rank:
+...        print(ri, arr3)
+...    mpiutil.barrier()
+0 [0.]
 
 Direct Slicing
 ==============
 
-`MPIArray` supports direct slicing using `[...]` (implemented via :py:meth:`__getitem__` ).
-This can be used for both fetching and assignment. It is recommended
-to only index into the non-parallel axis or to do a full slice `[:]`.
+`MPIArray` supports direct slicing using `[...]` (implemented via
+:py:meth:`__getitem__` ). This can be used for both fetching and assignment. It is
+recommended to only index into the non-parallel axis or to do a full slice `[:]`.
 
 Direct Slicing Behaviour
 ------------------------
@@ -120,35 +122,33 @@ Direct Slicing Behaviour
 Direct Slicing Examples
 -----------------------
 
-    Direct indexing into parallel axis is DEPRECATED.
-    For now, it will return a numpy array
-    equal to local array indexing, along with a warning.
-    This behaviour will be removed in the future.
+.. deprecated:: 21.04
+    Direct indexing into parallel axis is DEPRECATED. For now, it will return a numpy
+    array equal to local array indexing, along with a warning. This behaviour will be
+    removed in the future.
 
-    >>> darr = mpiarray.MPIArray((mpiutil.size,), axis=0)
-    >>> (darr[0] == darr.local_array[0]).all()
-    True
-    >>> not hasattr(darr[0], "axis")
-    True
+>>> darr = mpiarray.MPIArray((mpiutil.size,), axis=0)
+>>> (darr[0] == darr.local_array[0]).all()
+True
+>>> not hasattr(darr[0], "axis")
+True
 
-    If you wish to index into the parallel axis in a local array,
-    index into the local array.
+If you wish to index into local portion of a distributed array along its parallel
+axis, you need to index into the :py:attr:`MPIArray.local_array`.
 
-    >>> darr[:] = 1.0
-    >>> darr.local_array[0]
-    1.0
+>>> darr[:] = 1.0
+>>> darr.local_array[0]
+1.0
 
-    indexing into non-parallel axes returns an MPIArray
-    with appropriate attributes
-    Slicing could result in a reduction of axis, and a lower
-    parallel axis number
-    >>> darr = mpiarray.MPIArray((4, mpiutil.size), axis=1)
-    >>> darr[:] = mpiutil.rank
+indexing into non-parallel axes returns an MPIArray with appropriate attributes
+Slicing could result in a reduction of axis, and a lower parallel axis number
 
-    >>> (darr[0] == mpiutil.rank).all()
-    array([ True])
-    >>> darr[0].axis == 0
-    True
+>>> darr = mpiarray.MPIArray((4, mpiutil.size), axis=1)
+>>> darr[:] = mpiutil.rank
+>>> (darr[0] == mpiutil.rank).all()
+array([ True])
+>>> darr[0].axis == 0
+True
 
 ufunc
 =====
@@ -166,54 +166,67 @@ ufunc Requirements
 ufunc Behaviour
 ---------------
 
-- If no output are provided, the results are converted back to MPIArrays. The new array
-  will either be parallel over the same axis as the input MPIArrays, or possibly one axis
-  down if the `ufunc` is applied via a `reduce` method (i.e. the shape of the array is reduced
-  by one axis).
-- For operations that normally return a scalar, the scalars will be wrapped into a 1D array,
-  parallel across axis 0.
-- shape related attributes will be re-calculated
+- If no output are provided, the results are converted back to MPIArrays. The new
+  array will either be parallel over the same axis as the input MPIArrays, or possibly
+  one axis down if the `ufunc` is applied via a `reduce` method (i.e. the shape of the
+  array is reduced by one axis).
+- For operations that normally reduce to a scalar, the scalars will be wrapped into a 1D
+  array distributed across axis 0.
+- shape related attributes will be re-calculated.
 
 ufunc Examples
 --------------
 
-    >>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4), axis=0)
-    >>> dist_arr[:] = mpiutil.rank
+Create an array
 
-    >>> (dist_arr + dist_arr == 2 * mpiutil.rank).all()
-    array([ True])
+>>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4), axis=0)
+>>> dist_arr[:] = mpiutil.rank
 
-    >>> (dist_arr * 2 == 2 * mpiutil.rank).all()
-    array([ True])
+Element wise summation and `.all()` reduction
 
-    >>> (dist_arr + dist_arr).axis == 0
-    True
+>>> (dist_arr + dist_arr == 2 * mpiutil.rank).all()
+array([ True])
 
-    will result in an exception
-    because the two arrays have different parallel axes
-    >>> mpiarray.MPIArray((mpiutil.size, 4), axis=0) - mpiarray.MPIArray((mpiutil.size, 4), axis=1)
-    Traceback (most recent call last):
-    ...
-    caput.mpiarray.AxisException: The distributed axis for all MPIArrays in an expression should be the same
+Element wise multiplication and reduction
 
+>>> (dist_arr * 2 == 2 * mpiutil.rank).all()
+array([ True])
 
-    sums across any non-parallel axes
-    >>> (dist_arr.sum(axis=1) == 4 * mpiutil.rank).all()
-    array([ True])
+The distributed axis is unchanged during an elementwise operation
 
-    sum reduces across all non-parallel axes
-    >>> (dist_arr.sum() == 4 * 3 * mpiutil.rank).all()
-    array([ True])
-    >>> (dist_arr.sum().local_shape) == (1,)
-    True
-    >>> (dist_arr.sum().global_shape) == (mpiutil.size,)
-    True
+>>> (dist_arr + dist_arr).axis == 0
+True
 
-    reduce methods might result in a decrease in the distributed axis number
-    >>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4, 3), axis=1)
-    >>> dist_arr.sum(axis=0).axis == 0
-    True
+An operation on multiple arrays with different parallel axes is not possible and will
+result in an exception
 
+>>> (mpiarray.MPIArray((mpiutil.size, 4), axis=0) -
+...  mpiarray.MPIArray((mpiutil.size, 4), axis=1))  # doctest: +NORMALIZE_WHITESPACE
+Traceback (most recent call last):
+...
+caput.mpiarray.AxisException: The distributed axis for all MPIArrays in an expression
+should be the same
+
+Summation across a non-parallel axis
+
+>>> (dist_arr.sum(axis=1) == 4 * mpiutil.rank).all()
+array([ True])
+
+A sum reducing across all axes will reduce across each local array and give a new
+distributed array with a single element on each rank.
+
+>>> (dist_arr.sum() == 4 * 3 * mpiutil.rank).all()
+array([ True])
+>>> (dist_arr.sum().local_shape) == (1,)
+True
+>>> (dist_arr.sum().global_shape) == (mpiutil.size,)
+True
+
+Reduction methods might result in a decrease in the distributed axis number
+
+>>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4, 3), axis=1)
+>>> dist_arr.sum(axis=0).axis == 0
+True
 """
 import os
 import time
@@ -344,7 +357,8 @@ class _global_resolver:
 
         slobj, _ = self._resolve_slice(slobj)
 
-        # If the distributed axis has a None, that means that index is not available on this rank
+        # If the distributed axis has a None, that means that index is not available on
+        # this rank
         if slobj[self.axis] is None:
             return
         self.array[slobj] = value
@@ -372,8 +386,8 @@ class MPIArray(np.ndarray):
         if len(v) < len(self.global_shape):
             v = v + (slice(None, None, None),) * (len(self.global_shape) - len(v))
 
-        # __getitem__ should not be receiving sub-slices or direct indexes on the distributed axis
-        # global_slice should be used for both
+        # __getitem__ should not be receiving sub-slices or direct indexes on the
+        # distributed axis. global_slice should be used for both
         dist_axis_index = v[self.axis]
         if (dist_axis_index != slice(None, None, None)) and (
             dist_axis_index != slice(0, self.local_array.shape[self.axis], None)
@@ -804,7 +818,8 @@ class MPIArray(np.ndarray):
 
                 if stat.error != mpiutil.MPI.SUCCESS:
                     logger.error(
-                        f"**** ERROR in MPI RECV (r: {ir} c: {ic} rank: {self.comm.rank}) *****"
+                        f"**** ERROR in MPI RECV (r: {ir} c: {ic} rank: "
+                        f"{self.comm.rank}) *****"
                     )
 
             # Put together the blocks we received
@@ -1022,8 +1037,10 @@ class MPIArray(np.ndarray):
         ----------
         axes : None, tuple of ints, or n ints
             - None or no argument: reverses the order of the axes.
-            - tuple of ints: i in the j-th place in the tuple means a’s i-th axis becomes a.transpose()’s j-th axis.
-            - n ints: same as an n-tuple of the same ints (this form is intended simply as a “convenience” alternative to the tuple form)
+            - tuple of ints: i in the j-th place in the tuple means a’s i-th axis
+              becomes a.transpose()’s j-th axis.
+            - n ints: same as an n-tuple of the same ints (this form is intended simply
+              as a “convenience” alternative to the tuple form)
 
         Returns
         -------
@@ -1350,7 +1367,8 @@ class MPIArray(np.ndarray):
 
         if "axis" in kwargs and (kwargs["axis"] == dist_axis):
             raise AxisException(
-                f"operations along the distributed axis (in this case, {dist_axis}) are not allowed."
+                f"operations along the distributed axis (in this case, {dist_axis}) "
+                "are not allowed."
             )
 
         # 'out' kwargs contain arrays that the ufunc places the results into
@@ -1392,14 +1410,17 @@ class MPIArray(np.ndarray):
             if output is not None:
                 if hasattr(output, "axis") and output.axis != dist_axis:
                     raise AxisException(
-                        f"provided output MPIArray's distributed axis is not consistent with expected output distributed axis. Expected {dist_axis}; Actual {output.axis}"
+                        "provided output MPIArray's distributed axis is not consistent "
+                        f"with expected output distributed axis. Expected {dist_axis}; "
+                        f"Actual {output.axis}"
                     )
                 ret.append(output)
             else:
                 # case: the result is an ndarray; wrap it into an MPIArray
                 if result.shape:
                     ret.append(MPIArray.wrap(result, axis=dist_axis))
-                # case: result is a scalar; convert to 1-d vector, distributed across axis 0
+                # case: result is a scalar; convert to 1-d vector, distributed across
+                # axis 0
                 else:
                     ret.append(MPIArray.wrap(np.reshape(result, (1,)), axis=0))
 
@@ -1474,7 +1495,8 @@ def _partition_sel(sel, split_axis, n, slice_):
     """
     Re-slice a selection along a new axis.
 
-    Take a selection (a tuple of slices) and re-slice along the split_axis (which has length n).
+    Take a selection (a tuple of slices) and re-slice along the split_axis (which has
+    length n).
 
     Parameters
     ----------
@@ -1489,7 +1511,8 @@ def _partition_sel(sel, split_axis, n, slice_):
     Returns
     -------
     Tuple[List[slice], Tuple[slice]]
-        The new selections for the initial (pre-selection) space and the final (post-selection) space.
+        The new selections for the initial (pre-selection) space and the final
+        (post-selection) space.
     """
     # Reconstruct the slice for the split axis
     slice_init = _reslice(sel[split_axis], n, slice_)
@@ -1518,8 +1541,9 @@ def _reslice(slice_, n, subslice):
     # For a slice along an axis of length n, return the slice that would select the
     # slice(start, end) elements of the final array.
     #
-    # In other words find a single slice that has the same affect as application of two successive
-    # slices
+    # In other words find a single slice that has the same affect as application of two
+    # successive slices
+    dstart, dstop, dstep = slice_.indices(n)
 
     if subslice.step is not None and subslice.step > 1:
         raise ValueError("stride > 1 not supported. subslice: %s" % subslice)
@@ -1571,7 +1595,8 @@ def _mpi_to_ndarray(inputs):
             else:
                 if dist_axis != array.axis:
                     raise AxisException(
-                        "The distributed axis for all MPIArrays in an expression should be the same"
+                        "The distributed axis for all MPIArrays in an expression "
+                        "should be the same"
                     )
 
             args.append(array.local_array)
