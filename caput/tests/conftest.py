@@ -1,10 +1,13 @@
 """Pytest fixtures and simple tasks that can be used by all unit tests."""
 
+import glob
+import os
 import numpy as np
 import pytest
+import shutil
 
 from caput.pipeline import PipelineStopIteration, TaskBase, IterBase
-from caput import config
+from caput import config, mpiutil
 
 
 @pytest.fixture(scope="session")
@@ -88,3 +91,49 @@ class CookEggs(IterBase):
 
     def write_output(self, filename, output):
         raise NotImplementedError()
+
+
+@pytest.fixture
+def h5_file():
+    fname = "tmp_test_memh5.h5"
+    yield fname
+    rm_all_files(fname)
+
+
+@pytest.fixture
+def zarr_file():
+    fname = "tmp_test_memh5.zarr"
+    yield fname
+    rm_all_files(fname)
+
+
+@pytest.fixture
+def h5_file_distributed():
+    fname = "tmp_test_memh5_distributed.h5"
+    yield fname
+    if mpiutil.rank == 0:
+        rm_all_files(fname)
+
+
+@pytest.fixture
+def zarr_file_distributed():
+    fname = "tmp_test_memh5.zarr"
+    yield fname
+    if mpiutil.rank == 0:
+        rm_all_files(fname)
+
+
+def rm_all_files(fname):
+    """Remove all files and directories starting with `fname`."""
+    file_names = glob.glob(fname + "*")
+    for fname in file_names:
+        if os.path.isdir(fname):
+            try:
+                shutil.rmtree(fname)
+            except FileNotFoundError:
+                pass
+        else:
+            try:
+                os.remove(fname)
+            except FileNotFoundError:
+                pass
