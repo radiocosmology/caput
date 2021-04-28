@@ -15,6 +15,7 @@ import h5py
 
 from . import memh5
 from . import mpiarray
+from . import fileformats
 
 
 class TOData(memh5.BasicCont):
@@ -101,13 +102,15 @@ class Reader:
     files : filename, `h5py.File` or list there-of or filename pattern
         Files containing data. Filename patterns with wild cards (e.g.
         "foo*.h5") are supported.
+    file_format : `fileformats.FileFormat`
+            File format to use. Default `None` (format will be guessed).
     """
 
     # Controls the association between Reader classes and data classes.
     # Override with subclass of TOData.
     data_class = TOData
 
-    def __init__(self, files):
+    def __init__(self, files, file_format=None):
 
         # If files is a filename, or pattern, turn into list of files.
         if isinstance(files, str):
@@ -118,9 +121,10 @@ class Reader:
 
         # Fetch all meta data.
         time = np.copy(data_empty.time)
-        first_file, toclose = memh5.get_h5py_File(files[0])
+        first_file, toclose = memh5.get_file(files[0], file_format=file_format)
         datasets = _copy_non_time_data(first_file)
-        if toclose:
+        # Zarr arrays are flushed automatically flushed and closed
+        if toclose and (file_format == fileformats.HDF5):
             first_file.close()
 
         # Set the metadata attributes.

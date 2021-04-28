@@ -1,357 +1,511 @@
 """Unit tests for the memh5 module."""
 
-
 import datetime
-import unittest
-import os
-import glob
 import gc
 import json
 import warnings
 
-import numpy as np
 import h5py
+import numpy as np
+import pytest
+from pytest_lazyfixture import lazy_fixture
+import zarr
 
-from caput import memh5
+from caput import memh5, fileformats
 
 
-class TestRODict(unittest.TestCase):
-    """Unit tests for ro_dict."""
+def test_ro_dict():
+    """Test memh5.ro_dict."""
+    a = {"a": 5}
+    a = memh5.ro_dict(a)
+    assert a["a"] == 5
+    assert list(a.keys()) == ["a"]
+    # Convoluded test to make sure you can't write to it.
+    with pytest.raises(TypeError):
+        # pylint: disable=unsupported-assignment-operation
+        a["b"] = 6
 
-    def test_everything(self):
-        a = {"a": 5}
-        a = memh5.ro_dict(a)
-        self.assertEqual(a["a"], 5)
-        self.assertEqual(list(a.keys()), ["a"])
-        # Convoluded test to make sure you can't write to it.
-        try:
-            a["b"] = 6
-        except TypeError:
-            correct = True
+
+# Unit tests for MemGroup.
+
+
+def test_memgroup_nested():
+    """Test nested groups in MemGroup."""
+    root = memh5.MemGroup()
+    l1 = root.create_group("level1")
+    l2 = l1.require_group("level2")
+    assert root["level1"] == l1
+    assert root["level1/level2"] == l2
+    assert root["level1/level2"].name == "/level1/level2"
+
+
+def test_memgroup_create_dataset():
+    """Test creating datasets in MemGroup."""
+    g = memh5.MemGroup()
+    data = np.arange(100, dtype=np.float32)
+    g.create_dataset("data", data=data)
+    assert np.allclose(data, g["data"])
+
+
+def test_memgroup_recursive_create():
+    """Test creating nested groups at once in MemGroup."""
+    g = memh5.MemGroup()
+    with pytest.raises(ValueError):
+        g.create_group("")
+    g2 = g.create_group("level2/")
+    with pytest.raises(ValueError):
+        g2.create_group("/")
+    g2.create_group("/level22")
+    assert set(g.keys()) == {"level22", "level2"}
+    g.create_group("/a/b/c/d/")
+    gd = g["/a/b/c/d/"]
+    assert gd.name == "/a/b/c/d"
+
+
+def test_memgroup_recursive_create_dataset():
+    """Test creating nested datasets in MemGroup."""
+    g = memh5.MemGroup()
+    data = np.arange(10)
+    g.create_dataset("a/ra", data=data)
+    assert memh5.is_group(g["a"])
+    assert np.all(g["a/ra"][:] == data)
+    g["a"].create_dataset("/ra", data=data)
+    assert np.all(g["ra"][:] == data)
+    assert isinstance(g["a/ra"].parent, memh5.MemGroup)
+
+    # Check that d keeps g in scope.
+    d = g["a/ra"]
+    del g
+    gc.collect()
+    assert np.all(d.file["ra"][:] == data)
+
+
+def fill_test_file(f):
+    """Fill a file with some groups, datasets and attrs for testing."""
+    l1 = f.create_group("level1")
+    l1.create_group("level2")
+    d1 = l1.create_dataset("large", data=np.arange(100))
+    f.attrs["a"] = 5
+    d1.attrs["b"] = 6
+
+
+@pytest.fixture
+def filled_h5_file(h5_file):
+    """Provides an H5 file with some content."""
+    with h5py.File(h5_file, "w") as f:
+        fill_test_file(f)
+        f["level1"]["level2"].attrs["small"] = np.arange(3)
+        f["level1"]["level2"].attrs["ndarray"] = np.ndarray([1, 2, 3])
+    yield h5_file
+
+
+@pytest.fixture
+def filled_zarr_file(zarr_file):
+    """Provides an H5 file with some content."""
+    with zarr.open_group(zarr_file, "w") as f:
+        fill_test_file(f)
+    f["level1"]["level2"].attrs["small"] = [0, 1, 2]
+    yield zarr_file
+
+
+def assertGroupsEqual(a, b):
+    """Compare two groups."""
+    assert list(a.keys()) == list(b.keys())
+    assertAttrsEqual(a.attrs, b.attrs)
+    for key in a.keys():
+        this_a = a[key]
+        this_b = b[key]
+        if not memh5.is_group(a[key]):
+            assertAttrsEqual(this_a.attrs, this_b.attrs)
+            assert np.allclose(this_a, this_b)
         else:
-            correct = False
-        self.assertTrue(correct)
+            assertGroupsEqual(this_a, this_b)
 
 
-class TestGroup(unittest.TestCase):
-    """Unit tests for MemGroup."""
-
-    def test_nested(self):
-        root = memh5.MemGroup()
-        l1 = root.create_group("level1")
-        l2 = l1.require_group("level2")
-        self.assertTrue(root["level1"] == l1)
-        self.assertTrue(root["level1/level2"] == l2)
-        self.assertEqual(root["level1/level2"].name, "/level1/level2")
-
-    def test_create_dataset(self):
-        g = memh5.MemGroup()
-        data = np.arange(100, dtype=np.float32)
-        g.create_dataset("data", data=data)
-        self.assertTrue(np.allclose(data, g["data"]))
-
-    def test_recursive_create(self):
-        g = memh5.MemGroup()
-        self.assertRaises(ValueError, g.create_group, "")
-        g2 = g.create_group("level2/")
-        self.assertRaises(ValueError, g2.create_group, "/")
-        g2.create_group("/level22")
-        self.assertEqual(set(g.keys()), {"level22", "level2"})
-        g.create_group("/a/b/c/d/")
-        gd = g["/a/b/c/d/"]
-        self.assertEqual(gd.name, "/a/b/c/d")
-
-    def test_recursive_create_dataset(self):
-        g = memh5.MemGroup()
-        data = np.arange(10)
-        g.create_dataset("a/ra", data=data)
-        self.assertTrue(memh5.is_group(g["a"]))
-        self.assertTrue(np.all(g["a/ra"][:] == data))
-        g["a"].create_dataset("/ra", data=data)
-        self.assertTrue(np.all(g["ra"][:] == data))
-        self.assertIsInstance(g["a/ra"].parent, memh5.MemGroup)
-
-        # Check that d keeps g in scope.
-        d = g["a/ra"]
-        del g
-        gc.collect()
-        self.assertTrue(np.all(d.file["ra"][:] == data))
+def assertAttrsEqual(a, b):
+    """Compare two attributes."""
+    assert list(a.keys()) == list(b.keys())
+    for key in a.keys():
+        this_a = a[key]
+        this_b = b[key]
+        if hasattr(this_a, "shape"):
+            assert np.allclose(this_a, this_b)
+        else:
+            assert this_a == this_b
 
 
-class TestH5Files(unittest.TestCase):
-    """Tests that make hdf5 objects, convert to mem and back."""
+@pytest.mark.parametrize(
+    "test_file,file_open_function",
+    [
+        (lazy_fixture("filled_h5_file"), h5py.File),
+        (lazy_fixture("filled_zarr_file"), zarr.open_group),
+    ],
+)
+def test_file_sanity(test_file, file_open_function):
+    """Compare a file with itself."""
+    with file_open_function(test_file, "r") as f:
+        assertGroupsEqual(f, f)
 
-    fname = "tmp_test_memh5.h5"
 
-    def setUp(self):
-        with h5py.File(self.fname, "w") as f:
-            l1 = f.create_group("level1")
-            l2 = l1.create_group("level2")
-            d1 = l1.create_dataset("large", data=np.arange(100))
-            f.attrs["a"] = 5
-            d1.attrs["b"] = 6
-            l2.attrs["small"] = np.arange(3)
+@pytest.mark.parametrize(
+    "test_file,file_open_function,file_format",
+    [
+        (lazy_fixture("filled_h5_file"), h5py.File, fileformats.HDF5),
+        (lazy_fixture("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
+    ],
+)
+def test_to_from_file(test_file, file_open_function, file_format):
+    """Tests that makes hdf5 objects, convert to mem and back."""
+    m = memh5.MemGroup.from_file(test_file, file_format=file_format)
 
-    def assertGroupsEqual(self, a, b):
-        self.assertEqual(list(a.keys()), list(b.keys()))
-        self.assertAttrsEqual(a.attrs, b.attrs)
-        for key in a.keys():
-            this_a = a[key]
-            this_b = b[key]
-            if not memh5.is_group(a[key]):
-                self.assertAttrsEqual(this_a.attrs, this_b.attrs)
-                self.assertTrue(np.allclose(this_a, this_b))
+    # Check that read in file has same structure
+    with file_open_function(test_file, "r") as f:
+        assertGroupsEqual(f, m)
+
+    m.to_file(
+        test_file + ".new",
+        file_format=file_format,
+    )
+
+    # Check that written file has same structure
+    with file_open_function(test_file + ".new", "r") as f:
+        assertGroupsEqual(f, m)
+
+
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("filled_h5_file"), fileformats.HDF5),
+        (lazy_fixture("filled_zarr_file"), fileformats.Zarr),
+    ],
+)
+def test_memdisk(test_file, file_format):
+    """Test MemDiskGroup."""
+    f = memh5.MemDiskGroup(test_file, file_format=file_format)
+    assert set(f.keys()) == set(f._data.keys())
+    m = memh5.MemDiskGroup(memh5.MemGroup.from_file(test_file, file_format=file_format))
+    assert set(m.keys()) == set(f.keys())
+    # Recursive indexing.
+    assert set(f["/level1/"].keys()) == set(m["/level1/"].keys())
+    assert set(f.keys()) == set(m["/level1"]["/"].keys())
+    assert np.all(f["/level1/large"][:] == m["/level1/large"])
+    gf = f.create_group("/level1/level2/level3/")
+    gf.create_dataset("new", data=np.arange(5))
+    gm = m.create_group("/level1/level2/level3/")
+    gm.create_dataset("new", data=np.arange(5))
+    assert np.all(
+        f["/level1/level2/level3/new"][:] == m["/level1/level2/level3/new"][:]
+    )
+
+
+@pytest.mark.parametrize(
+    "compression,compression_opts,chunks",
+    [(None, None, None), ("bitshuffle", (None, "lz4"), (2, 3))],
+)
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("filled_h5_file"), fileformats.HDF5),
+        (lazy_fixture("filled_zarr_file"), fileformats.Zarr),
+    ],
+)
+def test_compression(test_file, file_format, compression, compression_opts, chunks):
+    # add a new compressed dataset
+    f = memh5.MemDiskGroup.from_file(test_file, file_format=file_format)
+    rng = np.random.default_rng(12345)
+    f.create_dataset(
+        "new",
+        data=rng.random((5, 7)),
+        chunks=chunks,
+        compression=compression,
+        compression_opts=compression_opts,
+    )
+    # f.flush()
+    f.save(
+        test_file + ".cmp",
+        convert_attribute_strings=True,
+        convert_dataset_strings=True,
+        file_format=file_format,
+    )
+    # f.close()
+
+    # read back compression parameters from file
+    with file_format.open(test_file + ".cmp") as fh:
+        if file_format is fileformats.HDF5:
+            if compression is not None:
+                # for some reason .compression doesn't get set...
+                assert str(fileformats.H5FILTER) in fh["new"]._filters
+            assert fh["new"].chunks == chunks
+        else:
+            if compression is None:
+                assert fh["new"].compressor is None
+                assert fh["new"].chunks == fh["new"].shape
             else:
-                self.assertGroupsEqual(this_a, this_b)
-
-    def assertAttrsEqual(self, a, b):
-        self.assertEqual(list(a.keys()), list(b.keys()))
-        for key in a.keys():
-            this_a = a[key]
-            this_b = b[key]
-            if hasattr(this_a, "shape"):
-                self.assertTrue(np.allclose(this_a, this_b))
-            else:
-                self.assertEqual(this_a, this_b)
-
-    def test_h5_sanity(self):
-        with h5py.File(self.fname, "r") as f:
-            self.assertGroupsEqual(f, f)
-
-    def test_to_from_hdf5(self):
-        m = memh5.MemGroup.from_hdf5(self.fname)
-
-        # Check that read in file has same structure
-        with h5py.File(self.fname, "r") as f:
-            self.assertGroupsEqual(f, m)
-
-        m.to_hdf5(self.fname + ".new")
-
-        # Check that written file has same structure
-        with h5py.File(self.fname + ".new", "r") as f:
-            self.assertGroupsEqual(f, m)
-
-    def test_memdisk(self):
-        f = memh5.MemDiskGroup(self.fname)
-        self.assertEqual(set(f.keys()), set(f._data.keys()))
-        m = memh5.MemDiskGroup(memh5.MemGroup.from_hdf5(self.fname))
-        self.assertEqual(set(m.keys()), set(f.keys()))
-        # Recursive indexing.
-        self.assertEqual(set(f["/level1/"].keys()), set(m["/level1/"].keys()))
-        self.assertEqual(set(f.keys()), set(m["/level1"]["/"].keys()))
-        self.assertTrue(np.all(f["/level1/large"][:] == m["/level1/large"]))
-        gf = f.create_group("/level1/level2/level3/")
-        gf.create_dataset("new", data=np.arange(5))
-        gm = m.create_group("/level1/level2/level3/")
-        gm.create_dataset("new", data=np.arange(5))
-        self.assertTrue(
-            np.all(
-                f["/level1/level2/level3/new"][:] == m["/level1/level2/level3/new"][:]
-            )
-        )
-
-    def tearDown(self):
-        file_names = glob.glob(self.fname + "*")
-        for fname in file_names:
-            os.remove(fname)
+                assert fh["new"].compressor is not None
+                assert fh["new"].chunks == chunks
 
 
 class TempSubClass(memh5.MemDiskGroup):
+    """A subclass of MemDiskGroup for testing."""
+
     pass
 
 
-class TestMemDiskGroup(unittest.TestCase):
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
+    ],
+)
+def test_io(test_file, file_format):
+    """Test I/O of MemDiskGroup."""
+    # Save a subclass of MemDiskGroup
+    tsc = TempSubClass()
+    tsc.create_dataset("dset", data=np.arange(10))
+    tsc.save(test_file, file_format=file_format)
 
-    fname = "temp_mdg.h5"
+    # Load it from disk
+    tsc2 = memh5.MemDiskGroup.from_file(test_file, file_format=file_format)
+    tsc3 = memh5.MemDiskGroup.from_file(test_file, ondisk=True, file_format=file_format)
 
-    def test_io(self):
+    # Check that is is recreated with the correct type
+    assert isinstance(tsc2, TempSubClass)
+    assert isinstance(tsc3, TempSubClass)
 
-        # Save a subclass of MemDiskGroup
-        tsc = TempSubClass()
-        tsc.create_dataset("dset", data=np.arange(10))
-        tsc.save(self.fname)
+    # Check that parent/etc is properly implemented.
+    # Turns out this is very hard so give up for now.
+    # self.assertIsInstance(tsc2['dset'].parent, TempSubClass)
+    # self.assertIsInstance(tsc3['dset'].parent, TempSubClass)
+    tsc3.close()
 
-        # Load it from disk
-        tsc2 = memh5.MemDiskGroup.from_file(self.fname)
-        tsc3 = memh5.MemDiskGroup.from_file(self.fname, ondisk=True)
+    with memh5.MemDiskGroup.from_file(
+        test_file, mode="r", ondisk=True, file_format=file_format
+    ):
+        # h5py will error if file already open
+        if file_format == fileformats.HDF5:
+            with pytest.raises(IOError):
+                file_format.open(test_file, "w")
+        # ...zarr will not
+        else:
+            file_format.open(test_file, "w")
 
-        # Check that is is recreated with the correct type
-        self.assertIsInstance(tsc2, TempSubClass)
-        self.assertIsInstance(tsc3, TempSubClass)
-
-        # Check that parent/etc is properly implemented.
-        # Turns out this is very hard so give up for now.
-        # self.assertIsInstance(tsc2['dset'].parent, TempSubClass)
-        # self.assertIsInstance(tsc3['dset'].parent, TempSubClass)
-        tsc3.close()
-
-        with memh5.MemDiskGroup.from_file(self.fname, mode="r", ondisk=True):
-            self.assertRaises(IOError, h5py.File, self.fname, "w")
-
-        with memh5.MemDiskGroup.from_file(self.fname, mode="r", ondisk=False):
-            f = h5py.File(self.fname, "w")
+    with memh5.MemDiskGroup.from_file(
+        test_file, mode="r", ondisk=False, file_format=file_format
+    ):
+        f = file_format.open(test_file, "w")
+        if file_format == fileformats.HDF5:
             f.close()
 
-    def tearDown(self):
-        file_names = glob.glob(self.fname + "*")
-        for fname in file_names:
-            os.remove(fname)
+
+@pytest.fixture(name="history_dict")
+def fixture_history_dict():
+    """Provides dict with some content for testing."""
+    return {"foo": {"bar": {"f": 23}, "foo": "bar"}, "bar": 0}
 
 
-class TestBasicCont(unittest.TestCase):
-    fname = "test_bc.h5"
-    history_dict = {"foo": {"bar": {"f": 23}, "foo": "bar"}, "bar": 0}
+@pytest.fixture
+def h5_basiccont_file(h5_file, history_dict):
+    """Provides a BasicCont file written to HDF5."""
+    d = memh5.BasicCont()
+    d.create_dataset("a", data=np.arange(5))
+    d.add_history("test", history_dict)
+    d.to_disk(h5_file)
+    yield h5_file, history_dict
+
+
+@pytest.fixture
+def zarr_basiccont_file(zarr_file, history_dict):
+    """Provides a BasicCont file written to Zarr."""
+    d = memh5.BasicCont()
+    d.create_dataset("a", data=np.arange(5))
+    d.add_history("test", history_dict)
+    d.to_disk(zarr_file, file_format=fileformats.Zarr)
+    yield zarr_file, history_dict
+
+
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
+    ],
+)
+def test_access(test_file, file_format):
+    """Test access to BasicCont content."""
+    test_file = test_file[0]
+    d = memh5.BasicCont.from_file(test_file, file_format=file_format)
+    assert "history" in d._data
+    assert "index_map" in d._data
+    with pytest.raises(KeyError):
+        d.__getitem__("history")
+    with pytest.raises(KeyError):
+        d.__getitem__("index_map")
+
+    with pytest.raises(ValueError):
+        d.create_group("a")
+    with pytest.raises(ValueError):
+        d.create_dataset("index_map/stuff", data=np.arange(5))
+
+
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
+    ],
+)
+def test_history(test_file, file_format):
+    """Test history of BasicCont."""
+    basic_cont, history_dict = test_file
     json_prefix = "!!_memh5_json:"
 
-    def setUp(self):
-        d = memh5.BasicCont()
-        d.create_dataset("a", data=np.arange(5))
-        d.add_history("test", self.history_dict)
-        d.to_disk(self.fname)
+    # Check file for config- and versiondump
+    with file_format.open(basic_cont, "r") as f:
+        history = f["history"].attrs["test"]
+        # if file_format == fileformats.HDF5:
+        assert history == json_prefix + json.dumps(history_dict)
+        # else:
+        #     assert history == history_dict
 
-    def test_access(self):
-        d = memh5.BasicCont.from_file(self.fname)
-        self.assertTrue("history" in d._data)
-        self.assertTrue("index_map" in d._data)
-        self.assertRaises(KeyError, d.__getitem__, "history")
-        self.assertRaises(KeyError, d.__getitem__, "index_map")
+    # add old format history
+    with file_format.open(basic_cont, "r+") as f:
+        f["history"].create_group("old_history_format")
+        f["history/old_history_format"].attrs["foo"] = "bar"
 
-        self.assertRaises(ValueError, d.create_group, "a")
-        self.assertRaises(
-            ValueError, d.create_dataset, "index_map/stuff", data=np.arange(5)
-        )
+    with memh5.BasicCont.from_file(basic_cont, file_format=file_format) as m:
+        with warnings.catch_warnings(record=True) as w:
+            # Cause all warnings to always be triggered.
+            warnings.simplefilter("always")
+            old_history_format = m.history["old_history_format"]
 
-    def test_history(self):
-        # Check HDF5 file for config- and versiondump
-        with h5py.File(self.fname, "r") as f:
-            history = f["history"].attrs["test"]
-            assert history == self.json_prefix + json.dumps(self.history_dict)
+            # Expect exactly one warning about deprecated history format
+            assert len(w) == 1
+            assert issubclass(w[-1].category, DeprecationWarning)
+            assert "deprecated" in str(w[-1].message)
 
-        # add old format history
-        with h5py.File(self.fname, "r+") as f:
-            f["history"].create_group("old_history_format")
-            f["history/old_history_format"].attrs["foo"] = "bar"
-
-        with memh5.BasicCont.from_file(self.fname) as m:
-            with warnings.catch_warnings(record=True) as w:
-                # Cause all warnings to always be triggered.
-                warnings.simplefilter("always")
-                old_history_format = m.history["old_history_format"]
-
-                # Expect exactly one warning about deprecated history format
-                assert len(w) == 1
-                assert issubclass(w[-1].category, DeprecationWarning)
-                assert "deprecated" in str(w[-1].message)
-
-        assert old_history_format == {"foo": "bar"}
+    assert old_history_format == {"foo": "bar"}
 
 
-class TestUnicodeDataset(unittest.TestCase):
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
+    ],
+)
+def test_to_from__file_unicode(test_file, file_format):
     """Test that a unicode memh5 dataset is round tripped correctly."""
+    udata = np.array(["Test", "this", "works"])
+    sdata = udata.astype("S")
+    assert udata.dtype.kind == "U"
+    assert sdata.dtype.kind == "S"
 
-    fname = "tmp_test_unicode.h5"
+    m = memh5.MemGroup()
+    udset = m.create_dataset("udata", data=udata)
+    sdset = m.create_dataset("sdata", data=sdata)
+    assert udset.dtype.kind == "U"
+    assert sdset.dtype.kind == "S"
 
-    def test_to_from_hdf5(self):
+    # Test a write without conversion. This should throw an exception
+    with pytest.raises(TypeError):
+        m.to_file(test_file, file_format=file_format)
 
-        udata = np.array(["Test", "this", "works"])
-        sdata = udata.astype("S")
-        self.assertEqual(udata.dtype.kind, "U")
-        self.assertEqual(sdata.dtype.kind, "S")
+    # Write with conversion
+    m.to_file(
+        test_file,
+        convert_attribute_strings=True,
+        convert_dataset_strings=True,
+        file_format=file_format,
+    )
 
-        m = memh5.MemGroup()
-        udset = m.create_dataset("udata", data=udata)
-        sdset = m.create_dataset("sdata", data=sdata)
-        self.assertEqual(udset.dtype.kind, "U")
-        self.assertEqual(sdset.dtype.kind, "S")
+    with file_format.open(test_file, "r") as fh:
+        # pylint warns here that "Instance of 'Group' has no 'dtype' member"
+        # pylint: disable=E1101
+        assert fh["udata"].dtype.kind == "S"
+        assert fh["sdata"].dtype.kind == "S"
 
-        # Test a write without conversion. This should throw an exception
-        with self.assertRaises(TypeError):
-            m.to_hdf5(self.fname)
+    # Test a load without conversion, types should be bytestrings
+    m2 = memh5.MemGroup.from_file(test_file, file_format=file_format)
+    assert m2["udata"].dtype.kind == "S"
+    assert m2["sdata"].dtype.kind == "S"
+    # Check the dtype here, for some reason Python 2 thinks the arrays are equal
+    # and Python 3 does not even though both agree that the datatypes are different
+    assert m["udata"].dtype != m2["udata"].dtype
+    assert (m["sdata"].data == m2["sdata"].data).all()
 
-        # Write with conversion
-        m.to_hdf5(
-            self.fname, convert_attribute_strings=True, convert_dataset_strings=True
-        )
-
-        with h5py.File(self.fname, "r") as fh:
-            # pylint warns here that "Instance of 'Group' has no 'dtype' member"
-            # pylint: disable=E1101
-            self.assertEqual(fh["udata"].dtype.kind, "S")
-            self.assertEqual(fh["sdata"].dtype.kind, "S")
-
-        # Test a load without conversion, types should be bytestrings
-        m2 = memh5.MemGroup.from_hdf5(self.fname)
-        self.assertEqual(m2["udata"].dtype.kind, "S")
-        self.assertEqual(m2["sdata"].dtype.kind, "S")
-        # Check the dtype here, for some reason Python 2 thinks the arrays are equal
-        # and Python 3 does not even though both agree that the datatypes are different
-        self.assertTrue(m["udata"].dtype != m2["udata"].dtype)
-        self.assertTrue((m["sdata"].data == m2["sdata"].data).all())
-
-        # Test a load *with* conversion, types should be unicode
-        m3 = memh5.MemGroup.from_hdf5(
-            self.fname, convert_attribute_strings=True, convert_dataset_strings=True
-        )
-        self.assertEqual(m3["udata"].dtype.kind, "U")
-        self.assertEqual(m3["sdata"].dtype.kind, "U")
-        self.assertTrue((m["udata"].data == m3["udata"].data).all())
-        self.assertTrue((m["udata"].data == m3["sdata"].data).all())
-
-    def test_failure(self):
-        # Test that we fail when trying to write a non ASCII character
-
-        udata = np.array(["\u03B2"])
-
-        m = memh5.MemGroup()
-        m.create_dataset("udata", data=udata)
-
-        with self.assertRaises(TypeError):
-            m.to_hdf5(self.fname)
-
-    def tearDown(self):
-        file_names = glob.glob(self.fname + "*")
-        for fname in file_names:
-            os.remove(fname)
+    # Test a load *with* conversion, types should be unicode
+    m3 = memh5.MemGroup.from_file(
+        test_file,
+        convert_attribute_strings=True,
+        convert_dataset_strings=True,
+        file_format=file_format,
+    )
+    assert m3["udata"].dtype.kind == "U"
+    assert m3["sdata"].dtype.kind == "U"
+    assert (m["udata"].data == m3["udata"].data).all()
+    assert (m["udata"].data == m3["sdata"].data).all()
 
 
-class TestMapJSON(unittest.TestCase):
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
+    ],
+)
+def test_failure(test_file, file_format):
+    """Test that we fail when trying to write a non ASCII character."""
+    udata = np.array(["\u03B2"])
+
+    m = memh5.MemGroup()
+    m.create_dataset("udata", data=udata)
+
+    with pytest.raises(TypeError):
+        m.to_file(test_file, file_format=file_format)
+
+
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
+    ],
+)
+def test_to_from_hdf5(test_file, file_format):
     """Test that a memh5 dataset JSON serialization is done correctly."""
+    json_prefix = "!!_memh5_json:"
+    data = {"foo": {"bar": [1, 2, 3], "fu": "1"}}
+    time = datetime.datetime.now()
 
-    fname = "tmp_test_json.h5"
+    m = memh5.MemGroup()
+    m.attrs["data"] = data
+    m.attrs["datetime"] = {"datetime": time}
+    m.attrs["ndarray"] = np.ndarray([1, 2, 3])
 
-    def test_to_from_hdf5(self):
-        json_prefix = "!!_memh5_json:"
-        data = {"foo": {"bar": [1, 2, 3], "fu": "1"}}
-        time = datetime.datetime.now()
+    m.to_file(test_file, file_format=file_format)
+    with file_format.open(test_file, "r") as f:
+        assert f.attrs["data"] == json_prefix + json.dumps(data)
+        assert f.attrs["datetime"] == json_prefix + json.dumps(
+            {"datetime": time.isoformat()}
+        )
 
-        m = memh5.MemGroup()
-        m.attrs["data"] = data
-        m.attrs["datetime"] = {"datetime": time}
-
-        m.to_hdf5(self.fname)
-        with h5py.File(self.fname, "r") as f:
-            assert f.attrs["data"] == json_prefix + json.dumps(data)
-            assert f.attrs["datetime"] == json_prefix + json.dumps(
-                {"datetime": time.isoformat()}
-            )
-
-        m2 = memh5.MemGroup.from_hdf5(self.fname)
-        assert m2.attrs["data"] == data
-        assert m2.attrs["datetime"] == {"datetime": time.isoformat()}
-
-    def test_failure(self):
-        """Test that we get a TypeError if we try to serialize something else"""
-        m = memh5.MemGroup()
-        m.attrs["non_serializable"] = {"datetime": self}
-
-        with self.assertRaises(TypeError):
-            m.to_hdf5(self.fname)
-
-    def tearDown(self):
-        file_names = glob.glob(self.fname + "*")
-        for fname in file_names:
-            os.remove(fname)
+    m2 = memh5.MemGroup.from_file(test_file, file_format=file_format)
+    assert m2.attrs["data"] == data
+    assert m2.attrs["datetime"] == {"datetime": time.isoformat()}
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
+    ],
+)
+def test_json_failure(test_file, file_format):
+    """Test that we get a TypeError if we try to serialize something else."""
+    m = memh5.MemGroup()
+    m.attrs["non_serializable"] = {"datetime": object}
+
+    with pytest.raises(TypeError):
+        m.to_file(test_file, file_format=file_format)

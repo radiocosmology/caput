@@ -46,10 +46,10 @@ def simple_config():
 
 
 def write_to_file(config_json):
-    temp = tempfile.NamedTemporaryFile(mode="w+t", delete=False)
-    yaml.safe_dump(config_json, temp, encoding="utf-8")
-    temp.flush()
-    return temp.name
+    with tempfile.NamedTemporaryFile(mode="w+t", delete=False) as temp:
+        yaml.safe_dump(config_json, temp, encoding="utf-8")
+        temp.flush()
+        return temp.name
 
 
 def test_load_yaml(simple_config):
