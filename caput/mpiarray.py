@@ -96,7 +96,7 @@ import logging
 
 import numpy as np
 
-from caput import mpiutil, misc
+from caput import fileformats, mpiutil, misc
 
 
 logger = logging.getLogger(__name__)
@@ -631,12 +631,61 @@ class MPIArray(np.ndarray):
         -------
         array : MPIArray
         """
-        # Don't bother using MPI where the axis is not zero. It's probably just slower.
-        # TODO: with tuning this might not be true. Keep an eye on this.
-        use_mpi = axis > 0
+        return cls.from_file(f, dataset, comm, axis, sel, file_format=fileformats.HDF5)
 
-        # Read the file. Opening with MPI if requested, and we can
-        fh = misc.open_h5py_mpi(f, "r", use_mpi=use_mpi, comm=comm)
+    @classmethod
+    def from_file(
+        cls, f, dataset, comm=None, axis=0, sel=None, file_format=fileformats.HDF5
+    ):
+        """Read MPIArray from an HDF5 dataset or Zarr array on disk in parallel.
+
+        Parameters
+        ----------
+        f : filename, or `h5py.File` object
+            File to read dataset from.
+        dataset : string
+            Name of dataset to read from. Must exist.
+        comm : MPI.Comm, optional
+            MPI communicator to distribute over. If `None` optional, use
+            `MPI.COMM_WORLD`.
+        axis : int, optional
+            Axis over which the read should be distributed. This can be used
+            to select the most efficient axis for the reading.
+        sel : tuple, optional
+            A tuple of slice objects used to make a selection from the array
+            *before* reading. The output will be this selection from the dataset
+            distributed over the given axis.
+        file_format : `fileformats.HDF5` or `fileformats.Zarr`
+            File format to use. Default `fileformats.HDF5`.
+
+        Returns
+        -------
+        array : MPIArray
+        """
+        if file_format == fileformats.HDF5:
+            # Don't bother using MPI where the axis is not zero. It's probably just slower.
+            # TODO: with tuning this might not be true. Keep an eye on this.
+            use_mpi = axis > 0
+
+            # Read the file. Opening with MPI if requested, and we can
+            fh = misc.open_h5py_mpi(f, "r", use_mpi=use_mpi, comm=comm)
+        elif file_format == fileformats.Zarr:
+            # Blosc may share incorrect global state amongst processes causing programs to hang.
+            # See https://zarr.readthedocs.io/en/stable/tutorial.html#parallel-computing-and-synchronization
+            try:
+                import numcodecs
+            except ImportError:
+                raise RuntimeError("Install numcodecs to read from zarr files.")
+            numcodecs.blosc.use_threads = False
+
+            if isinstance(f, str):
+                fh = file_format.open(f, "r")
+            elif isinstance(f, file_format.module.Group):
+                fh = f
+            else:
+                raise ValueError(
+                    f"Can't write to {f} (Expected a {file_format.module.__name__}.Group or str filename)."
+                )
 
         dset = fh[dataset]
         dshape = dset.shape  # Shape of the underlying dataset
@@ -669,33 +718,42 @@ class MPIArray(np.ndarray):
         sel = tuple(sel)
 
         # Split the axis to get the IO size under ~2GB (only if MPI-IO)
-        split_axis, partitions = dist_arr._partition_io(skip=(not fh.is_mpi))
+        split_axis, partitions = dist_arr._partition_io(
+            skip=file_format == fileformats.HDF5 and not fh.is_mpi
+        )
 
-        # Check that there are no null slices, otherwise we need to turn off
-        # collective IO to work around an h5py issue (#965)
-        no_null_slices = dist_arr.global_shape[axis] >= dist_arr.comm.size
+        if file_format == fileformats.HDF5:
+            # Check that there are no null slices, otherwise we need to turn off
+            # collective IO to work around an h5py issue (#965)
+            no_null_slices = dist_arr.global_shape[axis] >= dist_arr.comm.size
 
-        # Only use collective IO if:
-        # - there are no null slices (h5py bug)
-        # - we are not distributed over axis=0 as there is no advantage for
-        #   collective IO which is usually slow
-        # TODO: change if h5py bug fixed
-        # TODO: better would be a test on contiguous IO size
-        # TODO: do we need collective IO to read chunked data?
-        use_collective = fh.is_mpi and no_null_slices and axis > 0
+            # Only use collective IO if:
+            # - there are no null slices (h5py bug)
+            # - we are not distributed over axis=0 as there is no advantage for
+            #   collective IO which is usually slow
+            # TODO: change if h5py bug fixed
+            # TODO: better would be a test on contiguous IO size
+            # TODO: do we need collective IO to read chunked data?
+            use_collective = fh.is_mpi and no_null_slices and axis > 0
 
-        # Read using collective MPI-IO if specified
-        with dset.collective if use_collective else DummyContext():
+            # Read using collective MPI-IO if specified
+            with dset.collective if use_collective else DummyContext():
 
-            # Loop over partitions of the IO and perform them
+                # Loop over partitions of the IO and perform them
+                for part in partitions:
+                    islice, fslice = _partition_sel(
+                        sel, split_axis, dshape[split_axis], part
+                    )
+                    dist_arr[fslice] = dset[islice]
+
+            if fh.opened:
+                fh.close()
+        else:
             for part in partitions:
                 islice, fslice = _partition_sel(
                     sel, split_axis, dshape[split_axis], part
                 )
                 dist_arr[fslice] = dset[islice]
-
-        if fh.opened:
-            fh.close()
 
         return dist_arr
 
@@ -712,12 +770,17 @@ class MPIArray(np.ndarray):
 
         Parameters
         ----------
-        filename : str, h5py.File or h5py.Group
+        f : str, h5py.File or h5py.Group
             File to write dataset into.
         dataset : string
             Name of dataset to write into. Should not exist.
+        chunks
+        compression : str or int
+            Name or identifier of HDF5 compression filter.
+        compression_opts
+            See HDF5 documentation for compression filters.
+            Compression options for the dataset.
         """
-
         import h5py
 
         if not h5py.get_config().mpi:
@@ -730,22 +793,11 @@ class MPIArray(np.ndarray):
                 )
 
         mode = "a" if create else "r+"
-
         fh = misc.open_h5py_mpi(f, mode, self.comm)
-
-        start = self.local_offset[self.axis]
-        end = start + self.local_shape[self.axis]
-
-        # Construct slices for axis
-        sel = ([slice(None, None)] * self.axis) + [slice(start, end)]
-        sel = _expand_sel(sel, self.ndim)
 
         # Check that there are no null slices, otherwise we need to turn off
         # collective IO to work around an h5py issue (#965)
         no_null_slices = self.global_shape[self.axis] >= self.comm.size
-
-        # Split the axis to get the IO size under ~2GB (only if MPI-IO)
-        split_axis, partitions = self._partition_io(skip=(not fh.is_mpi))
 
         # Only use collective IO if:
         # - there are no null slices (h5py bug)
@@ -753,16 +805,23 @@ class MPIArray(np.ndarray):
         #   collective IO which is usually slow
         # - unless we want to use compression/chunking
         # TODO: change if h5py bug fixed
+        # https://github.com/h5py/h5py/issues/965
         # TODO: better would be a test on contiguous IO size
         use_collective = (
             fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
         )
 
-        if fh.is_mpi and not use_collective:
+        if fh.is_mpi and (not use_collective):
             # Need to disable compression if we can't use collective IO
+            logger.error("Cannot use collective IO, disabling compression")
             chunks, compression, compression_opts = None, None, None
 
-        dset = fh.create_dataset(
+        sel = self._make_selections()
+
+        # Split the axis to get the IO size under ~2GB (only if MPI-IO)
+        split_axis, partitions = self._partition_io(skip=(not fh.is_mpi))
+
+        fh.create_dataset(
             dataset,
             shape=self.global_shape,
             dtype=self.dtype,
@@ -772,17 +831,160 @@ class MPIArray(np.ndarray):
         )
 
         # Read using collective MPI-IO if specified
-        with dset.collective if use_collective else DummyContext():
+        with fh[dataset].collective if use_collective else DummyContext():
 
             # Loop over partitions of the IO and perform them
             for part in partitions:
                 islice, fslice = _partition_sel(
                     sel, split_axis, self.global_shape[split_axis], part
                 )
-                dset[islice] = self[fslice]
+                fh[dataset][islice] = self[fslice]
 
         if fh.opened:
             fh.close()
+
+    def to_zarr(
+        self,
+        f,
+        dataset,
+        create,
+        chunks,
+        compression,
+        compression_opts,
+    ):
+        """Parallel write into a contiguous Zarr dataset.
+
+        Parameters
+        ----------
+        f : str zarr.Group
+            File to write dataset into.
+        dataset : string
+            Name of dataset to write into. Should not exist.
+        chunks
+        compression : str or int
+            Name or identifier of HDF5 compression filter.
+        compression_opts
+            See HDF5 documentation for compression filters.
+            Compression options for the dataset.
+        """
+        try:
+            import zarr
+            import numcodecs
+        except ImportError as err:
+            raise RuntimeError(
+                f"Can't write to zarr file. Please install zarr and numcodecs: {err}"
+            )
+
+        # Blosc may share incorrect global state amongst processes causing programs to hang.
+        # See https://zarr.readthedocs.io/en/stable/tutorial.html#parallel-computing-and-synchronization
+        numcodecs.blosc.use_threads = False
+
+        mode = "a" if create else "r+"
+        extra_args = fileformats.Zarr.compression_kwargs(
+            compression=compression,
+            compression_opts=compression_opts,
+        )
+
+        lockfile = None
+
+        if isinstance(f, str):
+            if self.comm.rank == 0 and create:
+                zarr.open(store=f, mode=mode)
+            lockfile = f".{f}.sync"
+            self.comm.Barrier()
+            group = zarr.open_group(
+                store=f,
+                mode="r+",
+                synchronizer=zarr.ProcessSynchronizer(lockfile),
+            )
+        elif isinstance(f, zarr.Group):
+            if f.synchronizer is None:
+                raise ValueError(
+                    "Got zarr.Group without synchronizer, can't perform parallel write."
+                )
+            group = f
+        else:
+            raise ValueError(
+                f"Can't write to {f} (Expected a zarr.Group or str filename)."
+            )
+
+        sel = self._make_selections()
+
+        # Split the axis
+        split_axis, partitions = self._partition_io(skip=True)
+
+        if self.comm.rank == 0:
+            group.create_dataset(
+                dataset,
+                shape=self.global_shape,
+                dtype=self.dtype,
+                chunks=chunks,
+                **extra_args,
+            )
+        self.comm.Barrier()
+
+        for part in partitions:
+            islice, fslice = _partition_sel(
+                sel, split_axis, self.global_shape[split_axis], part
+            )
+            group[dataset][islice] = self.local_array[fslice]
+        self.comm.Barrier()
+        if self.comm.rank == 0 and lockfile is not None:
+            fileformats.remove_file_or_dir(lockfile)
+
+    def to_file(
+        self,
+        f,
+        dataset,
+        create=False,
+        chunks=None,
+        compression=None,
+        compression_opts=None,
+        file_format=fileformats.HDF5,
+    ):
+        """Parallel write into a contiguous HDF5/Zarr dataset.
+
+        Parameters
+        ----------
+        f : str, h5py.File, h5py.Group or zarr.Group
+            File to write dataset into.
+        dataset : string
+            Name of dataset to write into. Should not exist.
+        chunks
+        compression : str or int
+            Name or identifier of HDF5 compression filter.
+        compression_opts
+            See HDF5 documentation for compression filters.
+            Compression options for the dataset.
+        """
+        if chunks is None and hasattr(self, "chunks"):
+            logger.error(f"getting chunking opts from mpiarray: {self.chunks}")
+            chunks = self.chunks
+        if compression is None and hasattr(self, "compression"):
+            logger.error(f"getting compression opts from mpiarray: {self.compression}")
+
+            compression = self.compression
+        if compression_opts is None and hasattr(self, "compression_opts"):
+            logger.error(
+                f"getting compression_opts opts from mpiarray: {self.compression_opts}"
+            )
+
+            compression_opts = self.compression_opts
+        if file_format == fileformats.HDF5:
+            self.to_hdf5(f, dataset, create, chunks, compression, compression_opts)
+        elif file_format == fileformats.Zarr:
+            self.to_zarr(f, dataset, create, chunks, compression, compression_opts)
+        else:
+            raise ValueError(f"Unknown file format: {file_format}")
+
+    def _make_selections(self):
+        """Make selections for writing local data to distributed file."""
+        start = self.local_offset[self.axis]
+        end = start + self.local_shape[self.axis]
+
+        # Construct slices for axis
+        sel = ([slice(None, None)] * self.axis) + [slice(start, end)]
+        return _expand_sel(sel, self.ndim)
 
     def transpose(self, *axes):
         """Transpose the array axes.

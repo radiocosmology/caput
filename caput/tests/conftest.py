@@ -1,13 +1,14 @@
 """Pytest fixtures and simple tasks that can be used by all unit tests."""
 
+import glob
 import tempfile
 
 import numpy as np
 import pytest
 
-from caput.pipeline import PipelineStopIteration, TaskBase, IterBase
-from caput.scripts.runner import cli
-from caput import config
+from ..pipeline import PipelineStopIteration, TaskBase, IterBase
+from ..scripts.runner import cli
+from .. import config, fileformats, mpiutil
 
 
 @pytest.fixture(scope="session")
@@ -89,7 +90,7 @@ class CookEggs(IterBase):
     def read_output(self, filename):
         raise NotImplementedError()
 
-    def write_output(self, filename, output):
+    def write_output(self, filename, output, file_format=None, **kwargs):
         raise NotImplementedError()
 
 
@@ -129,6 +130,7 @@ def run_pipeline(parameters=None, configstr=eggs_pipeline_conf):
         Holds the captured result. Try accessing e.g. `result.exit_code`, `result.output`.
 
     """
+
     with tempfile.NamedTemporaryFile("w+") as configfile:
         configfile.write(configstr)
         configfile.flush()
@@ -139,3 +141,44 @@ def run_pipeline(parameters=None, configstr=eggs_pipeline_conf):
             return runner.invoke(cli, ["run", configfile.name])
         else:
             return runner.invoke(cli, ["run", *parameters, configfile.name])
+
+
+@pytest.fixture
+def h5_file():
+    """Provides a file name and removes all files/dirs with the same prefix later."""
+    fname = "tmp_test_memh5.h5"
+    yield fname
+    rm_all_files(fname)
+
+
+@pytest.fixture
+def zarr_file():
+    """Provides a directory name and removes all files/dirs with the same prefix later."""
+    fname = "tmp_test_memh5.zarr"
+    yield fname
+    rm_all_files(fname)
+
+
+@pytest.fixture
+def h5_file_distributed():
+    """Provides a file name and removes all files/dirs with the same prefix later."""
+    fname = "tmp_test_memh5_distributed.h5"
+    yield fname
+    if mpiutil.rank == 0:
+        rm_all_files(fname)
+
+
+@pytest.fixture
+def zarr_file_distributed():
+    """Provides a directory name and removes all files/dirs with the same prefix later."""
+    fname = "tmp_test_memh5.zarr"
+    yield fname
+    if mpiutil.rank == 0:
+        rm_all_files(fname)
+
+
+def rm_all_files(file_name):
+    """Remove all files and directories starting with `file_name`."""
+    file_names = glob.glob(file_name + "*")
+    for fname in file_names:
+        fileformats.remove_file_or_dir(fname)
