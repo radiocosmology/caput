@@ -25,7 +25,7 @@ jobs:
 
       - name: Install pip dependencies
         run: |
-          pip install pylint==2.7.0 pylint-ignore flake8 pytest black mpi4py pyinstrument
+          pip install pylint==2.7.0 pylint-ignore flake8 pytest black mpi4py pyinstrument pytest-lazy-fixture
           pip install -r requirements.txt
           python setup.py develop
 
@@ -64,7 +64,7 @@ jobs:
       run: |
         pip install -r requirements.txt
         pip install mpi4py
-        pip install pytest
+        pip install pytest pytest-lazy-fixture
         python setup.py develop
 
     - name: Run serial tests
