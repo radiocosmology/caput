@@ -35,7 +35,7 @@ jobs:
       - name: Run pylint
         run: >
           pylint-ignore -d
-          line-too-long,invalid-name,import-outside-toplevel,logging-fstring-interpolation,unnecessary-pass,no-else-return
+          line-too-long,invalid-name,import-outside-toplevel,logging-fstring-interpolation,unnecessary-pass,no-else-return,too-many-arguments,too-many-locals
           --extension-pkg-whitelist=mpi4py,caput.weighted_median,h5py caput
 
       - name: Check code with black
