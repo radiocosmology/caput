@@ -351,7 +351,7 @@ from copy import deepcopy
 
 import yaml
 
-from . import config, misc
+from . import config, fileformats, misc
 
 
 # Set the module logger.
@@ -1376,7 +1376,7 @@ class IterBase(_OneAndOne):
 
 
 class H5IOMixin:
-    """Provides hdf5 IO for pipeline tasks.
+    """Provides hdf5/zarr IO for pipeline tasks.
 
     As a mixin, this must be combined (using multiple inheritance) with a
     subclass of `TaskBase`, providing the full task API.
@@ -1404,18 +1404,27 @@ class H5IOMixin:
 
         return memh5.MemGroup.from_hdf5(filename, mode="r")
 
-    def write_output(self, filename, output):
-        """Method for writing hdf5 output.
+    def write_output(self, filename, output, file_format=None):
+        """
+        Method for writing hdf5/zarr output.
 
-        `output` to be written must be either a `memh5.MemGroup` or an
-        `h5py.Group` (which include `hdf5.File` objects). In the latter case
-        the buffer is flushed if `filename` points to the same file and a copy
-        is made otherwise.
-
+        Parameters
+        ----------
+        filename : str
+            File name
+        output : memh5.Group, zarr.Group or h5py.Group
+            `output` to be written. If this is a `h5py.Group` (which include `hdf5.File` objects)
+            the buffer is flushed if `filename` points to the same file and a copy is made otherwise.
+        file_format : fileformats.Zarr, fileformats.HDF5 or None
+            File format to use. If this is not specified, the file format is guessed based on the type of
+            `output` or the `filename`. If guessing is not successful, HDF5 is used.
         """
 
         from caput import memh5
         import h5py
+        import zarr
+
+        file_format = fileformats.check_file_format(filename, file_format, output)
 
         # Ensure parent directory is present.
         dirname = os.path.dirname(filename)
@@ -1432,14 +1441,16 @@ class H5IOMixin:
 
             # Lock file
             with misc.lock_file(filename, comm=output.comm) as fn:
-                output.to_hdf5(fn, mode="w")
+                output.to_file(fn, mode="w", file_format=file_format)
+            return
 
-        elif isinstance(output, h5py.Group):
+        if isinstance(output, h5py.Group):
             if os.path.isfile(filename) and os.path.samefile(
                 output.file.filename, filename
             ):
                 # `output` already lives in this file.
                 output.flush()
+
             else:
                 # Copy to memory then to disk
                 # XXX This can be made much more efficient using a direct copy.
@@ -1448,6 +1459,24 @@ class H5IOMixin:
                 # Lock file as we write
                 with misc.lock_file(filename, comm=out_copy.comm) as fn:
                     out_copy.to_hdf5(fn, mode="w")
+        elif isinstance(output, zarr.Group):
+            if os.path.isdir(filename) and os.path.samefile(
+                output.store.path, filename
+            ):
+                pass
+            else:
+                logger.debug(f"Copying {output.store}:{output.path} to {filename}.")
+                from . import mpiutil
+
+                if mpiutil.rank == 0:
+                    n_copied, n_skipped, n_bytes_copied = zarr.copy_store(
+                        output.store,
+                        zarr.DirectoryStore(filename),
+                        source_path=output.path,
+                    )
+                logger.debug(
+                    f"Copied {n_copied} items ({n_bytes_copied} bytes), skipped {n_skipped} items."
+                )
 
 
 class BasicContMixin:
@@ -1487,13 +1516,28 @@ class BasicContMixin:
             filename, distributed=self._distributed, comm=self._comm
         )
 
-    def write_output(self, filename, output):
-        """Method for writing hdf5 output.
+    @staticmethod
+    def write_output(filename, output, file_format=None):
+        """
+        Method for writing output to disk.
 
-        `output` to be written must be either a :class:`memh5.BasicCont` object.
+        Parameters
+        ----------
+        filename : str
+            File name.
+        output : :class:`memh5.BasicCont`
+            Data to be written.
+        file_format : `fileformats.FileFormat`
+            File format to use. Default `fileformats.HDF5`.
+
+        Returns
+        -------
+
         """
 
         from caput import memh5
+
+        file_format = fileformats.check_file_format(filename, file_format, output)
 
         # Ensure parent directory is present.
         dirname = os.path.dirname(filename)
@@ -1511,7 +1555,7 @@ class BasicContMixin:
             )
 
         # Already in memory.
-        output.save(filename)
+        output.save(filename, file_format=file_format)
 
 
 class SingleH5Base(H5IOMixin, SingleBase):

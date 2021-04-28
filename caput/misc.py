@@ -232,7 +232,9 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
         fh = f
         fh.opened = False
     else:
-        raise ValueError("Did not receive a h5py.File or filename")
+        raise ValueError(
+            f"Can't write to {f} (Expected a h5py.File, h5py.Group or str filename)."
+        )
 
     fh.is_mpi = fh.file.driver == "mpio"
 

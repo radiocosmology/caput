@@ -1,7 +1,9 @@
-numpy>=1.16
-scipy
-h5py
-PyYAML
-skyfield>=1.31
-cython
 click
+cython
+h5py
+numcodecs==0.7.3
+numpy>=1.16
+PyYAML
+scipy
+skyfield>=1.31
+zarr==2.8.1
