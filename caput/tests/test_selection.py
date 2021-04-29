@@ -1,6 +1,6 @@
 """Serial version of the selection tests."""
 import pytest
-
+from pytest_lazyfixture import lazy_fixture
 import numpy as np
 
 from caput.memh5 import MemGroup
@@ -14,6 +14,7 @@ sel = {"dset1": (fsel, isel, slice(None)), "dset2": (fsel, slice(None))}
 
 @pytest.fixture
 def h5_file_select(datasets, h5_file):
+    """Provides an HDF5 file with some content for testing."""
     container = MemGroup()
     container.create_dataset("dset1", data=datasets[0].view())
     container.create_dataset("dset2", data=datasets[1].view())
@@ -24,6 +25,7 @@ def h5_file_select(datasets, h5_file):
 
 @pytest.fixture
 def zarr_file_select(datasets, zarr_file):
+    """Provides a Zarr file with some content for testing."""
     container = MemGroup()
     container.create_dataset("dset1", data=datasets[0].view())
     container.create_dataset("dset2", data=datasets[1].view())
@@ -35,8 +37,8 @@ def zarr_file_select(datasets, zarr_file):
 @pytest.mark.parametrize(
     "container_on_disk, file_format",
     [
-        (pytest.lazy_fixture("h5_file_select"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_file_select"), fileformats.Zarr),
+        (lazy_fixture("h5_file_select"), fileformats.HDF5),
+        (lazy_fixture("zarr_file_select"), fileformats.Zarr),
     ],
 )
 def test_H5FileSelect(container_on_disk, file_format):

@@ -6,6 +6,7 @@ Needs to be run on 1, 2 or 4 MPI processes.
 from mpi4py import MPI
 import numpy as np
 import pytest
+from pytest_lazyfixture import lazy_fixture
 
 from caput import mpiutil, mpiarray, fileformats
 from caput.memh5 import MemGroup
@@ -17,6 +18,7 @@ comm = MPI.COMM_WORLD
 
 @pytest.fixture
 def h5_file_select_parallel(datasets, h5_file):
+    """Prepare an HDF5 file for the select_parallel tests."""
     if comm.rank == 0:
         m1 = mpiarray.MPIArray.wrap(datasets[0], axis=0, comm=MPI.COMM_SELF)
         m2 = mpiarray.MPIArray.wrap(datasets[1], axis=0, comm=MPI.COMM_SELF)
@@ -37,6 +39,7 @@ def h5_file_select_parallel(datasets, h5_file):
 
 @pytest.fixture
 def zarr_file_select_parallel(datasets, zarr_file):
+    """Prepare a Zarr file for the select_parallel tests."""
     if comm.rank == 0:
         m1 = mpiarray.MPIArray.wrap(datasets[0], axis=0, comm=MPI.COMM_SELF)
         m2 = mpiarray.MPIArray.wrap(datasets[1], axis=0, comm=MPI.COMM_SELF)
@@ -59,14 +62,14 @@ def zarr_file_select_parallel(datasets, zarr_file):
 @pytest.mark.parametrize(
     "container_on_disk, file_format",
     [
-        (pytest.lazy_fixture("h5_file_select_parallel"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_file_select_parallel"), fileformats.Zarr),
+        (lazy_fixture("h5_file_select_parallel"), fileformats.HDF5),
+        (lazy_fixture("zarr_file_select_parallel"), fileformats.Zarr),
     ],
 )
 @pytest.mark.parametrize("fsel", [slice(1, 8, 2), slice(5, 8, 2)])
 @pytest.mark.parametrize("isel", [slice(1, 4), slice(5, 8, 2)])
-def test_H5FileSelect_distributed(container_on_disk, fsel, isel, file_format):
-    """Load H5 into parallel container while down-selecting axes."""
+def test_FileSelect_distributed(container_on_disk, fsel, isel, file_format):
+    """Load H5/Zarr file into parallel container while down-selecting axes."""
 
     sel = {"dset1": (fsel, isel, slice(None)), "dset2": (fsel, slice(None))}
 

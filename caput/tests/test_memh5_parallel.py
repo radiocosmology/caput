@@ -1,7 +1,7 @@
 """Unit tests for the parallel features of the memh5 module."""
 
 import pytest
-
+from pytest_lazyfixture import lazy_fixture
 import numpy as np
 import h5py
 import zarr
@@ -13,9 +13,8 @@ comm = mpiutil.world
 rank, size = mpiutil.rank, mpiutil.size
 
 
-# Unit tests for MemGroup
 def test_create_dataset():
-
+    """Test for creating datasets in MemGroup."""
     global_data = np.arange(size * 5 * 10, dtype=np.float32)
     local_data = global_data.reshape(size, -1, 10)[rank]
     d_array = mpiarray.MPIArray.wrap(local_data, axis=0)
@@ -55,15 +54,16 @@ def test_create_dataset():
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
-        (pytest.lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
         (
-            pytest.lazy_fixture("zarr_file_distributed"),
+            lazy_fixture("zarr_file_distributed"),
             zarr.open_group,
             fileformats.Zarr,
         ),
     ],
 )
 def test_io(test_file, file_open_function, file_format):
+    """Test for I/O in MemGroup."""
 
     # Create distributed memh5 object
     g = memh5.MemGroup(distributed=True)
@@ -144,19 +144,19 @@ def test_io(test_file, file_open_function, file_format):
     assert g2["serial_data"].attrs["const"] == 18
 
 
-# MemDiskGroupDistributed tests
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
-        (pytest.lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
         (
-            pytest.lazy_fixture("zarr_file_distributed"),
+            lazy_fixture("zarr_file_distributed"),
             zarr.open_group,
             fileformats.Zarr,
         ),
     ],
 )
 def test_misc(test_file, file_open_function, file_format):
+    """Misc tests for MemDiskGroupDistributed"""
 
     dg = memh5.MemDiskGroup(distributed=True)
 
@@ -193,8 +193,8 @@ def test_misc(test_file, file_open_function, file_format):
     mpiutil.barrier()
 
 
-# BasicCont tests
 def test_redistribute():
+    """Test redistribute in BasicCont."""
 
     g = memh5.BasicCont(distributed=True)
 
