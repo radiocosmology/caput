@@ -1,26 +1,28 @@
 """Unit tests for the memh5 module."""
 
-
 import datetime
-import pytest
 import gc
 import json
 import warnings
 
-import numpy as np
 import h5py
+import numpy as np
+import pytest
+from pytest_lazyfixture import lazy_fixture
 import zarr
 
 from caput import memh5, fileformats
 
 
 def test_ro_dict():
+    """Test memh5.ro_dict."""
     a = {"a": 5}
     a = memh5.ro_dict(a)
     assert a["a"] == 5
     assert list(a.keys()) == ["a"]
     # Convoluded test to make sure you can't write to it.
     with pytest.raises(TypeError):
+        # pylint: disable=unsupported-assignment-operation
         a["b"] = 6
 
 
@@ -28,6 +30,7 @@ def test_ro_dict():
 
 
 def test_memgroup_nested():
+    """Test nested groups in MemGroup."""
     root = memh5.MemGroup()
     l1 = root.create_group("level1")
     l2 = l1.require_group("level2")
@@ -37,6 +40,7 @@ def test_memgroup_nested():
 
 
 def test_memgroup_create_dataset():
+    """Test creating datasets in MemGroup."""
     g = memh5.MemGroup()
     data = np.arange(100, dtype=np.float32)
     g.create_dataset("data", data=data)
@@ -44,6 +48,7 @@ def test_memgroup_create_dataset():
 
 
 def test_memgroup_recursive_create():
+    """Test creating nested groups at once in MemGroup."""
     g = memh5.MemGroup()
     with pytest.raises(ValueError):
         g.create_group("")
@@ -58,6 +63,7 @@ def test_memgroup_recursive_create():
 
 
 def test_memgroup_recursive_create_dataset():
+    """Test creating nested datasets in MemGroup."""
     g = memh5.MemGroup()
     data = np.arange(10)
     g.create_dataset("a/ra", data=data)
@@ -74,10 +80,8 @@ def test_memgroup_recursive_create_dataset():
     assert np.all(d.file["ra"][:] == data)
 
 
-# Tests that make hdf5 objects, convert to mem and back."""
-
-
 def fill_test_file(f):
+    """Fill a file with some groups, datasets and attrs for testing."""
     l1 = f.create_group("level1")
     l1.create_group("level2")
     d1 = l1.create_dataset("large", data=np.arange(100))
@@ -87,6 +91,7 @@ def fill_test_file(f):
 
 @pytest.fixture
 def filled_h5_file(h5_file):
+    """Provides an H5 file with some content."""
     with h5py.File(h5_file, "w") as f:
         fill_test_file(f)
         f["level1"]["level2"].attrs["small"] = np.arange(3)
@@ -96,6 +101,7 @@ def filled_h5_file(h5_file):
 
 @pytest.fixture
 def filled_zarr_file(zarr_file):
+    """Provides an H5 file with some content."""
     with zarr.open_group(zarr_file, "w") as f:
         fill_test_file(f)
     f["level1"]["level2"].attrs["small"] = [0, 1, 2]
@@ -103,6 +109,7 @@ def filled_zarr_file(zarr_file):
 
 
 def assertGroupsEqual(a, b):
+    """Compare two groups."""
     assert list(a.keys()) == list(b.keys())
     assertAttrsEqual(a.attrs, b.attrs)
     for key in a.keys():
@@ -116,6 +123,7 @@ def assertGroupsEqual(a, b):
 
 
 def assertAttrsEqual(a, b):
+    """Compare two attributes."""
     assert list(a.keys()) == list(b.keys())
     for key in a.keys():
         this_a = a[key]
@@ -129,11 +137,12 @@ def assertAttrsEqual(a, b):
 @pytest.mark.parametrize(
     "test_file,file_open_function",
     [
-        (pytest.lazy_fixture("filled_h5_file"), h5py.File),
-        (pytest.lazy_fixture("filled_zarr_file"), zarr.open_group),
+        (lazy_fixture("filled_h5_file"), h5py.File),
+        (lazy_fixture("filled_zarr_file"), zarr.open_group),
     ],
 )
 def test_file_sanity(test_file, file_open_function):
+    """Compare a file with itself."""
     with file_open_function(test_file, "r") as f:
         assertGroupsEqual(f, f)
 
@@ -141,11 +150,12 @@ def test_file_sanity(test_file, file_open_function):
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
-        (pytest.lazy_fixture("filled_h5_file"), h5py.File, fileformats.HDF5),
-        (pytest.lazy_fixture("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
+        (lazy_fixture("filled_h5_file"), h5py.File, fileformats.HDF5),
+        (lazy_fixture("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
     ],
 )
 def test_to_from_file(test_file, file_open_function, file_format):
+    """Tests that makes hdf5 objects, convert to mem and back."""
     m = memh5.MemGroup.from_file(test_file, file_format=file_format)
 
     # Check that read in file has same structure
@@ -162,11 +172,12 @@ def test_to_from_file(test_file, file_open_function, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (pytest.lazy_fixture("filled_h5_file"), fileformats.HDF5),
-        (pytest.lazy_fixture("filled_zarr_file"), fileformats.Zarr),
+        (lazy_fixture("filled_h5_file"), fileformats.HDF5),
+        (lazy_fixture("filled_zarr_file"), fileformats.Zarr),
     ],
 )
 def test_memdisk(test_file, file_format):
+    """Test MemDiskGroup."""
     f = memh5.MemDiskGroup(test_file, file_format=file_format)
     assert set(f.keys()) == set(f._data.keys())
     m = memh5.MemDiskGroup(memh5.MemGroup.from_file(test_file, file_format=file_format))
@@ -185,20 +196,20 @@ def test_memdisk(test_file, file_format):
 
 
 class TempSubClass(memh5.MemDiskGroup):
+    """A subclass of MemDiskGroup for testing."""
+
     pass
-
-
-# MemDiskGroup tests
 
 
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (pytest.lazy_fixture("h5_file"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_io(test_file, file_format):
+    """Test I/O of MemDiskGroup."""
     # Save a subclass of MemDiskGroup
     tsc = TempSubClass()
     tsc.create_dataset("dset", data=np.arange(10))
@@ -237,14 +248,15 @@ def test_io(test_file, file_format):
             f.close()
 
 
-# BasicCont tests
-@pytest.fixture
-def history_dict():
+@pytest.fixture(name="history_dict")
+def fixture_history_dict():
+    """Provides dict with some content for testing."""
     return {"foo": {"bar": {"f": 23}, "foo": "bar"}, "bar": 0}
 
 
 @pytest.fixture
 def h5_basiccont_file(h5_file, history_dict):
+    """Provides a BasicCont file written to HDF5."""
     d = memh5.BasicCont()
     d.create_dataset("a", data=np.arange(5))
     d.add_history("test", history_dict)
@@ -254,6 +266,7 @@ def h5_basiccont_file(h5_file, history_dict):
 
 @pytest.fixture
 def zarr_basiccont_file(zarr_file, history_dict):
+    """Provides a BasicCont file written to Zarr."""
     d = memh5.BasicCont()
     d.create_dataset("a", data=np.arange(5))
     d.add_history("test", history_dict)
@@ -264,11 +277,12 @@ def zarr_basiccont_file(zarr_file, history_dict):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (pytest.lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
+        (lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
     ],
 )
 def test_access(test_file, file_format):
+    """Test access to BasicCont content."""
     test_file = test_file[0]
     d = memh5.BasicCont.from_file(test_file, file_format=file_format)
     assert "history" in d._data
@@ -287,11 +301,12 @@ def test_access(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (pytest.lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
+        (lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
     ],
 )
 def test_history(test_file, file_format):
+    """Test history of BasicCont."""
     basic_cont, history_dict = test_file
     json_prefix = "!!_memh5_json:"
 
@@ -322,17 +337,15 @@ def test_history(test_file, file_format):
     assert old_history_format == {"foo": "bar"}
 
 
-# Test that a unicode memh5 dataset is round tripped correctly.
-
-
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (pytest.lazy_fixture("h5_file"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_to_from__file_unicode(test_file, file_format):
+    """Test that a unicode memh5 dataset is round tripped correctly."""
     udata = np.array(["Test", "this", "works"])
     sdata = udata.astype("S")
     assert udata.dtype.kind == "U"
@@ -387,13 +400,12 @@ def test_to_from__file_unicode(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (pytest.lazy_fixture("h5_file"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_failure(test_file, file_format):
-    # Test that we fail when trying to write a non ASCII character
-
+    """Test that we fail when trying to write a non ASCII character."""
     udata = np.array(["\u03B2"])
 
     m = memh5.MemGroup()
@@ -403,17 +415,15 @@ def test_failure(test_file, file_format):
         m.to_file(test_file, file_format=file_format)
 
 
-# Test that a memh5 dataset JSON serialization is done correctly.
-
-
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (pytest.lazy_fixture("h5_file"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_to_from_hdf5(test_file, file_format):
+    """Test that a memh5 dataset JSON serialization is done correctly."""
     json_prefix = "!!_memh5_json:"
     data = {"foo": {"bar": [1, 2, 3], "fu": "1"}}
     time = datetime.datetime.now()
@@ -438,12 +448,12 @@ def test_to_from_hdf5(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (pytest.lazy_fixture("h5_file"), fileformats.HDF5),
-        (pytest.lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_json_failure(test_file, file_format):
-    """Test that we get a TypeError if we try to serialize something else"""
+    """Test that we get a TypeError if we try to serialize something else."""
     m = memh5.MemGroup()
     m.attrs["non_serializable"] = {"datetime": object}
 

@@ -1238,7 +1238,8 @@ class _OneAndOne(TaskBase):
 
         raise NotImplementedError()
 
-    def write_output(self, filename, output):
+    @staticmethod
+    def write_output(filename, output):
         """Override to implement reading inputs from disk."""
 
         raise NotImplementedError()
@@ -1389,14 +1390,16 @@ class H5IOMixin:
     # TODO, implement reading on disk (i.e. no copy to memory).
     # ondisk = config.Property(default=False, proptype=bool)
 
-    def read_input(self, filename):
+    @staticmethod
+    def read_input(filename):
         """Method for reading hdf5 input."""
 
         from caput import memh5
 
         return memh5.MemGroup.from_hdf5(filename, mode="r")
 
-    def read_output(self, filename):
+    @staticmethod
+    def read_output(filename):
         """Method for reading hdf5 output (from caches)."""
 
         # Replicate code from read_input in case read_input is overridden.
@@ -1404,7 +1407,8 @@ class H5IOMixin:
 
         return memh5.MemGroup.from_hdf5(filename, mode="r")
 
-    def write_output(self, filename, output, file_format=None):
+    @staticmethod
+    def write_output(filename, output, file_format=None):
         """
         Method for writing hdf5/zarr output.
 

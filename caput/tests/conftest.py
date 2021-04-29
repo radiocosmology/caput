@@ -2,9 +2,10 @@
 
 import glob
 import os
+import shutil
+
 import numpy as np
 import pytest
-import shutil
 
 from caput.pipeline import PipelineStopIteration, TaskBase, IterBase
 from caput import config, mpiutil
@@ -95,6 +96,7 @@ class CookEggs(IterBase):
 
 @pytest.fixture
 def h5_file():
+    """Provides a file name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5.h5"
     yield fname
     rm_all_files(fname)
@@ -102,6 +104,7 @@ def h5_file():
 
 @pytest.fixture
 def zarr_file():
+    """Provides a directory name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5.zarr"
     yield fname
     rm_all_files(fname)
@@ -109,6 +112,7 @@ def zarr_file():
 
 @pytest.fixture
 def h5_file_distributed():
+    """Provides a file name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5_distributed.h5"
     yield fname
     if mpiutil.rank == 0:
@@ -117,15 +121,16 @@ def h5_file_distributed():
 
 @pytest.fixture
 def zarr_file_distributed():
+    """Provides a directory name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5.zarr"
     yield fname
     if mpiutil.rank == 0:
         rm_all_files(fname)
 
 
-def rm_all_files(fname):
-    """Remove all files and directories starting with `fname`."""
-    file_names = glob.glob(fname + "*")
+def rm_all_files(file_name):
+    """Remove all files and directories starting with `file_name`."""
+    file_names = glob.glob(file_name + "*")
     for fname in file_names:
         if os.path.isdir(fname):
             try:
