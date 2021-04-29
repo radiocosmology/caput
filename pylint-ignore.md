@@ -28,154 +28,80 @@ The recommended approach to using `pylint-ignore` is:
  - [E1111: assignment-from-no-return (2x)](#e1111-assignment-from-no-return)
  - [E1120: no-value-for-parameter (1x)](#e1120-no-value-for-parameter)
  - [E1121: too-many-function-args (1x)](#e1121-too-many-function-args)
- - [E1137: unsupported-assignment-operation (1x)](#e1137-unsupported-assignment-operation)
- - [W0201: attribute-defined-outside-init (18x)](#w0201-attribute-defined-outside-init)
+ - [W0201: attribute-defined-outside-init (12x)](#w0201-attribute-defined-outside-init)
  - [W0212: protected-access (45x)](#w0212-protected-access)
  - [W0221: arguments-differ (3x)](#w0221-arguments-differ)
  - [W0223: abstract-method (6x)](#w0223-abstract-method)
  - [W0231: super-init-not-called (1x)](#w0231-super-init-not-called)
- - [W0511: fixme (14x)](#w0511-fixme)
+ - [W0511: fixme (16x)](#w0511-fixme)
  - [W0603: global-statement (1x)](#w0603-global-statement)
- - [W0613: unused-argument (8x)](#w0613-unused-argument)
- - [W0621: redefined-outer-name (20x)](#w0621-redefined-outer-name)
+ - [W0613: unused-argument (6x)](#w0613-unused-argument)
+ - [W0621: redefined-outer-name (17x)](#w0621-redefined-outer-name)
  - [W0622: redefined-builtin (5x)](#w0622-redefined-builtin)
  - [W1113: keyword-arg-before-vararg (1x)](#w1113-keyword-arg-before-vararg)
  - [C0114: missing-module-docstring (5x)](#c0114-missing-module-docstring)
- - [C0115: missing-class-docstring (16x)](#c0115-missing-class-docstring)
- - [C0116: missing-function-docstring (106x)](#c0116-missing-function-docstring)
+ - [C0115: missing-class-docstring (10x)](#c0115-missing-class-docstring)
+ - [C0116: missing-function-docstring (69x)](#c0116-missing-function-docstring)
  - [C0302: too-many-lines (4x)](#c0302-too-many-lines)
  - [C0411: wrong-import-order (1x)](#c0411-wrong-import-order)
- - [R0201: no-self-use (32x)](#r0201-no-self-use)
- - [R0901: too-many-ancestors (6x)](#r0901-too-many-ancestors)
- - [R0903: too-few-public-methods (2x)](#r0903-too-few-public-methods)
- - [R0912: too-many-branches (7x)](#r0912-too-many-branches)
- - [R0913: too-many-arguments (24x)](#r0913-too-many-arguments)
- - [R0914: too-many-locals (14x)](#r0914-too-many-locals)
+ - [R0201: no-self-use (22x)](#r0201-no-self-use)
+ - [R0903: too-few-public-methods (1x)](#r0903-too-few-public-methods)
  - [R0915: too-many-statements (2x)](#r0915-too-many-statements)
- - [R1718: consider-using-set-comprehension (3x)](#r1718-consider-using-set-comprehension)
- - [R1720: no-else-raise (6x)](#r1720-no-else-raise)
+ - [R1720: no-else-raise (5x)](#r1720-no-else-raise)
  - [R1724: no-else-continue (1x)](#r1724-no-else-continue)
  - [R1725: super-with-arguments (3x)](#r1725-super-with-arguments)
 
 
 # E1101: no-member
 
-## File caput/tests/test_memh5_parallel.py - Line 54 - E1101 (no-member)
+## File caput/tests/test_memh5_parallel.py - Line 48 - E1101 (no-member)
 
 - `message: Instance of 'MemGroup' has no 'local_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  23:     def test_create_dataset(self):
+  16: def test_create_dataset():
   ...
-  52:         self.assertTrue(np.allclose(d_array_T, g["data_T"][:]))
-  53:         if comm is not None:
-> 54:             self.assertEqual(d_array_T.local_shape, g["data2"].local_shape)
-  55:
-  56:         # Test global indexing
+  46:     assert np.allclose(d_array_T, g["data_T"][:])
+  47:     if comm is not None:
+> 48:         assert d_array_T.local_shape == g["data2"].local_shape
+  49:
+  50:     # Test global indexing
 ```
 
 
-## File caput/tests/test_memh5_parallel.py - Line 128 - E1101 (no-member)
+## File caput/tests/test_memh5_parallel.py - Line 139 - E1101 (no-member)
 
 - `message: Instance of 'MemGroup' has no 'dtype' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-   59:     def test_io(self):
+   65: def test_io(test_file, file_open_function, file_format):
   ...
-  126:
-  127:         # Check the unicode dataset
-> 128:         self.assertEqual(g2["unicode_data"].dtype.kind, "U")
-  129:         self.assertEqual(g2["unicode_data"][0], "hello")
-  130:
+  137:
+  138:     # Check the unicode dataset
+> 139:     assert g2["unicode_data"].dtype.kind == "U"
+  140:     assert g2["unicode_data"][0] == "hello"
+  141:
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 186 - E1101 (no-member)
-
-- `message: Instance of 'ndarray' has no 'global_shape' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  172:     def test_transpose(self):
-  ...
-  184:
-  185:         # Check global shape
-> 186:         assert arr2.global_shape == (11, 14, 1, 2)
-  187:
-  188:         # Check local shape
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 189 - E1101 (no-member)
-
-- `message: Instance of 'ndarray' has no 'local_shape' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  172:     def test_transpose(self):
-  ...
-  187:
-  188:         # Check local shape
-> 189:         assert arr2.local_shape == (l0, 14, 1, 2)
-  190:
-  191:         # Check local offset
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 192 - E1101 (no-member)
-
-- `message: Instance of 'ndarray' has no 'local_offset' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  172:     def test_transpose(self):
-  ...
-  190:
-  191:         # Check local offset
-> 192:         assert arr2.local_offset == (s0, 0, 0, 0)
-  193:
-  194:         # Check axis
-```
-
-
-## File caput/tests/test_memh5_parallel.py - Line 195 - E1101 (no-member)
+## File caput/tests/test_memh5_parallel.py - Line 203 - E1101 (no-member)
 
 - `message: Instance of '_BaseGroup' has no 'distributed_axis' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  189:     def test_redistribute(self):
+  196: def test_redistribute():
   ...
-  193:         # Create an array from data
-  194:         g.create_dataset("data", shape=(10, 10), distributed=True, distributed_axis=0)
-> 195:         self.assertEqual(g["data"].distributed_axis, 0)
-  196:         g.redistribute(1)
-  197:         self.assertEqual(g["data"].distributed_axis, 1)
-```
-
-
-## File caput/tests/test_memh5_parallel.py - Line 197 - E1101 (no-member)
-
-- `message: Instance of '_BaseGroup' has no 'distributed_axis' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  189:     def test_redistribute(self):
-  ...
-  195:         self.assertEqual(g["data"].distributed_axis, 0)
-  196:         g.redistribute(1)
-> 197:         self.assertEqual(g["data"].distributed_axis, 1)
-  198:
-  199:
+  201:     # Create an array from data
+  202:     g.create_dataset("data", shape=(10, 10), distributed=True, distributed_axis=0)
+> 203:     assert g["data"].distributed_axis == 0
+  204:     g.redistribute(1)
+  205:     assert g["data"].distributed_axis == 1
 ```
 
 
@@ -183,16 +109,31 @@ The recommended approach to using `pylint-ignore` is:
 
 - `message: Instance of 'ndarray' has no 'global_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  172:     def test_transpose(self):
+  190: def test_transpose():
   ...
   202:
-  203:         # Check global shape
-> 204:         assert arr3.global_shape == (11, 14, 1, 2)
+  203:     # Check global shape
+> 204:     assert arr2.global_shape == (11, 14, 1, 2)
   205:
-  206:         # Check local shape
+  206:     # Check local shape
+```
+
+
+## File caput/tests/test_memh5_parallel.py - Line 205 - E1101 (no-member)
+
+- `message: Instance of '_BaseGroup' has no 'distributed_axis' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  196: def test_redistribute():
+  ...
+  203:     assert g["data"].distributed_axis == 0
+  204:     g.redistribute(1)
+> 205:     assert g["data"].distributed_axis == 1
 ```
 
 
@@ -200,16 +141,16 @@ The recommended approach to using `pylint-ignore` is:
 
 - `message: Instance of 'ndarray' has no 'local_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  172:     def test_transpose(self):
+  190: def test_transpose():
   ...
   205:
-  206:         # Check local shape
-> 207:         assert arr3.local_shape == (l0, 14, 1, 2)
+  206:     # Check local shape
+> 207:     assert arr2.local_shape == (l0, 14, 1, 2)
   208:
-  209:         # Check local offset
+  209:     # Check local offset
 ```
 
 
@@ -217,33 +158,16 @@ The recommended approach to using `pylint-ignore` is:
 
 - `message: Instance of 'ndarray' has no 'local_offset' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  172:     def test_transpose(self):
+  190: def test_transpose():
   ...
   208:
-  209:         # Check local offset
-> 210:         assert arr3.local_offset == (s0, 0, 0, 0)
+  209:     # Check local offset
+> 210:     assert arr2.local_offset == (s0, 0, 0, 0)
   211:
-  212:         # Check axis
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 213 - E1101 (no-member)
-
-- `message: Instance of 'ndarray' has no 'axis' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  172:     def test_transpose(self):
-  ...
-  211:
-  212:         # Check axis
-> 213:         assert arr3.axis == 0
-  214:
-  215:         # Do the same test with None as argument to transpose
+  212:     # Check axis
 ```
 
 
@@ -251,16 +175,16 @@ The recommended approach to using `pylint-ignore` is:
 
 - `message: Instance of 'ndarray' has no 'global_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  172:     def test_transpose(self):
+  190: def test_transpose():
   ...
   220:
-  221:         # Check global shape
-> 222:         assert arr4.global_shape == (14, 2, 11, 1)
+  221:     # Check global shape
+> 222:     assert arr3.global_shape == (11, 14, 1, 2)
   223:
-  224:         # Check local shape
+  224:     # Check local shape
 ```
 
 
@@ -268,16 +192,16 @@ The recommended approach to using `pylint-ignore` is:
 
 - `message: Instance of 'ndarray' has no 'local_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  172:     def test_transpose(self):
+  190: def test_transpose():
   ...
   223:
-  224:         # Check local shape
-> 225:         assert arr4.local_shape == (14, 2, l0, 1)
+  224:     # Check local shape
+> 225:     assert arr3.local_shape == (l0, 14, 1, 2)
   226:
-  227:         # Check local offset
+  227:     # Check local offset
 ```
 
 
@@ -285,16 +209,16 @@ The recommended approach to using `pylint-ignore` is:
 
 - `message: Instance of 'ndarray' has no 'local_offset' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  172:     def test_transpose(self):
+  190: def test_transpose():
   ...
   226:
-  227:         # Check local offset
-> 228:         assert arr4.local_offset == (0, 0, s0, 0)
+  227:     # Check local offset
+> 228:     assert arr3.local_offset == (s0, 0, 0, 0)
   229:
-  230:         # Check axis
+  230:     # Check axis
 ```
 
 
@@ -305,251 +229,319 @@ The recommended approach to using `pylint-ignore` is:
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  172:     def test_transpose(self):
+  190: def test_transpose():
   ...
   229:
-  230:         # Check axis
-> 231:         assert arr4.axis == 2
+  230:     # Check axis
+> 231:     assert arr3.axis == 0
   232:
-  233:     def test_reshape(self):
+  233:     # Do the same test with None as argument to transpose
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 247 - E1101 (no-member)
+## File caput/tests/test_mpiarray.py - Line 240 - E1101 (no-member)
 
 - `message: Instance of 'ndarray' has no 'global_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  233:     def test_reshape(self):
+  190: def test_transpose():
   ...
-  245:
-  246:         # Check global shape
-> 247:         assert arr2.global_shape == (11, 28)
-  248:
-  249:         # Check local shape
+  238:
+  239:     # Check global shape
+> 240:     assert arr4.global_shape == (14, 2, 11, 1)
+  241:
+  242:     # Check local shape
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 250 - E1101 (no-member)
+## File caput/tests/test_mpiarray.py - Line 243 - E1101 (no-member)
 
 - `message: Instance of 'ndarray' has no 'local_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  233:     def test_reshape(self):
+  190: def test_transpose():
   ...
-  248:
-  249:         # Check local shape
-> 250:         assert arr2.local_shape == (l0, 28)
-  251:
-  252:         # Check local offset
+  241:
+  242:     # Check local shape
+> 243:     assert arr4.local_shape == (14, 2, l0, 1)
+  244:
+  245:     # Check local offset
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 253 - E1101 (no-member)
+## File caput/tests/test_mpiarray.py - Line 246 - E1101 (no-member)
 
 - `message: Instance of 'ndarray' has no 'local_offset' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  233:     def test_reshape(self):
+  190: def test_transpose():
   ...
-  251:
-  252:         # Check local offset
-> 253:         assert arr2.local_offset == (s0, 0)
-  254:
-  255:         # Check axis
+  244:
+  245:     # Check local offset
+> 246:     assert arr4.local_offset == (0, 0, s0, 0)
+  247:
+  248:     # Check axis
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 256 - E1101 (no-member)
+## File caput/tests/test_mpiarray.py - Line 249 - E1101 (no-member)
 
 - `message: Instance of 'ndarray' has no 'axis' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  233:     def test_reshape(self):
+  190: def test_transpose():
   ...
-  254:
-  255:         # Check axis
-> 256:         assert arr2.axis == 0
-  257:
-  258:     def test_global_getslice(self):
+  247:
+  248:     # Check axis
+> 249:     assert arr4.axis == 2
+  250:
+  251:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 282 - E1101 (no-member)
+## File caput/tests/test_mpiarray.py - Line 266 - E1101 (no-member)
 
-- `message: Instance of 'MemGroup' has no 'dtype' member`
+- `message: Instance of 'ndarray' has no 'global_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  254:     def test_to_from_hdf5(self):
+  252: def test_reshape():
   ...
-  280:         # Test a load without conversion, types should be bytestrings
-  281:         m2 = memh5.MemGroup.from_hdf5(self.fname)
-> 282:         self.assertEqual(m2["udata"].dtype.kind, "S")
-  283:         self.assertEqual(m2["sdata"].dtype.kind, "S")
-  284:         # Check the dtype here, for some reason Python 2 thinks the arrays are equal
+  264:
+  265:     # Check global shape
+> 266:     assert arr2.global_shape == (11, 28)
+  267:
+  268:     # Check local shape
 ```
 
 
-## File caput/tests/test_memh5.py - Line 283 - E1101 (no-member)
+## File caput/tests/test_mpiarray.py - Line 269 - E1101 (no-member)
 
-- `message: Instance of 'MemGroup' has no 'dtype' member`
+- `message: Instance of 'ndarray' has no 'local_shape' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  254:     def test_to_from_hdf5(self):
+  252: def test_reshape():
   ...
-  281:         m2 = memh5.MemGroup.from_hdf5(self.fname)
-  282:         self.assertEqual(m2["udata"].dtype.kind, "S")
-> 283:         self.assertEqual(m2["sdata"].dtype.kind, "S")
-  284:         # Check the dtype here, for some reason Python 2 thinks the arrays are equal
-  285:         # and Python 3 does not even though both agree that the datatypes are different
+  267:
+  268:     # Check local shape
+> 269:     assert arr2.local_shape == (l0, 28)
+  270:
+  271:     # Check local offset
 ```
 
 
-## File caput/tests/test_memh5.py - Line 286 - E1101 (no-member)
+## File caput/tests/test_mpiarray.py - Line 272 - E1101 (no-member)
 
-- `message: Instance of 'MemGroup' has no 'dtype' member`
+- `message: Instance of 'ndarray' has no 'local_offset' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  254:     def test_to_from_hdf5(self):
+  252: def test_reshape():
   ...
-  284:         # Check the dtype here, for some reason Python 2 thinks the arrays are equal
-  285:         # and Python 3 does not even though both agree that the datatypes are different
-> 286:         self.assertTrue(m["udata"].dtype != m2["udata"].dtype)
-  287:         self.assertTrue((m["sdata"].data == m2["sdata"].data).all())
-  288:
+  270:
+  271:     # Check local offset
+> 272:     assert arr2.local_offset == (s0, 0)
+  273:
+  274:     # Check axis
 ```
 
 
-## File caput/tests/test_memh5.py - Line 287 - E1101 (no-member)
+## File caput/tests/test_mpiarray.py - Line 275 - E1101 (no-member)
 
-- `message: Instance of 'MemGroup' has no 'data' member`
+- `message: Instance of 'ndarray' has no 'axis' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  254:     def test_to_from_hdf5(self):
+  252: def test_reshape():
   ...
-  285:         # and Python 3 does not even though both agree that the datatypes are different
-  286:         self.assertTrue(m["udata"].dtype != m2["udata"].dtype)
-> 287:         self.assertTrue((m["sdata"].data == m2["sdata"].data).all())
-  288:
-  289:         # Test a load *with* conversion, types should be unicode
+  273:
+  274:     # Check axis
+> 275:     assert arr2.axis == 0
+  276:
+  277:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 293 - E1101 (no-member)
-
-- `message: Instance of 'MemGroup' has no 'dtype' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  254:     def test_to_from_hdf5(self):
-  ...
-  291:             self.fname, convert_attribute_strings=True, convert_dataset_strings=True
-  292:         )
-> 293:         self.assertEqual(m3["udata"].dtype.kind, "U")
-  294:         self.assertEqual(m3["sdata"].dtype.kind, "U")
-  295:         self.assertTrue((m["udata"].data == m3["udata"].data).all())
-```
-
-
-## File caput/tests/test_memh5.py - Line 294 - E1101 (no-member)
-
-- `message: Instance of 'MemGroup' has no 'dtype' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  254:     def test_to_from_hdf5(self):
-  ...
-  292:         )
-  293:         self.assertEqual(m3["udata"].dtype.kind, "U")
-> 294:         self.assertEqual(m3["sdata"].dtype.kind, "U")
-  295:         self.assertTrue((m["udata"].data == m3["udata"].data).all())
-  296:         self.assertTrue((m["udata"].data == m3["sdata"].data).all())
-```
-
-
-## File caput/tests/test_memh5.py - Line 295 - E1101 (no-member)
-
-- `message: Instance of 'MemGroup' has no 'data' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  254:     def test_to_from_hdf5(self):
-  ...
-  293:         self.assertEqual(m3["udata"].dtype.kind, "U")
-  294:         self.assertEqual(m3["sdata"].dtype.kind, "U")
-> 295:         self.assertTrue((m["udata"].data == m3["udata"].data).all())
-  296:         self.assertTrue((m["udata"].data == m3["sdata"].data).all())
-  297:
-```
-
-
-## File caput/tests/test_memh5.py - Line 296 - E1101 (no-member)
-
-- `message: Instance of 'MemGroup' has no 'data' member`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  254:     def test_to_from_hdf5(self):
-  ...
-  294:         self.assertEqual(m3["sdata"].dtype.kind, "U")
-  295:         self.assertTrue((m["udata"].data == m3["udata"].data).all())
-> 296:         self.assertTrue((m["udata"].data == m3["sdata"].data).all())
-  297:
-  298:     def test_failure(self):
-```
-
-
-## File caput/memh5.py - Line 338 - E1101 (no-member)
+## File caput/memh5.py - Line 361 - E1101 (no-member)
 
 - `message: Instance of '_BaseGroup' has no 'create_dataset' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  329:     def require_dataset(self, name, shape, dtype, **kwargs):
+  352:     def require_dataset(self, name, shape, dtype, **kwargs):
   ...
-  336:             d = self[name]
-  337:         except KeyError:
-> 338:             return self.create_dataset(name, shape=shape, dtype=dtype, **kwargs)
-  339:         if is_group(d):
-  340:             msg = "Entry '%s' exists and is not a Dataset." % name
+  359:             d = self[name]
+  360:         except KeyError:
+> 361:             return self.create_dataset(name, shape=shape, dtype=dtype, **kwargs)
+  362:         if is_group(d):
+  363:             msg = "Entry '%s' exists and is not a Dataset." % name
 ```
 
 
-## File caput/memh5.py - Line 350 - E1101 (no-member)
+## File caput/memh5.py - Line 373 - E1101 (no-member)
 
 - `message: Instance of '_BaseGroup' has no 'create_group' member`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  345:     def require_group(self, name):
+  368:     def require_group(self, name):
   ...
-  348:             g = self[name]
-  349:         except KeyError:
-> 350:             return self.create_group(name)
-  351:         if not is_group(g):
-  352:             msg = "Entry '%s' exists and is not a Group." % name
+  371:             g = self[name]
+  372:         except KeyError:
+> 373:             return self.create_group(name)
+  374:         if not is_group(g):
+  375:             msg = "Entry '%s' exists and is not a Group." % name
+```
+
+
+## File caput/tests/test_memh5.py - Line 379 - E1101 (no-member)
+
+- `message: Instance of 'MemGroup' has no 'dtype' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  346: def test_to_from__file_unicode(test_file, file_format):
+  ...
+  377:     # Test a load without conversion, types should be bytestrings
+  378:     m2 = memh5.MemGroup.from_file(test_file, file_format=file_format)
+> 379:     assert m2["udata"].dtype.kind == "S"
+  380:     assert m2["sdata"].dtype.kind == "S"
+  381:     # Check the dtype here, for some reason Python 2 thinks the arrays are equal
+```
+
+
+## File caput/tests/test_memh5.py - Line 380 - E1101 (no-member)
+
+- `message: Instance of 'MemGroup' has no 'dtype' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  346: def test_to_from__file_unicode(test_file, file_format):
+  ...
+  378:     m2 = memh5.MemGroup.from_file(test_file, file_format=file_format)
+  379:     assert m2["udata"].dtype.kind == "S"
+> 380:     assert m2["sdata"].dtype.kind == "S"
+  381:     # Check the dtype here, for some reason Python 2 thinks the arrays are equal
+  382:     # and Python 3 does not even though both agree that the datatypes are different
+```
+
+
+## File caput/tests/test_memh5.py - Line 383 - E1101 (no-member)
+
+- `message: Instance of 'MemGroup' has no 'dtype' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  346: def test_to_from__file_unicode(test_file, file_format):
+  ...
+  381:     # Check the dtype here, for some reason Python 2 thinks the arrays are equal
+  382:     # and Python 3 does not even though both agree that the datatypes are different
+> 383:     assert m["udata"].dtype != m2["udata"].dtype
+  384:     assert (m["sdata"].data == m2["sdata"].data).all()
+  385:
+```
+
+
+## File caput/tests/test_memh5.py - Line 384 - E1101 (no-member)
+
+- `message: Instance of 'MemGroup' has no 'data' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  346: def test_to_from__file_unicode(test_file, file_format):
+  ...
+  382:     # and Python 3 does not even though both agree that the datatypes are different
+  383:     assert m["udata"].dtype != m2["udata"].dtype
+> 384:     assert (m["sdata"].data == m2["sdata"].data).all()
+  385:
+  386:     # Test a load *with* conversion, types should be unicode
+```
+
+
+## File caput/tests/test_memh5.py - Line 393 - E1101 (no-member)
+
+- `message: Instance of 'MemGroup' has no 'dtype' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  346: def test_to_from__file_unicode(test_file, file_format):
+  ...
+  391:         file_format=file_format,
+  392:     )
+> 393:     assert m3["udata"].dtype.kind == "U"
+  394:     assert m3["sdata"].dtype.kind == "U"
+  395:     assert (m["udata"].data == m3["udata"].data).all()
+```
+
+
+## File caput/tests/test_memh5.py - Line 394 - E1101 (no-member)
+
+- `message: Instance of 'MemGroup' has no 'dtype' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  346: def test_to_from__file_unicode(test_file, file_format):
+  ...
+  392:     )
+  393:     assert m3["udata"].dtype.kind == "U"
+> 394:     assert m3["sdata"].dtype.kind == "U"
+  395:     assert (m["udata"].data == m3["udata"].data).all()
+  396:     assert (m["udata"].data == m3["sdata"].data).all()
+```
+
+
+## File caput/tests/test_memh5.py - Line 395 - E1101 (no-member)
+
+- `message: Instance of 'MemGroup' has no 'data' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  346: def test_to_from__file_unicode(test_file, file_format):
+  ...
+  393:     assert m3["udata"].dtype.kind == "U"
+  394:     assert m3["sdata"].dtype.kind == "U"
+> 395:     assert (m["udata"].data == m3["udata"].data).all()
+  396:     assert (m["udata"].data == m3["sdata"].data).all()
+  397:
+```
+
+
+## File caput/tests/test_memh5.py - Line 396 - E1101 (no-member)
+
+- `message: Instance of 'MemGroup' has no 'data' member`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  346: def test_to_from__file_unicode(test_file, file_format):
+  ...
+  394:     assert m3["sdata"].dtype.kind == "U"
+  395:     assert (m["udata"].data == m3["udata"].data).all()
+> 396:     assert (m["udata"].data == m3["sdata"].data).all()
+  397:
+  398:
 ```
 
 
@@ -663,128 +655,7 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-# E1137: unsupported-assignment-operation
-
-## File caput/tests/test_memh5.py - Line 28 - E1137 (unsupported-assignment-operation)
-
-- `message: 'a' does not support item assignment`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  21:     def test_everything(self):
-  ...
-  26:         # Convoluded test to make sure you can't write to it.
-  27:         try:
-> 28:             a["b"] = 6
-  29:         except TypeError:
-  30:             correct = True
-```
-
-
 # W0201: attribute-defined-outside-init
-
-## File caput/_version.py - Line 41 - W0201 (attribute-defined-outside-init)
-
-- `message: Attribute 'VCS' defined outside __init__`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: def get_config():
-  ...
-  39:     # _version.py
-  40:     cfg = VersioneerConfig()
-> 41:     cfg.VCS = "git"
-  42:     cfg.style = "pep440"
-  43:     cfg.tag_prefix = "v"
-```
-
-
-## File caput/_version.py - Line 42 - W0201 (attribute-defined-outside-init)
-
-- `message: Attribute 'style' defined outside __init__`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: def get_config():
-  ...
-  40:     cfg = VersioneerConfig()
-  41:     cfg.VCS = "git"
-> 42:     cfg.style = "pep440"
-  43:     cfg.tag_prefix = "v"
-  44:     cfg.parentdir_prefix = "caput-"
-```
-
-
-## File caput/_version.py - Line 43 - W0201 (attribute-defined-outside-init)
-
-- `message: Attribute 'tag_prefix' defined outside __init__`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: def get_config():
-  ...
-  41:     cfg.VCS = "git"
-  42:     cfg.style = "pep440"
-> 43:     cfg.tag_prefix = "v"
-  44:     cfg.parentdir_prefix = "caput-"
-  45:     cfg.versionfile_source = "caput/_version.py"
-```
-
-
-## File caput/_version.py - Line 44 - W0201 (attribute-defined-outside-init)
-
-- `message: Attribute 'parentdir_prefix' defined outside __init__`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: def get_config():
-  ...
-  42:     cfg.style = "pep440"
-  43:     cfg.tag_prefix = "v"
-> 44:     cfg.parentdir_prefix = "caput-"
-  45:     cfg.versionfile_source = "caput/_version.py"
-  46:     cfg.verbose = False
-```
-
-
-## File caput/_version.py - Line 45 - W0201 (attribute-defined-outside-init)
-
-- `message: Attribute 'versionfile_source' defined outside __init__`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: def get_config():
-  ...
-  43:     cfg.tag_prefix = "v"
-  44:     cfg.parentdir_prefix = "caput-"
-> 45:     cfg.versionfile_source = "caput/_version.py"
-  46:     cfg.verbose = False
-  47:     return cfg
-```
-
-
-## File caput/_version.py - Line 46 - W0201 (attribute-defined-outside-init)
-
-- `message: Attribute 'verbose' defined outside __init__`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: def get_config():
-  ...
-  44:     cfg.parentdir_prefix = "caput-"
-  45:     cfg.versionfile_source = "caput/_version.py"
-> 46:     cfg.verbose = False
-  47:     return cfg
-  48:
-```
-
 
 ## File caput/pipeline.py - Line 964 - W0201 (attribute-defined-outside-init)
 
@@ -1009,18 +880,20 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 136 - W0212 (protected-access)
+## File caput/tests/test_memh5.py - Line 181 - W0212 (protected-access)
 
 - `message: Access to a protected member _data of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  134:     def test_memdisk(self):
-  135:         f = memh5.MemDiskGroup(self.fname)
-> 136:         self.assertEqual(set(f.keys()), set(f._data.keys()))
-  137:         m = memh5.MemDiskGroup(memh5.MemGroup.from_hdf5(self.fname))
-  138:         self.assertEqual(set(m.keys()), set(f.keys()))
+  178: def test_memdisk(test_file, file_format):
+  ...
+  179:     """Test MemDiskGroup."""
+  180:     f = memh5.MemDiskGroup(test_file, file_format=file_format)
+> 181:     assert set(f.keys()) == set(f._data.keys())
+  182:     m = memh5.MemDiskGroup(memh5.MemGroup.from_file(test_file, file_format=file_format))
+  183:     assert set(m.keys()) == set(f.keys())
 ```
 
 
@@ -1041,67 +914,35 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 214 - W0212 (protected-access)
-
-- `message: Access to a protected member _data of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  212:     def test_access(self):
-  213:         d = memh5.BasicCont.from_file(self.fname)
-> 214:         self.assertTrue("history" in d._data)
-  215:         self.assertTrue("index_map" in d._data)
-  216:         self.assertRaises(KeyError, d.__getitem__, "history")
-```
-
-
-## File caput/tests/test_memh5.py - Line 215 - W0212 (protected-access)
-
-- `message: Access to a protected member _data of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  212:     def test_access(self):
-  ...
-  213:         d = memh5.BasicCont.from_file(self.fname)
-  214:         self.assertTrue("history" in d._data)
-> 215:         self.assertTrue("index_map" in d._data)
-  216:         self.assertRaises(KeyError, d.__getitem__, "history")
-  217:         self.assertRaises(KeyError, d.__getitem__, "index_map")
-```
-
-
-## File caput/memh5.py - Line 230 - W0212 (protected-access)
+## File caput/memh5.py - Line 253 - W0212 (protected-access)
 
 - `message: Access to a protected member _from_storage_root of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  227:     def parent(self):
+  250:     def parent(self):
   ...
-  228:         """Parent :class:`MemGroup` that contains this group."""
-  229:         parent_name, _ = posixpath.split(self.name)
-> 230:         return self._group_class._from_storage_root(self._storage_root, parent_name)
-  231:
-  232:     @property
+  251:         """Parent :class:`MemGroup` that contains this group."""
+  252:         parent_name, _ = posixpath.split(self.name)
+> 253:         return self._group_class._from_storage_root(self._storage_root, parent_name)
+  254:
+  255:     @property
 ```
 
 
-## File caput/memh5.py - Line 235 - W0212 (protected-access)
+## File caput/memh5.py - Line 258 - W0212 (protected-access)
 
 - `message: Access to a protected member _from_storage_root of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  233:     def file(self):
-  234:         """Not a file at all but the top most :class:`MemGroup` of the tree."""
-> 235:         return self._group_class._from_storage_root(self._storage_root, "/")
-  236:
-  237:     def __eq__(self, other):
+  256:     def file(self):
+  257:         """Not a file at all but the top most :class:`MemGroup` of the tree."""
+> 258:         return self._group_class._from_storage_root(self._storage_root, "/")
+  259:
+  260:     def __eq__(self, other):
 ```
 
 
@@ -1119,6 +960,40 @@ The recommended approach to using `pylint-ignore` is:
 > 285:         return MPI._typedict[np.dtype(dtype).char]
   286:
   287:
+```
+
+
+## File caput/tests/test_memh5.py - Line 287 - W0212 (protected-access)
+
+- `message: Access to a protected member _data of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  283: def test_access(test_file, file_format):
+  ...
+  285:     test_file = test_file[0]
+  286:     d = memh5.BasicCont.from_file(test_file, file_format=file_format)
+> 287:     assert "history" in d._data
+  288:     assert "index_map" in d._data
+  289:     with pytest.raises(KeyError):
+```
+
+
+## File caput/tests/test_memh5.py - Line 288 - W0212 (protected-access)
+
+- `message: Access to a protected member _data of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+  283: def test_access(test_file, file_format):
+  ...
+  286:     d = memh5.BasicCont.from_file(test_file, file_format=file_format)
+  287:     assert "history" in d._data
+> 288:     assert "index_map" in d._data
+  289:     with pytest.raises(KeyError):
+  290:         d.__getitem__("history")
 ```
 
 
@@ -1207,37 +1082,20 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tod.py - Line 498 - W0212 (protected-access)
+## File caput/tod.py - Line 500 - W0212 (protected-access)
 
 - `message: Access to a protected member _hl of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  305:         def dataset_filter(d):
+  307:         def dataset_filter(d):
   ...
-  496:                 mtype = h5py.h5t.py_create(out_dtype)
-  497:                 mdata = dataset.copy().flat[:]
-> 498:                 mspace = h5py._hl.selections.SimpleSelection(
-  499:                     (mdata.size // out_dtype.itemsize,)
-  500:                 ).id
-```
-
-
-## File caput/tod.py - Line 501 - W0212 (protected-access)
-
-- `message: Access to a protected member _hl of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  305:         def dataset_filter(d):
-  ...
-  499:                     (mdata.size // out_dtype.itemsize,)
-  500:                 ).id
-> 501:                 fspace = h5py._hl.selections.select(
-  502:                     out_dset.shape, out_slice, out_dset.id
-  503:                 ).id
+  498:                 mtype = h5py.h5t.py_create(out_dtype)
+  499:                 mdata = dataset.copy().flat[:]
+> 500:                 mspace = h5py._hl.selections.SimpleSelection(
+  501:                     (mdata.size // out_dtype.itemsize,)
+  502:                 ).id
 ```
 
 
@@ -1255,6 +1113,23 @@ The recommended approach to using `pylint-ignore` is:
 > 502:                 dec = pos.cirs_radec(epoch=t_sf)[1]._degrees
   503:             else:
   504:                 dec = np.array([], dtype=np.float64)
+```
+
+
+## File caput/tod.py - Line 503 - W0212 (protected-access)
+
+- `message: Access to a protected member _hl of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  307:         def dataset_filter(d):
+  ...
+  501:                     (mdata.size // out_dtype.itemsize,)
+  502:                 ).id
+> 503:                 fspace = h5py._hl.selections.select(
+  504:                     out_dset.shape, out_slice, out_dset.id
+  505:                 ).id
 ```
 
 
@@ -1306,23 +1181,6 @@ The recommended approach to using `pylint-ignore` is:
 > 603:                     out = task._pipeline_next()
   604:                 except _PipelineMissingData:
   605:                     if self.tasks.index(task) == 0:
-```
-
-
-## File caput/memh5.py - Line 605 - W0212 (protected-access)
-
-- `message: Access to a protected member _get_storage of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  566:     def create_dataset(
-  ...
-  603:         parent_name, name = posixpath.split(posixpath.join(self.name, name))
-  604:         parent_name = format_abs_path(parent_name)
-> 605:         parent_storage = self.require_group(parent_name)._get_storage()
-  606:
-  607:         # If distributed, synchronise to ensure that we create group collectively
 ```
 
 
@@ -1394,20 +1252,37 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 672 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 719 - W0212 (protected-access)
 
 - `message: Access to a protected member _partition_io of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-30T10:45:30`
+
+```
+  637:     def from_file(
+  ...
+  717:
+  718:         # Split the axis to get the IO size under ~2GB (only if MPI-IO)
+> 719:         split_axis, partitions = dist_arr._partition_io(
+  720:             skip=file_format == fileformats.HDF5 and not fh.is_mpi
+  721:         )
+```
+
+
+## File caput/memh5.py - Line 738 - W0212 (protected-access)
+
+- `message: Access to a protected member _get_storage of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
+  699:     def create_dataset(
   ...
-  670:
-  671:         # Split the axis to get the IO size under ~2GB (only if MPI-IO)
-> 672:         split_axis, partitions = dist_arr._partition_io(skip=(not fh.is_mpi))
-  673:
-  674:         # Check that there are no null slices, otherwise we need to turn off
+  736:         parent_name, name = posixpath.split(posixpath.join(self.name, name))
+  737:         parent_name = format_abs_path(parent_name)
+> 738:         parent_storage = self.require_group(parent_name)._get_storage()
+  739:
+  740:         # If distributed, synchronise to ensure that we create group collectively
 ```
 
 
@@ -1445,360 +1320,360 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 814 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 971 - W0212 (protected-access)
 
 - `message: Access to a protected member _axis of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  787:     def transpose(self, *axes):
+  944:     def transpose(self, *axes):
   ...
-  812:         tdata.local_offset = tuple(self.local_offset[ax] for ax in axes)
-  813:
-> 814:         tdata._axis = list(axes).index(self.axis)
-  815:         tdata._comm = self._comm
-  816:
+  969:         tdata.local_offset = tuple(self.local_offset[ax] for ax in axes)
+  970:
+> 971:         tdata._axis = list(axes).index(self.axis)
+  972:         tdata._comm = self._comm
+  973:
 ```
 
 
-## File caput/mpiarray.py - Line 815 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 972 - W0212 (protected-access)
 
 - `message: Access to a protected member _comm of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
+- `date   : 2021-04-29T14:56:14`
 
 ```
-  787:     def transpose(self, *axes):
+  944:     def transpose(self, *axes):
   ...
-  813:
-  814:         tdata._axis = list(axes).index(self.axis)
-> 815:         tdata._comm = self._comm
-  816:
-  817:         return tdata
+  970:
+  971:         tdata._axis = list(axes).index(self.axis)
+> 972:         tdata._comm = self._comm
+  973:
+  974:         return tdata
 ```
 
 
-## File caput/mpiarray.py - Line 857 - W0212 (protected-access)
-
-- `message: Access to a protected member _axis of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  819:     def reshape(self, *shape):
-  ...
-  855:         rdata = np.ndarray.reshape(self, local_shape)
-  856:
-> 857:         rdata._axis = new_axis
-  858:         rdata._comm = self._comm
-  859:         rdata._local_shape = tuple(local_shape)
-```
-
-
-## File caput/mpiarray.py - Line 858 - W0212 (protected-access)
-
-- `message: Access to a protected member _comm of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  819:     def reshape(self, *shape):
-  ...
-  856:
-  857:         rdata._axis = new_axis
-> 858:         rdata._comm = self._comm
-  859:         rdata._local_shape = tuple(local_shape)
-  860:         rdata._global_shape = tuple(global_shape)
-```
-
-
-## File caput/mpiarray.py - Line 859 - W0212 (protected-access)
-
-- `message: Access to a protected member _local_shape of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  819:     def reshape(self, *shape):
-  ...
-  857:         rdata._axis = new_axis
-  858:         rdata._comm = self._comm
-> 859:         rdata._local_shape = tuple(local_shape)
-  860:         rdata._global_shape = tuple(global_shape)
-  861:         rdata._local_offset = tuple(local_offset)
-```
-
-
-## File caput/mpiarray.py - Line 860 - W0212 (protected-access)
-
-- `message: Access to a protected member _global_shape of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  819:     def reshape(self, *shape):
-  ...
-  858:         rdata._comm = self._comm
-  859:         rdata._local_shape = tuple(local_shape)
-> 860:         rdata._global_shape = tuple(global_shape)
-  861:         rdata._local_offset = tuple(local_offset)
-  862:
-```
-
-
-## File caput/mpiarray.py - Line 861 - W0212 (protected-access)
-
-- `message: Access to a protected member _local_offset of a client class`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  819:     def reshape(self, *shape):
-  ...
-  859:         rdata._local_shape = tuple(local_shape)
-  860:         rdata._global_shape = tuple(global_shape)
-> 861:         rdata._local_offset = tuple(local_offset)
-  862:
-  863:         return rdata
-```
-
-
-## File caput/memh5.py - Line 873 - W0212 (protected-access)
+## File caput/memh5.py - Line 1006 - W0212 (protected-access)
 
 - `message: Access to a protected member _attrs of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  869:     def view(self):
+  1002:     def view(self):
   ...
-  871:         out = cls.__new__(cls)
-  872:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
-> 873:         out._attrs = self._attrs
-  874:         out._data = self._data
-  875:         out.chunks = self.chunks
+  1004:         out = cls.__new__(cls)
+  1005:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
+> 1006:         out._attrs = self._attrs
+  1007:         out._data = self._data
+  1008:         out.chunks = self.chunks
 ```
 
 
-## File caput/memh5.py - Line 874 - W0212 (protected-access)
+## File caput/memh5.py - Line 1007 - W0212 (protected-access)
 
 - `message: Access to a protected member _data of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  869:     def view(self):
+  1002:     def view(self):
   ...
-  872:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
-  873:         out._attrs = self._attrs
-> 874:         out._data = self._data
-  875:         out.chunks = self.chunks
-  876:         out.compression = self.compression
+  1005:         super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
+  1006:         out._attrs = self._attrs
+> 1007:         out._data = self._data
+  1008:         out.chunks = self.chunks
+  1009:         out.compression = self.compression
 ```
 
 
-## File caput/memh5.py - Line 1127 - W0212 (protected-access)
+## File caput/mpiarray.py - Line 1014 - W0212 (protected-access)
+
+- `message: Access to a protected member _axis of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+   976:     def reshape(self, *shape):
+  ...
+  1012:         rdata = np.ndarray.reshape(self, local_shape)
+  1013:
+> 1014:         rdata._axis = new_axis
+  1015:         rdata._comm = self._comm
+  1016:         rdata._local_shape = tuple(local_shape)
+```
+
+
+## File caput/mpiarray.py - Line 1015 - W0212 (protected-access)
+
+- `message: Access to a protected member _comm of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+   976:     def reshape(self, *shape):
+  ...
+  1013:
+  1014:         rdata._axis = new_axis
+> 1015:         rdata._comm = self._comm
+  1016:         rdata._local_shape = tuple(local_shape)
+  1017:         rdata._global_shape = tuple(global_shape)
+```
+
+
+## File caput/mpiarray.py - Line 1016 - W0212 (protected-access)
+
+- `message: Access to a protected member _local_shape of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+   976:     def reshape(self, *shape):
+  ...
+  1014:         rdata._axis = new_axis
+  1015:         rdata._comm = self._comm
+> 1016:         rdata._local_shape = tuple(local_shape)
+  1017:         rdata._global_shape = tuple(global_shape)
+  1018:         rdata._local_offset = tuple(local_offset)
+```
+
+
+## File caput/mpiarray.py - Line 1017 - W0212 (protected-access)
+
+- `message: Access to a protected member _global_shape of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+   976:     def reshape(self, *shape):
+  ...
+  1015:         rdata._comm = self._comm
+  1016:         rdata._local_shape = tuple(local_shape)
+> 1017:         rdata._global_shape = tuple(global_shape)
+  1018:         rdata._local_offset = tuple(local_offset)
+  1019:
+```
+
+
+## File caput/mpiarray.py - Line 1018 - W0212 (protected-access)
+
+- `message: Access to a protected member _local_offset of a client class`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+   976:     def reshape(self, *shape):
+  ...
+  1016:         rdata._local_shape = tuple(local_shape)
+  1017:         rdata._global_shape = tuple(global_shape)
+> 1018:         rdata._local_offset = tuple(local_offset)
+  1019:
+  1020:         return rdata
+```
+
+
+## File caput/memh5.py - Line 1286 - W0212 (protected-access)
 
 - `message: Access to a protected member _data of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1118:     def from_mpi_array(
+  1277:     def from_mpi_array(
   ...
-  1125:         super(MemDatasetDistributed, self).__init__(**kwargs)
-  1126:
-> 1127:         self._data = data
-  1128:         self._chunks = chunks
-  1129:         self._compression = compression
+  1284:         super(MemDatasetDistributed, self).__init__(**kwargs)
+  1285:
+> 1286:         self._data = data
+  1287:         self._chunks = chunks
+  1288:         self._compression = compression
 ```
 
 
-## File caput/memh5.py - Line 1128 - W0212 (protected-access)
+## File caput/memh5.py - Line 1287 - W0212 (protected-access)
 
 - `message: Access to a protected member _chunks of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1118:     def from_mpi_array(
+  1277:     def from_mpi_array(
   ...
-  1126:
-  1127:         self._data = data
-> 1128:         self._chunks = chunks
-  1129:         self._compression = compression
-  1130:         self._compression_opts = compression_opts
+  1285:
+  1286:         self._data = data
+> 1287:         self._chunks = chunks
+  1288:         self._compression = compression
+  1289:         self._compression_opts = compression_opts
 ```
 
 
-## File caput/memh5.py - Line 1129 - W0212 (protected-access)
+## File caput/memh5.py - Line 1288 - W0212 (protected-access)
 
 - `message: Access to a protected member _compression of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1118:     def from_mpi_array(
+  1277:     def from_mpi_array(
   ...
-  1127:         self._data = data
-  1128:         self._chunks = chunks
-> 1129:         self._compression = compression
-  1130:         self._compression_opts = compression_opts
-  1131:         return self
+  1286:         self._data = data
+  1287:         self._chunks = chunks
+> 1288:         self._compression = compression
+  1289:         self._compression_opts = compression_opts
+  1290:         return self
 ```
 
 
-## File caput/memh5.py - Line 1130 - W0212 (protected-access)
+## File caput/memh5.py - Line 1289 - W0212 (protected-access)
 
 - `message: Access to a protected member _compression_opts of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1118:     def from_mpi_array(
+  1277:     def from_mpi_array(
   ...
-  1128:         self._chunks = chunks
-  1129:         self._compression = compression
-> 1130:         self._compression_opts = compression_opts
-  1131:         return self
-  1132:
+  1287:         self._chunks = chunks
+  1288:         self._compression = compression
+> 1289:         self._compression_opts = compression_opts
+  1290:         return self
+  1291:
 ```
 
 
-## File caput/memh5.py - Line 1200 - W0212 (protected-access)
+## File caput/memh5.py - Line 1372 - W0212 (protected-access)
 
 - `message: Access to a protected member _comm of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1198:     def comm(self):
-  1199:         """Reference to the MPI communicator."""
-> 1200:         return self._data._comm
-  1201:
-  1202:     def redistribute(self, axis):
+  1370:     def comm(self):
+  1371:         """Reference to the MPI communicator."""
+> 1372:         return self._data._comm
+  1373:
+  1374:     def redistribute(self, axis):
 ```
 
 
-## File caput/memh5.py - Line 1575 - W0212 (protected-access)
+## File caput/memh5.py - Line 1757 - W0212 (protected-access)
 
 - `message: Access to a protected member _finish_setup of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1469:     def from_file(
+  1645:     def from_file(
   ...
-  1573:
-  1574:         # ... skip the class initialisation, and use a special method
-> 1575:         self._finish_setup()
-  1576:
-  1577:         self._toclose = toclose
+  1755:
+  1756:         # ... skip the class initialisation, and use a special method
+> 1757:         self._finish_setup()
+  1758:
+  1759:         self._toclose = toclose
 ```
 
 
-## File caput/memh5.py - Line 1577 - W0212 (protected-access)
+## File caput/memh5.py - Line 1759 - W0212 (protected-access)
 
 - `message: Access to a protected member _toclose of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1469:     def from_file(
+  1645:     def from_file(
   ...
-  1575:         self._finish_setup()
-  1576:
-> 1577:         self._toclose = toclose
-  1578:         return self
-  1579:
+  1757:         self._finish_setup()
+  1758:
+> 1759:         self._toclose = toclose
+  1760:         return self
+  1761:
 ```
 
 
-## File caput/memh5.py - Line 1697 - W0212 (protected-access)
+## File caput/memh5.py - Line 1881 - W0212 (protected-access)
 
 - `message: Access to a protected member _from_storage_root of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1689:     def create_group(self, name):
+  1873:     def create_group(self, name):
   ...
-  1695:             raise ValueError(msg)
-  1696:         self._data.create_group(path)
-> 1697:         return self._group_class._from_storage_root(self._data, path)
-  1698:
-  1699:     def to_memory(self):
+  1879:             raise ValueError(msg)
+  1880:         self._data.create_group(path)
+> 1881:         return self._group_class._from_storage_root(self._data, path)
+  1882:
+  1883:     def to_memory(self):
 ```
 
 
-## File caput/memh5.py - Line 1969 - W0212 (protected-access)
+## File caput/memh5.py - Line 2174 - W0212 (protected-access)
 
 - `message: Access to a protected member _storage_root of a client class`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1952:     def redistribute(self, dist_axis):
+  2157:     def redistribute(self, dist_axis):
   ...
-  1967:             dist_axis = [dist_axis]
-  1968:
-> 1969:         stack = list(self._data._storage_root.items())
-  1970:
-  1971:         # Crawl over the dataset tree and redistribute any matching datasets.
+  2172:             dist_axis = [dist_axis]
+  2173:
+> 2174:         stack = list(self._data._storage_root.items())
+  2175:
+  2176:         # Crawl over the dataset tree and redistribute any matching datasets.
 ```
 
 
 # W0221: arguments-differ
 
-## File caput/mpiarray.py - Line 865 - W0221 (arguments-differ)
+## File caput/mpiarray.py - Line 1022 - W0221 (arguments-differ)
 
 - `message: Parameters differ from overridden 'copy' method`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  236: class MPIArray(np.ndarray):
+   236: class MPIArray(np.ndarray):
   ...
-  863:         return rdata
-  864:
-> 865:     def copy(self):
-  866:         """Return a copy of the MPIArray.
-  867:
+  1020:         return rdata
+  1021:
+> 1022:     def copy(self):
+  1023:         """Return a copy of the MPIArray.
+  1024:
 ```
 
 
-## File caput/pipeline.py - Line 1549 - W0221 (arguments-differ)
+## File caput/pipeline.py - Line 1562 - W0221 (arguments-differ)
 
 - `message: Parameters differ from overridden 'next' method`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1541: class Input(TaskBase):
+  1554: class Input(TaskBase):
   ...
-  1547:         self._iter = None
-  1548:
-> 1549:     def next(self):
-  1550:         """Pop and return the first element of inputs."""
-  1551:
+  1560:         self._iter = None
+  1561:
+> 1562:     def next(self):
+  1563:         """Pop and return the first element of inputs."""
+  1564:
 ```
 
 
-## File caput/pipeline.py - Line 1581 - W0221 (arguments-differ)
+## File caput/pipeline.py - Line 1594 - W0221 (arguments-differ)
 
 - `message: Parameters differ from overridden 'next' method`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1561: class Output(TaskBase):
+  1574: class Output(TaskBase):
   ...
-  1579:         self.callback = callback
-  1580:
-> 1581:     def next(self, in_):
-  1582:         """Pop and return the first element of inputs."""
-  1583:
+  1592:         self.callback = callback
+  1593:
+> 1594:     def next(self, in_):
+  1595:         """Pop and return the first element of inputs."""
+  1596:
 ```
 
 
@@ -1930,118 +1805,84 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/misc.py - Line 318 - W0511 (fixme)
+## File caput/misc.py - Line 320 - W0511 (fixme)
 
 - `message: TODO: remove this. This was to support a patching of this routine to support Python 2`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  316:
-  317:
-> 318: # TODO: remove this. This was to support a patching of this routine to support Python 2
-  319: # that used to exist in here. This will be removed when all other repos are changed to
-  320: # use the version from `inspect`
+  318:
+  319:
+> 320: # TODO: remove this. This was to support a patching of this routine to support Python 2
+  321: # that used to exist in here. This will be removed when all other repos are changed to
+  322: # use the version from `inspect`
 ```
 
 
-## File caput/tod.py - Line 552 - W0511 (fixme)
+## File caput/tod.py - Line 554 - W0511 (fixme)
 
 - `message: XXX Do something more sophisticated here when/if we aren't getting`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  533: def _copy_non_time_data(
+  535: def _copy_non_time_data(
   ...
-  550:
-  551:     if isinstance(data, list):
-> 552:         # XXX Do something more sophisticated here when/if we aren't getting
-  553:         # all our non-time dependant information from the first entry.
-  554:         data = data[0]
+  552:
+  553:     if isinstance(data, list):
+> 554:         # XXX Do something more sophisticated here when/if we aren't getting
+  555:         # all our non-time dependant information from the first entry.
+  556:         data = data[0]
 ```
 
 
-## File caput/tod.py - Line 563 - W0511 (fixme)
+## File caput/tod.py - Line 565 - W0511 (fixme)
 
 - `message: XXX exclude index map and reverse map.`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  533: def _copy_non_time_data(
+  535: def _copy_non_time_data(
   ...
-  561:     for key, entry in data.items():
-  562:         if key in ["index_map", "reverse_map"]:
-> 563:             # XXX exclude index map and reverse map.
-  564:             continue
-  565:         if memh5.is_group(entry):
+  563:     for key, entry in data.items():
+  564:         if key in ["index_map", "reverse_map"]:
+> 565:             # XXX exclude index map and reverse map.
+  566:             continue
+  567:         if memh5.is_group(entry):
 ```
 
 
-## File caput/tod.py - Line 597 - W0511 (fixme)
+## File caput/tod.py - Line 599 - W0511 (fixme)
 
 - `message: XXX andata still calls these.`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  595:
-  596:
-> 597: # XXX andata still calls these.
+  597:
   598:
-  599:
+> 599: # XXX andata still calls these.
+  600:
+  601:
 ```
 
 
-## File caput/memh5.py - Line 624 - W0511 (fixme)
-
-- `message: XXX In future could accept extra arguments and use them if`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  566:     def create_dataset(
-  ...
-  622:             )
-  623:             raise TypeError(msg)
-> 624:             # XXX In future could accept extra arguments and use them if
-  625:             # writing to disk.
-  626:
-```
-
-
-## File caput/mpiarray.py - Line 635 - W0511 (fixme)
+## File caput/mpiarray.py - Line 667 - W0511 (fixme)
 
 - `message: TODO: with tuning this might not be true. Keep an eye on this.`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
+  637:     def from_file(
   ...
-  633:         """
-  634:         # Don't bother using MPI where the axis is not zero. It's probably just slower.
-> 635:         # TODO: with tuning this might not be true. Keep an eye on this.
-  636:         use_mpi = axis > 0
-  637:
-```
-
-
-## File caput/mpiarray.py - Line 684 - W0511 (fixme)
-
-- `message: TODO: do we need collective IO to read chunked data?`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
-  ...
-  682:         # TODO: change if h5py bug fixed
-  683:         # TODO: better would be a test on contiguous IO size
-> 684:         # TODO: do we need collective IO to read chunked data?
-  685:         use_collective = fh.is_mpi and no_null_slices and axis > 0
-  686:
+  665:         if file_format == fileformats.HDF5:
+  666:             # Don't bother using MPI where the axis is not zero. It's probably just slower.
+> 667:             # TODO: with tuning this might not be true. Keep an eye on this.
+  668:             use_mpi = axis > 0
+  669:
 ```
 
 
@@ -2062,37 +1903,105 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/mpiarray.py - Line 755 - W0511 (fixme)
+## File caput/mpiarray.py - Line 732 - W0511 (fixme)
 
 - `message: TODO: change if h5py bug fixed`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  702:     def to_hdf5(
+  637:     def from_file(
   ...
-  753:         #   collective IO which is usually slow
-  754:         # - unless we want to use compression/chunking
-> 755:         # TODO: change if h5py bug fixed
-  756:         # TODO: better would be a test on contiguous IO size
-  757:         use_collective = (
+  730:             # - we are not distributed over axis=0 as there is no advantage for
+  731:             #   collective IO which is usually slow
+> 732:             # TODO: change if h5py bug fixed
+  733:             # TODO: better would be a test on contiguous IO size
+  734:             # TODO: do we need collective IO to read chunked data?
 ```
 
 
-## File caput/mpiarray.py - Line 756 - W0511 (fixme)
+## File caput/mpiarray.py - Line 733 - W0511 (fixme)
 
 - `message: TODO: better would be a test on contiguous IO size`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  702:     def to_hdf5(
+  637:     def from_file(
   ...
-  754:         # - unless we want to use compression/chunking
-  755:         # TODO: change if h5py bug fixed
-> 756:         # TODO: better would be a test on contiguous IO size
-  757:         use_collective = (
-  758:             fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
+  731:             #   collective IO which is usually slow
+  732:             # TODO: change if h5py bug fixed
+> 733:             # TODO: better would be a test on contiguous IO size
+  734:             # TODO: do we need collective IO to read chunked data?
+  735:             use_collective = fh.is_mpi and no_null_slices and axis > 0
+```
+
+
+## File caput/mpiarray.py - Line 734 - W0511 (fixme)
+
+- `message: TODO: do we need collective IO to read chunked data?`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  637:     def from_file(
+  ...
+  732:             # TODO: change if h5py bug fixed
+  733:             # TODO: better would be a test on contiguous IO size
+> 734:             # TODO: do we need collective IO to read chunked data?
+  735:             use_collective = fh.is_mpi and no_null_slices and axis > 0
+  736:
+```
+
+
+## File caput/memh5.py - Line 757 - W0511 (fixme)
+
+- `message: XXX In future could accept extra arguments and use them if`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  699:     def create_dataset(
+  ...
+  755:             )
+  756:             raise TypeError(msg)
+> 757:             # XXX In future could accept extra arguments and use them if
+  758:             # writing to disk.
+  759:
+```
+
+
+## File caput/mpiarray.py - Line 799 - W0511 (fixme)
+
+- `message: TODO: change if h5py bug fixed`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  758:     def to_hdf5(
+  ...
+  797:         #   collective IO which is usually slow
+  798:         # - unless we want to use compression/chunking
+> 799:         # TODO: change if h5py bug fixed
+  800:         # https://github.com/h5py/h5py/issues/965
+  801:         # TODO: better would be a test on contiguous IO size
+```
+
+
+## File caput/mpiarray.py - Line 801 - W0511 (fixme)
+
+- `message: TODO: better would be a test on contiguous IO size`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+  758:     def to_hdf5(
+  ...
+  799:         # TODO: change if h5py bug fixed
+  800:         # https://github.com/h5py/h5py/issues/965
+> 801:         # TODO: better would be a test on contiguous IO size
+  802:         use_collective = (
+  803:             fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
 ```
 
 
@@ -2130,20 +2039,20 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 1837 - W0511 (fixme)
+## File caput/memh5.py - Line 2042 - W0511 (fixme)
 
 - `message: TODO: this seems like a trememndous hack. I've changed it to a safer version of`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1809:     def history(self):
+  2014:     def history(self):
   ...
-  1835:             out[name] = value
-  1836:
-> 1837:         # TODO: this seems like a trememndous hack. I've changed it to a safer version of
-  1838:         # eval, but this should probably be removed
-  1839:         out["order"] = literal_eval(
+  2040:             out[name] = value
+  2041:
+> 2042:         # TODO: this seems like a trememndous hack. I've changed it to a safer version of
+  2043:         # eval, but this should probably be removed
+  2044:         out["order"] = literal_eval(
 ```
 
 
@@ -2183,20 +2092,20 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 484 - W0613 (unused-argument)
+## File caput/memh5.py - Line 606 - W0613 (unused-argument)
 
 - `message: Unused argument 'hints'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  480:     def to_hdf5(
+  602:     def to_file(
   ...
-  482:         filename,
-  483:         mode="w",
-> 484:         hints=True,
-  485:         convert_attribute_strings=True,
-  486:         convert_dataset_strings=False,
+  604:         filename,
+  605:         mode="w",
+> 606:         hints=True,
+  607:         convert_attribute_strings=True,
+  608:         convert_dataset_strings=False,
 ```
 
 
@@ -2217,120 +2126,58 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 1448 - W0613 (unused-argument)
+## File caput/memh5.py - Line 1624 - W0613 (unused-argument)
 
 - `message: Unused argument 'sel_args'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1253: class MemDiskGroup(_BaseGroup):
+  1425: class MemDiskGroup(_BaseGroup):
   ...
-  1446:
-  1447:     @classmethod
-> 1448:     def _make_selections(cls, sel_args):
-  1449:         """
-  1450:         Overwrite this method in your subclass if you want to implement downselection
+  1622:
+  1623:     @classmethod
+> 1624:     def _make_selections(cls, sel_args):
+  1625:         """
+  1626:         Overwrite this method in your subclass if you want to implement downselection
 ```
 
 
-## File caput/memh5.py - Line 1582 - W0613 (unused-argument)
+## File caput/memh5.py - Line 1765 - W0613 (unused-argument)
 
 - `message: Unused argument 'name'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1253: class MemDiskGroup(_BaseGroup):
+  1425: class MemDiskGroup(_BaseGroup):
   ...
-  1580:     # Methods for manipulating and building the class. #
-  1581:
-> 1582:     def group_name_allowed(self, name):
-  1583:         """Used by subclasses to restrict creation of and access to groups.
-  1584:
+  1763:
+  1764:     @staticmethod
+> 1765:     def group_name_allowed(name):
+  1766:         """Used by subclasses to restrict creation of and access to groups.
+  1767:
 ```
 
 
-## File caput/memh5.py - Line 1606 - W0613 (unused-argument)
+## File caput/memh5.py - Line 1790 - W0613 (unused-argument)
 
 - `message: Unused argument 'name'`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1253: class MemDiskGroup(_BaseGroup):
+  1425: class MemDiskGroup(_BaseGroup):
   ...
-  1604:         return True
-  1605:
-> 1606:     def dataset_name_allowed(self, name):
-  1607:         """Used by subclasses to restrict creation of and access to datasets.
-  1608:
-```
-
-
-## File caput/memh5.py - Line 2405 - W0613 (unused-argument)
-
-- `message: Unused argument 'kwargs'`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  2403:
-  2404: def _distributed_group_to_hdf5_parallel(
-> 2405:     group,
-  2406:     fname,
-  2407:     mode,
-```
-
-
-## File caput/memh5.py - Line 2505 - W0613 (unused-argument)
-
-- `message: Unused argument 'hints'`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  2502: def _distributed_group_from_hdf5(
-  ...
-  2503:     fname,
-  2504:     comm=None,
-> 2505:     hints=True,
-  2506:     convert_dataset_strings=False,
-  2507:     convert_attribute_strings=True,
+  1788:
+  1789:     @staticmethod
+> 1790:     def dataset_name_allowed(name):
+  1791:         """Used by subclasses to restrict creation of and access to datasets.
+  1792:
 ```
 
 
 # W0621: redefined-outer-name
-
-## File caput/tests/test_selection.py - Line 30 - W0621 (redefined-outer-name)
-
-- `message: Redefining name 'container_on_disk' from outer scope (line 16)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  28:
-  29:
-> 30: def test_H5FileSelect(container_on_disk):
-  31:     """Tests that makes hdf5 objects and tests selecting on their axes."""
-  32:
-```
-
-
-## File caput/tests/test_selection_parallel.py - Line 48 - W0621 (redefined-outer-name)
-
-- `message: Redefining name 'container_on_disk' from outer scope (line 20)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  46: @pytest.mark.parametrize("fsel", [slice(1, 8, 2), slice(5, 8, 2)])
-  47: @pytest.mark.parametrize("isel", [slice(1, 4), slice(5, 8, 2)])
-> 48: def test_H5FileSelect_distributed(container_on_disk, fsel, isel):
-  49:     """Load H5 into parallel container while down-selecting axes."""
-  50:
-```
-
 
 ## File caput/tests/test_lint.py - Line 55 - W0621 (redefined-outer-name)
 
@@ -2453,21 +2300,6 @@ The recommended approach to using `pylint-ignore` is:
 > 145:         size = comm.size
   146:
   147:     return partition_list(full_list, rank, size, method=method)
-```
-
-
-## File caput/_version.py - Line 233 - W0621 (redefined-outer-name)
-
-- `message: Redefining name 'run_command' from outer scope (line 71)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  231:
-  232: @register_vcs_handler("git", "pieces_from_vcs")
-> 233: def git_pieces_from_vcs(tag_prefix, root, verbose, run_command=run_command):
-  234:     """Get version from 'git describe' in the root of the source tree.
-  235:
 ```
 
 
@@ -2849,21 +2681,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 16 - C0115 (missing-class-docstring)
-
-- `message: Missing class docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  14:
-  15:
-> 16: class TestMPIArray(unittest.TestCase):
-  17:     def test_construction(self):
-  18:
-```
-
-
 ## File caput/tests/test_lint.py - Line 16 - C0115 (missing-class-docstring)
 
 - `message: Missing class docstring`
@@ -2924,81 +2741,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5_parallel.py - Line 142 - C0115 (missing-class-docstring)
-
-- `message: Missing class docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  140:
-  141:
-> 142: class TestMemDiskGroupDistributed(unittest.TestCase):
-  143:
-  144:     fname = "tmp_parallel_dg.h5"
-```
-
-
-## File caput/tests/test_memh5.py - Line 159 - C0115 (missing-class-docstring)
-
-- `message: Missing class docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  157:
-  158:
-> 159: class TempSubClass(memh5.MemDiskGroup):
-  160:     pass
-  161:
-```
-
-
-## File caput/tests/test_memh5.py - Line 163 - C0115 (missing-class-docstring)
-
-- `message: Missing class docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  161:
-  162:
-> 163: class TestMemDiskGroup(unittest.TestCase):
-  164:
-  165:     fname = "temp_mdg.h5"
-```
-
-
-## File caput/tests/test_memh5_parallel.py - Line 188 - C0115 (missing-class-docstring)
-
-- `message: Missing class docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  186:
-  187:
-> 188: class TestBasicCont(unittest.TestCase):
-  189:     def test_redistribute(self):
-  190:
-```
-
-
-## File caput/tests/test_memh5.py - Line 201 - C0115 (missing-class-docstring)
-
-- `message: Missing class docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  199:
-  200:
-> 201: class TestBasicCont(unittest.TestCase):
-  202:     fname = "test_bc.h5"
-  203:     history_dict = {"foo": {"bar": {"f": 23}, "foo": "bar"}, "bar": 0}
-```
-
-
 # C0116: missing-function-docstring
 
 ## File caput/tests/test_metadata.py - Line 9 - C0116 (missing-function-docstring)
@@ -3031,36 +2773,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_selection.py - Line 16 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T17:04:01`
-
-```
-  14:
-  15: @pytest.fixture
-> 16: def container_on_disk(datasets):
-  17:     fname = "tmp_test_memh5_select.h5"
-  18:     container = MemGroup()
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 17 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  15:
-  16: class TestMPIArray(unittest.TestCase):
-> 17:     def test_construction(self):
-  18:
-  19:         arr = mpiarray.MPIArray((10, 11), axis=1)
-```
-
-
 ## File caput/ephemeris.py - Line 20 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3076,38 +2788,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_selection_parallel.py - Line 20 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T17:04:01`
-
-```
-  18:
-  19: @pytest.fixture(scope="module")
-> 20: def container_on_disk(datasets):
-  21:
-  22:     fname = "tmp_test_memh5_select_parallel.h5"
-```
-
-
-## File caput/tests/test_memh5.py - Line 21 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  18: class TestRODict(unittest.TestCase):
-  ...
-  19:     """Unit tests for ro_dict."""
-  20:
-> 21:     def test_everything(self):
-  22:         a = {"a": 5}
-  23:         a = memh5.ro_dict(a)
-```
-
-
 ## File caput/tests/test_lint.py - Line 21 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3120,23 +2800,6 @@ The recommended approach to using `pylint-ignore` is:
 > 21: def simple_config():
   22:     yield {
   23:         "pipeline": {
-```
-
-
-## File caput/tests/test_memh5_parallel.py - Line 23 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  18: class TestMemGroupDistributed(unittest.TestCase):
-  ...
-  21:     fname = "tmp_test_memh5_distributed.h5"
-  22:
-> 23:     def test_create_dataset(self):
-  24:
-  25:         global_data = np.arange(size * 5 * 10, dtype=np.float32)
 ```
 
 
@@ -3172,23 +2835,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 32 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  16: class TestMPIArray(unittest.TestCase):
-  ...
-  30:         assert arr.local_shape == (10, l)
-  31:
-> 32:     def test_redistribution(self):
-  33:
-  34:         gshape = (1, 11, 2, 14, 3, 4)
-```
-
-
 ## File caput/tests/test_config.py - Line 35 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3221,23 +2867,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 39 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: class TestGroup(unittest.TestCase):
-  ...
-  37:     """Unit tests for MemGroup."""
-  38:
-> 39:     def test_nested(self):
-  40:         root = memh5.MemGroup()
-  41:         l1 = root.create_group("level1")
-```
-
-
 ## File caput/tests/test_config.py - Line 44 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3253,23 +2882,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 47 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: class TestGroup(unittest.TestCase):
-  ...
-  45:         self.assertEqual(root["level1/level2"].name, "/level1/level2")
-  46:
-> 47:     def test_create_dataset(self):
-  48:         g = memh5.MemGroup()
-  49:         data = np.arange(100, dtype=np.float32)
-```
-
-
 ## File caput/tests/test_lint.py - Line 48 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3280,8 +2892,8 @@ The recommended approach to using `pylint-ignore` is:
   46:
   47:
 > 48: def write_to_file(config_json):
-  49:     temp = tempfile.NamedTemporaryFile(mode="w+t", delete=False)
-  50:     yaml.safe_dump(config_json, temp, encoding="utf-8")
+  49:     with tempfile.NamedTemporaryFile(mode="w+t", delete=False) as temp:
+  50:         yaml.safe_dump(config_json, temp, encoding="utf-8")
 ```
 
 
@@ -3317,23 +2929,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 51 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  16: class TestMPIArray(unittest.TestCase):
-  ...
-  49:         assert (arr3 == garr[:, :, :, :, :, s2:e2]).view(np.ndarray).all()
-  50:
-> 51:     def test_gather(self):
-  52:
-  53:         rank = mpiutil.rank
-```
-
-
 ## File caput/tests/test_config.py - Line 52 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3361,23 +2956,6 @@ The recommended approach to using `pylint-ignore` is:
 > 53: def test_transit_array():
   54:     # Do a simple test of transit_RA in an array. Use the fact that the RA
   55:     # advances predictably to predict the answers
-```
-
-
-## File caput/tests/test_memh5.py - Line 53 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: class TestGroup(unittest.TestCase):
-  ...
-  51:         self.assertTrue(np.allclose(data, g["data"]))
-  52:
-> 53:     def test_recursive_create(self):
-  54:         g = memh5.MemGroup()
-  55:         self.assertRaises(ValueError, g.create_group, "")
 ```
 
 
@@ -3413,23 +2991,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5_parallel.py - Line 59 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  18: class TestMemGroupDistributed(unittest.TestCase):
-  ...
-  57:         self.assertTrue((g["data"][rank * 5] == local_data[0]).all())
-  58:
-> 59:     def test_io(self):
-  60:
-  61:         # Create distributed memh5 object
-```
-
-
 ## File caput/tests/test_config.py - Line 61 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3457,23 +3018,6 @@ The recommended approach to using `pylint-ignore` is:
 > 62: def test_unknown_task(simple_config):
   63:     test_runner = CliRunner()
   64:     simple_config["pipeline"]["tasks"][0]["type"] = "what.was.the.name.of.my.Task"
-```
-
-
-## File caput/tests/test_memh5.py - Line 64 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  36: class TestGroup(unittest.TestCase):
-  ...
-  62:         self.assertEqual(gd.name, "/a/b/c/d")
-  63:
-> 64:     def test_recursive_create_dataset(self):
-  65:         g = memh5.MemGroup()
-  66:         data = np.arange(10)
 ```
 
 
@@ -3521,23 +3065,6 @@ The recommended approach to using `pylint-ignore` is:
 > 71: def test_pickle():
   72:
   73:     person = PersonWithPet()
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 74 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  16: class TestMPIArray(unittest.TestCase):
-  ...
-  72:             assert ga is None
-  73:
-> 74:     def test_wrap(self):
-  75:
-  76:         ds = mpiarray.MPIArray((10, 17))
 ```
 
 
@@ -3601,57 +3128,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 95 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  81: class TestH5Files(unittest.TestCase):
-  ...
-  93:             l2.attrs["small"] = np.arange(3)
-  94:
-> 95:     def assertGroupsEqual(self, a, b):
-  96:         self.assertEqual(list(a.keys()), list(b.keys()))
-  97:         self.assertAttrsEqual(a.attrs, b.attrs)
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 98 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-   96:                 mpiarray.MPIArray.wrap(df, axis=0)
-   97:
->  98:     def test_io(self):
-   99:
-  100:         import h5py
-```
-
-
-## File caput/tests/test_memh5.py - Line 107 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   81: class TestH5Files(unittest.TestCase):
-  ...
-  105:                 self.assertGroupsEqual(this_a, this_b)
-  106:
-> 107:     def assertAttrsEqual(self, a, b):
-  108:         self.assertEqual(list(a.keys()), list(b.keys()))
-  109:         for key in a.keys():
-```
-
-
 ## File caput/tests/test_config.py - Line 108 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3682,23 +3158,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 117 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   81: class TestH5Files(unittest.TestCase):
-  ...
-  115:                 self.assertEqual(this_a, this_b)
-  116:
-> 117:     def test_h5_sanity(self):
-  118:         with h5py.File(self.fname, "r") as f:
-  119:             self.assertGroupsEqual(f, f)
-```
-
-
 ## File caput/tests/test_time.py - Line 127 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3711,23 +3170,6 @@ The recommended approach to using `pylint-ignore` is:
 > 127: def test_lsa_tra():
   128:     # Near the epoch transit RA and LRA should be extremely close
   129:
-```
-
-
-## File caput/tests/test_memh5.py - Line 134 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   81: class TestH5Files(unittest.TestCase):
-  ...
-  132:             self.assertGroupsEqual(f, m)
-  133:
-> 134:     def test_memdisk(self):
-  135:         f = memh5.MemDiskGroup(self.fname)
-  136:         self.assertEqual(set(f.keys()), set(f._data.keys()))
 ```
 
 
@@ -3758,23 +3200,6 @@ The recommended approach to using `pylint-ignore` is:
 > 140: def test_reverse_lsa():
   141:     # Check that the lsa_to_unix routine correctly inverts a call to
   142:     # unix_to_lsa
-```
-
-
-## File caput/tests/test_memh5_parallel.py - Line 146 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  142: class TestMemDiskGroupDistributed(unittest.TestCase):
-  ...
-  144:     fname = "tmp_parallel_dg.h5"
-  145:
-> 146:     def test_misc(self):
-  147:
-  148:         dg = memh5.MemDiskGroup(distributed=True)
 ```
 
 
@@ -3842,23 +3267,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 167 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  163: class TestMemDiskGroup(unittest.TestCase):
-  ...
-  165:     fname = "temp_mdg.h5"
-  166:
-> 167:     def test_io(self):
-  168:
-  169:         # Save a subclass of MemDiskGroup
-```
-
-
 ## File caput/mpiutil.py - Line 169 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3871,23 +3279,6 @@ The recommended approach to using `pylint-ignore` is:
 > 169: def bcast(data, root=0, comm=_comm):
   170:     if comm is not None and comm.size > 1:
   171:         return comm.bcast(data, root=root)
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 172 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-  170:             os.remove(fname)
-  171:
-> 172:     def test_transpose(self):
-  173:
-  174:         gshape = (1, 11, 2, 14)
 ```
 
 
@@ -3906,21 +3297,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5_parallel.py - Line 189 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  187:
-  188: class TestBasicCont(unittest.TestCase):
-> 189:     def test_redistribute(self):
-  190:
-  191:         g = memh5.BasicCont(distributed=True)
-```
-
-
 ## File caput/tests/test_time.py - Line 205 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -3933,40 +3309,6 @@ The recommended approach to using `pylint-ignore` is:
 > 205: def test_lsd_array():
   206:
   207:     dt = datetime(2025, 1, 1, 12, 0, 0)
-```
-
-
-## File caput/tests/test_memh5.py - Line 212 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  201: class TestBasicCont(unittest.TestCase):
-  ...
-  210:         d.to_disk(self.fname)
-  211:
-> 212:     def test_access(self):
-  213:         d = memh5.BasicCont.from_file(self.fname)
-  214:         self.assertTrue("history" in d._data)
-```
-
-
-## File caput/tests/test_memh5.py - Line 224 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  201: class TestBasicCont(unittest.TestCase):
-  ...
-  222:         )
-  223:
-> 224:     def test_history(self):
-  225:         # Check HDF5 file for config- and versiondump
-  226:         with h5py.File(self.fname, "r") as f:
 ```
 
 
@@ -4016,23 +3358,6 @@ The recommended approach to using `pylint-ignore` is:
 > 232:     def test_1d_mwm_int(self):
   233:         values = [0, 0, 7, 0, 9, 42, 0, 1, 9, 1]
   234:         weights = [0, 7, 1, 23, 0, 4, 7, 8, 9, 0]
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 233 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-  231:         assert arr4.axis == 2
-  232:
-> 233:     def test_reshape(self):
-  234:
-  235:         gshape = (1, 11, 2, 14)
 ```
 
 
@@ -4097,23 +3422,6 @@ The recommended approach to using `pylint-ignore` is:
 > 250: def test_string_to_datetime():
   251:     dt = ctime.timestr_to_datetime("20140421T163312Z_stone")
   252:     ans = datetime(2014, 4, 21, 16, 33, 12)
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 258 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-  256:         assert arr2.axis == 0
-  257:
-> 258:     def test_global_getslice(self):
-  259:
-  260:         rank = mpiutil.rank
 ```
 
 
@@ -4183,23 +3491,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_memh5.py - Line 298 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  249: class TestUnicodeDataset(unittest.TestCase):
-  ...
-  296:         self.assertTrue((m["udata"].data == m3["sdata"].data).all())
-  297:
-> 298:     def test_failure(self):
-  299:         # Test that we fail when trying to write a non ASCII character
-  300:
-```
-
-
 ## File caput/tests/test_time.py - Line 302 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
@@ -4244,23 +3535,6 @@ The recommended approach to using `pylint-ignore` is:
 > 320: def test_era_known():
   321:     # Check an ERA calculated by caput.time against one calculated by
   322:     # http://dc.zah.uni-heidelberg.de/apfs/times/q/form (note the latter
-```
-
-
-## File caput/tests/test_memh5.py - Line 320 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  315: class TestMapJSON(unittest.TestCase):
-  ...
-  318:     fname = "tmp_test_json.h5"
-  319:
-> 320:     def test_to_from_hdf5(self):
-  321:         json_prefix = "!!_memh5_json:"
-  322:         data = {"foo": {"bar": [1, 2, 3], "fu": "1"}}
 ```
 
 
@@ -4310,23 +3584,6 @@ The recommended approach to using `pylint-ignore` is:
 > 348:     def test_2d_mwm(self):
   349:         values = np.random.rand(14, 8)
   350:         weights = np.random.rand(14, 8)
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 349 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-  347:         assert dslice.local_shape == (1, 136, 41)
-  348:
-> 349:     def test_global_setslice(self):
-  350:
-  351:         rank = mpiutil.rank
 ```
 
 
@@ -4439,292 +3696,143 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 869 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1002 - C0116 (missing-function-docstring)
+
+- `message: Missing function or method docstring`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-04-29T14:56:14`
+
+```
+   984: class MemDataset(_MemObjMixin):
+  ...
+  1000:         return MemGroup
+  1001:
+> 1002:     def view(self):
+  1003:         cls = self.__class__
+  1004:         out = cls.__new__(cls)
+```
+
+
+## File caput/memh5.py - Line 1024 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  851: class MemDataset(_MemObjMixin):
+   984: class MemDataset(_MemObjMixin):
   ...
-  867:         return MemGroup
-  868:
-> 869:     def view(self):
-  870:         cls = self.__class__
-  871:         out = cls.__new__(cls)
+  1022:         return self._attrs
+  1023:
+> 1024:     def resize(self):
+  1025:         # h5py datasets reshape() is different from numpy reshape.
+  1026:         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
 ```
 
 
-## File caput/memh5.py - Line 891 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1277 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  851: class MemDataset(_MemObjMixin):
+  1237: class MemDatasetDistributed(MemDataset):
   ...
-  889:         return self._attrs
-  890:
-> 891:     def resize(self):
-  892:         # h5py datasets reshape() is different from numpy reshape.
-  893:         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
+  1275:
+  1276:     @classmethod
+> 1277:     def from_mpi_array(
+  1278:         cls, data, chunks=None, compression=None, compression_opts=None, **kwargs
+  1279:     ):
 ```
 
 
-## File caput/memh5.py - Line 897 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1293 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  851: class MemDataset(_MemObjMixin):
+  1237: class MemDatasetDistributed(MemDataset):
   ...
-  895:
-  896:     @property
-> 897:     def shape(self):
-  898:         raise NotImplementedError("Not implemented in base class.")
-  899:
+  1291:
+  1292:     @property
+> 1293:     def common(self):
+  1294:         return False
+  1295:
 ```
 
 
-## File caput/memh5.py - Line 901 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1297 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  851: class MemDataset(_MemObjMixin):
+  1237: class MemDatasetDistributed(MemDataset):
   ...
-  899:
-  900:     @property
-> 901:     def dtype(self):
-  902:         raise NotImplementedError("Not implemented in base class.")
-  903:
+  1295:
+  1296:     @property
+> 1297:     def distributed(self):
+  1298:         return True
+  1299:
 ```
 
 
-## File caput/memh5.py - Line 905 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1301 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  851: class MemDataset(_MemObjMixin):
+  1237: class MemDatasetDistributed(MemDataset):
   ...
-  903:
-  904:     @property
-> 905:     def chunks(self):
-  906:         raise NotImplementedError("Not implemented in base class.")
-  907:
+  1299:
+  1300:     @property
+> 1301:     def data(self):
+  1302:         return self._data
+  1303:
 ```
 
 
-## File caput/memh5.py - Line 909 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1305 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  851: class MemDataset(_MemObjMixin):
+  1237: class MemDatasetDistributed(MemDataset):
   ...
-  907:
-  908:     @property
-> 909:     def compression(self):
-  910:         raise NotImplementedError("Not implemented in base class.")
-  911:
+  1303:
+  1304:     @property
+> 1305:     def local_data(self):
+  1306:         return self._data.local_array
+  1307:
 ```
 
 
-## File caput/memh5.py - Line 913 - C0116 (missing-function-docstring)
+## File caput/memh5.py - Line 1331 - C0116 (missing-function-docstring)
 
 - `message: Missing function or method docstring`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  851: class MemDataset(_MemObjMixin):
+  1237: class MemDatasetDistributed(MemDataset):
   ...
-  911:
-  912:     @property
-> 913:     def compression_opts(self):
-  914:         raise NotImplementedError("Not implemented in base class.")
-  915:
-```
-
-
-## File caput/memh5.py - Line 1118 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1116:
-  1117:     @classmethod
-> 1118:     def from_mpi_array(
-  1119:         cls, data, chunks=None, compression=None, compression_opts=None, **kwargs
-  1120:     ):
-```
-
-
-## File caput/memh5.py - Line 1134 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1132:
-  1133:     @property
-> 1134:     def common(self):
-  1135:         return False
-  1136:
-```
-
-
-## File caput/memh5.py - Line 1138 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1136:
-  1137:     @property
-> 1138:     def distributed(self):
-  1139:         return True
-  1140:
-```
-
-
-## File caput/memh5.py - Line 1142 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1140:
-  1141:     @property
-> 1142:     def data(self):
-  1143:         return self._data
-  1144:
-```
-
-
-## File caput/memh5.py - Line 1146 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1144:
-  1145:     @property
-> 1146:     def local_data(self):
-  1147:         return self._data.local_array
-  1148:
-```
-
-
-## File caput/memh5.py - Line 1154 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1152:
-  1153:     @property
-> 1154:     def global_shape(self):
-  1155:         return self._data.global_shape
-  1156:
-```
-
-
-## File caput/memh5.py - Line 1158 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1156:
-  1157:     @property
-> 1158:     def local_shape(self):
-  1159:         return self._data.local_shape
-  1160:
-```
-
-
-## File caput/memh5.py - Line 1162 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1160:
-  1161:     @property
-> 1162:     def local_offset(self):
-  1163:         return self._data.local_offset
-  1164:
-```
-
-
-## File caput/memh5.py - Line 1194 - C0116 (missing-function-docstring)
-
-- `message: Missing function or method docstring`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1192:
-  1193:     @property
-> 1194:     def distributed_axis(self):
-  1195:         return self._data.axis
-  1196:
+  1329:
+  1330:     @property
+> 1331:     def local_offset(self):
+  1332:         return self._data.local_offset
+  1333:
 ```
 
 
 # C0302: too-many-lines
-
-## File caput/mpiarray.py - Line 1 - C0302 (too-many-lines)
-
-- `message: Too many lines in module (1148/1000)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-> 1: """
-  2: An array class for containing MPI distributed array.
-  3:
-```
-
 
 ## File caput/time.py - Line 1 - C0302 (too-many-lines)
 
@@ -4739,9 +3847,22 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
+## File caput/mpiarray.py - Line 1 - C0302 (too-many-lines)
+
+- `message: Too many lines in module (1305/1000)`
+- `author : Rick Nitsche <rick@phas.ubc.ca>`
+- `date   : 2021-01-27T15:38:40`
+
+```
+> 1: """
+  2: An array class for containing MPI distributed array.
+  3:
+```
+
+
 ## File caput/pipeline.py - Line 1 - C0302 (too-many-lines)
 
-- `message: Too many lines in module (1625/1000)`
+- `message: Too many lines in module (1638/1000)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
@@ -4754,7 +3875,7 @@ The recommended approach to using `pylint-ignore` is:
 
 ## File caput/memh5.py - Line 1 - C0302 (too-many-lines)
 
-- `message: Too many lines in module (2845/1000)`
+- `message: Too many lines in module (3186/1000)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
@@ -4783,72 +3904,6 @@ The recommended approach to using `pylint-ignore` is:
 
 
 # R0201: no-self-use
-
-## File caput/tests/test_mpiarray.py - Line 17 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  15:
-  16: class TestMPIArray(unittest.TestCase):
-> 17:     def test_construction(self):
-  18:
-  19:         arr = mpiarray.MPIArray((10, 11), axis=1)
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 32 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  16: class TestMPIArray(unittest.TestCase):
-  ...
-  30:         assert arr.local_shape == (10, l)
-  31:
-> 32:     def test_redistribution(self):
-  33:
-  34:         gshape = (1, 11, 2, 14, 3, 4)
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 51 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  16: class TestMPIArray(unittest.TestCase):
-  ...
-  49:         assert (arr3 == garr[:, :, :, :, :, s2:e2]).view(np.ndarray).all()
-  50:
-> 51:     def test_gather(self):
-  52:
-  53:         rank = mpiutil.rank
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 98 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-   96:                 mpiarray.MPIArray.wrap(df, axis=0)
-   97:
->  98:     def test_io(self):
-   99:
-  100:         import h5py
-```
-
 
 ## File caput/tests/test_moving_weighted_median.py - Line 135 - R0201 (no-self-use)
 
@@ -4899,23 +3954,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 172 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-  170:             os.remove(fname)
-  171:
-> 172:     def test_transpose(self):
-  173:
-  174:         gshape = (1, 11, 2, 14)
-```
-
-
 ## File caput/tests/test_moving_weighted_median.py - Line 225 - R0201 (no-self-use)
 
 - `message: Method could be a function`
@@ -4950,23 +3988,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 233 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-  231:         assert arr4.axis == 2
-  232:
-> 233:     def test_reshape(self):
-  234:
-  235:         gshape = (1, 11, 2, 14)
-```
-
-
 ## File caput/tests/test_moving_weighted_median.py - Line 239 - R0201 (no-self-use)
 
 - `message: Method could be a function`
@@ -4998,23 +4019,6 @@ The recommended approach to using `pylint-ignore` is:
 > 247:     def test_1d_mwm_big(self):
   248:         N = 100
   249:         values = np.random.random_sample(N)
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 258 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-  256:         assert arr2.axis == 0
-  257:
-> 258:     def test_global_getslice(self):
-  259:
-  260:         rank = mpiutil.rank
 ```
 
 
@@ -5120,23 +4124,6 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tests/test_mpiarray.py - Line 349 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-  347:         assert dslice.local_shape == (1, 136, 41)
-  348:
-> 349:     def test_global_setslice(self):
-  350:
-  351:         rank = mpiutil.rank
-```
-
-
 ## File caput/tests/test_moving_weighted_median.py - Line 357 - R0201 (no-self-use)
 
 - `message: Method could be a function`
@@ -5188,20 +4175,20 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/memh5.py - Line 891 - R0201 (no-self-use)
+## File caput/memh5.py - Line 1024 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  851: class MemDataset(_MemObjMixin):
+   984: class MemDataset(_MemObjMixin):
   ...
-  889:         return self._attrs
-  890:
-> 891:     def resize(self):
-  892:         # h5py datasets reshape() is different from numpy reshape.
-  893:         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
+  1022:         return self._attrs
+  1023:
+> 1024:     def resize(self):
+  1025:         # h5py datasets reshape() is different from numpy reshape.
+  1026:         msg = "Dataset reshaping not allowed. Perhapse make an new array view."
 ```
 
 
@@ -5273,165 +4260,24 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/pipeline.py - Line 1490 - R0201 (no-self-use)
+## File caput/pipeline.py - Line 1407 - R0201 (no-self-use)
 
 - `message: Method could be a function`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1453: class BasicContMixin:
+  1378: class H5IOMixin:
   ...
-  1488:         )
-  1489:
-> 1490:     def write_output(self, filename, output):
-  1491:         """Method for writing hdf5 output.
-  1492:
-```
-
-
-## File caput/memh5.py - Line 1582 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1253: class MemDiskGroup(_BaseGroup):
-  ...
-  1580:     # Methods for manipulating and building the class. #
-  1581:
-> 1582:     def group_name_allowed(self, name):
-  1583:         """Used by subclasses to restrict creation of and access to groups.
-  1584:
-```
-
-
-## File caput/memh5.py - Line 1606 - R0201 (no-self-use)
-
-- `message: Method could be a function`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1253: class MemDiskGroup(_BaseGroup):
-  ...
-  1604:         return True
-  1605:
-> 1606:     def dataset_name_allowed(self, name):
-  1607:         """Used by subclasses to restrict creation of and access to datasets.
-  1608:
-```
-
-
-# R0901: too-many-ancestors
-
-## File caput/tod.py - Line 20 - R0901 (too-many-ancestors)
-
-- `message: Too many ancestors (10/7)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  18:
-  19:
-> 20: class TOData(memh5.BasicCont):
-  21:     """Time ordered data.
-  22:
-```
-
-
-## File caput/tests/test_memh5.py - Line 159 - R0901 (too-many-ancestors)
-
-- `message: Too many ancestors (9/7)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  157:
-  158:
-> 159: class TempSubClass(memh5.MemDiskGroup):
-  160:     pass
-  161:
-```
-
-
-## File caput/memh5.py - Line 358 - R0901 (too-many-ancestors)
-
-- `message: Too many ancestors (8/7)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  356:
-  357:
-> 358: class MemGroup(_BaseGroup):
-  359:     """
-  360:     In memory implementation of the :class:`h5py.Group`.
-```
-
-
-## File caput/config.py - Line 492 - R0901 (too-many-ancestors)
-
-- `message: Too many ancestors (10/7)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  490:
-  491:
-> 492: class SafeLineLoader(SafeLoader):
-  493:     """
-  494:     YAML loader that tracks line numbers.
-```
-
-
-## File caput/memh5.py - Line 1253 - R0901 (too-many-ancestors)
-
-- `message: Too many ancestors (8/7)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1251:
-  1252:
-> 1253: class MemDiskGroup(_BaseGroup):
-  1254:     """Container whose data may either be stored on disk or in memory.
-  1255:
-```
-
-
-## File caput/memh5.py - Line 1778 - R0901 (too-many-ancestors)
-
-- `message: Too many ancestors (9/7)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1776:
-  1777:
-> 1778: class BasicCont(MemDiskGroup):
-  1779:     """Basic high level data container.
-  1780:
+  1405:         return memh5.MemGroup.from_hdf5(filename, mode="r")
+  1406:
+> 1407:     def write_output(self, filename, output):
+  1408:         """Method for writing hdf5 output.
+  1409:
 ```
 
 
 # R0903: too-few-public-methods
-
-## File caput/_version.py - Line 32 - R0903 (too-few-public-methods)
-
-- `message: Too few public methods (0/2)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  30:
-  31:
-> 32: class VersioneerConfig:
-  33:     """Container for Versioneer configuration parameters."""
-  34:
-```
-
 
 ## File caput/mpiutil.py - Line 69 - R0903 (too-few-public-methods)
 
@@ -5445,743 +4291,6 @@ The recommended approach to using `pylint-ignore` is:
 > 69: class _close_message:
   70:     def __repr__(self):
   71:         return "<Close message>"
-```
-
-
-# R0912: too-many-branches
-
-## File caput/mpiarray.py - Line 115 - R0912 (too-many-branches)
-
-- `message: Too many branches (15/12)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  105: class _global_resolver:
-  ...
-  113:         self.length = array.global_shape[self.axis]
-  114:
-> 115:     def _resolve_slice(self, slobj):
-  116:         # Transforms a numpy basic slice on the global arrays into a fully
-  117:         # fleshed out slice tuple referencing the positions in the local arrays.
-```
-
-
-## File caput/scripts/runner.py - Line 175 - R0912 (too-many-branches)
-
-- `message: Too many branches (18/12)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  115: def run(configfile, loglevel, profile, profiler):
-  ...
-  173: @click.option(
-  174:     "--lint/--nolint",
-> 175:     default=True,
-  176:     help="Check the pipeline for errors before submitting it.",
-  177: )
-```
-
-
-## File caput/tod.py - Line 248 - R0912 (too-many-branches)
-
-- `message: Too many branches (37/12)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  246:
-  247:
-> 248: def concatenate(
-  249:     data_list,
-  250:     out_group=None,
-```
-
-
-## File caput/mpiarray.py - Line 452 - R0912 (too-many-branches)
-
-- `message: Too many branches (15/12)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  450:         return dist_arr
-  451:
-> 452:     def redistribute(self, axis):
-  453:         """Change the axis that the array is distributed over.
-  454:
-```
-
-
-## File caput/memh5.py - Line 566 - R0912 (too-many-branches)
-
-- `message: Too many branches (22/12)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  358: class MemGroup(_BaseGroup):
-  ...
-  564:         return self[name]
-  565:
-> 566:     def create_dataset(
-  567:         self,
-  568:         name,
-```
-
-
-## File caput/pipeline.py - Line 686 - R0912 (too-many-branches)
-
-- `message: Too many branches (13/12)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  460: class Manager(config.Reader):
-  ...
-  684:                         )
-  685:
-> 686:     def _setup_task(self, task_spec):
-  687:         """Set up a pipeline task from the spec given in the tasks list."""
-  688:
-```
-
-
-## File caput/memh5.py - Line 2272 - R0912 (too-many-branches)
-
-- `message: Too many branches (17/12)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  2270:
-  2271:
-> 2272: def _distributed_group_to_hdf5_serial(
-  2273:     group,
-  2274:     fname,
-```
-
-
-# R0913: too-many-arguments
-
-## File caput/tod.py - Line 42 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (7/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  20: class TOData(memh5.BasicCont):
-  ...
-  40:
-  41:     @classmethod
-> 42:     def from_mult_files(
-  43:         cls,
-  44:         files,
-```
-
-
-## File caput/ephemeris.py - Line 46 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (7/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  44:
-  45:
-> 46: def source_transit(obs, source, t0, t1=None, step=0.2, lower=False, return_dec=False):
-  47:     """Find the transit times of the given source in an interval.
-  48:
-```
-
-
-## File caput/_version.py - Line 71 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  69:
-  70:
-> 71: def run_command(commands, args, cwd=None, verbose=False, hide_stderr=False, env=None):
-  72:     """Call the given command(s)."""
-  73:     assert isinstance(commands, list)
-```
-
-
-## File caput/interferometry.py - Line 79 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  77:
-  78:
-> 79: def projected_distance(ha, lat, dec, x, y, z=0.0):
-  80:     """Return the distance project in the direction of a source.
-  81:
-```
-
-
-## File caput/interferometry.py - Line 112 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  110:
-  111:
-> 112: def fringestop_phase(ha, lat, dec, u, v, w=0.0):
-  113:     """Return the phase required to fringestop. All angle inputs are radians.
-  114:
-```
-
-
-## File caput/ephemeris.py - Line 122 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  120:
-  121:
-> 122: def source_rise_set(obs, source, t0, t1=None, step=0.2, diameter=0.0):
-  123:     """Find all times a sources rises or sets in an interval.
-  124:
-```
-
-
-## File caput/time.py - Line 218 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  182: class Observer:
-  ...
-  216:     lsd_start_day = config.utc_time(default=datetime(2000, 1, 1, 11, 58, 56))
-  217:
-> 218:     def __init__(self, lon=0.0, lat=0.0, alt=0.0, lsd_start=None, sf_wrapper=None):
-  219:
-  220:         self.longitude = lon
-```
-
-
-## File caput/tod.py - Line 248 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (8/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  246:
-  247:
-> 248: def concatenate(
-  249:     data_list,
-  250:     out_group=None,
-```
-
-
-## File caput/memh5.py - Line 405 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (8/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  358: class MemGroup(_BaseGroup):
-  ...
-  403:
-  404:     @classmethod
-> 405:     def from_hdf5(
-  406:         cls,
-  407:         filename,
-```
-
-
-## File caput/time.py - Line 440 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (7/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  182: class Observer:
-  ...
-  438:         return ra
-  439:
-> 440:     def transit_times(
-  441:         self, source, t0, t1=None, step=None, lower=False, return_dec=False
-  442:     ):
-```
-
-
-## File caput/memh5.py - Line 480 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  358: class MemGroup(_BaseGroup):
-  ...
-  478:         return self
-  479:
-> 480:     def to_hdf5(
-  481:         self,
-  482:         filename,
-```
-
-
-## File caput/time.py - Line 510 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  182: class Observer:
-  ...
-  508:             return t_unix
-  509:
-> 510:     def rise_set_times(self, source, t0, t1=None, step=None, diameter=0.0):
-  511:         """Find all times a sources rises or sets in an interval.
-  512:
-```
-
-
-## File caput/time.py - Line 546 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  182: class Observer:
-  ...
-  544:         )
-  545:
-> 546:     def rise_times(self, source, t0, t1=None, step=None, diameter=0.0):
-  547:         """Find all times a sources rises in an interval.
-  548:
-```
-
-
-## File caput/memh5.py - Line 566 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (10/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  358: class MemGroup(_BaseGroup):
-  ...
-  564:         return self[name]
-  565:
-> 566:     def create_dataset(
-  567:         self,
-  568:         name,
-```
-
-
-## File caput/time.py - Line 578 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  182: class Observer:
-  ...
-  576:         )[0]
-  577:
-> 578:     def set_times(self, source, t0, t1=None, step=None, diameter=0.0):
-  579:         """Find all times a sources sets in an interval.
-  580:
-```
-
-
-## File caput/mpiarray.py - Line 610 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  608:
-  609:     @classmethod
-> 610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
-  611:         """Read MPIArray from an HDF5 dataset in parallel.
-  612:
-```
-
-
-## File caput/time.py - Line 610 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (8/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  182: class Observer:
-  ...
-  608:         )[0]
-  609:
-> 610:     def _sr_work(self, source, t0, t1, step, diameter, skip_rise=False, skip_set=False):
-  611:         # A work routine factoring out common functionality
-  612:
-```
-
-
-## File caput/mpiarray.py - Line 702 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (7/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  700:         return dist_arr
-  701:
-> 702:     def to_hdf5(
-  703:         self,
-  704:         f,
-```
-
-
-## File caput/memh5.py - Line 947 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  931: class MemDatasetCommon(MemDataset):
-  ...
-  945:     """
-  946:
-> 947:     def __init__(
-  948:         self,
-  949:         shape,
-```
-
-
-## File caput/memh5.py - Line 1099 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (8/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1078: class MemDatasetDistributed(MemDataset):
-  ...
-  1097:     """
-  1098:
-> 1099:     def __init__(
-  1100:         self,
-  1101:         shape,
-```
-
-
-## File caput/time.py - Line 1116 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1114:
-  1115:
-> 1116: def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kwargs):
-  1117:     """Find all roots of function f, within the interval [x0, x1].
-  1118:
-```
-
-
-## File caput/memh5.py - Line 1469 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (8/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1253: class MemDiskGroup(_BaseGroup):
-  ...
-  1467:
-  1468:     @classmethod
-> 1469:     def from_file(
-  1470:         cls,
-  1471:         file_,
-```
-
-
-## File caput/memh5.py - Line 2272 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  2270:
-  2271:
-> 2272: def _distributed_group_to_hdf5_serial(
-  2273:     group,
-  2274:     fname,
-```
-
-
-## File caput/memh5.py - Line 2404 - R0913 (too-many-arguments)
-
-- `message: Too many arguments (6/5)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  2402:
-  2403:
-> 2404: def _distributed_group_to_hdf5_parallel(
-  2405:     group,
-  2406:     fname,
-```
-
-
-# R0914: too-many-locals
-
-## File caput/ephemeris.py - Line 46 - R0914 (too-many-locals)
-
-- `message: Too many local variables (19/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  44:
-  45:
-> 46: def source_transit(obs, source, t0, t1=None, step=0.2, lower=False, return_dec=False):
-  47:     """Find the transit times of the given source in an interval.
-  48:
-```
-
-
-## File caput/tests/test_mpiarray.py - Line 98 - R0914 (too-many-locals)
-
-- `message: Too many local variables (16/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-   16: class TestMPIArray(unittest.TestCase):
-  ...
-   96:                 mpiarray.MPIArray.wrap(df, axis=0)
-   97:
->  98:     def test_io(self):
-   99:
-  100:         import h5py
-```
-
-
-## File caput/ephemeris.py - Line 122 - R0914 (too-many-locals)
-
-- `message: Too many local variables (17/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  120:
-  121:
-> 122: def source_rise_set(obs, source, t0, t1=None, step=0.2, diameter=0.0):
-  123:     """Find all times a sources rises or sets in an interval.
-  124:
-```
-
-
-## File caput/scripts/runner.py - Line 175 - R0914 (too-many-locals)
-
-- `message: Too many local variables (26/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  115: def run(configfile, loglevel, profile, profiler):
-  ...
-  173: @click.option(
-  174:     "--lint/--nolint",
-> 175:     default=True,
-  176:     help="Check the pipeline for errors before submitting it.",
-  177: )
-```
-
-
-## File caput/_version.py - Line 233 - R0914 (too-many-locals)
-
-- `message: Too many local variables (17/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  231:
-  232: @register_vcs_handler("git", "pieces_from_vcs")
-> 233: def git_pieces_from_vcs(tag_prefix, root, verbose, run_command=run_command):
-  234:     """Get version from 'git describe' in the root of the source tree.
-  235:
-```
-
-
-## File caput/tod.py - Line 248 - R0914 (too-many-locals)
-
-- `message: Too many local variables (46/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  246:
-  247:
-> 248: def concatenate(
-  249:     data_list,
-  250:     out_group=None,
-```
-
-
-## File caput/time.py - Line 440 - R0914 (too-many-locals)
-
-- `message: Too many local variables (16/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  182: class Observer:
-  ...
-  438:         return ra
-  439:
-> 440:     def transit_times(
-  441:         self, source, t0, t1=None, step=None, lower=False, return_dec=False
-  442:     ):
-```
-
-
-## File caput/mpiutil.py - Line 449 - R0914 (too-many-locals)
-
-- `message: Too many local variables (27/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  447:
-  448:
-> 449: def transpose_blocks(row_array, shape, comm=_comm):
-  450:     """
-  451:     Take a 2D matrix which is split between processes row-wise and split it
-```
-
-
-## File caput/mpiarray.py - Line 452 - R0914 (too-many-locals)
-
-- `message: Too many local variables (24/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  450:         return dist_arr
-  451:
-> 452:     def redistribute(self, axis):
-  453:         """Change the axis that the array is distributed over.
-  454:
-```
-
-
-## File caput/memh5.py - Line 566 - R0914 (too-many-locals)
-
-- `message: Too many local variables (17/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  358: class MemGroup(_BaseGroup):
-  ...
-  564:         return self[name]
-  565:
-> 566:     def create_dataset(
-  567:         self,
-  568:         name,
-```
-
-
-## File caput/mpiarray.py - Line 610 - R0914 (too-many-locals)
-
-- `message: Too many local variables (25/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  608:
-  609:     @classmethod
-> 610:     def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None):
-  611:         """Read MPIArray from an HDF5 dataset in parallel.
-  612:
-```
-
-
-## File caput/mpiarray.py - Line 702 - R0914 (too-many-locals)
-
-- `message: Too many local variables (21/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  236: class MPIArray(np.ndarray):
-  ...
-  700:         return dist_arr
-  701:
-> 702:     def to_hdf5(
-  703:         self,
-  704:         f,
-```
-
-
-## File caput/memh5.py - Line 747 - R0914 (too-many-locals)
-
-- `message: Too many local variables (16/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  358: class MemGroup(_BaseGroup):
-  ...
-  745:         return self[full_path_name]
-  746:
-> 747:     def dataset_common_to_distributed(self, name, distributed_axis=0):
-  748:         """Convert a common dataset to a distributed one.
-  749:
-```
-
-
-## File caput/time.py - Line 1116 - R0914 (too-many-locals)
-
-- `message: Too many local variables (17/15)`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1114:
-  1115:
-> 1116: def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kwargs):
-  1117:     """Find all roots of function f, within the interval [x0, x1].
-  1118:
 ```
 
 
@@ -6204,107 +4313,54 @@ The recommended approach to using `pylint-ignore` is:
 ```
 
 
-## File caput/tod.py - Line 248 - R0915 (too-many-statements)
+## File caput/tod.py - Line 250 - R0915 (too-many-statements)
 
 - `message: Too many statements (94/50)`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  246:
-  247:
-> 248: def concatenate(
-  249:     data_list,
-  250:     out_group=None,
-```
-
-
-# R1718: consider-using-set-comprehension
-
-## File caput/_version.py - Line 189 - R1718 (consider-using-set-comprehension)
-
-- `message: Consider using a set comprehension`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  171: def git_versions_from_keywords(keywords, tag_prefix, verbose):
-  ...
-  187:             print("keywords are unexpanded, not using")
-  188:         raise NotThisMethod("unexpanded keywords, not a git-archive tarball")
-> 189:     refs = set([r.strip() for r in refnames.strip("()").split(",")])
-  190:     # starting in git-1.8.3, tags are listed as "tag: foo-1.0" instead of
-  191:     # just "foo-1.0". If we see a "tag: " prefix, prefer those.
-```
-
-
-## File caput/_version.py - Line 193 - R1718 (consider-using-set-comprehension)
-
-- `message: Consider using a set comprehension`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  171: def git_versions_from_keywords(keywords, tag_prefix, verbose):
-  ...
-  191:     # just "foo-1.0". If we see a "tag: " prefix, prefer those.
-  192:     TAG = "tag: "
-> 193:     tags = set([r[len(TAG) :] for r in refs if r.startswith(TAG)])
-  194:     if not tags:
-  195:         # Either we're using git < 1.8.3, or there really are no tags. We use
-```
-
-
-## File caput/_version.py - Line 202 - R1718 (consider-using-set-comprehension)
-
-- `message: Consider using a set comprehension`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  171: def git_versions_from_keywords(keywords, tag_prefix, verbose):
-  ...
-  200:         # filter out many common branch names like "release" and
-  201:         # "stabilization", as well as "HEAD" and "master".
-> 202:         tags = set([r for r in refs if re.search(r"\d", r)])
-  203:         if verbose:
-  204:             print("discarding '%s', no digits" % ",".join(refs - tags))
+  248:
+  249:
+> 250: def concatenate(
+  251:     data_list,
+  252:     out_group=None,
 ```
 
 
 # R1720: no-else-raise
 
-## File caput/memh5.py - Line 339 - R1720 (no-else-raise)
+## File caput/memh5.py - Line 362 - R1720 (no-else-raise)
 
 - `message: Unnecessary "else" after "raise"`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  329:     def require_dataset(self, name, shape, dtype, **kwargs):
+  352:     def require_dataset(self, name, shape, dtype, **kwargs):
   ...
-  337:         except KeyError:
-  338:             return self.create_dataset(name, shape=shape, dtype=dtype, **kwargs)
-> 339:         if is_group(d):
-  340:             msg = "Entry '%s' exists and is not a Dataset." % name
-  341:             raise TypeError(msg)
+  360:         except KeyError:
+  361:             return self.create_dataset(name, shape=shape, dtype=dtype, **kwargs)
+> 362:         if is_group(d):
+  363:             msg = "Entry '%s' exists and is not a Dataset." % name
+  364:             raise TypeError(msg)
 ```
 
 
-## File caput/memh5.py - Line 351 - R1720 (no-else-raise)
+## File caput/memh5.py - Line 374 - R1720 (no-else-raise)
 
 - `message: Unnecessary "else" after "raise"`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  345:     def require_group(self, name):
+  368:     def require_group(self, name):
   ...
-  349:         except KeyError:
-  350:             return self.create_group(name)
-> 351:         if not is_group(g):
-  352:             msg = "Entry '%s' exists and is not a Group." % name
-  353:             raise TypeError(msg)
+  372:         except KeyError:
+  373:             return self.create_group(name)
+> 374:         if not is_group(g):
+  375:             msg = "Entry '%s' exists and is not a Group." % name
+  376:             raise TypeError(msg)
 ```
 
 
@@ -6339,23 +4395,6 @@ The recommended approach to using `pylint-ignore` is:
 > 1094:                     if self._in is None:
   1095:                         msg = (
   1096:                             "Tried to queue 'requires' data product, but"
-```
-
-
-## File caput/memh5.py - Line 1311 - R1720 (no-else-raise)
-
-- `message: Unnecessary "elif" after "raise"`
-- `author : Rick Nitsche <rick@phas.ubc.ca>`
-- `date   : 2021-01-27T15:38:40`
-
-```
-  1287:     def __init__(self, data_group=None, distributed=False, comm=None):
-  ...
-  1309:             data_group, toclose = get_h5py_File(data_group, mode="a")
-  1310:
-> 1311:         if distributed and isinstance(data_group, h5py.Group):
-  1312:             raise ValueError(
-  1313:                 "Distributed MemDiskGroup cannot be created around h5py objects."
 ```
 
 
@@ -6397,52 +4436,52 @@ The recommended approach to using `pylint-ignore` is:
 
 # R1725: super-with-arguments
 
-## File caput/memh5.py - Line 283 - R1725 (super-with-arguments)
+## File caput/memh5.py - Line 306 - R1725 (super-with-arguments)
 
 - `message: Consider using Python 3 style super() without arguments`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  281:     def _from_storage_root(cls, storage_root, name):
-  282:         self = super(_BaseGroup, cls).__new__(cls)
-> 283:         super(_BaseGroup, self).__init__(storage_root, name)
-  284:         return self
-  285:
+  304:     def _from_storage_root(cls, storage_root, name):
+  305:         self = super(_BaseGroup, cls).__new__(cls)
+> 306:         super(_BaseGroup, self).__init__(storage_root, name)
+  307:         return self
+  308:
 ```
 
 
-## File caput/memh5.py - Line 984 - R1725 (super-with-arguments)
+## File caput/memh5.py - Line 1143 - R1725 (super-with-arguments)
 
 - `message: Consider using Python 3 style super() without arguments`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  964:     def from_numpy_array(
+  1123:     def from_numpy_array(
   ...
-  982:
-  983:         self = cls.__new__(cls)
-> 984:         super(MemDatasetCommon, self).__init__(**kwargs)
-  985:
-  986:         self._data = data
+  1141:
+  1142:         self = cls.__new__(cls)
+> 1143:         super(MemDatasetCommon, self).__init__(**kwargs)
+  1144:
+  1145:         self._data = data
 ```
 
 
-## File caput/memh5.py - Line 1125 - R1725 (super-with-arguments)
+## File caput/memh5.py - Line 1284 - R1725 (super-with-arguments)
 
 - `message: Consider using Python 3 style super() without arguments`
 - `author : Rick Nitsche <rick@phas.ubc.ca>`
 - `date   : 2021-01-27T15:38:40`
 
 ```
-  1118:     def from_mpi_array(
+  1277:     def from_mpi_array(
   ...
-  1123:
-  1124:         self = cls.__new__(cls)
-> 1125:         super(MemDatasetDistributed, self).__init__(**kwargs)
-  1126:
-  1127:         self._data = data
+  1282:
+  1283:         self = cls.__new__(cls)
+> 1284:         super(MemDatasetDistributed, self).__init__(**kwargs)
+  1285:
+  1286:         self._data = data
 ```
 
 

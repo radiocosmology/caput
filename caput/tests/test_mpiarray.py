@@ -6,7 +6,7 @@ Designed to be run as an MPI job with four processes like::
 """
 
 import pytest
-
+from pytest_lazyfixture import lazy_fixture
 import h5py
 import numpy as np
 import zarr
@@ -15,7 +15,7 @@ from caput import mpiutil, mpiarray, fileformats
 
 
 def test_construction():
-
+    """Test local/global shape construction of MPIArray."""
     arr = mpiarray.MPIArray((10, 11), axis=1)
 
     l, s, _ = mpiutil.split_local(11)
@@ -31,7 +31,7 @@ def test_construction():
 
 
 def test_redistribution():
-
+    """Test redistributing an MPIArray."""
     gshape = (1, 11, 2, 14, 3, 4)
     nelem = np.prod(gshape)
     garr = np.arange(nelem).reshape(gshape)
@@ -51,7 +51,7 @@ def test_redistribution():
 
 
 def test_gather():
-
+    """Test MPIArray.gather()."""
     rank = mpiutil.rank
     size = mpiutil.size
     block = 2
@@ -75,7 +75,7 @@ def test_gather():
 
 
 def test_wrap():
-
+    """Test MPIArray.wrap()."""
     ds = mpiarray.MPIArray((10, 17))
 
     df = np.fft.rfft(ds, axis=1)
@@ -102,16 +102,16 @@ def test_wrap():
 @pytest.mark.parametrize(
     "filename, file_open_function, file_format",
     [
-        (pytest.lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
         (
-            pytest.lazy_fixture("zarr_file_distributed"),
+            lazy_fixture("zarr_file_distributed"),
             zarr.open_group,
             fileformats.Zarr,
         ),
     ],
 )
 def test_io(filename, file_open_function, file_format):
-
+    """Test I/O of MPIArray."""
     gshape = (19, 17)
 
     ds = mpiarray.MPIArray(gshape, dtype=np.int64)
@@ -188,7 +188,7 @@ def test_io(filename, file_open_function, file_format):
 
 
 def test_transpose():
-
+    """Test MPIArray.transpose()."""
     gshape = (1, 11, 2, 14)
 
     l0, s0, _ = mpiutil.split_local(11)
@@ -250,7 +250,7 @@ def test_transpose():
 
 
 def test_reshape():
-
+    """Test MPIArray.reshape()."""
     gshape = (1, 11, 2, 14)
 
     l0, s0, _ = mpiutil.split_local(11)
@@ -276,7 +276,7 @@ def test_reshape():
 
 
 def test_global_getslice():
-
+    """Test MPIArray.global_slice."""
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -368,7 +368,7 @@ def test_global_getslice():
 
 
 def test_global_setslice():
-
+    """Test setting MPIArray.global_slice."""
     rank = mpiutil.rank
     size = mpiutil.size
 

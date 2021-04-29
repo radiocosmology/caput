@@ -1007,22 +1007,48 @@ class MemDataset(_MemObjMixin):
 
     @property
     def shape(self):
+        """
+        Shape of the dataset.
+
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     @property
     def dtype(self):
+        """
+        numpy data type of the dataset.
+
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     @property
     def chunks(self):
+        """
+        Chunk shape of the dataset.
+
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     @property
     def compression(self):
+        """
+        Name or identifier of HDF5 compression filter for the dataset.
+
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     @property
     def compression_opts(self):
+        """
+        Compression options for the dataset.
+
+        See HDF5 documentation for compression filters.
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     def __getitem__(self, obj):
@@ -1264,10 +1290,20 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def global_shape(self):
+        """
+        Global shape of the distributed dataset.
+
+        The shape of the whole array that is distributed between multiple nodes.
+        """
         return self._data.global_shape
 
     @property
     def local_shape(self):
+        """
+        Local shape of the distributed dataset.
+
+        The shape of the part of the distributed array that is allocated to *this* node.
+        """
         return self._data.local_shape
 
     @property
@@ -1276,10 +1312,12 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def dtype(self):
+        """The numpy data type of the dataset"""
         return self._data.dtype
 
     @property
     def chunks(self):
+        """The chunk shape of the dataset."""
         return self._chunks
 
     @chunks.setter
@@ -1304,6 +1342,7 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def distributed_axis(self):
+        """The index of the axis over which this dataset is distributed."""
         return self._data.axis
 
     @property
@@ -1424,12 +1463,12 @@ class MemDiskGroup(_BaseGroup):
                 data_group, mode="a", file_format=file_format
             )
 
-        if distributed and isinstance(data_group, (h5py.Group, zarr.Group)):
-            raise ValueError(
-                "Distributed MemDiskGroup cannot be created around h5py or zarr objects."
-            )
         # Check the distribution settings
-        elif distributed:
+        if distributed:
+            if isinstance(data_group, (h5py.Group, zarr.Group)):
+                raise ValueError(
+                    "Distributed MemDiskGroup cannot be created around h5py or zarr objects."
+                )
             # Check parallel distribution is the same
             if not data_group.distributed:
                 raise ValueError(
@@ -1701,7 +1740,8 @@ class MemDiskGroup(_BaseGroup):
 
     # Methods for manipulating and building the class. #
 
-    def group_name_allowed(self, name):
+    @staticmethod
+    def group_name_allowed(name):
         """Used by subclasses to restrict creation of and access to groups.
 
         This method is called by :meth:`create_group`, :meth:`require_group`,
@@ -1725,7 +1765,8 @@ class MemDiskGroup(_BaseGroup):
         """
         return True
 
-    def dataset_name_allowed(self, name):
+    @staticmethod
+    def dataset_name_allowed(name):
         """Used by subclasses to restrict creation of and access to datasets.
 
         This method is called by :meth:`create_dataset`,
