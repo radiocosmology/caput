@@ -95,6 +95,7 @@ def filled_h5_file(h5_file):
     with h5py.File(h5_file, "w") as f:
         fill_test_file(f)
         f["level1"]["level2"].attrs["small"] = np.arange(3)
+        f["level1"]["level2"].attrs["ndarray"] = numpy.ndarray([1, 2, 3])
     yield h5_file
 
 
@@ -430,17 +431,14 @@ def test_to_from_hdf5(test_file, file_format):
     m = memh5.MemGroup()
     m.attrs["data"] = data
     m.attrs["datetime"] = {"datetime": time}
+    m.attrs["ndarray"] = np.ndarray([1, 2, 3])
 
     m.to_file(test_file, file_format=file_format)
     with file_format.open(test_file, "r") as f:
-        # if file_format == fileformats.HDF5:
         assert f.attrs["data"] == json_prefix + json.dumps(data)
         assert f.attrs["datetime"] == json_prefix + json.dumps(
             {"datetime": time.isoformat()}
         )
-        # else:
-        #     assert f.attrs["data"] == data
-        #     assert f.attrs["datetime"] == {"datetime": time.isoformat()}
 
     m2 = memh5.MemGroup.from_file(test_file, file_format=file_format)
     assert m2.attrs["data"] == data

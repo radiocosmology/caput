@@ -2336,8 +2336,12 @@ def copyattrs(a1, a2, convert_strings=False):
                 # Let the default method raise the TypeError
                 return json.JSONEncoder.default(self, o)
 
-        if isinstance(value, dict) and isinstance(
-            a2, (h5py.AttributeManager, zarr.attrs.Attributes)
+        if (
+            isinstance(value, (dict, np.ndarray, datetime.datetime))
+            and isinstance(a2, zarr.attrs.Attributes)
+        ) or (
+            isinstance(value, (dict, datetime.datetime))
+            and isinstance(a2, h5py.AttributeManager)
         ):
             # Save to JSON converting datetimes.
             encoder = Memh5JSONEncoder()
