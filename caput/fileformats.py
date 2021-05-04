@@ -123,7 +123,7 @@ def guess_file_format(name, default=HDF5):
     """
     import pathlib
 
-    if name.endswith(".zarr") or pathlib.Path.is_dir(name):
+    if name.endswith(".zarr") or pathlib.Path(name).is_dir():
         return Zarr
     if name.endswith(".h5"):
         return HDF5
