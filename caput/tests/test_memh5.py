@@ -95,7 +95,7 @@ def filled_h5_file(h5_file):
     with h5py.File(h5_file, "w") as f:
         fill_test_file(f)
         f["level1"]["level2"].attrs["small"] = np.arange(3)
-        f["level1"]["level2"].attrs["ndarray"] = numpy.ndarray([1, 2, 3])
+        f["level1"]["level2"].attrs["ndarray"] = np.ndarray([1, 2, 3])
     yield h5_file
 
 
