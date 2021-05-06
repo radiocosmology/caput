@@ -356,6 +356,13 @@ def queue(configfile, submit=False, lint=True):
 # exit if a command returns non-zero code
 set -e
 
+# set status to crashed upon non-zero status of command
+function setCrashed {
+    echo CRASHED > %(statuspath)s
+}
+
+trap setCrashed ERR
+
 %(module)s
 
 source %(venv)s
@@ -393,6 +400,13 @@ fi
 
 # exit if a command returns non-zero code
 set -e
+
+# set status to crashed upon non-zero status of command
+function setCrashed {
+    echo CRASHED > %(statuspath)s
+}
+
+trap setCrashed ERR
 
 echo RUNNING > %(statuspath)s
 
