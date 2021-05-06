@@ -1111,6 +1111,11 @@ class _OneAndOne(TaskBase):
 
     input_root = config.Property(default="None", proptype=str)
     output_root = config.Property(default="None", proptype=str)
+    output_format = config.Property(
+        default=fileformats.HDF5, proptype=fileformats.FileFormat
+    )
+    output_compression = config.Property(default=None, proptype=str)
+    output_compression_opts = config.Property(default=None)
 
     def __init__(self):
         # Inspect the `process` method to see how many arguments it takes.
@@ -1216,7 +1221,13 @@ class _OneAndOne(TaskBase):
             output_dirname = os.path.dirname(output_filename)
             if not os.path.isdir(output_dirname):
                 os.makedirs(output_dirname)
-            self.write_output(output_filename, output)
+            self.write_output(
+                output_filename,
+                output,
+                file_format=self.output_format,
+                compression=self.output_compression,
+                compression_opts=self.output_compression_opts,
+            )
         return output
 
     def read_input(self, filename):
@@ -1239,7 +1250,7 @@ class _OneAndOne(TaskBase):
         raise NotImplementedError()
 
     @staticmethod
-    def write_output(filename, output):
+    def write_output(filename, output, file_format=None, **kwargs):
         """Override to implement reading inputs from disk."""
 
         raise NotImplementedError()
@@ -1284,6 +1295,11 @@ class SingleBase(_OneAndOne):
 
     input_filename = config.Property(default="", proptype=str)
     output_filename = config.Property(default="", proptype=str)
+    output_format = config.Property(
+        default=fileformats.HDF5, proptype=fileformats.FileFormat
+    )
+    output_compression = config.Property(default=None, proptype=str)
+    output_compression_opts = config.Property(default=None)
 
     def next(self, input=None):
         """Should not need to override."""
@@ -1408,7 +1424,7 @@ class H5IOMixin:
         return memh5.MemGroup.from_hdf5(filename, mode="r")
 
     @staticmethod
-    def write_output(filename, output, file_format=None):
+    def write_output(filename, output, file_format=None, **kwargs):
         """
         Method for writing hdf5/zarr output.
 
@@ -1445,7 +1461,7 @@ class H5IOMixin:
 
             # Lock file
             with misc.lock_file(filename, comm=output.comm) as fn:
-                output.to_file(fn, mode="w", file_format=file_format)
+                output.to_file(fn, mode="w", file_format=file_format, **kwargs)
             return
 
         if isinstance(output, h5py.Group):
@@ -1521,7 +1537,7 @@ class BasicContMixin:
         )
 
     @staticmethod
-    def write_output(filename, output, file_format=None):
+    def write_output(filename, output, file_format=None, **kwargs):
         """
         Method for writing output to disk.
 
@@ -1559,7 +1575,7 @@ class BasicContMixin:
             )
 
         # Already in memory.
-        output.save(filename, file_format=file_format)
+        output.save(filename, file_format=file_format, **kwargs)
 
 
 class SingleH5Base(H5IOMixin, SingleBase):
