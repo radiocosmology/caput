@@ -52,6 +52,9 @@ def test_create_dataset():
 
 
 @pytest.mark.parametrize(
+    "compression,compression_opts", [(None, None), ("bitshuffle", (None, "lz4"))]
+)
+@pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
         (lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
@@ -62,7 +65,7 @@ def test_create_dataset():
         ),
     ],
 )
-def test_io(test_file, file_open_function, file_format):
+def test_io(test_file, file_open_function, file_format, compression, compression_opts):
     """Test for I/O in MemGroup."""
 
     # Create distributed memh5 object
@@ -96,6 +99,8 @@ def test_io(test_file, file_open_function, file_format):
         convert_attribute_strings=True,
         convert_dataset_strings=True,
         file_format=file_format,
+        compression=compression,
+        compression_opts=compression_opts,
     )
 
     # Test that the HDF5 file has the correct structure

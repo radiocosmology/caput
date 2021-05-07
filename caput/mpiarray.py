@@ -871,7 +871,9 @@ class MPIArray(np.ndarray):
                 zarr.open(store=f, mode=mode)
             self.comm.Barrier()
             group = zarr.open_group(
-                store=f, mode="r+", synchronizer=zarr.ProcessSynchronizer(f"{f}.sync")
+                store=f,
+                mode="r+",
+                synchronizer=zarr.ProcessSynchronizer(f"{f}.sync"),
             )
         elif isinstance(f, zarr.Group):
             if f.synchronizer is None:
