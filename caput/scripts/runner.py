@@ -372,18 +372,11 @@ export OMP_NUM_THREADS=%(ompnum)i
 
 mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
 
-retcode=$?
-
 # Set the status
-if [ $retcode -eq 0 ]
-then
-    echo FINISHED > %(statuspath)s
-else
-    echo CRASHED > %(statuspath)s
-fi
+echo FINISHED > %(statuspath)s
 
 # If the job was successful, then move the output to its final location
-if [ %(usetemp)s -eq 1 ] && [ $retcode -eq 0 ]
+if [ %(usetemp)s -eq 1 ]
 then
     mkdir -p $(dirname \"%(finaldir)s\")
     mv \"%(workdir)s\" \"%(finaldir)s\"
@@ -419,18 +412,11 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 srun python %(scriptpath)s run %(configpath)s &> %(logpath)s
 
-retcode=$?
-
 # Set the status
-if [ $retcode -eq 0 ]
-then
-    echo FINISHED > %(statuspath)s
-else
-    echo CRASHED > %(statuspath)s
-fi
+echo FINISHED > %(statuspath)s
 
 # If the job was successful, then move the output to its final location
-if [ %(usetemp)s -eq 1 ] && [ $retcode -eq 0 ]
+if [ %(usetemp)s -eq 1 ]
 then
     mkdir -p $(dirname \"%(finaldir)s\")
     mv \"%(workdir)s\" \"%(finaldir)s\"
