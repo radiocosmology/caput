@@ -483,6 +483,62 @@ def logging_config(default=None):
     return prop
 
 
+def file_format(default=None):
+    """A property type that accepts only "zarr", "hdf5" or None.
+
+    Returns the selected `caput.fileformat.FileFormat` subclass or `caput.fileformats.HDF5` if `value == default`.
+
+    Parameters
+    ----------
+    default : optional
+        The optional default value.
+
+    Returns
+    -------
+    prop : Property
+        A property instance setup to validate a file format.
+
+    Raises
+    ------
+    ValueError
+        If the default value is not `None`, `"hdf5"` or `"zarr"`.
+
+    Examples
+    --------
+    Should be used like::
+
+        class Project:
+
+            mode = file_format(default='zarr')
+    """
+    options = ("hdf5", "zarr", None)
+
+    def _prop(val):
+        from . import fileformats
+
+        if val is None:
+            return None
+
+        if not isinstance(val, str):
+            CaputConfigError(
+                f"Input {repr(val)} is of type {type(val).__name__} (expected str or None)."
+            )
+
+        val = val.lower()
+        if val == "hdf5":
+            return fileformats.HDF5
+        if val == "zarr":
+            return fileformats.Zarr
+        raise CaputConfigError(f"Input {repr(val)} needs to be one of {options})")
+
+    if default is not None and (
+        not isinstance(default, str) or default.lower() not in options
+    ):
+        raise CaputConfigError(f"Default value {repr(default)} must be in {options}")
+
+    return Property(proptype=_prop, default=default)
+
+
 class _line_dict(dict):
     """A private dict subclass that also stores line numbers for debugging."""
 

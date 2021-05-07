@@ -84,9 +84,9 @@ class Zarr(FileFormat):
         if compression:
             if compression == "gzip":
                 return {"compressor": numcodecs.gzip.GZip(level=compression_opts)}
-            elif compression == BSHUF_H5FILTER:
+            elif int(compression) == BSHUF_H5FILTER or compression == "bitshuffle":
                 blocksize, c = compression_opts
-                if c == BSHUF_H5_COMPRESS_LZ4:
+                if int(c) == BSHUF_H5_COMPRESS_LZ4 or c == "lz4":
                     cname = "lz4"
                 else:
                     raise ValueError(
@@ -94,7 +94,9 @@ class Zarr(FileFormat):
                     )
                 return {
                     "compressor": numcodecs.Blosc(
-                        cname, shuffle=numcodecs.blosc.BITSHUFFLE, blocksize=blocksize
+                        cname,
+                        shuffle=numcodecs.blosc.BITSHUFFLE,
+                        blocksize=int(blocksize),
                     )
                 }
             else:
