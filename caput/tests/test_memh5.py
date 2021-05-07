@@ -148,13 +148,18 @@ def test_file_sanity(test_file, file_open_function):
 
 
 @pytest.mark.parametrize(
+    "compression,compression_opts", [(None, None), ("bitshuffle", (None, "lz4"))]
+)
+@pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
         (lazy_fixture("filled_h5_file"), h5py.File, fileformats.HDF5),
         (lazy_fixture("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
     ],
 )
-def test_to_from_file(test_file, file_open_function, file_format):
+def test_to_from_file(
+    test_file, file_open_function, file_format, compression, compression_opts
+):
     """Tests that makes hdf5 objects, convert to mem and back."""
     m = memh5.MemGroup.from_file(test_file, file_format=file_format)
 
@@ -162,7 +167,12 @@ def test_to_from_file(test_file, file_open_function, file_format):
     with file_open_function(test_file, "r") as f:
         assertGroupsEqual(f, m)
 
-    m.to_file(test_file + ".new", file_format=file_format)
+    m.to_file(
+        test_file + ".new",
+        file_format=file_format,
+        compression=compression,
+        compression_opts=compression_opts,
+    )
 
     # Check that written file has same structure
     with file_open_function(test_file + ".new", "r") as f:

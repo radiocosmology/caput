@@ -64,7 +64,18 @@ class HDF5(FileFormat):
         super(HDF5, HDF5).compression_kwargs(compression, compression_opts, compressor)
         if compressor:
             raise NotImplementedError
-        return {"compression": compression, "compression_opts": compression_opts}
+        if compression in ("bitshuffle", BSHUF_H5FILTER, str(BSHUF_H5FILTER)):
+            compression = BSHUF_H5FILTER
+            blocksize, c = compression_opts
+            if blocksize is None:
+                blocksize = 0
+            if c in (BSHUF_H5_COMPRESS_LZ4, str(BSHUF_H5_COMPRESS_LZ4), "lz4"):
+                c = BSHUF_H5_COMPRESS_LZ4
+            compression_opts = (blocksize, c)
+
+        if compression is not None:
+            return {"compression": compression, "compression_opts": compression_opts}
+        return {}
 
 
 class Zarr(FileFormat):
@@ -84,19 +95,21 @@ class Zarr(FileFormat):
         if compression:
             if compression == "gzip":
                 return {"compressor": numcodecs.gzip.GZip(level=compression_opts)}
-            elif int(compression) == BSHUF_H5FILTER or compression == "bitshuffle":
+            if compression in (BSHUF_H5FILTER, str(BSHUF_H5FILTER), "bitshuffle"):
                 blocksize, c = compression_opts
-                if int(c) == BSHUF_H5_COMPRESS_LZ4 or c == "lz4":
+                if c in (BSHUF_H5_COMPRESS_LZ4, str(BSHUF_H5_COMPRESS_LZ4), "lz4"):
                     cname = "lz4"
                 else:
                     raise ValueError(
-                        f"Unknown value for cname in HDF5 compression opts: {compression_opts[1]}"
+                        f"Unknown value for cname in HDF5 compression opts: {c}"
                     )
+                if blocksize is None:
+                    blocksize = 0
                 return {
                     "compressor": numcodecs.Blosc(
                         cname,
                         shuffle=numcodecs.blosc.BITSHUFFLE,
-                        blocksize=int(blocksize),
+                        blocksize=int(blocksize) if blocksize is not None else None,
                     )
                 }
             else:
