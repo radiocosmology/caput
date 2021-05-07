@@ -1111,9 +1111,7 @@ class _OneAndOne(TaskBase):
 
     input_root = config.Property(default="None", proptype=str)
     output_root = config.Property(default="None", proptype=str)
-    output_format = config.Property(
-        default=fileformats.HDF5, proptype=fileformats.FileFormat
-    )
+    output_format = config.file_format()
     output_compression = config.Property(default=None, proptype=str)
     output_compression_opts = config.Property(default=None)
 
@@ -1295,9 +1293,7 @@ class SingleBase(_OneAndOne):
 
     input_filename = config.Property(default="", proptype=str)
     output_filename = config.Property(default="", proptype=str)
-    output_format = config.Property(
-        default=fileformats.HDF5, proptype=fileformats.FileFormat
-    )
+    output_format = config.file_format()
     output_compression = config.Property(default=None, proptype=str)
     output_compression_opts = config.Property(default=None)
 

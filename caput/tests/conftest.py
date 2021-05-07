@@ -90,7 +90,7 @@ class CookEggs(IterBase):
     def read_output(self, filename):
         raise NotImplementedError()
 
-    def write_output(self, filename, output):
+    def write_output(self, filename, output, file_format=None, **kwargs):
         raise NotImplementedError()
 
 
