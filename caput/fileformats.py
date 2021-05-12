@@ -1,4 +1,5 @@
 """Interface for file formats supported by caput: HDF5 and Zarr."""
+import logging
 import h5py
 import numcodecs
 import zarr
@@ -6,6 +7,8 @@ import zarr
 # Copied from https://github.com/kiyo-masui/bitshuffle/blob/master/src/bshuf_h5filter.h
 BSHUF_H5FILTER = 32008
 BSHUF_H5_COMPRESS_LZ4 = 2
+
+logger = logging.getLogger(__name__)
 
 
 class FileFormat:
@@ -66,10 +69,17 @@ class HDF5(FileFormat):
             raise NotImplementedError
         if compression in ("bitshuffle", BSHUF_H5FILTER, str(BSHUF_H5FILTER)):
             compression = BSHUF_H5FILTER
-            blocksize, c = compression_opts
+            try:
+                blocksize, c = compression_opts
+            except ValueError as e:
+                logger.error(
+                    f"Failed to interpret compression_opts: {e}\n{compression_opts}\nUsing blocksize=0, c=2."
+                )
+                blocksize = 0
+                c = BSHUF_H5_COMPRESS_LZ4
             if blocksize is None:
                 blocksize = 0
-            if c in (BSHUF_H5_COMPRESS_LZ4, str(BSHUF_H5_COMPRESS_LZ4), "lz4"):
+            if c in (str(BSHUF_H5_COMPRESS_LZ4), "lz4"):
                 c = BSHUF_H5_COMPRESS_LZ4
             compression_opts = (blocksize, c)
 
@@ -96,9 +106,16 @@ class Zarr(FileFormat):
             if compression == "gzip":
                 return {"compressor": numcodecs.gzip.GZip(level=compression_opts)}
             if compression in (BSHUF_H5FILTER, str(BSHUF_H5FILTER), "bitshuffle"):
-                blocksize, c = compression_opts
-                if c in (BSHUF_H5_COMPRESS_LZ4, str(BSHUF_H5_COMPRESS_LZ4), "lz4"):
-                    cname = "lz4"
+                try:
+                    blocksize, c = compression_opts
+                except ValueError as e:
+                    logger.error(
+                        f"Failed to interpret compression_opts: {e}\n{compression_opts}\nUsing blocksize=0, c=lz4."
+                    )
+                    blocksize = 0
+                    c = "lz4"
+                if c in (BSHUF_H5_COMPRESS_LZ4, str(BSHUF_H5_COMPRESS_LZ4)):
+                    c = "lz4"
                 else:
                     raise ValueError(
                         f"Unknown value for cname in HDF5 compression opts: {c}"
@@ -107,7 +124,7 @@ class Zarr(FileFormat):
                     blocksize = 0
                 return {
                     "compressor": numcodecs.Blosc(
-                        cname,
+                        c,
                         shuffle=numcodecs.blosc.BITSHUFFLE,
                         blocksize=int(blocksize) if blocksize is not None else None,
                     )
