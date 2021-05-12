@@ -137,7 +137,7 @@ class PFB:
             ft = np.fft.rfft(ts_sec * w)
 
             # Choose every n-th frequency
-            spec[bi] = ft[:: self.ntap]
+            spec[bi] = ft[: ((self.lblock // 2) * self.ntap) : self.ntap]
 
         return spec
 
