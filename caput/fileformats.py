@@ -1,14 +1,8 @@
 """Interface for file formats supported by caput: HDF5 and Zarr."""
-import logging
+from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4
 import h5py
 import numcodecs
 import zarr
-
-# Copied from https://github.com/kiyo-masui/bitshuffle/blob/master/src/bshuf_h5filter.h
-BSHUF_H5FILTER = 32008
-BSHUF_H5_COMPRESS_LZ4 = 2
-
-logger = logging.getLogger(__name__)
 
 
 class FileFormat:
@@ -67,20 +61,18 @@ class HDF5(FileFormat):
         super(HDF5, HDF5).compression_kwargs(compression, compression_opts, compressor)
         if compressor:
             raise NotImplementedError
-        if compression in ("bitshuffle", BSHUF_H5FILTER, str(BSHUF_H5FILTER)):
-            compression = BSHUF_H5FILTER
+        if compression in ("bitshuffle", H5FILTER, str(H5FILTER)):
+            compression = H5FILTER
             try:
                 blocksize, c = compression_opts
             except ValueError as e:
-                logger.error(
-                    f"Failed to interpret compression_opts: {e}\n{compression_opts}\nUsing blocksize=0, c=2."
-                )
-                blocksize = 0
-                c = BSHUF_H5_COMPRESS_LZ4
+                raise ValueError(
+                    f"Failed to interpret compression_opts: {e}\n{compression_opts}."
+                ) from e
             if blocksize is None:
                 blocksize = 0
-            if c in (str(BSHUF_H5_COMPRESS_LZ4), "lz4"):
-                c = BSHUF_H5_COMPRESS_LZ4
+            if c in (str(H5_COMPRESS_LZ4), "lz4"):
+                c = H5_COMPRESS_LZ4
             compression_opts = (blocksize, c)
 
         if compression is not None:
@@ -105,16 +97,14 @@ class Zarr(FileFormat):
         if compression:
             if compression == "gzip":
                 return {"compressor": numcodecs.gzip.GZip(level=compression_opts)}
-            if compression in (BSHUF_H5FILTER, str(BSHUF_H5FILTER), "bitshuffle"):
+            if compression in (H5FILTER, str(H5FILTER), "bitshuffle"):
                 try:
                     blocksize, c = compression_opts
                 except ValueError as e:
-                    logger.error(
-                        f"Failed to interpret compression_opts: {e}\n{compression_opts}\nUsing blocksize=0, c=lz4."
-                    )
-                    blocksize = 0
-                    c = "lz4"
-                if c in (BSHUF_H5_COMPRESS_LZ4, str(BSHUF_H5_COMPRESS_LZ4)):
+                    raise ValueError(
+                        f"Failed to interpret compression_opts: {e}\n{compression_opts}"
+                    ) from e
+                if c in (H5_COMPRESS_LZ4, str(H5_COMPRESS_LZ4)):
                     c = "lz4"
                 if blocksize is None:
                     blocksize = 0
