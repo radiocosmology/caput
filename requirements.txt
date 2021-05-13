@@ -1,8 +1,6 @@
-bitshuffle @ git+https://github.com/kiyo-masui/bitshuffle.git
 click
 cython
 h5py
-numcodecs==0.7.3
 numpy>=1.16
 PyYAML
 scipy
