@@ -61,7 +61,13 @@ setup(
     """,
     python_requires=">=3.6",
     install_requires=requires,
-    extras_require={"mpi": ["mpi4py>=1.3"]},
+    extras_require={
+        "mpi": ["mpi4py>=1.3"],
+        "compression": [
+            "bitshuffle @ git+https://github.com/kiyo-masui/bitshuffle.git",
+            "numcodecs == 0.7.3",
+        ],
+    },
     setup_requires=["cython"],
     # metadata for upload to PyPI
     author="Kiyo Masui, J. Richard Shaw",
