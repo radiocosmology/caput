@@ -1,8 +1,20 @@
 """Interface for file formats supported by caput: HDF5 and Zarr."""
-from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4
+import logging
 import h5py
-import numcodecs
 import zarr
+
+logger = logging.getLogger(__name__)
+
+try:
+    from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4
+    import numcodecs
+except ModuleNotFoundError as e:
+    logger.debug(
+        f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
+    )
+    compression_enabled = False
+else:
+    compression_enabled = True
 
 
 class FileFormat:
@@ -62,6 +74,10 @@ class HDF5(FileFormat):
         if compressor:
             raise NotImplementedError
         if compression in ("bitshuffle", H5FILTER, str(H5FILTER)):
+            if not compression_enabled:
+                raise ValueError(
+                    f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
+                )
             compression = H5FILTER
             try:
                 blocksize, c = compression_opts
@@ -95,6 +111,11 @@ class Zarr(FileFormat):
         """Format compression arguments for zarr API."""
         super(Zarr, Zarr).compression_kwargs(compression, compression_opts, compressor)
         if compression:
+            if not compression_enabled:
+                raise ValueError(
+                    f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression "
+                    f"filters."
+                )
             if compression == "gzip":
                 return {"compressor": numcodecs.gzip.GZip(level=compression_opts)}
             if compression in (H5FILTER, str(H5FILTER), "bitshuffle"):
