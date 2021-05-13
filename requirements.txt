@@ -1,3 +1,4 @@
+bitshuffle @ git+https://github.com/kiyo-masui/bitshuffle.git
 click
 cython
 h5py

@@ -30,7 +30,7 @@ class Mock(MagicMock):
         return Mock()
 
 
-# Do not mock up mpi4py. This is an "extra", and docs bbuild without it.
+# Do not mock up mpi4py. This is an "extra", and docs build without it.
 # MOCK_MODULES = ['h5py', 'mpi4py']
 MOCK_MODULES = ["h5py"]
 if on_rtd:

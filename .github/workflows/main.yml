@@ -21,7 +21,7 @@ jobs:
 
       - name: Install apt dependencies
         run: |
-          sudo apt-get install -y libopenmpi-dev openmpi-bin
+          sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
 
       - name: Install pip dependencies
         run: |
@@ -37,7 +37,7 @@ jobs:
           pylint-ignore
           -d line-too-long,invalid-name,import-outside-toplevel,logging-fstring-interpolation,unnecessary-pass
           -d no-else-return,too-many-arguments,too-many-locals,too-many-ancestors,too-many-branches
-          --extension-pkg-whitelist=mpi4py,caput.weighted_median,h5py,numcodecs.blosc caput
+          --extension-pkg-whitelist=mpi4py,caput.weighted_median,h5py,numcodecs.blosc,bitshuffle.h5 caput
 
       - name: Check code with black
         run: black --check .
@@ -54,7 +54,7 @@ jobs:
 
     - name: Install apt dependencies
       run: |
-        sudo apt-get install -y libopenmpi-dev openmpi-bin
+        sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v1
@@ -63,6 +63,7 @@ jobs:
 
     - name: Install pip dependencies
       run: |
+        pip install --no-binary=h5py h5py
         pip install -r requirements.txt
         pip install mpi4py
         pip install pytest pytest-lazy-fixture
@@ -89,6 +90,10 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: 3.9
+
+    - name: Install apt dependencies
+      run: |
+        sudo apt-get install -y libhdf5-serial-dev
 
     - name: Install pip dependencies
       run: |
