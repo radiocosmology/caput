@@ -116,10 +116,6 @@ class Zarr(FileFormat):
                     c = "lz4"
                 if c in (BSHUF_H5_COMPRESS_LZ4, str(BSHUF_H5_COMPRESS_LZ4)):
                     c = "lz4"
-                else:
-                    raise ValueError(
-                        f"Unknown value for cname in HDF5 compression opts: {c}"
-                    )
                 if blocksize is None:
                     blocksize = 0
                 return {

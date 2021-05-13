@@ -2464,9 +2464,7 @@ def deep_group_copy(
                 )
             else:
                 # use HDF5 compression args format
-                compression_kwargs = (
-                    compression_kwargs
-                ) = fileformats.HDF5.compression_kwargs(
+                compression_kwargs = fileformats.HDF5.compression_kwargs(
                     compression=compression, compression_opts=compression_opts
                 )
             g2.create_dataset(
