@@ -142,7 +142,7 @@ def scalarize(dtype=np.float64):
     return _scalarize_desc
 
 
-def listize(**base_kwargs):
+def listize(**_):
     """Make functions that already work with `np.ndarray` or scalars accept lists.
 
     Also works with tuples.
