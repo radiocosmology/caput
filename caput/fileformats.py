@@ -83,7 +83,7 @@ class HDF5(FileFormat):
                 blocksize, c = compression_opts
             except ValueError as e:
                 raise ValueError(
-                    f"Failed to interpret compression_opts: {e}\n{compression_opts}."
+                    f"Failed to interpret compression_opts: {e}\ncompression_opts: {compression_opts}."
                 ) from e
             if blocksize is None:
                 blocksize = 0
@@ -122,7 +122,7 @@ class Zarr(FileFormat):
                     blocksize, c = compression_opts
                 except ValueError as e:
                     raise ValueError(
-                        f"Failed to interpret compression_opts: {e}\n{compression_opts}"
+                        f"Failed to interpret compression_opts: {e}\ncompression_opts: {compression_opts}"
                     ) from e
                 if c in (H5_COMPRESS_LZ4, str(H5_COMPRESS_LZ4)):
                     c = "lz4"
