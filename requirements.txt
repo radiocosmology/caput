@@ -5,3 +5,4 @@ PyYAML
 skyfield>=1.31
 cython
 click
+cachetools
