@@ -452,6 +452,25 @@ def test_global_setslice():
 
     assert (darr == local_array).all()
 
+    # test setting complex dtypes
+
+    darr_complex = mpiarray.MPIArray((size * 5, 20), axis=0, dtype=np.complex64)
+
+    darr_complex[:] = 4
+    assert darr_complex.dtype == np.complex64
+    assert (darr_complex == 4. + 0.j).all()
+
+    darr_complex[:] = 2.0 + 1.345j
+
+    assert darr_complex.dtype == np.complex64
+    assert (darr_complex == 2.0 + 1.345j).all()
+
+    darr_float = mpiarray.MPIArray((size * 5, 20), axis=0, dtype=np.float64)
+
+    darr_float[:] = 4.0
+    assert darr_float.dtype == np.float64
+    assert (darr_float == 4.0).all()
+
 
 def test_outer_ufunc():
     rank = mpiutil.rank
@@ -495,6 +514,14 @@ def test_outer_ufunc():
             mpiarray.MPIArray((size, 3), axis=0), mpiarray.MPIArray((size, 4), axis=0)
         )
     # pylint: enable=expression-not-assigned
+
+    # test ufuncs with complex dtypes
+
+    dist_complex = mpiarray.MPIArray((size, 4), axis=0, dtype=np.complex64)
+    dist_complex_add = dist_complex + dist_complex
+
+    assert (dist_complex_add == dist_complex + dist_complex).all()
+    assert dist_complex_add.dtype == np.complex64
 
 
 def test_reduce():
