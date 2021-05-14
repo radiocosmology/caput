@@ -10,7 +10,7 @@ try:
     import numcodecs
 except ModuleNotFoundError as e:
     logger.debug(
-        f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
+        "Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
     )
     compression_enabled = False
 else:
@@ -76,7 +76,7 @@ class HDF5(FileFormat):
         if compression in ("bitshuffle", H5FILTER, str(H5FILTER)):
             if not compression_enabled:
                 raise ValueError(
-                    f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
+                    "Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
                 )
             compression = H5FILTER
             try:
@@ -113,8 +113,7 @@ class Zarr(FileFormat):
         if compression:
             if not compression_enabled:
                 raise ValueError(
-                    f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression "
-                    f"filters."
+                    "Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
                 )
             if compression == "gzip":
                 return {"compressor": numcodecs.gzip.GZip(level=compression_opts)}
