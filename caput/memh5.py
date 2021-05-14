@@ -2397,6 +2397,9 @@ def _distributed_group_to_hdf5_serial(
 
                     if hints:
                         f[entry.name].attrs["__memh5_distributed_dset"] = True
+                        f[entry.name].attrs[
+                            "__memh5_distributed_axis"
+                        ] = entry.distributed_axis
 
     comm.Barrier()
 
@@ -2453,6 +2456,7 @@ def _distributed_group_to_hdf5_parallel(
 
                     if hints:
                         dset.attrs["__memh5_distributed_dset"] = True
+                        dset.attrs["__memh5_distributed_axis"] = item.distributed_axis
 
                 # Create common dataset (collective)
                 else:
@@ -2558,13 +2562,17 @@ def _distributed_group_from_hdf5(
                     "__memh5_distributed_dset"
                 ]:
 
+                    distributed_axis = item.attrs.get("__memh5_distributed_axis", 0)
+
                     # Read from file into MPIArray
                     pdata = mpiarray.MPIArray.from_hdf5(
-                        h5group, key, comm=comm, sel=selection
+                        h5group, key, axis=distributed_axis, comm=comm, sel=selection
                     )
 
                     # Create dataset from MPIArray
-                    dset = memgroup.create_dataset(key, data=pdata, distributed=True)
+                    dset = memgroup.create_dataset(
+                        key, data=pdata, distributed=True, distributed_axis=pdata.axis
+                    )
                 else:
                     # Read common data onto rank zero and broadcast
                     cdata = None
