@@ -5,7 +5,8 @@ from pathlib import Path
 
 import click
 
-from caput.config import CaputConfigError
+from ..config import CaputConfigError
+from ..profile import Profiler
 
 products = None
 
@@ -123,43 +124,18 @@ def run(configfile, loglevel, profile, profiler):
             "--loglevel is deprecated, use the config file instead", DeprecationWarning
         )
 
-    if profile:
-        if profiler == "cProfile":
-            import cProfile
-
-            pr = cProfile.Profile()
-            pr.enable()
-        elif profiler == "pyinstrument":
-            from pyinstrument import Profiler
-
-            pr = Profiler()
-            pr.start()
-
-    try:
-        P = Manager.from_yaml_file(configfile)
-    except CaputConfigError as e:
-        click.echo(
-            "Found at least one error in '{}'.\n"
-            "Fix and run again to find more problems.".format(configfile)
-        )
-        click.echo(e)
-        sys.exit(1)
-    else:
-        P.run()
-
-    if profile:
-
-        from caput import mpiutil
-
-        rank = mpiutil.rank
-
-        if profiler == "cProfile":
-            pr.disable()
-            pr.dump_stats("profile_%i.prof" % mpiutil.rank)
-        elif profiler == "pyinstrument":
-            pr.stop()
-            with open("profile_%i.txt" % rank, "w") as fh:
-                fh.write(pr.output_text(unicode=True))
+    with Profiler(profile, profiler=profiler):
+        try:
+            P = Manager.from_yaml_file(configfile)
+        except CaputConfigError as e:
+            click.echo(
+                "Found at least one error in '{}'.\n"
+                "Fix and run again to find more problems.".format(configfile)
+            )
+            click.echo(e)
+            sys.exit(1)
+        else:
+            P.run()
 
 
 @cli.command()
