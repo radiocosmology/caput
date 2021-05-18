@@ -53,7 +53,10 @@ class PSUtilProfiler(psutil.Process):
             self._start_cpu_times[name] = self.cpu_times()
             self.cpu_percent()
             self._start_memory[name] = self.memory_full_info().uss
-            self._start_disk_io[name] = self.io_counters()
+            if psutil.MACOS:
+                self._start_memory[name] = psutil.disk_io_counters()
+            else:
+                self._start_disk_io[name] = self.io_counters()
 
     def stop(self, name):
         """
@@ -74,7 +77,8 @@ class PSUtilProfiler(psutil.Process):
             Process CPU utilization since `start` was called as percentage. Can be >100 if multiple threads run on
             different cores. See `PSUtil.cpu_count` for available cores.
         disk_io : `collections.namedtuple`
-            Same as `psutil.disk_io_counters`. Difference since `start` was called.
+            Same as `psutil.io_counters` (on Linux) or `psutil.disk_io_counters` (on MacOS).
+            Difference since `start` was called.
         memory : str
             Difference of memory in use by this process since `start` was called. If negative,
             less memory is in use now.
@@ -90,8 +94,11 @@ class PSUtilProfiler(psutil.Process):
         with self.oneshot():
             cpu_times = self.cpu_times()
             cpu_percent = self.cpu_percent()
-            disk_io = self.io_counters()
             memory = self.memory_full_info().uss
+            if psutil.MACOS:
+                disk_io = psutil.disk_io_counters()
+            else:
+                disk_io = self.io_counters()
 
         if name not in self._start_cpu_times:
             raise RuntimeError(
