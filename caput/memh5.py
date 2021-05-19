@@ -1570,6 +1570,9 @@ class MemDiskGroup(_BaseGroup):
         if self.ondisk and hasattr(self, "_toclose") and self._toclose:
             self._storage_root.close()
 
+        if hasattr(self, "_lockfile") and (self.comm is None or self.comm.rank is None):
+            fileformats.remove_file_or_dir(self._lockfile)
+
     def __getitem__(self, name):
         """Retrieve an object.
 
@@ -1693,6 +1696,8 @@ class MemDiskGroup(_BaseGroup):
         if convert_dataset_strings is None:
             convert_dataset_strings = getattr(cls, "convert_dataset_strings", False)
 
+        lockfile = None
+
         if not ondisk:
             if isinstance(file_, (h5py.Group, zarr.Group)):
                 file_ = file_.filename
@@ -1735,7 +1740,8 @@ class MemDiskGroup(_BaseGroup):
             else:
                 kwargs.setdefault("mode", "a")
                 if distributed and file_format == fileformats.Zarr:
-                    kwargs["synchronizer"] = zarr.ProcessSynchronizer(f"{file_}.sync")
+                    lockfile = f"{file_}.sync"
+                    kwargs["synchronizer"] = zarr.ProcessSynchronizer(lockfile)
                 data = file_format.open(file_, **kwargs)
                 toclose = file_format == fileformats.HDF5
 
@@ -1747,6 +1753,10 @@ class MemDiskGroup(_BaseGroup):
         self._finish_setup()
 
         self._toclose = toclose
+
+        if lockfile is not None:
+            self._comm = comm
+            self._lockfile = lockfile
         return self
 
     # Methods for manipulating and building the class. #
@@ -2831,8 +2841,11 @@ def _distributed_group_to_zarr(
     group.comm.Barrier()
 
     # Open file on all ranks
-    with zarr.open_group(
-        store=fname, mode="r+", synchronizer=zarr.ProcessSynchronizer(f"{fname}.sync")
+
+    with fileformats.ZarrProcessSynchronizer(
+        f".{fname}.sync", group.comm
+    ) as synchronizer, zarr.open_group(
+        store=fname, mode="r+", synchronizer=synchronizer
     ) as f:
         # Start recursive file write
         _copy_to_file(group, f, compression, compression_opts)

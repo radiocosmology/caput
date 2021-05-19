@@ -866,14 +866,17 @@ class MPIArray(np.ndarray):
             compression_opts=compression_opts,
         )
 
+        lockfile = None
+
         if isinstance(f, str):
             if self.comm.rank == 0 and create:
                 zarr.open(store=f, mode=mode)
+            lockfile = f".{f}.sync"
             self.comm.Barrier()
             group = zarr.open_group(
                 store=f,
                 mode="r+",
-                synchronizer=zarr.ProcessSynchronizer(f"{f}.sync"),
+                synchronizer=zarr.ProcessSynchronizer(lockfile),
             )
         elif isinstance(f, zarr.Group):
             if f.synchronizer is None:
@@ -907,6 +910,8 @@ class MPIArray(np.ndarray):
             )
             group[dataset][islice] = self.local_array[fslice]
         self.comm.Barrier()
+        if self.comm.rank == 0 and lockfile is not None:
+            fileformats.remove_file_or_dir(lockfile)
 
     def to_file(
         self,
