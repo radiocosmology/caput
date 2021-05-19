@@ -1,5 +1,8 @@
 """Interface for file formats supported by caput: HDF5 and Zarr."""
 import logging
+import os
+import shutil
+
 import h5py
 import zarr
 
@@ -141,6 +144,53 @@ class Zarr(FileFormat):
                 )
         else:
             return {"compressor": compressor}
+
+
+class ZarrProcessSynchronizer:
+    """
+    A context manager for Zarr's ProcessSynchronizer that removes the lock files when done.
+
+    If an MPI communicator is supplied, only rank 0 will attempt to remove files.
+
+    Parameters
+    ----------
+    name : str
+        Name of the lockfile directory.
+    comm :
+        MPI communicator (optional).
+    """
+
+    def __init__(self, name, comm=None):
+        self.name = name
+        self._comm = comm
+
+    def __enter__(self):
+        return zarr.ProcessSynchronizer(self.name)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._comm is None or self._comm.rank == 0:
+            remove_file_or_dir(self.name)
+
+
+def remove_file_or_dir(name: str):
+    """
+    Remove the file or directory with the given name.
+
+    Parameters
+    ----------
+    name : str
+        File or directory name to remove.
+    """
+    if os.path.isdir(name):
+        try:
+            shutil.rmtree(name)
+        except FileNotFoundError:
+            pass
+    else:
+        try:
+            os.remove(name)
+        except FileNotFoundError:
+            pass
 
 
 def guess_file_format(name, default=HDF5):

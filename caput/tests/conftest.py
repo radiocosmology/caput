@@ -1,14 +1,12 @@
 """Pytest fixtures and simple tasks that can be used by all unit tests."""
 
 import glob
-import os
-import shutil
 
 import numpy as np
 import pytest
 
-from caput.pipeline import PipelineStopIteration, TaskBase, IterBase
-from caput import config, mpiutil
+from ..pipeline import PipelineStopIteration, TaskBase, IterBase
+from .. import config, fileformats, mpiutil
 
 
 @pytest.fixture(scope="session")
@@ -132,13 +130,4 @@ def rm_all_files(file_name):
     """Remove all files and directories starting with `file_name`."""
     file_names = glob.glob(file_name + "*")
     for fname in file_names:
-        if os.path.isdir(fname):
-            try:
-                shutil.rmtree(fname)
-            except FileNotFoundError:
-                pass
-        else:
-            try:
-                os.remove(fname)
-            except FileNotFoundError:
-                pass
+        fileformats.remove_file_or_dir(fname)
