@@ -2764,6 +2764,8 @@ def _distributed_group_to_zarr(
         for key in sorted(memgroup):
 
             item = memgroup[key]
+            logger.error(f"memgroup: {memgroup}")
+            logger.error(f"item: {item}")
 
             # If group, create the entry and the recurse into it
             if is_group(item):
@@ -2774,6 +2776,7 @@ def _distributed_group_to_zarr(
 
             # If dataset, create dataset
             else:
+                logger.error(f"compression settings: {item.compression} {item.compression_opts}")
                 if item.compression is not None:
                     compression = item.compression
                     compression_opts = item.compression_opts
@@ -2782,6 +2785,9 @@ def _distributed_group_to_zarr(
                 if isinstance(item, MemDatasetDistributed):
 
                     data = check_unicode(item)
+
+                    logger.error(f"chunk settings: {item.chunks}")
+
 
                     # Write to file from MPIArray
                     data.to_file(
