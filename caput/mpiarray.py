@@ -449,7 +449,9 @@ class MPIArray(np.ndarray):
 
         # create an mpi array, with the appropriate parameters
         # fill it with the contents of the slice
-        arr_mpi = MPIArray(tuple(new_global_shape), axis=dist_axis, comm=self._comm, dtype=self.dtype)
+        arr_mpi = MPIArray(
+            tuple(new_global_shape), axis=dist_axis, comm=self._comm, dtype=self.dtype
+        )
         arr_mpi[:] = arr_sliced[:]
         return arr_mpi
 

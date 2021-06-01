@@ -458,7 +458,7 @@ def test_global_setslice():
 
     darr_complex[:] = 4
     assert darr_complex.dtype == np.complex64
-    assert (darr_complex == 4. + 0.j).all()
+    assert (darr_complex == 4.0 + 0.0j).all()
 
     darr_complex[:] = 2.0 + 1.345j
 

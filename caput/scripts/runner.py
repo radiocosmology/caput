@@ -1,11 +1,13 @@
+import itertools
 import os
 import sys
-
 from pathlib import Path
+import tempfile
 
 import click
 
 from caput.config import CaputConfigError
+from caput.profile import Profiler
 
 products = None
 
@@ -123,43 +125,73 @@ def run(configfile, loglevel, profile, profiler):
             "--loglevel is deprecated, use the config file instead", DeprecationWarning
         )
 
-    if profile:
-        if profiler == "cProfile":
-            import cProfile
+    with Profiler(profile, profiler=profiler):
+        try:
+            P = Manager.from_yaml_file(configfile)
+        except CaputConfigError as e:
+            click.echo(
+                "Found at least one error in '{}'.\n"
+                "Fix and run again to find more problems.".format(configfile)
+            )
+            click.echo(e)
+            sys.exit(1)
+        else:
+            P.run()
 
-            pr = cProfile.Profile()
-            pr.enable()
-        elif profiler == "pyinstrument":
-            from pyinstrument import Profiler
 
-            pr = Profiler()
-            pr.start()
+@cli.command()
+@click.argument(
+    "templatefile",
+    type=click.File(mode="r"),
+)
+@click.option(
+    "--var",
+    multiple=True,
+    help=(
+        "The template variable value(s). This option can be given multiple times, once "
+        "for each variable to be substituted."
+    ),
+    metavar="<NAME>=<VALUE>[,<VALUE2>...]",
+)
+def template_run(templatefile, var):
+    """Run a pipeline immediately from the given TEMPLATEFILE.
 
-    try:
-        P = Manager.from_yaml_file(configfile)
-    except CaputConfigError as e:
-        click.echo(
-            "Found at least one error in '{}'.\n"
-            "Fix and run again to find more problems.".format(configfile)
-        )
-        click.echo(e)
-        sys.exit(1)
-    else:
-        P.run()
+    Template variable substitutions are specified with `--var <varname>=<val>`
+    arguments, with one for each variable. `<val>` may be a comma separated list, in
+    which case item represents a separate value that is processed. Values *must* not
+    contain a comma themselves. If multiple variables are specified, each with multiple
+    substitutions the outer product of all possible values is generated.
+    """
+    from caput.pipeline import Manager
 
-    if profile:
+    # Parse all the specified variables into a dictionary, with lists for the values
+    # taken by each variable
+    vardict = {}
+    for v in var:
+        varname, vals = v.split("=", 1)
+        vardict[varname] = vals.split(",")
 
-        from caput import mpiutil
+    template_string = templatefile.read()
 
-        rank = mpiutil.rank
+    # Loop over the outer product of all the variables
+    for vars_single in itertools.product(*vardict.values()):
 
-        if profiler == "cProfile":
-            pr.disable()
-            pr.dump_stats("profile_%i.prof" % mpiutil.rank)
-        elif profiler == "pyinstrument":
-            pr.stop()
-            with open("profile_%i.txt" % rank, "w") as fh:
-                fh.write(pr.output_text(unicode=True))
+        # Construct a dict mapping each variable name to its value
+        vardict_single = dict(zip(vardict.keys(), vars_single))
+
+        with tempfile.NamedTemporaryFile("w") as tfh:
+
+            # Output the set of variable values used in this iteratin
+            var_string = " ".join([f"{k}={v}" for k, v in vardict_single.items()])
+            click.echo(f"Running script with {var_string}")
+
+            # Expand and save the job script
+            expanded_string = template_string.format(**vardict_single)
+            tfh.write(expanded_string)
+            tfh.flush()
+
+            # Run the pipeline
+            Manager.from_yaml_file(tfh.name).run()
 
 
 @cli.command()
