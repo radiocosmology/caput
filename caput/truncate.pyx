@@ -1,15 +1,25 @@
 """Routines for truncating data to a specified precision."""
 
+# cython: language_level=3
+
 cimport cython
 from cython.parallel import prange
 
 import numpy as np
 cimport numpy as cnp
 
+cdef extern from "truncate.hpp":
+    inline int bit_truncate(int val, int err) nogil
 
 cdef extern from "truncate.hpp":
-    inline float bit_truncate_float(float val, float err) nogil
+    inline long bit_truncate_64(long val, long err) nogil
 
+cdef extern from "truncate.hpp":
+    inline float _bit_truncate_float(float val, float err) nogil
+
+
+cdef extern from "truncate.hpp":
+    inline double _bit_truncate_double(double val, double err) nogil
 
 ctypedef double complex complex128
 
@@ -17,7 +27,30 @@ cdef extern from "complex.h" nogil:
     double cabs(complex128)
 
 
-def bit_truncate(float val, float err):
+def bit_truncate_int(int val, int err):
+    """
+    Bit truncation of a 32bit integer.
+
+    Truncate the precision of `val` by rounding to a multiple of a power of
+    two, keeping error less than or equal to `err`.
+
+    Made available for testing.
+    """
+    return bit_truncate(val, err)
+
+def bit_truncate_long(long val, long err):
+    """
+    Bit truncation of a 64bit integer.
+
+    Truncate the precision of `val` by rounding to a multiple of a power of
+    two, keeping error less than or equal to `err`.
+
+    Made available for testing.
+    """
+    return bit_truncate_64(val, err)
+
+
+def bit_truncate_float(float val, float err):
     """Truncate using a fixed error.
 
     Parameters
@@ -33,7 +66,26 @@ def bit_truncate(float val, float err):
         The truncated value.
     """
 
-    return bit_truncate_float(val, err)
+    return _bit_truncate_float(val, err)
+
+
+def bit_truncate_double(double val, double err):
+    """Truncate using a fixed error.
+
+    Parameters
+    ----------
+    val
+        The value to truncate.
+    err
+        The absolute precision to allow.
+
+    Returns
+    -------
+    val
+        The truncated value.
+    """
+
+    return _bit_truncate_double(val, err)
 
 
 @cython.boundscheck(False)
@@ -69,9 +121,9 @@ def bit_truncate_weights(float[::1] val, float[::1] inv_var, float fallback):
 
     for i in prange(n, nogil=True):
         if inv_var[i] != 0:
-            val[i] = bit_truncate_float(val[i], 1.0 / inv_var[i]**0.5)
+            val[i] = _bit_truncate_float(val[i], 1.0 / inv_var[i]**0.5)
         else:
-            val[i] = bit_truncate_float(val[i], fallback * val[i])
+            val[i] = _bit_truncate_float(val[i], fallback * val[i])
 
     return np.asarray(val)
 
@@ -97,9 +149,35 @@ def bit_truncate_relative(float[::1] val, float prec):
     cdef Py_ssize_t i = 0
 
     for i in prange(n, nogil=True):
-        val[i] = bit_truncate_float(val[i], prec * val[i])
+        val[i] = _bit_truncate_float(val[i], prec * val[i])
 
     return np.asarray(val)
+
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def bit_truncate_relative_double(cnp.float64_t[::1] val, cnp.float64_t prec):
+    """Truncate doubles using a relative tolerance.
+
+    Parameters
+    ----------
+    val
+        The array of double values to truncate the precision of. These values are modified in place.
+    prec
+        The fractional precision required.
+
+    Returns
+    -------
+    val
+        The modified array. This shares the same underlying memory as the input.
+    """
+    cdef Py_ssize_t n = val.shape[0]
+    cdef Py_ssize_t i = 0
+
+    for i in prange(n, nogil=True):
+        val[i] = _bit_truncate_double(val[i], prec * val[i])
+
+    return np.asarray(val, dtype=np.float64)
 
 
 @cython.boundscheck(False)
@@ -155,7 +233,7 @@ def bit_truncate_max_complex(complex128[:, ::1] val, float prec, float prec_max_
 
             vr = val[i, j].real
             vi = val[i, j].imag
-            val[i, j].real = bit_truncate_float(<float>vr, abs_prec)
-            val[i, j].imag = bit_truncate_float(<float>vi, abs_prec)
+            val[i, j].real = _bit_truncate_float(<float>vr, abs_prec)
+            val[i, j].imag = _bit_truncate_float(<float>vi, abs_prec)
 
     return np.asarray(val)
