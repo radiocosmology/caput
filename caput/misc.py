@@ -1,6 +1,5 @@
 """A set of miscellaneous routines that don't really fit anywhere more specific."""
 
-
 import importlib
 import os
 

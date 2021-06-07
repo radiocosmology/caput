@@ -21,6 +21,8 @@ import sys
 import time
 import warnings
 from types import ModuleType
+from typing import Optional
+
 import numpy as np
 
 
@@ -677,6 +679,60 @@ def parallel_rows_write_hdf5(fname, dsetname, local_data, shape, comm=_comm):
     lock_and_write_buffer(local_data, fname, offset + sr * nc, lr * nc)
 
 
+# Need to disable the pylint error here as we only need to implement one method
+class MPILogFilter(logging.Filter):  # pylint: disable=too-few-public-methods
+    """Filter log entries by MPI rank.
+
+    Also this will optionally add MPI rank information, and add an elapsed time
+    entry.
+
+    Parameters
+    ----------
+    add_mpi_info : boolean, optional
+        Add MPI rank/size info to log records that don't already have it.
+    level_rank0 : int
+        Log level for messages from rank=0.
+    level_all : int
+        Log level for messages from all other ranks.
+    """
+
+    def __init__(
+        self,
+        add_mpi_info: bool = True,
+        level_rank0: int = logging.INFO,
+        level_all: int = logging.WARN,
+        comm: Optional["MPI.Intracomm"] = None,
+    ):
+
+        super().__init__()
+
+        self.add_mpi_info = add_mpi_info
+
+        self.level_rank0 = level_rank0
+        self.level_all = level_all
+
+        self.rank = comm.rank if comm else rank
+        self.size = comm.size if comm else size
+
+    def filter(self, record):
+
+        # Add MPI info if desired
+        try:
+            record.mpi_rank
+        except AttributeError:
+            if self.add_mpi_info:
+                record.mpi_rank = self.rank
+                record.mpi_size = self.size
+
+        # Add a new field with the elapsed time in seconds (as a float)
+        record.elapsedTime = record.relativeCreated * 1e-3
+
+        # Return whether we should filter the record or not.
+        return (record.mpi_rank == 0 and record.levelno >= self.level_rank0) or (
+            record.mpi_rank > 0 and record.levelno >= self.level_all
+        )
+
+
 class SelfWrapper(ModuleType):
     """A thin wrapper around THIS module (`we patch sys.modules[__name__]`)."""
 
@@ -705,5 +761,5 @@ class SelfWrapper(ModuleType):
         return SelfWrapper(self.self_module, kwargs)
 
 
-self = sys.modules[__name__]
-sys.modules[__name__] = SelfWrapper(self)
+thismod = sys.modules[__name__]
+sys.modules[__name__] = SelfWrapper(thismod)

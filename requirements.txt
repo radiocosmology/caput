@@ -1,7 +1,11 @@
+bitshuffle @ git+https://github.com/kiyo-masui/bitshuffle.git
+cachetools
 click
 cython
 h5py
+numcodecs==0.7.3
 numpy>=1.16
+psutil
 PyYAML
 scipy
 skyfield>=1.31
