@@ -6,8 +6,8 @@ import tempfile
 
 import click
 
-from ..config import CaputConfigError
-from ..profile import Profiler
+from caput.config import CaputConfigError
+from caput.profile import Profiler
 
 products = None
 
