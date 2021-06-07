@@ -39,3 +39,22 @@ def test_truncate_array():
         )
         == np.asarray([32, 32], dtype=np.float64)
     ).all()
+
+
+def test_truncate_weights():
+    assert (
+        truncate.bit_truncate_weights(
+            np.asarray([32.121, 32.5], dtype=np.float32),
+            np.asarray([1 / 32, 1 / 32], dtype=np.float32),
+            0.001,
+        )
+        == np.asarray([32, 32], dtype=np.float32)
+    ).all()
+    assert (
+        truncate.bit_truncate_weights(
+            np.asarray([32.121, 32.5], dtype=np.float64),
+            np.asarray([1 / 32, 1 / 32], dtype=np.float64),
+            0.001,
+        )
+        == np.asarray([32, 32], dtype=np.float64)
+    ).all()

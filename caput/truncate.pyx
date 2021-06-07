@@ -88,9 +88,19 @@ def bit_truncate_double(double val, double err):
     return _bit_truncate_double(val, err)
 
 
+def bit_truncate_weights(val, inv_var, fallback):
+    if val.dtype == np.float32 and inv_var.dtype == np.float32:
+        return bit_truncate_weights_float(val, inv_var, fallback)
+    if val.dtype == np.float64 and inv_var.dtype == np.float64:
+        return bit_truncate_weights_double(val, inv_var, fallback)
+    else:
+        raise RuntimeError(f"Can't truncate data of type {val.dtype}/{inv_var.dtype} "
+                           f"(expected float32 or float64).")
+
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_weights(float[::1] val, float[::1] inv_var, float fallback):
+def bit_truncate_weights_float(float[::1] val, float[::1] inv_var, float fallback):
     """Truncate using a set of inverse variance weights.
 
     Giving the error as an inverse variance is particularly useful for data analysis.
@@ -124,6 +134,45 @@ def bit_truncate_weights(float[::1] val, float[::1] inv_var, float fallback):
             val[i] = _bit_truncate_float(val[i], 1.0 / inv_var[i]**0.5)
         else:
             val[i] = _bit_truncate_float(val[i], fallback * val[i])
+
+    return np.asarray(val)
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+def bit_truncate_weights_double(double[::1] val, double[::1] inv_var, double fallback):
+    """Truncate array of doubles using a set of inverse variance weights.
+
+    Giving the error as an inverse variance is particularly useful for data analysis.
+
+    Parameters
+    ----------
+    val
+        The array of values to truncate the precision of. These values are modified in place.
+    inv_var
+        The acceptable precision expressed as an inverse variance.
+    fallback
+        A relative precision to use for cases where the inv_var is zero.
+
+    Returns
+    -------
+    val
+        The modified array. This shares the same underlying memory as the input.
+    """
+    cdef Py_ssize_t n = val.shape[0]
+    cdef Py_ssize_t i = 0
+
+    if val.ndim != 1:
+        raise ValueError("Input array must be 1-d.")
+    if inv_var.shape[0] != n:
+        raise ValueError(
+            f"Weight and value arrays must have same shape ({inv_var.shape[0]} != {n})"
+        )
+
+    for i in prange(n, nogil=True):
+        if inv_var[i] != 0:
+            val[i] = _bit_truncate_double(val[i], 1.0 / inv_var[i]**0.5)
+        else:
+            val[i] = _bit_truncate_double(val[i], fallback * val[i])
 
     return np.asarray(val)
 
