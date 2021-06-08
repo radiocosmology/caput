@@ -176,10 +176,18 @@ def bit_truncate_weights_double(double[::1] val, double[::1] inv_var, double fal
 
     return np.asarray(val)
 
+def bit_truncate_relative(val, prec):
+    if val.dtype == np.float32:
+        return bit_truncate_relative_float(val, prec)
+    if val.dtype == np.float64:
+        return bit_truncate_relative_double(val, prec)
+    else:
+        raise RuntimeError(f"Can't truncate data of type {val.dtype} (expected float32 or float64).")
+
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_relative(float[::1] val, float prec):
+def bit_truncate_relative_float(float[::1] val, float prec):
     """Truncate using a relative tolerance.
 
     Parameters
