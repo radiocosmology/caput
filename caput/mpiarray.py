@@ -227,6 +227,17 @@ Reduction methods might result in a decrease in the distributed axis number
 >>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4, 3), axis=1)
 >>> dist_arr.sum(axis=0).axis == 0
 True
+
+MPI.Comm
+=====
+
+mpi4py.MPI.Comm provides a wide variety of functions for communications across nodes
+https://mpi4py.readthedocs.io/en/stable/overview.html?highlight=allreduce#collective-communications
+
+They provide an upper-case and lower-case variant of many functions.
+With MPIArrays, please use the uppercase variant of the function. The lower-case variants involve
+an intermediate pickling process, which can lead to malformed arrays.
+
 """
 import os
 import time
@@ -1590,6 +1601,13 @@ def _mpi_to_ndarray(inputs):
 
     for array in inputs:
         if isinstance(array, MPIArray):
+            if not hasattr(array, 'axis'):
+                raise AxisException(
+                        "An input to a ufunc has an MPIArray, which is missing its axis property."
+                        "If using a lower-case MPI.Comm function, please use its upper-case alternative."
+                        "Pickling does not preserve the axis property."
+                        "Otherwise, please file an issue on caput with a stacktrace."
+                )
             if dist_axis is None:
                 dist_axis = array.axis
             else:
