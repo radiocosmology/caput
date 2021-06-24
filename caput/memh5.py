@@ -2780,7 +2780,9 @@ def _distributed_group_to_zarr(
 
             # If dataset, create dataset
             else:
-                logger.error(f"compression settings: {item.compression} {item.compression_opts}")
+                logger.error(
+                    f"compression settings: {item.compression} {item.compression_opts}"
+                )
                 if item.compression is not None:
                     compression = item.compression
                     compression_opts = item.compression_opts
@@ -2791,7 +2793,6 @@ def _distributed_group_to_zarr(
                     data = check_unicode(item)
 
                     logger.error(f"chunk settings: {item.chunks}")
-
 
                     # Write to file from MPIArray
                     data.to_file(

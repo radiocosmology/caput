@@ -932,6 +932,19 @@ class MPIArray(np.ndarray):
         dataset : string
             Name of dataset to write into. Should not exist.
         """
+        if chunks is None and hasattr(self, "chunks"):
+            logger.error(f"getting chunking opts from mpiarray: {self.chunks}")
+            chunks = self.chunks
+        if compression is None and hasattr(self, "compression"):
+            logger.error(f"getting compression opts from mpiarray: {self.compression}")
+
+            compression = self.compression
+        if compression_opts is None and hasattr(self, "compression_opts"):
+            logger.error(
+                f"getting compression_opts opts from mpiarray: {self.compression_opts}"
+            )
+
+            compression_opts = self.compression_opts
         if file_format == fileformats.HDF5:
             self.to_hdf5(f, dataset, create, chunks, compression, compression_opts)
         elif file_format == fileformats.Zarr:
