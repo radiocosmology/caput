@@ -6,10 +6,20 @@ import tempfile
 
 import click
 
+# N.B. we must avoid importing anything that initialises the MPI communicator.
+#      Otherwise, the runtime config set in `run` will be ignored.
 from caput.config import CaputConfigError
-from caput.profile import Profiler
 
 products = None
+
+# Per system overrides (i.e. specialisations for Scinet GPC and Westgrid cedar)
+CLUSTER_SYSTEM_DEFAULTS = {
+    "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
+    "cedar": {
+        "ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime",
+        "mpi4py.rc": {"recv_mprobe": False}
+    },
+}
 
 
 @click.group()
@@ -125,6 +135,29 @@ def run(configfile, loglevel, profile, profiler):
             "--loglevel is deprecated, use the config file instead", DeprecationWarning
         )
 
+    # Set up runtime cluster config options
+    import yaml
+    with open(configfile, "r") as f:
+        yconf = yaml.safe_load(f)
+
+    cluster_conf = {}
+    # fetch system defaults
+    if ("cluster" in yconf) and ("system" in yconf["cluster"]):
+        system = yconf["cluster"]["system"]
+
+        if system not in CLUSTER_SYSTEM_DEFAULTS:
+            raise ValueError('Specified system "%s": is not known.' % system)
+
+        cluster_conf.update(**CLUSTER_SYSTEM_DEFAULTS[system])
+    # override with user config
+    cluster_conf.update(yconf.get("cluster", {}))
+
+    # For this to work, mpi4py.rc needs to be set before the comm is initialised
+    if ("mpi4py.rc" in cluster_conf):
+        import mpi4py
+        mpi4py.rc(**cluster_conf["mpi4py.rc"])
+
+    from caput.profile import Profiler
     with Profiler(profile, profiler=profiler):
         try:
             P = Manager.from_yaml_file(configfile)
@@ -293,13 +326,6 @@ def queue(configfile, submit=False, lint=True):
     # Base setting if nothing else is set
     defaults = {"name": "job", "queue": "batch", "pernode": 1, "ompnum": 8}
 
-    # Per system overrides (i.e. specialisations for Scinet GPC and Westgrid
-    # cedar)
-    system_defaults = {
-        "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
-        "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
-    }
-
     # Start to generate the full resolved config
     rconf = defaults.copy()
 
@@ -308,10 +334,10 @@ def queue(configfile, submit=False, lint=True):
 
         system = conf["system"]
 
-        if system not in system_defaults:
+        if system not in CLUSTER_SYSTEM_DEFAULTS:
             raise ValueError('Specified system "%s": is not known.' % system)
 
-        rconf.update(**system_defaults[system])
+        rconf.update(**CLUSTER_SYSTEM_DEFAULTS[system])
 
     # Update the current config with the rest of the users variables
     rconf.update(**conf)
