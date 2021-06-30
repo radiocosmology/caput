@@ -106,11 +106,12 @@ def load_venv(configfile):
     help=(
         "Run the job in a profiler. This will output a `profile_<rank>.prof` file per "
         "MPI rank if using cProfile or `profile_<rank>.txt` file for pyinstrument."
+        "The output of psutil profiling can be found in the caput logs."
     ),
 )
 @click.option(
     "--profiler",
-    type=click.Choice(["cProfile", "pyinstrument"], case_sensitive=False),
+    type=click.Choice(["cProfile", "pyinstrument", "psutil"], case_sensitive=False),
     default="cProfile",
     help="Set the profiler to use. Default is cProfile.",
 )
@@ -125,9 +126,11 @@ def run(configfile, loglevel, profile, profiler):
             "--loglevel is deprecated, use the config file instead", DeprecationWarning
         )
 
-    with Profiler(profile, profiler=profiler):
+    use_psutil_profiler = profile and (profiler == "psutil")
+
+    with Profiler(profile and not use_psutil_profiler, profiler=profiler.lower()):
         try:
-            P = Manager.from_yaml_file(configfile)
+            P = Manager.from_yaml_file(configfile, psutil_profiling=use_psutil_profiler)
         except CaputConfigError as e:
             click.echo(
                 "Found at least one error in '{}'.\n"
@@ -207,7 +210,22 @@ def template_run(templatefile, var):
     default=True,
     help="Check the pipeline for errors before submitting it.",
 )
-def queue(configfile, submit=False, lint=True):
+@click.option(
+    "--profile",
+    is_flag=True,
+    default=False,
+    help=(
+        "Run the job in a profiler. This will output a `profile_<rank>.prof` file per "
+        "MPI rank if using cProfile or `profile_<rank>.txt` file for pyinstrument,"
+    ),
+)
+@click.option(
+    "--profiler",
+    type=click.Choice(["cProfile", "pyinstrument", "psutil"], case_sensitive=False),
+    default="cProfile",
+    help="Set the profiler to use. Default is cProfile.",
+)
+def queue(configfile, submit=False, lint=True, profile=False, profiler="cProfiler"):
     """Queue a pipeline on a cluster from the given CONFIGFILE.
 
     This queues the job, using parameters from the `cluster` section of the
@@ -366,6 +384,10 @@ def queue(configfile, submit=False, lint=True):
     else:
         rconf["venv"] = "/dev/null"
 
+    # Forward profiler configuration
+    rconf["profile"] = "--profile" if profile else ""
+    rconf["profiler"] = f"--profiler={profiler}" if profile else ""
+
     # Derived vars only needed to create script
     rconf["mpiproc"] = rconf["nodes"] * rconf["pernode"]
     rconf["workdir"] = workdir
@@ -442,7 +464,7 @@ source %(venv)s
 cd %(workdir)s
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-srun python %(scriptpath)s run %(configpath)s &> %(logpath)s
+srun python %(scriptpath)s run %(profile)s %(profiler)s %(configpath)s &> %(logpath)s
 
 # Set the status
 echo FINISHED > %(statuspath)s
