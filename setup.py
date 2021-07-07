@@ -65,8 +65,9 @@ setup(
         "mpi": ["mpi4py>=1.3"],
         "compression": [
             "bitshuffle @ git+https://github.com/kiyo-masui/bitshuffle.git",
-            "numcodecs == 0.7.3",
+            "numcodecs==0.7.3",
         ],
+        "zarr": ["zarr==2.8.1"],
     },
     setup_requires=["cython"],
     # metadata for upload to PyPI

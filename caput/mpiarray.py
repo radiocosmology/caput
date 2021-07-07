@@ -672,8 +672,10 @@ class MPIArray(np.ndarray):
         elif file_format == fileformats.Zarr:
             # Blosc may share incorrect global state amongst processes causing programs to hang.
             # See https://zarr.readthedocs.io/en/stable/tutorial.html#parallel-computing-and-synchronization
-            import numcodecs
-
+            try:
+                import numcodecs
+            except ImportError:
+                raise RuntimeError("Install numcodecs to read from zarr files.")
             numcodecs.blosc.use_threads = False
 
             if isinstance(f, str):
@@ -852,12 +854,16 @@ class MPIArray(np.ndarray):
         dataset : string
             Name of dataset to write into. Should not exist.
         """
-        import zarr
+        try:
+            import zarr
+            import numcodecs
+        except ImportError as err:
+            raise RuntimeError(
+                f"Can't write to zarr file. Please install zarr and numcodecs: {err}"
+            )
 
         # Blosc may share incorrect global state amongst processes causing programs to hang.
         # See https://zarr.readthedocs.io/en/stable/tutorial.html#parallel-computing-and-synchronization
-        import numcodecs
-
         numcodecs.blosc.use_threads = False
 
         mode = "a" if create else "r+"
