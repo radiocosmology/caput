@@ -195,7 +195,8 @@ class PSUtilProfiler(psutil.Process):
         self._logger = logger
 
         super().__init__()
-        if self.use_profiler:
+
+        if self._use_profiler and self._logger:
             self._logger.info(f"Profiling pipeline: {self.cpu_count} cores available.")
 
     def __eq__(self, other):
@@ -302,20 +303,21 @@ class PSUtilProfiler(psutil.Process):
 
         time_s = stop_time - self._start_time.pop(name)
 
-        if time_s < 0.1:
+        if time_s < 0.1 and self._logger:
             self._logger.info(
                 f"{name} ran for {time_s:.4f} < 0.1s, results might be inaccurate."
             )
 
-        self._logger.info(
-            f"{name} ran for {time_s:.4f}s\n"
-            f"---------------------------------------------------------------------------------------------"
-            f"\n{cpu_times}\n"
-            f"Average CPU load: {cpu_percent}\n"
-            f"{disk_io}\n"
-            f"Change in (uss) memory: {memory}\n"
-            f"============================================================================================="
-        )
+        if self._logger:
+            self._logger.info(
+                f"{name} ran for {time_s:.4f}s\n"
+                f"---------------------------------------------------------------------------------------------"
+                f"\n{cpu_times}\n"
+                f"Average CPU load: {cpu_percent}\n"
+                f"{disk_io}\n"
+                f"Change in (uss) memory: {memory}\n"
+                f"=============================================================================================\n"
+            )
 
     @property
     def cpu_count(self):
