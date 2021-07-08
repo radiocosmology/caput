@@ -30,7 +30,7 @@ class Profiler:
         current directory.
     """
 
-    profilers = ["cprofile", "pyinstrument", "psutil"]
+    profilers = ["cprofile", "pyinstrument"]
 
     def __init__(
         self,
@@ -123,8 +123,6 @@ class IOUsage:
     @staticmethod
     def _get_io():  # pylint: disable=no-self-use
         # Get the cumulative IO performed
-
-        import psutil
 
         if psutil.MACOS:
             d = psutil.disk_io_counters()
