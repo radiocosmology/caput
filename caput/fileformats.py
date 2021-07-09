@@ -4,9 +4,16 @@ import os
 import shutil
 
 import h5py
-import zarr
 
 logger = logging.getLogger(__name__)
+
+try:
+    import zarr
+except ImportError as err:
+    logger.info(f"zarr support disabled. Install zarr to change this: {err}")
+    zarr_available = False
+else:
+    zarr_available = True
 
 try:
     from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4
@@ -107,6 +114,8 @@ class Zarr(FileFormat):
     @staticmethod
     def open(*args, **kwargs):
         """Open a zarr file."""
+        if not zarr_available:
+            raise RuntimeError("Can't open zarr file. Please install zarr.")
         return zarr.open_group(*args, **kwargs)
 
     @staticmethod
@@ -161,6 +170,10 @@ class ZarrProcessSynchronizer:
     """
 
     def __init__(self, name, comm=None):
+        if not zarr_available:
+            raise RuntimeError(
+                "Can't use zarr process synchronizer. Please install zarr."
+            )
         self.name = name
         self._comm = comm
 
@@ -247,7 +260,7 @@ def check_file_format(filename, file_format, data):
     # guess file format from <output>
     if isinstance(data, h5py.Group):
         file_format_guess_output = HDF5
-    elif isinstance(data, zarr.Group):
+    elif zarr_available and isinstance(data, zarr.Group):
         file_format_guess_output = Zarr
     else:
         file_format_guess_output = None

@@ -1438,9 +1438,14 @@ class H5IOMixin:
 
         from caput import memh5
         import h5py
-        import zarr
 
         file_format = fileformats.check_file_format(filename, file_format, output)
+
+        try:
+            import zarr
+        except ImportError:
+            if file_format == fileformats.Zarr:
+                raise RuntimeError("Can't write to zarr file. Please install zarr.")
 
         # Ensure parent directory is present.
         dirname = os.path.dirname(filename)

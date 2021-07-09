@@ -59,7 +59,6 @@ import logging
 
 import numpy as np
 import h5py
-import zarr
 
 from . import fileformats
 from . import mpiutil
@@ -69,6 +68,13 @@ from . import misc
 
 logger = logging.getLogger(__name__)
 
+try:
+    import zarr
+except ImportError as err:
+    logger.info(f"zarr support disabled. Install zarr to change this: {err}")
+    zarr_available = False
+else:
+    zarr_available = True
 
 # Basic Classes
 # -------------
@@ -1476,7 +1482,9 @@ class MemDiskGroup(_BaseGroup):
 
         # Check the distribution settings
         if distributed:
-            if isinstance(data_group, (h5py.Group, zarr.Group)):
+            if isinstance(data_group, h5py.Group) or (
+                zarr_available and isinstance(data_group, zarr.Group)
+            ):
                 raise ValueError(
                     "Distributed MemDiskGroup cannot be created around h5py or zarr objects."
                 )
@@ -1609,8 +1617,9 @@ class MemDiskGroup(_BaseGroup):
     @property
     def ondisk(self):
         """Whether the data is stored on disk as opposed to in memory."""
-        return hasattr(self, "_storage_root") and isinstance(
-            self._storage_root, (h5py.File, zarr.Group)
+        return hasattr(self, "_storage_root") and (
+            isinstance(self._storage_root, h5py.File)
+            or (zarr_available and isinstance(self._storage_root, zarr.Group))
         )
 
     @classmethod
@@ -1688,6 +1697,8 @@ class MemDiskGroup(_BaseGroup):
             Any additional keyword arguments are passed to :class:`h5py.File`'s
             constructor if *file_* is a filename and silently ignored otherwise.
         """
+        if file_format == fileformats.Zarr and not zarr_available:
+            raise RuntimeError("Unable to read zarr file, please install zarr.")
 
         # Get a value for the conversion parameters, looking up on the class type if
         # not supplied
@@ -1952,6 +1963,8 @@ class MemDiskGroup(_BaseGroup):
         **kwargs
             Keyword arguments passed through to the file creating, e.g. `mode`.
         """
+        if file_format == fileformats.Zarr and not zarr_available:
+            raise RuntimeError("Unable to write to zarr file, please install zarr.")
 
         # Get a value for the conversion parameters, looking up on the instance if
         # not supplied
@@ -2282,6 +2295,8 @@ def get_file(f, file_format=None, **kwargs):
     else:
         if file_format is None:
             file_format = fileformats.guess_file_format(f)
+        if file_format == fileformats.Zarr and not zarr_available:
+            raise RuntimeError("Unable to open zarr file. Please install zarr.")
         try:
             f = file_format.open(f, **kwargs)
         except IOError as e:
@@ -2359,6 +2374,7 @@ def copyattrs(a1, a2, convert_strings=False):
 
         if (
             isinstance(value, (dict, np.ndarray, datetime.datetime))
+            and zarr_available
             and isinstance(a2, zarr.attrs.Attributes)
         ) or (
             isinstance(value, (dict, datetime.datetime))
@@ -2754,6 +2770,9 @@ def _distributed_group_to_zarr(
     """Private routine to copy full data tree from distributed memh5 object into a Zarr file.
 
     This paralellizes all IO."""
+
+    if not zarr_available:
+        raise RuntimeError("Can't write to zarr file. Please install zarr.")
 
     # == Create some internal functions for doing the read ==
     # Function to perform a recursive clone of the tree structure
