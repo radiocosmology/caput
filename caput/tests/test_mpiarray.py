@@ -567,6 +567,7 @@ def test_reduce():
     # test AllReduce
     if size > 1:
         from mpi4py import MPI
+
         dist_array = mpiarray.MPIArray((size, 4), axis=1)
         dist_array[:] = 1
 
@@ -581,7 +582,6 @@ def test_reduce():
         assert (df_total == 4 * size).all()
 
         assert (df_total == df_sum.allreduce()).all()
-
 
         df_total = np.zeros_like(df_sum)
 

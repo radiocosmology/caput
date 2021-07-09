@@ -863,6 +863,7 @@ class MPIArray(np.ndarray):
 
         """
         from mpi4py import MPI
+
         return self.comm.allreduce(self.local_array, MPI.SUM if op is None else op)
 
     def Allreduce(self, result_arr, op=None):
@@ -876,8 +877,11 @@ class MPIArray(np.ndarray):
             Reduction operation to perform. Default: MPI.SUM
         """
         from mpi4py import MPI
+
         if self.shape != result_arr.shape:
-            raise ValueError(f"`result_arr` is shape {result_arr.shape}; expected {self.shape}")
+            raise ValueError(
+                f"`result_arr` is shape {result_arr.shape}; expected {self.shape}"
+            )
         self.comm.Allreduce(self, result_arr, MPI.SUM if op is None else op)
 
     def enumerate(self, axis):
@@ -1630,12 +1634,12 @@ def _mpi_to_ndarray(inputs):
 
     for array in inputs:
         if isinstance(array, MPIArray):
-            if not hasattr(array, 'axis'):
+            if not hasattr(array, "axis"):
                 raise AxisException(
-                        "An input to a ufunc has an MPIArray, which is missing its axis property."
-                        "If using a lower-case MPI.Comm function, please use its upper-case alternative."
-                        "Pickling does not preserve the axis property."
-                        "Otherwise, please file an issue on caput with a stacktrace."
+                    "An input to a ufunc has an MPIArray, which is missing its axis property."
+                    "If using a lower-case MPI.Comm function, please use its upper-case alternative."
+                    "Pickling does not preserve the axis property."
+                    "Otherwise, please file an issue on caput with a stacktrace."
                 )
             if dist_axis is None:
                 dist_axis = array.axis
