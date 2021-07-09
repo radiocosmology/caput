@@ -2801,10 +2801,6 @@ def _distributed_group_to_zarr(
                 if item.compression is not None:
                     compression = item.compression
                     compression_opts = item.compression_opts
-                if compression is None and file_format == fileformats.Zarr:
-                    compression = "bitshuffle"
-                if compression_opts is None and file_format == fileformats.Zarr:
-                    compression_opts = (0, "lz4")
 
                 # Check if we are in a distributed dataset
                 if isinstance(item, MemDatasetDistributed):
@@ -2947,6 +2943,7 @@ def _distributed_group_from_file(
                     pdata = mpiarray.MPIArray.from_file(
                         h5group,
                         key,
+                        axis=distributed_axis,
                         comm=comm,
                         sel=selection,
                         file_format=file_format,

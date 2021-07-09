@@ -20,7 +20,7 @@ try:
     import numcodecs
 except ModuleNotFoundError as e:
     logger.debug(
-        "Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
+        f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters.: {e}"
     )
     compression_enabled = False
 else:
