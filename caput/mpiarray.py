@@ -844,6 +844,40 @@ class MPIArray(np.ndarray):
 
         return dist_arr
 
+    def allreduce(self, op=None):
+        """Perform MPI reduction operation `op` by pickling local array.
+
+        Return results for all ranks.
+
+        Parameters
+        ----------
+        op : MPI reduction operation
+            Reduction operation to perform. Default: MPI.SUM
+
+        Returns
+        -------
+        np.ndarray
+            ndarray result of reduction
+
+        """
+        from mpi4py import MPI
+        return self.comm.allreduce(self.local_array, MPI.SUM if op is None else op)
+
+    def Allreduce(self, result_arr, op=None):
+        """Perform MPI reduction `op` within memory buffer.
+
+        Place results in `result_arr` for all ranks.
+
+        Parameters
+        ----------
+        op : MPI reduction operation
+            Reduction operation to perform. Default: MPI.SUM
+        """
+        from mpi4py import MPI
+        if self.shape != result_arr.shape:
+            raise ValueError(f"`result_arr` is shape {result_arr.shape}; expected {self.shape}")
+        self.comm.Allreduce(self, result_arr, MPI.SUM if op is None else op)
+
     def enumerate(self, axis):
         """Helper for enumerating over a given axis.
 
