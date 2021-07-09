@@ -229,7 +229,7 @@ Reduction methods might result in a decrease in the distributed axis number
 True
 
 MPI.Comm
-=====
+========
 
 mpi4py.MPI.Comm provides a wide variety of functions for communications across nodes
 https://mpi4py.readthedocs.io/en/stable/overview.html?highlight=allreduce#collective-communications
