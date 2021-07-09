@@ -565,16 +565,32 @@ def test_reduce():
     assert mpiarray.MPIArray((size, 4), axis=1).sum(axis=0).axis == 0
 
     # test AllReduce
-    from mpi4py import MPI
-    dist_array = mpiarray.MPIArray((size, 4), axis=1)
-    dist_array[:] = 1
+    if size > 1:
+        from mpi4py import MPI
+        dist_array = mpiarray.MPIArray((size, 4), axis=1)
+        dist_array[:] = 1
 
-    df_sum = np.sum(dist_array, axis=0)
+        df_sum = np.sum(dist_array, axis=0)
 
-    assert (df_sum == 4).all()
+        assert (df_sum == 4).all()
 
-    df_total = np.zeros_like(df_sum)
+        df_total = np.zeros_like(df_sum)
 
-    dist_array.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
+        dist_array.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
 
-    assert (df_total == 4 * size).all()
+        assert (df_total == 4 * size).all()
+
+        assert (df_total == df_sum.allreduce()).all()
+
+
+        df_total = np.zeros_like(df_sum)
+
+        df_sum.Allreduce(df_total)
+
+        assert (df_total == 4 * size).all()
+
+        assert df_total.axis == 0
+
+        with pytest.raises(ValueError):
+            # ValueError should be raised, since df_total and dist_array are not the correct shape
+            dist_array.Allreduce(df_total)
