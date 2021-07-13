@@ -573,8 +573,6 @@ def test_reduce():
 
         df_sum = np.sum(dist_array, axis=0)
 
-        assert (df_sum == 4).all()
-
         df_total = np.zeros_like(df_sum)
 
         dist_array.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
@@ -583,14 +581,11 @@ def test_reduce():
 
         assert (df_total == df_sum.allreduce()).all()
 
-        df_total = np.zeros_like(df_sum)
+        # Test MPIArray.allreduce(); ensure it returns
+        # an ndarray vector with appropriate values + shape
+        assert (dist_array.allreduce() == 4).all()
+        assert (dist_array.allreduce()).shape == (4, 1)
 
-        df_sum.Allreduce(df_total)
-
-        assert (df_total == 4 * size).all()
-
-        assert df_total.axis == 0
-
-        with pytest.raises(ValueError):
-            # ValueError should be raised, since df_total and dist_array are not the correct shape
-            dist_array.Allreduce(df_total)
+        # MPIArray.sum().allreduce() should give the scalar sum of
+        # all entries
+        assert df_sum.allreduce() == 4 * size
