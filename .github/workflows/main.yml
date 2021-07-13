@@ -32,12 +32,6 @@ jobs:
       - name: Run flake8
         run: flake8 --show-source --ignore=E501,E741,E203,W503,E266 caput
 
-      - name: Run pylint
-        run: >
-          pylint-ignore -d
-          line-too-long,invalid-name,import-outside-toplevel,logging-fstring-interpolation,unnecessary-pass,no-else-return
-          --extension-pkg-whitelist=mpi4py,caput.weighted_median,h5py caput
-
       - name: Check code with black
         run: black --check .
 
