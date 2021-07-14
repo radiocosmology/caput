@@ -303,6 +303,10 @@ class PSUtilProfiler(psutil.Process):
         memory : str
             Difference of memory in use by this process since `start` was called. If negative,
             less memory is in use now.
+        used_memory : str
+            Current used memory at the time of the task's end.
+        available_memory : str
+            Current memory available to the system at the time of the task's end.
 
         Raises
         ------
@@ -316,6 +320,8 @@ class PSUtilProfiler(psutil.Process):
             cpu_times = self.cpu_times()
             cpu_percent = self.cpu_percent()
             memory = self.memory_full_info().uss
+            used_memory = psutil.virtual_memory().used
+            available_memory = psutil.virtual_memory().available
             if psutil.MACOS:
                 disk_io = psutil.disk_io_counters()
             else:
@@ -347,8 +353,12 @@ class PSUtilProfiler(psutil.Process):
             return f"{num:.1f}YiB"
 
         memory = bytes2human(memory)
+        available_memory = bytes2human(available_memory)
+        used_memory = bytes2human(used_memory)
 
         self._usage[label]["memory"] = memory
+        self._usage[label]["used_memory"] = used_memory
+        self._usage[label]["available_memory"] = available_memory
 
         time_s = stop_time - self._start_time.pop(label)
 
@@ -367,6 +377,8 @@ class PSUtilProfiler(psutil.Process):
                 f"Average CPU load: {cpu_percent}\n"
                 f"{disk_io}\n"
                 f"Change in (uss) memory: {memory}\n"
+                f"Current available memory: {available_memory}\n"
+                f"Current total used memory: {used_memory}\n"
                 f"=============================================================================================\n"
             )
 
