@@ -568,6 +568,7 @@ def test_reduce():
     if size > 1:
         from mpi4py import MPI
 
+        # Test comm.Allreduce
         dist_array = mpiarray.MPIArray((size, 4), axis=1)
         dist_array[:] = 1
 
@@ -579,13 +580,18 @@ def test_reduce():
 
         assert (df_total == 4 * size).all()
 
-        assert (df_total == df_sum.allreduce()).all()
-
-        # Test MPIArray.allreduce(); ensure it returns
-        # an ndarray vector with appropriate values + shape
-        assert (dist_array.allreduce() == 4).all()
-        assert (dist_array.allreduce()).shape == (4, 1)
+        # Test MPIArray.allreduce()
 
         # MPIArray.sum().allreduce() should give the scalar sum of
         # all entries
-        assert df_sum.allreduce() == 4 * size
+        df_sum = dist_array.sum()
+        df_total = np.zeros_like(df_sum)
+
+        assert dist_array.sum().allreduce() == 4 * size
+
+        df_sum.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
+
+        assert df_total == dist_array.sum().allreduce()
+
+        with pytest.raises(ValueError):
+            dist_array.allreduce()
