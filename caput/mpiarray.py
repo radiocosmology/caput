@@ -849,7 +849,11 @@ class MPIArray(np.ndarray):
     def allreduce(self, op=None):
         """Perform MPI reduction `op` within memory buffer.
 
-        Return results to all ranks.
+        Usage is restricted to arrays with a single element per rank.
+        Returns same scalar final result to all ranks.
+
+        E.g. usage: mpi_array.sum().allreduce()
+        to every rank.
 
         Parameters
         ----------
@@ -858,16 +862,20 @@ class MPIArray(np.ndarray):
 
         Returns
         -------
-        np.ndarray or scalar
-            ndarray result of reduction, unless it is vector (1,), then return scalar
-            mpi_array.sum().allreduce() should give the scalar sum of all entries.
-
+        scalar
+            result of reduction
         """
         from mpi4py import MPI
 
+        if self.local_shape != (1,):
+            raise ValueError(
+                "MPIArray.allreduce()'s usage is restricted to arrays with a single element per rank.\n"
+                f"rank {self.comm.rank} has shape {self.local_shape}"
+            )
+
         result_arr = np.zeros_like(self)
         self.comm.Allreduce(self, result_arr, MPI.SUM if op is None else op)
-        return result_arr if result_arr.shape != (1,) else result_arr[0]
+        return result_arr[0]
 
     def enumerate(self, axis):
         """Helper for enumerating over a given axis.
