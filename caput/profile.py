@@ -370,17 +370,13 @@ class PSUtilProfiler(psutil.Process):
             )
 
         if self._logger:
-            self._logger.info(
-                f"{label} ran for {time_s:.4f}s\n"
-                f"---------------------------------------------------------------------------------------------"
-                f"\n{cpu_times}\n"
-                f"Average CPU load: {cpu_percent}\n"
-                f"{disk_io}\n"
-                f"Change in (uss) memory: {memory}\n"
-                f"Current available memory: {available_memory}\n"
-                f"Current total used memory: {used_memory}\n"
-                f"=============================================================================================\n"
-            )
+            self._logger.info(f"{label} ran for {time_s:.4f}s")
+            self._logger.info(f"{label} {cpu_times}")
+            self._logger.info(f"{label} average CPU load: {cpu_percent}")
+            self._logger.info(f"{label}: {disk_io}")
+            self._logger.info(f"{label} change in (uss) memory: {memory}")
+            self._logger.info(f"{label} current available memory: {available_memory}")
+            self._logger.info(f"{label} current total used memory: {used_memory}")
 
     @property
     def cpu_count(self):
