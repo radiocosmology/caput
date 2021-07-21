@@ -114,7 +114,15 @@ def load_venv(configfile):
     default="cProfile",
     help="Set the profiler to use. Default is cProfile.",
 )
-def run(configfile, loglevel, profile, profiler):
+@click.option(
+    "--mpi-abort/--no-mpi-abort",
+    default=True,
+    help=(
+        "Enable an MPI aware exception handler such that all ranks will exit when any "
+        "one throws an exception."
+    ),
+)
+def run(configfile, loglevel, profile, profiler, mpi_abort):
     """Run a pipeline immediately from the given CONFIGFILE."""
     from caput.pipeline import Manager
 
@@ -124,6 +132,11 @@ def run(configfile, loglevel, profile, profiler):
         warnings.warn(
             "--loglevel is deprecated, use the config file instead", DeprecationWarning
         )
+
+    if mpi_abort:
+        from caput import mpiutil
+
+        mpiutil.enable_mpi_exception_handler()
 
     with Profiler(profile, profiler=profiler):
         try:
@@ -153,9 +166,7 @@ def run(configfile, loglevel, profile, profiler):
     ),
     metavar="<NAME>=<VALUE>[,<VALUE2>...]",
 )
-@click.option(
-    "--submit/--nosubmit", default=False, help="Submit into the batch queue"
-)
+@click.option("--submit/--nosubmit", default=False, help="Submit into the batch queue")
 @click.pass_context
 def template_run(ctx, templatefile, submit, var):
     """Run a pipeline from the given TEMPLATEFILE.
