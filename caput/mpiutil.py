@@ -34,8 +34,8 @@ rank0 = True
 
 logger = logging.getLogger(__name__)
 
-## Try to setup MPI and get the comm, rank and size.
-## If not they should end up as rank=0, size=1.
+# Try to setup MPI and get the comm, rank and size.
+# If not they should end up as rank=0, size=1.
 try:
     from mpi4py import MPI
 
@@ -50,22 +50,47 @@ try:
 
     rank0 = rank == 0
 
+except ImportError:
+    warnings.warn("Warning: mpi4py not installed.", ImportWarning)
+
+
+def enable_mpi_exception_handler():
+    """Install an MPI aware exception handler.
+
+    When enabled the whole MPI job will abort if *any* MPI process fails. If it's not
+    enabled, an MPI job will continue until it is killed by the scheduler.
+
+    The downside of enabling this is that it can cause slurm job steps and interactive
+    allocations to be ended prematurely, which is annoying when debugging.
+    """
+    logger.debug("Installing MPI aware exception handler.")
+
     def mpi_excepthook(exc_type, exc_obj, exc_tb):
 
-        # Run the standard exception handler, but try to ensure the output if flushed out before
-        # aborting
+        # Run the standard exception handler, but try to ensure the output is flushed
+        # out before aborting
         sys.__excepthook__(exc_type, exc_obj, exc_tb)
         sys.stdout.flush()
         sys.stderr.flush()
         time.sleep(5)
 
+        # Send an MPI Abort to force other MPI ranks to exit
         MPI.COMM_WORLD.Abort(1)
 
+    # Enable the faulthandler tracebacks as they are useful.
+    import io
+    import faulthandler
+
+    try:
+        faulthandler.enable()
+    except io.UnsupportedOperation:
+        logger.debug(
+            "Could not enable faulthandler. "
+            "This often happens when running within a test suite."
+        )
+
+    # Replace the standard exception handler
     sys.excepthook = mpi_excepthook
-
-
-except ImportError:
-    warnings.warn("Warning: mpi4py not installed.", ImportWarning)
 
 
 class _close_message:
