@@ -622,7 +622,11 @@ class Manager(config.Reader):
 
                 name_profiling = f"{task.__class__.__name__}.{task._pipeline_state}"
 
-                with PSUtilProfiler(self._psutil_profiling, name_profiling, logging):
+                if hasattr(task, "log"):
+                    psutil_log = task.log
+                else:
+                    psutil_log = logging
+                with PSUtilProfiler(self._psutil_profiling, name_profiling, psutil_log):
                     try:
                         out = task._pipeline_next()
                     except _PipelineMissingData:
