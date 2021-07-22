@@ -626,7 +626,9 @@ class Manager(config.Reader):
                     psutil_log = task.log
                 else:
                     psutil_log = logging
-                with PSUtilProfiler(self._psutil_profiling, name_profiling, psutil_log):
+                with PSUtilProfiler(
+                    self._psutil_profiling, name_profiling, logger=psutil_log
+                ):
                     try:
                         out = task._pipeline_next()
                     except _PipelineMissingData:

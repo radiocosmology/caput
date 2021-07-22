@@ -174,6 +174,8 @@ class PSUtilProfiler(psutil.Process):
     To access the profiling data the context manager object
     must be created and bound to a variable *before* the *with* statement.
 
+    Dumps results into csv file, one for each rank.
+
     >>> p = PSUtilProfiler(True, 'task-label')
     >>> with p:
     ...     print("do some task in here")
@@ -208,6 +210,11 @@ class PSUtilProfiler(psutil.Process):
     logger
         If a logging object is passed the values of the IO done counters are logged
         at INFO level.
+    comm
+        An optional MPI communicator. This is only used for labelling the output files.
+    path
+        The optional directory path under which to write the profile csvs.  If not set use the
+        current directory.
     """
 
     def __init__(
@@ -215,11 +222,30 @@ class PSUtilProfiler(psutil.Process):
         use_profiler: bool = True,
         label: str = "",
         logger: Optional[logging.Logger] = None,
+        comm: Optional["mpiutil.MPI.IntraComm"] = None,
+        path: Optional[os.PathLike] = None,
     ):
         self._use_profiler = use_profiler
         self._label = label
         self._usage = {}
         self._logger = logger
+        self.comm = comm
+
+        if self.comm is None:
+            rank = mpiutil.rank
+        else:
+            rank = self.comm.rank
+
+        if path is None:
+            self.path = Path.cwd()
+        else:
+            if not self.path.is_dir() or not self.path.exists():
+                raise ValueError(
+                    f"Make sure {self.path} passed to PSUtillProfiler is a directory that exists."
+                )
+            self.path = Path(path)
+
+        self.path = self.path / f"perf_{rank}.csv"
 
         self._start_cpu_times = {}
         self._start_memory = {}
@@ -228,6 +254,34 @@ class PSUtilProfiler(psutil.Process):
         self._start_time = {}
 
         super().__init__()
+
+        if self._use_profiler and not self.path.exists():
+
+            import csv
+
+            with open(self.path, mode="w") as fp:
+
+                colnames = [
+                    "task_name",
+                    "time_s",
+                    "cpu_times_user",
+                    "cpu_times_system",
+                    "cpu_times_children_user",
+                    "cpu_times_children_system",
+                    "cpu_times_iowait",
+                    "average_cpu_load_percent",
+                    "disk_io_read_count",
+                    "disk_io_write_count",
+                    "disk_io_read_bytes",
+                    "disk_io_write_bytes",
+                    "disk_io_read_chars",
+                    "disk_io_write_chars",
+                    "memory_change_uss",
+                    "current_available_memory_bytes",
+                    "current_total_used_memory_bytes",
+                ]
+                cw = csv.writer(fp)
+                cw.writerow(colnames)
 
         if self._use_profiler and self._logger:
             self._logger.info(f"Profiling pipeline: {self.cpu_count} cores available.")
@@ -279,7 +333,7 @@ class PSUtilProfiler(psutil.Process):
 
     def stop(self, label):
         """
-        Stop profiler and log and/or set results on self.usage.
+        Stop profiler. Dump results to csv file and/or log and/or set results on self.usage.
 
         `start` must be called first.
 
@@ -341,9 +395,12 @@ class PSUtilProfiler(psutil.Process):
         disk_io = DiskIO(*np.subtract(disk_io, self._start_disk_io.pop(label)))
         memory = memory - self._start_memory.pop(label)
 
-        self._usage[label]["cpu_times"] = cpu_times._asdict()
+        cpu_times = cpu_times._asdict()
+        disk_io = disk_io._asdict()
+
+        self._usage[label]["cpu_times"] = cpu_times
         self._usage[label]["cpu_percent"] = cpu_percent
-        self._usage[label]["disk_io"] = disk_io._asdict()
+        self._usage[label]["disk_io"] = disk_io
 
         def bytes2human(num):
             for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
@@ -351,10 +408,6 @@ class PSUtilProfiler(psutil.Process):
                     return f"{num:3.1f}{unit}B"
                 num /= 1024.0
             return f"{num:.1f}YiB"
-
-        memory = bytes2human(memory)
-        available_memory = bytes2human(available_memory)
-        used_memory = bytes2human(used_memory)
 
         self._usage[label]["memory"] = memory
         self._usage[label]["used_memory"] = used_memory
@@ -371,12 +424,40 @@ class PSUtilProfiler(psutil.Process):
 
         if self._logger:
             self._logger.info(f"{label} ran for {time_s:.4f}s")
-            self._logger.info(f"{label} {cpu_times}")
-            self._logger.info(f"{label} average CPU load: {cpu_percent}")
-            self._logger.info(f"{label}: {disk_io}")
-            self._logger.info(f"{label} change in (uss) memory: {memory}")
-            self._logger.info(f"{label} current available memory: {available_memory}")
-            self._logger.info(f"{label} current total used memory: {used_memory}")
+            self._logger.info(f"{cpu_times}")
+            self._logger.info(f"average CPU load: {cpu_percent}")
+            self._logger.info(f"{disk_io}")
+            self._logger.info(f"change in (uss) memory: {bytes2human(memory)}")
+            self._logger.info(
+                f"current available memory: {bytes2human(available_memory)}"
+            )
+            self._logger.info(f"current total used memory: {bytes2human(used_memory)}")
+
+        with open(self.path, mode="a", newline="") as fp:
+            import csv
+
+            cw = csv.writer(fp)
+            cw.writerow(
+                [
+                    label,
+                    time_s,
+                    cpu_times["user"],
+                    cpu_times["system"],
+                    cpu_times["children_user"],
+                    cpu_times["children_system"],
+                    cpu_times["iowait"],
+                    cpu_percent,
+                    disk_io["read_count"],
+                    disk_io["write_count"],
+                    disk_io["read_bytes"],
+                    disk_io["write_bytes"],
+                    disk_io["read_chars"],
+                    disk_io["write_chars"],
+                    memory,
+                    available_memory,
+                    used_memory,
+                ]
+            )
 
     @property
     def cpu_count(self):
