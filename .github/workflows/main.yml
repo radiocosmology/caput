@@ -21,7 +21,7 @@ jobs:
 
       - name: Install apt dependencies
         run: |
-          sudo apt-get install -y libopenmpi-dev openmpi-bin
+          sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin
 
       - name: Install pip dependencies
         run: |
@@ -47,7 +47,7 @@ jobs:
 
     - name: Install apt dependencies
       run: |
-        sudo apt-get install -y libopenmpi-dev openmpi-bin
+        sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v1
