@@ -1,7 +1,6 @@
 """Helper routines for profiling the CPU and IO usage of code."""
 
 import math
-import collections
 import time
 import logging
 import os
@@ -389,14 +388,17 @@ class PSUtilProfiler(psutil.Process):
         # Construct results
         self._usage[label] = {}
 
-        CPU_Times = collections.namedtuple("CPUtimes", list(cpu_times._fields))
-        cpu_times = CPU_Times(*np.subtract(cpu_times, self._start_cpu_times.pop(label)))
-        DiskIO = collections.namedtuple("DiskIO", list(disk_io._fields))
-        disk_io = DiskIO(*np.subtract(disk_io, self._start_disk_io.pop(label)))
-        memory = memory - self._start_memory.pop(label)
+        cpu_times_arr = np.subtract(cpu_times, self._start_cpu_times.pop(label))
+        disk_io_arr = np.subtract(disk_io, self._start_disk_io.pop(label))
 
-        cpu_times = cpu_times._asdict()
-        disk_io = disk_io._asdict()
+        cpu_times = {
+            k: v for (k, v) in zip(cpu_times._fields, cpu_times_arr)
+        }  # contain results in dictionary
+        disk_io = {
+            k: v for (k, v) in zip(disk_io._fields, disk_io_arr)
+        }  # contain results in dictionary
+
+        memory = memory - self._start_memory.pop(label)
 
         self._usage[label]["cpu_times"] = cpu_times
         self._usage[label]["cpu_percent"] = cpu_percent
