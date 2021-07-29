@@ -175,28 +175,21 @@ class PSUtilProfiler(psutil.Process):
 
     Dumps results into csv file, one for each rank.
 
-    >>> p = PSUtilProfiler(True, 'task-label')
+    >>> p = PSUtilProfiler(label='task-label')
     >>> with p:
     ...     print("do some task in here")
     do some task in here
     >>> print(p.usage)  #doctest: +ELLIPSIS
     {...}
 
-    `start` and `stop` can be used to re-use the same PSUtilProfier
-    for multiple profiles.
+    `start` and `stop` can be used to use the PSUtilProfiler outside of cotnext management.
 
-    >>> p = PSUtilProfiler()
-    >>> p.start('task_one')
+    >>> p = PSUtilProfiler(label='task-label')
+    >>> p.start()
     >>> print('do some task in here')
     do some task in here
-    >>> p.stop('task_one')
-    >>> p.start('task_two')
-    >>> print('do another task in here')
-    do another task in here
-    >>> p.stop('task_two')
-    >>> print(p.usage['task_one']) #doctest: +ELLIPSIS
-    {...}
-    >>> print(p.usage['task_two']) #doctest: +ELLIPSIS
+    >>> p.stop()
+    >>> print(p.usage) #doctest: +ELLIPSIS
     {...}
 
     Parameters
@@ -205,7 +198,6 @@ class PSUtilProfiler(psutil.Process):
         Whether to run the profiler or not.
     label : str
         Default description of what is being profiled.
-        Required for when used as a context manager.
     logger
         If a logging object is passed the values of the IO done counters are logged
         at INFO level.
@@ -246,11 +238,10 @@ class PSUtilProfiler(psutil.Process):
 
         self.path = self.path / f"perf_{rank}.csv"
 
-        self._start_cpu_times = {}
-        self._start_memory = {}
-        self._start_io = {}
-        self._start_disk_io = {}
-        self._start_time = {}
+        self._start_cpu_times = None
+        self._start_memory = None
+        self._start_disk_io = None
+        self._start_time = None
 
         super().__init__()
 
@@ -292,7 +283,6 @@ class PSUtilProfiler(psutil.Process):
             psutil.Process.__eq__(self, other)
             and self._start_cpu_times == other._start_cpu_times
             and self._start_memory == other._start_memory
-            and self._start_io == other._start_io
             and self._start_disk_io == other._start_disk_io
             and self._start_time == other._start_time
         )
@@ -300,46 +290,37 @@ class PSUtilProfiler(psutil.Process):
     def __enter__(self):
         if not self._use_profiler:
             return
-        self.start(self._label)
+        self.start()
 
     def __exit__(self, *args, **kwargs):
         if not self._use_profiler:
             return
-        self.stop(self._label)
+        self.stop()
 
-    def start(self, label):
+    def start(self):
         """
         Start profiling.
 
         Results generated when `stop` is called are based on this start time.
 
-        Attributes
-        ----------
-        label : str
-            Description of what is profiled. You have to pass the same str to `stop`.
         """
-        self._start_time[label] = time.time()
+        self._start_time = time.time()
 
         # Get all stats at the same time
         with self.oneshot():
-            self._start_cpu_times[label] = self.cpu_times()
+            self._start_cpu_times = self.cpu_times()
             self.cpu_percent()
-            self._start_memory[label] = self.memory_full_info().uss
+            self._start_memory = self.memory_full_info().uss
             if psutil.MACOS:
-                self._start_memory[label] = psutil.disk_io_counters()
+                self._start_memory = psutil.disk_io_counters()
             else:
-                self._start_disk_io[label] = self.io_counters()
+                self._start_disk_io = self.io_counters()
 
-    def stop(self, label):
+    def stop(self):
         """
         Stop profiler. Dump results to csv file and/or log and/or set results on self.usage.
 
         `start` must be called first.
-
-        Attributes
-        ----------
-        label : str
-            Description of what is profiled. Has to have been passed to `start` before.
 
         Returns
         -------
@@ -380,16 +361,14 @@ class PSUtilProfiler(psutil.Process):
             else:
                 disk_io = self.io_counters()
 
-        if label not in self._start_cpu_times:
-            raise RuntimeError(
-                f"PSUtilProfiler.stop was called before start for '{label}'."
-            )
+        if self._start_cpu_times is None:
+            raise RuntimeError(f"PSUtilProfiler.stop was called before start'.")
 
         # Construct results
-        self._usage[label] = {}
+        self._usage = {"task_name": self._label}
 
-        cpu_times_arr = np.subtract(cpu_times, self._start_cpu_times.pop(label))
-        disk_io_arr = np.subtract(disk_io, self._start_disk_io.pop(label))
+        cpu_times_arr = np.subtract(cpu_times, self._start_cpu_times)
+        disk_io_arr = np.subtract(disk_io, self._start_disk_io)
 
         cpu_times = {
             k: v for (k, v) in zip(cpu_times._fields, cpu_times_arr)
@@ -398,11 +377,11 @@ class PSUtilProfiler(psutil.Process):
             k: v for (k, v) in zip(disk_io._fields, disk_io_arr)
         }  # contain results in dictionary
 
-        memory = memory - self._start_memory.pop(label)
+        memory = memory - self._start_memory
 
-        self._usage[label]["cpu_times"] = cpu_times
-        self._usage[label]["cpu_percent"] = cpu_percent
-        self._usage[label]["disk_io"] = disk_io
+        self._usage["cpu_times"] = cpu_times
+        self._usage["cpu_percent"] = cpu_percent
+        self._usage["disk_io"] = disk_io
 
         def bytes2human(num):
             for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
@@ -411,21 +390,21 @@ class PSUtilProfiler(psutil.Process):
                 num /= 1024.0
             return f"{num:.1f}YiB"
 
-        self._usage[label]["memory"] = memory
-        self._usage[label]["used_memory"] = used_memory
-        self._usage[label]["available_memory"] = available_memory
+        self._usage["memory"] = memory
+        self._usage["used_memory"] = used_memory
+        self._usage["available_memory"] = available_memory
 
-        time_s = stop_time - self._start_time.pop(label)
+        time_s = stop_time - self._start_time
 
-        self._usage[label]["time_s"] = time_s
+        self._usage["time_s"] = time_s
 
         if time_s < 0.1 and self._logger:
             self._logger.info(
-                f"{label} ran for {time_s:.4f} < 0.1s, results might be inaccurate.\n"
+                f"{self._label} ran for {time_s:.4f} < 0.1s, results might be inaccurate.\n"
             )
 
         if self._logger:
-            self._logger.info(f"{label} ran for {time_s:.4f}s")
+            self._logger.info(f"{self._label} ran for {time_s:.4f}s")
             self._logger.info(f"{cpu_times}")
             self._logger.info(f"average CPU load: {cpu_percent}")
             self._logger.info(f"{disk_io}")
@@ -441,7 +420,7 @@ class PSUtilProfiler(psutil.Process):
             cw = csv.writer(fp)
             cw.writerow(
                 [
-                    label,
+                    self._label,
                     time_s,
                     cpu_times["user"],
                     cpu_times["system"],
