@@ -115,15 +115,6 @@ def load_venv(configfile):
     help="Set the profiler to use. Default is cProfile.",
 )
 @click.option(
-    "--psutil",
-    is_flag=True,
-    default=False,
-    help=(
-        "Run the job with a psutil profiler for each task. The output "
-        "can be found in the caput logs, at the INFO level."
-    ),
-)
-@click.option(
     "--mpi-abort/--no-mpi-abort",
     default=True,
     help=(
@@ -131,7 +122,7 @@ def load_venv(configfile):
         "one throws an exception."
     ),
 )
-def run(configfile, loglevel, profile, profiler, psutil, mpi_abort):
+def run(configfile, loglevel, profile, profiler, mpi_abort):
     """Run a pipeline immediately from the given CONFIGFILE."""
     from caput.pipeline import Manager
 
@@ -147,9 +138,9 @@ def run(configfile, loglevel, profile, profiler, psutil, mpi_abort):
 
         mpiutil.enable_mpi_exception_handler()
 
-    with Profiler(profile, profiler=profiler.lower()):
+    with Profiler(profile, profiler=profiler):
         try:
-            P = Manager.from_yaml_file(configfile, psutil_profiling=psutil)
+            P = Manager.from_yaml_file(configfile)
         except CaputConfigError as e:
             click.echo(
                 "Found at least one error in '{}'.\n"
@@ -237,38 +228,7 @@ def template_run(ctx, templatefile, submit, var):
     default=True,
     help="Check the pipeline for errors before submitting it.",
 )
-@click.option(
-    "--profile",
-    is_flag=True,
-    default=False,
-    help=(
-        "Run the job in a profiler. This will output a `profile_<rank>.prof` file per "
-        "MPI rank if using cProfile or `profile_<rank>.txt` file for pyinstrument,"
-    ),
-)
-@click.option(
-    "--profiler",
-    type=click.Choice(["cProfile", "pyinstrument"], case_sensitive=False),
-    default="cProfile",
-    help="Set the profiler to use. Default is cProfile.",
-)
-@click.option(
-    "--psutil",
-    is_flag=True,
-    default=False,
-    help=(
-        "Run the job with a psutil profiler for each task. The output "
-        "can be found in the caput logs, at the INFO level."
-    ),
-)
-def queue(
-    configfile,
-    submit=False,
-    lint=True,
-    profile=False,
-    profiler="cProfiler",
-    psutil=False,
-):
+def queue(configfile, submit=False, lint=True):
     """Queue a pipeline on a cluster from the given CONFIGFILE.
 
     This queues the job, using parameters from the `cluster` section of the
@@ -427,11 +387,6 @@ def queue(
     else:
         rconf["venv"] = "/dev/null"
 
-    # Forward profiler configuration
-    rconf["profile"] = "--profile" if profile else ""
-    rconf["profiler"] = f"--profiler={profiler}" if profile else ""
-    rconf["psutil"] = "--psutil" if psutil else ""
-
     # Derived vars only needed to create script
     rconf["mpiproc"] = rconf["nodes"] * rconf["pernode"]
     rconf["workdir"] = workdir
@@ -508,7 +463,7 @@ source %(venv)s
 cd %(workdir)s
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-srun python %(scriptpath)s run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
+srun python %(scriptpath)s run %(configpath)s &> %(logpath)s
 
 # Set the status
 echo FINISHED > %(statuspath)s

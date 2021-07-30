@@ -45,7 +45,7 @@ def vectorize(**base_kwargs):
 
             return arr
 
-        def __get__(self, obj, objtype=None):
+        def __get__(self, obj, type=None):
 
             # As a descriptor, this gets called whenever this is used to wrap a
             # function, and simply binds it to the instance
@@ -53,7 +53,7 @@ def vectorize(**base_kwargs):
             if obj is None:
                 return self
 
-            new_func = self.func.__get__(obj, objtype)
+            new_func = self.func.__get__(obj, type)
             return self.__class__(new_func)
 
     return _vectorize_desc
@@ -128,7 +128,7 @@ def scalarize(dtype=np.float64):
 
             return (x, scalar, len(x) == 0)
 
-        def __get__(self, obj, objtype=None):
+        def __get__(self, obj, type=None):
 
             # As a descriptor, this gets called whenever this is used to wrap a
             # function, and simply binds it to the instance
@@ -136,13 +136,13 @@ def scalarize(dtype=np.float64):
             if obj is None:
                 return self
 
-            new_func = self.func.__get__(obj, objtype)
+            new_func = self.func.__get__(obj, type)
             return self.__class__(new_func)
 
     return _scalarize_desc
 
 
-def listize(**_):
+def listize(**base_kwargs):
     """Make functions that already work with `np.ndarray` or scalars accept lists.
 
     Also works with tuples.
@@ -172,7 +172,7 @@ def listize(**_):
 
             return self.func(*new_args, **kwargs)
 
-        def __get__(self, obj, objtype=None):
+        def __get__(self, obj, type=None):
 
             # As a descriptor, this gets called whenever this is used to wrap a
             # function, and simply binds it to the instance
@@ -180,7 +180,7 @@ def listize(**_):
             if obj is None:
                 return self
 
-            new_func = self.func.__get__(obj, objtype)
+            new_func = self.func.__get__(obj, type)
             return self.__class__(new_func)
 
     return _listize_desc

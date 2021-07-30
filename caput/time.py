@@ -1171,7 +1171,7 @@ def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kw
         roots.append(root)
         increasing.append(is_increasing)
 
-    return (np.array(roots, dtype=np.float64), np.array(increasing, dtype=bool))
+    return (np.array(roots, dtype=np.float64), np.array(increasing, dtype=np.bool))
 
 
 def skyfield_star_from_ra_dec(ra, dec, name=""):
