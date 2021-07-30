@@ -123,7 +123,15 @@ def load_venv(configfile):
         "can be found in the caput logs, at the INFO level."
     ),
 )
-def run(configfile, loglevel, profile, profiler, psutil):
+@click.option(
+    "--mpi-abort/--no-mpi-abort",
+    default=True,
+    help=(
+        "Enable an MPI aware exception handler such that all ranks will exit when any "
+        "one throws an exception."
+    ),
+)
+def run(configfile, loglevel, profile, profiler, psutil, mpi_abort):
     """Run a pipeline immediately from the given CONFIGFILE."""
     from caput.pipeline import Manager
 
@@ -133,6 +141,11 @@ def run(configfile, loglevel, profile, profiler, psutil):
         warnings.warn(
             "--loglevel is deprecated, use the config file instead", DeprecationWarning
         )
+
+    if mpi_abort:
+        from caput import mpiutil
+
+        mpiutil.enable_mpi_exception_handler()
 
     with Profiler(profile, profiler=profiler.lower()):
         try:
@@ -162,8 +175,13 @@ def run(configfile, loglevel, profile, profiler, psutil):
     ),
     metavar="<NAME>=<VALUE>[,<VALUE2>...]",
 )
-def template_run(templatefile, var):
-    """Run a pipeline immediately from the given TEMPLATEFILE.
+@click.option("--submit/--nosubmit", default=False, help="Submit into the batch queue")
+@click.pass_context
+def template_run(ctx, templatefile, submit, var):
+    """Run a pipeline from the given TEMPLATEFILE.
+
+    This is either run immediately (default), or can be placed in the batch
+    queue with the --submit flag.
 
     Template variable substitutions are specified with `--var <varname>=<val>`
     arguments, with one for each variable. `<val>` may be a comma separated list, in
@@ -199,8 +217,11 @@ def template_run(templatefile, var):
             tfh.write(expanded_string)
             tfh.flush()
 
-            # Run the pipeline
-            Manager.from_yaml_file(tfh.name).run()
+            # Run or queue the pipeline
+            if submit:
+                ctx.invoke(queue, configfile=tfh.name)
+            else:
+                Manager.from_yaml_file(tfh.name).run()
 
 
 @cli.command()
