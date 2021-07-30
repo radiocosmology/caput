@@ -362,7 +362,7 @@ class PSUtilProfiler(psutil.Process):
                 disk_io = self.io_counters()
 
         if self._start_cpu_times is None:
-            raise RuntimeError(f"PSUtilProfiler.stop was called before start'.")
+            raise RuntimeError("PSUtilProfiler.stop was called before start.")
 
         # Construct results
         self._usage = {"task_name": self._label}
