@@ -369,7 +369,7 @@ class MPIArray(np.ndarray):
         arr = np.ndarray.__new__(cls, lshape, *args, **kwargs)
 
         # Set attributes of class
-        arr._global_shape = global_shape
+        arr._global_shape = tuple(global_shape)
         arr._axis = axis
         arr._local_shape = tuple(lshape)
         arr._local_offset = tuple(loffset)
