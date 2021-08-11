@@ -176,8 +176,17 @@ def run(configfile, loglevel, profile, profiler, mpi_abort, psutil):
     metavar="<NAME>=<VALUE>[,<VALUE2>...]",
 )
 @click.option("--submit/--nosubmit", default=False, help="Submit into the batch queue")
+@click.option(
+    "--overwrite",
+    type=click.Choice(["never", "always", "failed"]),
+    default="never",
+    help=(
+        "Overwrite an existing job: never (default); always; or failed "
+        "(if there is no STATUS file with the FINISHED status in it)"
+    ),
+)
 @click.pass_context
-def template_run(ctx, templatefile, submit, var):
+def template_run(ctx, templatefile, submit, var, overwrite):
     """Run a pipeline from the given TEMPLATEFILE.
 
     This is either run immediately (default), or can be placed in the batch
@@ -219,7 +228,7 @@ def template_run(ctx, templatefile, submit, var):
 
             # Run or queue the pipeline
             if submit:
-                ctx.invoke(queue, configfile=tfh.name)
+                ctx.invoke(queue, configfile=tfh.name, overwrite=overwrite)
             else:
                 Manager.from_yaml_file(tfh.name).run()
 
@@ -261,6 +270,15 @@ def template_run(ctx, templatefile, submit, var):
         "can be found in the caput logs, at the INFO level."
     ),
 )
+@click.option(
+    "--overwrite",
+    type=click.Choice(["never", "always", "failed"]),
+    default="never",
+    help=(
+        "Overwrite an existing job: never (default); always; or failed "
+        "(if there is no STATUS file with the FINISHED status in it)"
+    ),
+)
 def queue(
     configfile,
     submit=False,
@@ -268,6 +286,7 @@ def queue(
     profile=False,
     profiler="cProfiler",
     psutil=False,
+    overwrite="never",
 ):
     """Queue a pipeline on a cluster from the given CONFIGFILE.
 
@@ -399,7 +418,19 @@ def queue(
 
     # Create temporary directory if required
     jobdir = workdir / "job/"
-    if not jobdir.exists():
+    statusfile = jobdir / "STATUS"
+    if jobdir.exists():
+
+        if overwrite == "never":
+            click.echo(f"Job already exists at {workdir}. Skipping.")
+            return
+        elif overwrite == "failed" and statusfile.exists():
+            with open(statusfile, "r") as fh:
+                contents = fh.read()
+                if "FINISHED" in contents:
+                    click.echo(f"Successful job already exists at {workdir}. Skipping.")
+                    return
+    else:
         jobdir.mkdir(parents=True)
 
     # Copy config file into output directory (check it's not already there first)
