@@ -21,24 +21,17 @@ jobs:
 
       - name: Install apt dependencies
         run: |
-          sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
+          sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
 
       - name: Install pip dependencies
         run: |
-          pip install pylint==2.7.0 pylint-ignore flake8 pytest black mpi4py pyinstrument pytest-lazy-fixture
+          pip install pylint==2.7.0 pylint-ignore flake8 pytest black mpi4py pyinstrument psutil pytest-lazy-fixture
           pip install -r requirements.txt
           python setup.py develop
           pip install .[zarr,compression]
 
       - name: Run flake8
         run: flake8 --show-source --ignore=E501,E741,E203,W503,E266 caput
-
-      - name: Run pylint
-        run: >
-          pylint-ignore
-          -d line-too-long,invalid-name,import-outside-toplevel,logging-fstring-interpolation,unnecessary-pass
-          -d no-else-return,too-many-arguments,too-many-locals,too-many-ancestors,too-many-branches
-          --extension-pkg-whitelist=mpi4py,caput.weighted_median,h5py,numcodecs.blosc,bitshuffle.h5 caput
 
       - name: Check code with black
         run: black --check .
@@ -55,7 +48,7 @@ jobs:
 
     - name: Install apt dependencies
       run: |
-        sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
+        sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v1
@@ -66,7 +59,7 @@ jobs:
       run: |
         pip install --no-binary=h5py h5py
         pip install -r requirements.txt
-        pip install mpi4py numcodecs==0.7.3 bitshuffle@git+https://github.com/kiyo-masui/bitshuffle.git
+        pip install mpi4py numcodecs==0.7.3 bitshuffle@git+https://github.com/kiyo-masui/bitshuffle.git psutil
         pip install pytest pytest-lazy-fixture
         python setup.py develop
 

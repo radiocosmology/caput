@@ -330,14 +330,12 @@ def enum(options, default=None):
     def _prop(val):
 
         if val not in options:
-            raise CaputConfigError("Input %f not in %s" % (repr(val), repr(options)))
+            raise CaputConfigError(f"Input {val} not in {options}")
 
         return val
 
     if default is not None and default not in options:
-        raise ValueError(
-            "Default value %s must be in %s (or None)" % (repr(default), repr(options))
-        )
+        raise ValueError(f"Default value {default} must be in {options} (or None)")
 
     prop = Property(proptype=_prop, default=default)
 

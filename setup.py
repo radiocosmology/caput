@@ -68,6 +68,7 @@ setup(
             "numcodecs==0.7.3",
         ],
         "zarr": ["zarr==2.8.1"],
+        "profiling": ["psutil", "pyinstrument"],
     },
     setup_requires=["cython"],
     # metadata for upload to PyPI

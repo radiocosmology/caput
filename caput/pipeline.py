@@ -481,6 +481,8 @@ class Manager(config.Reader):
     save_config : bool
         If this is True, the global pipeline configuration is attached to output
         metadata. Default: True.
+    psutil_profiling : bool
+        Use psutil to profile CPU and memory usage. Default `False`.
     """
 
     logging = config.logging_config(default={"root": "WARNING"})
@@ -492,14 +494,20 @@ class Manager(config.Reader):
     versions = config.Property(default=[], proptype=_get_versions, key="save_versions")
     save_config = config.Property(default=True, proptype=bool)
 
-    def __init__(self):
+    def __init__(self, psutil_profiling=False):
         # Initialise the list of task instances
         self.tasks = []
         self.all_params = []
         self.all_tasks_params = []
 
+        self._psutil_profiling = psutil_profiling
+
+        logger.debug(
+            f"CPU and memory profiling using psutil {'enabled' if self._psutil_profiling else 'disabled'}."
+        )
+
     @classmethod
-    def from_yaml_file(cls, file_name, lint=False):
+    def from_yaml_file(cls, file_name, lint=False, psutil_profiling=False):
         """Initialize the pipeline from a YAML configuration file.
 
         Parameters
@@ -508,6 +516,8 @@ class Manager(config.Reader):
             Path to YAML pipeline configuration file.
         lint : bool
             Instantiate Manager only to lint config. Disables debug logging.
+        psutil_profiling : bool
+            Use psutil to profile CPU and memory usage
 
         Returns
         -------
@@ -522,10 +532,10 @@ class Manager(config.Reader):
                 "Unable to open yaml file ({}): {}".format(file_name, e),
                 file_=file_name,
             )
-        return cls.from_yaml_str(yaml_doc, lint)
+        return cls.from_yaml_str(yaml_doc, lint, psutil_profiling)
 
     @classmethod
-    def from_yaml_str(cls, yaml_doc, lint=False):
+    def from_yaml_str(cls, yaml_doc, lint=False, psutil_profiling=False):
         """Initialize the pipeline from a YAML configuration string.
 
         Parameters
@@ -534,6 +544,8 @@ class Manager(config.Reader):
             Yaml configuration document.
         lint : bool
             Instantiate Manager only to lint config. Disables debug logging.
+        psutil_profiling : bool
+            Use psutil to profile CPU and memory usage.
 
         Returns
         -------
@@ -555,7 +567,9 @@ class Manager(config.Reader):
                 "Couldn't find key 'pipeline' in YAML configuration document.",
                 location=yaml_params,
             ) from e
-        self = cls.from_config(yaml_params["pipeline"])
+        self = cls.from_config(
+            yaml_params["pipeline"], psutil_profiling=psutil_profiling
+        )
         self.all_params = yaml_params
         self.all_tasks_params = {
             "versions": self.versions,
@@ -593,54 +607,87 @@ class Manager(config.Reader):
         This function initializes all pipeline tasks and runs the pipeline
         through to completion.
 
+        Raises
+        ------
+        PipelineRuntimeError
+            If a task stage returns the wrong number of outputs.
+
         """
 
         # Run the pipeline.
         while self.tasks:
             for task in list(self.tasks):  # Copy list so we can alter it.
                 # These lines control the flow of the pipeline.
-                try:
-                    out = task._pipeline_next()
-                except _PipelineMissingData:
-                    if self.tasks.index(task) == 0:
-                        msg = (
-                            "%s missing input data and is at beginning of"
-                            " task list. Advancing state." % task.__class__.__name__
-                        )
-                        logger.debug(msg)
-                        task._pipeline_advance_state()
-                    break
-                except _PipelineFinished:
-                    self.tasks.remove(task)
+                from .profile import PSUtilProfiler
+
+                name_profiling = f"{task.__class__.__name__}.{task._pipeline_state}"
+
+                if hasattr(task, "log"):
+                    psutil_log = task.log
+                else:
+                    psutil_log = logging
+                with PSUtilProfiler(
+                    self._psutil_profiling, name_profiling, logger=psutil_log
+                ):
+                    try:
+                        out = task._pipeline_next()
+                    except _PipelineMissingData:
+                        if self.tasks.index(task) == 0:
+                            msg = (
+                                "%s missing input data and is at beginning of"
+                                " task list. Advancing state." % task.__class__.__name__
+                            )
+                            logger.debug(msg)
+                            task._pipeline_advance_state()
+                        break
+                    except _PipelineFinished:
+                        self.tasks.remove(task)
+                        continue
+                # Now pass the output data products to any task that needs them.
+                out = self._check_task_output(out, task)
+                if out is None:
                     continue
-                # Now pass the output data products to any task that needs
-                # them.
-                out_keys = task._out_keys
-                if out is None:  # This iteration supplied no output.
-                    continue
-                elif len(out_keys) == 0:  # Output not handled by pipeline.
-                    continue
-                elif len(out_keys) == 1:
-                    if isinstance(out_keys, tuple):
-                        # In config file, written as `out: out_key`. No
-                        # unpacking if `out` is a length 1 sequence.
-                        out = (out,)
-                    else:  # `out_keys` is a list.
-                        # In config file, written as `out: [out_key,]`.
-                        # `out` must be a length 1 sequence.
-                        pass
-                elif len(out_keys) != len(out):
-                    msg = (
-                        "Found unexpected number of outputs in %s (got %i expected %i)"
-                        % (task.__class__.__name__, len(out), len(out_keys))
-                    )
-                    raise PipelineRuntimeError(msg)
-                keys = str(out_keys)
+                keys = str(task._out_keys)
                 msg = "%s produced output data product with keys %s."
                 msg = msg % (task.__class__.__name__, keys)
                 logger.debug(msg)
                 for receiving_task in self.tasks:
-                    receiving_task._pipeline_inspect_queue_product(out_keys, out)
+                    receiving_task._pipeline_inspect_queue_product(task._out_keys, out)
+
+    @staticmethod
+    def _check_task_output(out, task):
+        """
+        Check if task stage's output is as expected.
+
+        Returns
+        -------
+        out : Same as `TaskBase.next` or None
+            Pipeline product. None if there's no output of that task stage that has to be handled further.
+
+        Raises
+        ------
+        PipelineRuntimeError
+            If a task stage returns the wrong number of outputs.
+        """
+        if out is None:  # This iteration supplied no output
+            return None
+        elif len(task._out_keys) == 0:  # Output not handled by pipeline.
+            return None
+        elif len(task._out_keys) == 1:
+            if isinstance(task._out_keys, tuple):
+                # in config file, written as `out: out_key`, No
+                # unpacking if `out` is a length 1 sequence.
+                return (out,)
+            else:  # `out_keys` is a list.
+                # In config file, written as `out: [out_key,]`.
+                # `out` must be a length 1 sequence.
+                return out
+        elif len(task._out_keys) != len(out):
+            raise PipelineRuntimeError(
+                f"Found unexpected number of outputs in {task.__class__.__name__}"
+                f"(got {len(out)} expected {len(task._out_keys)})"
+            )
+        return out
 
     def _setup_tasks(self):
         """Create and setup all tasks from the task list."""
