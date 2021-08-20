@@ -59,7 +59,7 @@ jobs:
       run: |
         pip install --no-binary=h5py h5py
         pip install -r requirements.txt
-        pip install mpi4py numcodecs==0.7.3 bitshuffle@git+https://github.com/kiyo-masui/bitshuffle.git psutil
+        pip install mpi4py numcodecs==0.7.3 bitshuffle@git+https://github.com/kiyo-masui/bitshuffle.git@a5d78e97ee85d05cd685c94f4d159f55747f57a8 psutil
         pip install pytest pytest-lazy-fixture
         python setup.py develop
 
