@@ -109,7 +109,10 @@ class HDF5(FileFormat):
 class Zarr(FileFormat):
     """Interface for using zarr file format from caput."""
 
-    module = zarr
+    if zarr_available:
+        module = zarr
+    else:
+        module = None
 
     @staticmethod
     def open(*args, **kwargs):
