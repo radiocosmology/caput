@@ -1710,7 +1710,6 @@ class MemDiskGroup(_BaseGroup):
         lockfile = None
 
         if not ondisk:
-            zarr_available = False
             if (zarr_available and isinstance(file_, zarr.Group)) or isinstance(
                 file_, h5py.Group
             ):
@@ -2287,7 +2286,7 @@ def get_file(f, file_format=None, **kwargs):
 
     Returns
     -------
-    f : hdf5 group
+    f : hdf5 or zarr group
     opened : bool
         Whether the a file was opened or not (i.e. was already open).
 

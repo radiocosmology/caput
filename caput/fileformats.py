@@ -281,7 +281,7 @@ def check_file_format(filename, file_format, data):
     # make sure guesses don't mismatch and decide on the format
     if (
         file_format_guess_output
-        and file_format_guess_output
+        and file_format_guess_name
         and file_format_guess_name != file_format_guess_output
     ):
         raise ValueError(
