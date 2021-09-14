@@ -805,7 +805,7 @@ class MPIArray(np.ndarray):
             fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
         )
 
-        if fh.is_mpi and not use_collective:
+        if fh.is_mpi and (not use_collective) or (not fileformats.HDF5.compression_enabled()):
             # Need to disable compression if we can't use collective IO
             chunks, compression, compression_opts = None, None, None
 

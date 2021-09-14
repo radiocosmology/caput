@@ -2724,7 +2724,7 @@ def _distributed_group_to_hdf5_parallel(
                         key,
                         shape=data.shape,
                         dtype=data.dtype,
-                        chunks=item.chunks,
+                        chunks=item.chunks if fileformats.HDF5.compression_enabled() else None,
                         **fileformats.HDF5.compression_kwargs(
                             item.compression, item.compression_opts
                         ),

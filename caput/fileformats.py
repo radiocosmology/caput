@@ -73,6 +73,11 @@ class HDF5(FileFormat):
     module = h5py
 
     @staticmethod
+    def compression_enabled():
+        """Disable compression and chunking due to bug: https://github.com/chime-experiment/Pipeline/issues/33"""
+        return False
+
+    @staticmethod
     def open(*args, **kwargs):
         """Open an HDF5 file using h5py."""
         return h5py.File(*args, **kwargs)
@@ -80,6 +85,8 @@ class HDF5(FileFormat):
     @staticmethod
     def compression_kwargs(compression=None, compression_opts=None, compressor=None):
         """Format compression arguments for h5py API."""
+        if not HDF5.compression_enabled():
+            return {}
         super(HDF5, HDF5).compression_kwargs(compression, compression_opts, compressor)
         if compressor:
             raise NotImplementedError
