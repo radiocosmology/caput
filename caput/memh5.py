@@ -1711,7 +1711,9 @@ class MemDiskGroup(_BaseGroup):
 
         if not ondisk:
             zarr_available = False
-            if (zarr_available and isinstance(file_, zarr.Group)) or isinstance(file_, h5py.Group):
+            if (zarr_available and isinstance(file_, zarr.Group)) or isinstance(
+                file_, h5py.Group
+            ):
                 file_ = file_.filename
 
             if "mode" in kwargs:
@@ -1981,7 +1983,9 @@ class MemDiskGroup(_BaseGroup):
 
             self.attrs["__memh5_subclass"] = clspath
 
-        if (zarr_available and isinstance(self._data, zarr.Group)) or isinstance(self._data, h5py.File):
+        if (zarr_available and isinstance(self._data, zarr.Group)) or isinstance(
+            self._data, h5py.File
+        ):
             with file_format.open(filename, **kwargs) as f:
                 deep_group_copy(self._data, f)
         else:
@@ -2724,7 +2728,9 @@ def _distributed_group_to_hdf5_parallel(
                         key,
                         shape=data.shape,
                         dtype=data.dtype,
-                        chunks=item.chunks if fileformats.HDF5.compression_enabled() else None,
+                        chunks=item.chunks
+                        if fileformats.HDF5.compression_enabled()
+                        else None,
                         **fileformats.HDF5.compression_kwargs(
                             item.compression, item.compression_opts
                         ),
