@@ -4,4 +4,3 @@ sphinx_rtd_theme
 # setup correctly.
 funcsigs
 mock
-h5py --no-binary=h5py
