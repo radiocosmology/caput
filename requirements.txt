@@ -1,4 +1,3 @@
-bitshuffle @ git+https://github.com/kiyo-masui/bitshuffle.git
 cachetools
 click
 cython
