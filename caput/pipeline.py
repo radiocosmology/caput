@@ -1266,7 +1266,7 @@ class _OneAndOne(TaskBase):
             output_dirname = os.path.dirname(output_filename)
             if not os.path.isdir(output_dirname):
                 os.makedirs(output_dirname)
-            self.write_output(
+            _OneAndOne.write_output(
                 output_filename,
                 output,
                 file_format=self.output_format,

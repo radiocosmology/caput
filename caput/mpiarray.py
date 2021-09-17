@@ -637,7 +637,7 @@ class MPIArray(np.ndarray):
     def from_file(
         cls, f, dataset, comm=None, axis=0, sel=None, file_format=fileformats.HDF5
     ):
-        """Read MPIArray from an HDF5 dataset in parallel.
+        """Read MPIArray from an HDF5 dataset or Zarr array on disk in parallel.
 
         Parameters
         ----------

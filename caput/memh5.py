@@ -425,7 +425,7 @@ class MemGroup(_BaseGroup):
         selections=None,
         convert_dataset_strings=False,
         convert_attribute_strings=True,
-        **_,
+        **kwargs,
     ):
         """Create a new instance by copying from an hdf5 group.
 
@@ -466,6 +466,7 @@ class MemGroup(_BaseGroup):
             convert_dataset_strings,
             convert_attribute_strings,
             file_format=fileformats.HDF5,
+            **kwargs,
         )
 
     @classmethod
@@ -576,7 +577,14 @@ class MemGroup(_BaseGroup):
             understands. Default is `True`.
         convert_dataset_strings : bool, optional
             Try and convert dataset string types to bytestrings. Default is `False`.
+        compression : str
+            Name or identifier of HDF5 compression filter for the dataset.
+        compression_opts
+            Compression options for the dataset.
+            See HDF5 documentation for compression filters.
+
         """
+
         self.to_file(
             filename,
             mode,
@@ -2467,6 +2475,12 @@ def deep_group_copy(
             except AttributeError:
                 selection = slice(None)
 
+            # only the case if zarr is not installed
+            if file_format.module is None:
+                raise RuntimeError(
+                    "Can't deep_group_copy zarr file. Please install zarr."
+                )
+
             if convert_dataset_strings:
                 # Convert unicode strings back into ascii byte strings. This will break
                 # if there are characters outside of the ascii range
@@ -2598,8 +2612,10 @@ def _distributed_group_to_hdf5_serial(
                 fname,
                 entry.name,
                 chunks=entry.chunks,
-                compression=entry.compression,
-                compression_opts=entry.compression_opts,
+                **fileformats.HDF5.compression_kwargs(
+                    compression=entry.compression,
+                    compression_opts=entry.compression_opts,
+                ),
             )
 
         comm.Barrier()
@@ -2626,8 +2642,10 @@ def _distributed_group_to_hdf5_serial(
                         entry.name,
                         data=data,
                         chunks=entry.chunks,
-                        compression=entry.compression,
-                        compression_opts=entry.compression_opts,
+                        **fileformats.HDF5.compression_kwargs(
+                            compression=entry.compression,
+                            compression_opts=entry.compression_opts,
+                        ),
                     )
                     copyattrs(
                         entry.attrs,
@@ -2900,7 +2918,7 @@ def _distributed_group_from_file(
     **kwargs,
 ):
     """
-    Restore full tree from an HDF5 file into a distributed memh5 object.
+    Restore full tree from an HDF5 file or Zarr group into a distributed memh5 object.
 
     A `selections=` parameter may be supplied as parts of 'kwargs'. See
     `_deep_group_copy' for a description.
