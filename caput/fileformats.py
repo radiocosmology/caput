@@ -85,8 +85,6 @@ class HDF5(FileFormat):
     @staticmethod
     def compression_kwargs(compression=None, compression_opts=None, compressor=None):
         """Format compression arguments for h5py API."""
-        if not HDF5.compression_enabled():
-            return {}
         super(HDF5, HDF5).compression_kwargs(compression, compression_opts, compressor)
         if compressor:
             raise NotImplementedError

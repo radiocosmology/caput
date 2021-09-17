@@ -789,6 +789,11 @@ class MPIArray(np.ndarray):
         mode = "a" if create else "r+"
         fh = misc.open_h5py_mpi(f, mode, self.comm)
 
+        # disable compression if not enabled for HDF5 files
+        # https://github.com/chime-experiment/Pipeline/issues/33
+        if not fileformats.HDF5.compression_enabled():
+            chunks, compression, compression_opts = None, None, None
+
         # Check that there are no null slices, otherwise we need to turn off
         # collective IO to work around an h5py issue (#965)
         no_null_slices = self.global_shape[self.axis] >= self.comm.size
@@ -805,11 +810,7 @@ class MPIArray(np.ndarray):
             fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
         )
 
-        if (
-            fh.is_mpi
-            and (not use_collective)
-            or (not fileformats.HDF5.compression_enabled())
-        ):
+        if fh.is_mpi and (not use_collective):
             # Need to disable compression if we can't use collective IO
             chunks, compression, compression_opts = None, None, None
 

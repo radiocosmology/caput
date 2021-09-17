@@ -2621,6 +2621,7 @@ def _distributed_group_to_hdf5_serial(
                     else:
                         data = check_unicode(entry)
 
+                    # allow chunks and compression bc serialised IO
                     dset = f.create_dataset(
                         entry.name,
                         data=data,
@@ -2723,16 +2724,22 @@ def _distributed_group_to_hdf5_parallel(
                     else:
                         data = check_unicode(item)
 
+                    # turn off chunks and compresson bc HDF5 parallelised IO
+                    if fileformats.HDF5.compression_enabled():
+                        chunks = item.chunks
+                        compression = fileformats.HDF5.compression_kwargs(
+                            item.compression, item.compression_opts
+                        )
+                    else:
+                        chunks = None
+                        compression = {"compression": None, "compression_opts": None}
+
                     dset = h5group.create_dataset(
                         key,
                         shape=data.shape,
                         dtype=data.dtype,
-                        chunks=item.chunks
-                        if fileformats.HDF5.compression_enabled()
-                        else None,
-                        **fileformats.HDF5.compression_kwargs(
-                            item.compression, item.compression_opts
-                        ),
+                        chunks=chunks,
+                        **compression,
                     )
 
                     # Write common data from rank 0
