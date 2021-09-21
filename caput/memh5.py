@@ -2608,15 +2608,26 @@ def _distributed_group_to_hdf5_serial(
 
             arr = check_unicode(entry)
 
-            arr.to_hdf5(
-                fname,
-                entry.name,
-                chunks=entry.chunks,
-                **fileformats.HDF5.compression_kwargs(
-                    compression=entry.compression,
-                    compression_opts=entry.compression_opts,
-                ),
-            )
+            if fileformats.HDF5.compression_enabled():
+                arr.to_hdf5(
+                    fname,
+                    entry.name,
+                    chunks=entry.chunks,
+                    *fileformats.HDF5.compression_kwargs(
+                        compression=entry.compression,
+                        compression_opts=entry.compression_opts,
+                    ),
+                )
+            else:
+                # disable compression if not enabled for HDF5 files
+                # https://github.com/chime-experiment/Pipeline/issues/33
+                arr.to_hdf5(
+                    fname,
+                    entry.name,
+                    chunks=None,
+                    compression=None,
+                    compression_opts=None,
+                )
 
         comm.Barrier()
 
@@ -2720,13 +2731,24 @@ def _distributed_group_to_hdf5_parallel(
                     data = check_unicode(item)
 
                     # Write to file from MPIArray
-                    data.to_hdf5(
-                        h5group,
-                        key,
-                        chunks=item.chunks,
-                        compression=item.compression,
-                        compression_opts=item.compression_opts,
-                    )
+                    if fileformats.HDF5.compression_enabled():
+                        data.to_hdf5(
+                            h5group,
+                            key,
+                            chunks=item.chunks,
+                            compression=item.compression,
+                            compression_opts=item.compression_opts,
+                        )
+                    else:
+                        # disable compression if not enabled for HDF5 files
+                        # https://github.com/chime-experiment/Pipeline/issues/33
+                        data.to_hdf5(
+                            h5group,
+                            key,
+                            chunks=None,
+                            compression=None,
+                            compression_opts=None,
+                        )
                     dset = h5group[key]
 
                     if hints:
@@ -2742,23 +2764,27 @@ def _distributed_group_to_hdf5_parallel(
                     else:
                         data = check_unicode(item)
 
-                    # turn off chunks and compresson bc HDF5 parallelised IO
                     if fileformats.HDF5.compression_enabled():
-                        chunks = item.chunks
-                        compression = fileformats.HDF5.compression_kwargs(
-                            item.compression, item.compression_opts
+                        dset = h5group.create_dataset(
+                            key,
+                            shape=data.shape,
+                            dtype=data.dtype,
+                            chunks=item.chunks,
+                            **fileformats.HDF5.compression_kwargs(
+                                item.compression, item.compression_opts
+                            ),
                         )
                     else:
-                        chunks = None
-                        compression = {"compression": None, "compression_opts": None}
-
-                    dset = h5group.create_dataset(
-                        key,
-                        shape=data.shape,
-                        dtype=data.dtype,
-                        chunks=chunks,
-                        **compression,
-                    )
+                        # disable compression if not enabled for HDF5 files
+                        # https://github.com/chime-experiment/Pipeline/issues/33
+                        dset = h5group.create_dataset(
+                            key,
+                            shape=data.shape,
+                            dtype=data.dtype,
+                            chunks=None,
+                            compression=None,
+                            compression_opts=None,
+                        )
 
                     # Write common data from rank 0
                     if memgroup.comm.rank == 0:
