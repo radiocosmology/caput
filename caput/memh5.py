@@ -1487,6 +1487,8 @@ class MemDiskGroup(_BaseGroup):
             data_group, toclose = get_file(
                 data_group, mode="a", file_format=file_format
             )
+            # Zarr arrays are automatically flushed and closed
+            toclose = False if file_format == fileformats.HDF5 else toclose
 
         # Check the distribution settings
         if distributed:
@@ -2314,7 +2316,7 @@ def get_file(f, file_format=None, **kwargs):
         except IOError as e:
             msg = "Opening file %s caused an error: " % str(f)
             raise IOError(msg + str(e)) from e
-        return f, file_format == fileformats.HDF5
+        return f, True
 
 
 def copyattrs(a1, a2, convert_strings=False):

@@ -15,6 +15,7 @@ import h5py
 
 from . import memh5
 from . import mpiarray
+from . import fileformats
 
 
 class TOData(memh5.BasicCont):
@@ -122,7 +123,8 @@ class Reader:
         time = np.copy(data_empty.time)
         first_file, toclose = memh5.get_file(files[0], file_format=file_format)
         datasets = _copy_non_time_data(first_file)
-        if toclose:
+        # Zarr arrays are flushed automatically flushed and closed
+        if toclose and (file_format == fileformats.HDF5):
             first_file.close()
 
         # Set the metadata attributes.
