@@ -807,6 +807,7 @@ class MPIArray(np.ndarray):
 
         if fh.is_mpi and (not use_collective):
             # Need to disable compression if we can't use collective IO
+            logger.error("Cannot use collective IO, disabling compression")
             chunks, compression, compression_opts = None, None, None
 
         sel = self._make_selections()

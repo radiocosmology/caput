@@ -2509,7 +2509,7 @@ def deep_group_copy(
                     compressor=getattr(entry, "compressor", None),
                 )
             else:
-                # use HDF5 compression args format
+                # in-memory case; use HDF5 compression args format for this case
                 compression_kwargs = fileformats.HDF5.compression_kwargs(
                     compression=compression, compression_opts=compression_opts
                 )
@@ -2939,7 +2939,7 @@ def _distributed_group_to_zarr(
 def _distributed_group_from_file(
     fname,
     comm=None,
-    _=True,
+    _=True,  # usually `hints`, but hints do not do anything in this method
     convert_dataset_strings=False,
     convert_attribute_strings=True,
     file_format=fileformats.HDF5,
