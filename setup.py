@@ -66,8 +66,8 @@ setup(
         "compression": [
             "bitshuffle @ git+https://github.com/kiyo-masui/bitshuffle.git",
             "numcodecs==0.7.3",
+            "zarr==2.8.1;platform_system!='Darwin'", # zarr is not supported on MacOS
         ],
-        "zarr": ["zarr==2.8.1"],
         "profiling": ["psutil", "pyinstrument"],
     },
     setup_requires=["cython"],

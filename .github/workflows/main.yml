@@ -28,7 +28,7 @@ jobs:
           pip install pylint==2.7.0 pylint-ignore flake8 pytest black mpi4py pyinstrument psutil pytest-lazy-fixture
           pip install -r requirements.txt
           python setup.py develop
-          pip install .[zarr,compression]
+          pip install .[compression]
 
       - name: Run flake8
         run: flake8 --show-source --ignore=E501,E741,E203,W503,E266 caput
