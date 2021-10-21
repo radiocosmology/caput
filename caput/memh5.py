@@ -536,7 +536,8 @@ class MemGroup(_BaseGroup):
         Could be generalized to MemGroups whose datasets are not all numpy arrays.
         In particular, if the data structure is hierarchical (datasets more than one layer deep), this will complain and fail.
         """
-        for key in new.keys():
+        new = MemGroup()
+        for key in self.keys():
             # TODO: Make me recurse if the dataset is a group
             # TODO: Handle non-numpy array datasets which need to be deep-copied.
             new.create_dataset(
