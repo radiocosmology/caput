@@ -530,6 +530,28 @@ class MemGroup(_BaseGroup):
                     convert_dataset_strings=convert_dataset_strings,
                 )
 
+    def copy(self):
+        """
+        Makes a copy of a MemGroup which deepcopies its datasets.
+        Could be generalized to MemGroups whose datasets are not all numpy arrays.
+        In particular, if the data structure is hierarchical (datasets more than one layer deep), this will complain and fail.
+        """
+        for key in new.keys():
+            # TODO: Make me recurse if the dataset is a group
+            # TODO: Handle non-numpy array datasets which need to be deep-copied.
+            new.create_dataset(
+                key,
+                shape=self[key].shape,
+                dtype=self[key].dtype,
+                data=np.ndarray.copy(
+                    self[key][:], order="A"
+                ),  # ...so lets ensure that deep copies are actually made.
+            )
+        if hasattr(self, "index_map"):
+            for key in self.index_map.keys():
+                new.create_index_map(key, self.index_map[key])
+        return new
+
     def create_group(self, name):
         """Create a group within the storage tree."""
 
