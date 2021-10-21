@@ -77,6 +77,13 @@ class TestGroup(unittest.TestCase):
         gc.collect()
         self.assertTrue(np.all(d.file["ra"][:] == data))
 
+    def test_copy(self):
+        f = memh5.MemGroup()
+        f.create_dataset('test',data=np.random.randn(20).reshape((5,4)))
+        g = f.copy()
+        assert (f['test'][:] == g['test'][:]).all(), "unsuccessful copy()!"
+        f['test'][:] *=0
+        assert (f['test'][:] != g['test'][:]).all(), "g should not be modified by changing f"
 
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""
