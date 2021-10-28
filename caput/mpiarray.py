@@ -1107,8 +1107,11 @@ def _partition_sel(sel, split_axis, n, slice_):
 
 def _len_slice(slice_, n):
     # Calculate the output length of a slice applied to an axis of length n
-    start, stop, step = slice_.indices(n)
-    return 1 + (stop - start - 1) // step
+    if isinstance(slice_, slice):
+        start, stop, step = slice_.indices(n)
+        return 1 + (stop - start - 1) // step
+    else:
+        return len(slice_)
 
 
 def _reslice(slice_, n, subslice):
@@ -1117,16 +1120,19 @@ def _reslice(slice_, n, subslice):
     #
     # In other words find a single slice that has the same affect as application of two successive
     # slices
-    dstart, dstop, dstep = slice_.indices(n)
 
     if subslice.step is not None and subslice.step > 1:
         raise ValueError("stride > 1 not supported. subslice: %s" % subslice)
 
-    return slice(
-        dstart + subslice.start * dstep,
-        min(dstart + subslice.stop * dstep, dstop),
-        dstep,
-    )
+    if isinstance(slice_, slice):
+        dstart, dstop, dstep = slice_.indices(n)
+        return slice(
+            dstart + subslice.start * dstep,
+            min(dstart + subslice.stop * dstep, dstop),
+            dstep,
+        )
+    else:
+        return slice_[subslice]
 
 
 def _expand_sel(sel, naxis):
