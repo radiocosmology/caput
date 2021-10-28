@@ -78,14 +78,29 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(np.all(d.file["ra"][:] == data))
 
     def test_copy(self):
-        f = memh5.BasicCont()
-        f.create_dataset('test',data=np.random.randn(20).reshape((5,4)))
-        f['test'].attrs['test_attribute'] = [1,2]
-        g = f.copy()
-        assert (f['test'][:] == g['test'][:]).all(), "unsuccessful copy()!"
-        assert f['test'].attrs['test_attribute'] == g['test'].attrs['test_attribute'], "attributes do not match"
-        f['test'][:] *=0
-        assert (f['test'][:] != g['test'][:]).all(), "g should not be modified by changing f"
+        # create a rudimentary data tree
+        a = memh5.MemDiskGroup()
+        a.create_dataset('first',data=np.arange(10))
+        b = a.create_group('second')
+        b.attrs['an_attribute'] = (1,2,3)
+        b.create_dataset('third',data=np.zeros(10))
+        b['third'].attrs['fill_value'] = 0 + 0j
+
+        # copy it
+
+
+        acopy = a.copy()
+        assert (a['first'][:] == acopy['first'][:]).all()
+        assert (a['second']['third'][:] == acopy['second/third'][:]).all()
+        assert (a['second'].attrs['an_attribute'] == acopy['second'].attrs['an_attribute'])
+
+        # try changing data
+        a['first'][:] += 1
+        assert not (a['first'][:] == acopy['first'][:]).all()
+
+        # try changing attrs
+        a['second'].attrs['an_attribute'] = (2,3,4)
+        assert not (a['second'].attrs['an_attribute'] == acopy['second'].attrs['an_attribute'])
 
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""
