@@ -1807,14 +1807,14 @@ class BasicCont(MemDiskGroup):
 
     def copy(self):
         """
-        Makes a copy of a MemGroup which deepcopies its datasets.
+        Makes a copy of a BasicCont which deepcopies its datasets.
         Could be generalized to MemGroups whose datasets are not all numpy arrays.
         In particular, if the data structure is hierarchical (datasets more than one layer deep), this will complain and fail.
         """
-
+        # the recursive function that does the moving of stuff from f to g
         def _copy(
             f, g
-        ):  # the recursive function that does the moving of stuff from f to g
+        ):
             copyattrs(f.attrs, g.attrs, convert_strings=True)
             for key in f.keys():
                 if is_group(f[key]):
