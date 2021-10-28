@@ -78,10 +78,12 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(np.all(d.file["ra"][:] == data))
 
     def test_copy(self):
-        f = memh5.MemGroup()
+        f = memh5.BasicCont()
         f.create_dataset('test',data=np.random.randn(20).reshape((5,4)))
+        f['test'].attrs['test_attribute'] = [1,2]
         g = f.copy()
         assert (f['test'][:] == g['test'][:]).all(), "unsuccessful copy()!"
+        assert f['test'].attrs['test_attribute'] == g['test'].attrs['test_attribute'], "attributes do not match"
         f['test'][:] *=0
         assert (f['test'][:] != g['test'][:]).all(), "g should not be modified by changing f"
 
