@@ -530,29 +530,6 @@ class MemGroup(_BaseGroup):
                     convert_dataset_strings=convert_dataset_strings,
                 )
 
-    def copy(self):
-        """
-        Makes a copy of a MemGroup which deepcopies its datasets.
-        Could be generalized to MemGroups whose datasets are not all numpy arrays.
-        In particular, if the data structure is hierarchical (datasets more than one layer deep), this will complain and fail.
-        """
-        new = MemGroup()
-        for key in self.keys():
-            # TODO: Make me recurse if the dataset is a group
-            # TODO: Handle non-numpy array datasets which need to be deep-copied.
-            new.create_dataset(
-                key,
-                shape=self[key].shape,
-                dtype=self[key].dtype,
-                data=np.ndarray.copy(
-                    self[key][:], order="A"
-                ),  # ...so lets ensure that deep copies are actually made.
-            )
-        if hasattr(self, "index_map"):
-            for key in self.index_map.keys():
-                new.create_index_map(key, self.index_map[key])
-        return new
-
     def create_group(self, name):
         """Create a group within the storage tree."""
 
@@ -1827,6 +1804,44 @@ class BasicCont(MemDiskGroup):
 
             if "order" not in self._data["history"].attrs:
                 self._data["history"].attrs["order"] = "[]"
+
+    def copy(self):
+        """
+        Makes a copy of a MemGroup which deepcopies its datasets.
+        Could be generalized to MemGroups whose datasets are not all numpy arrays.
+        In particular, if the data structure is hierarchical (datasets more than one layer deep), this will complain and fail.
+        """
+
+        def _copy(
+            f, g
+        ):  # the recursive function that does the moving of stuff from f to g
+            copyattrs(f.attrs, g.attrs, convert_strings=True)
+            for key in f.keys():
+                if is_group(f[key]):
+                    g_key = g.create_group(key)
+                    _copy(f[key], g_key)
+                else:
+                    try:
+                        g.create_dataset(
+                            key,
+                            shape=f[key].shape,
+                            dtype=f[key].dtype,
+                            data=np.ndarray.copy(
+                                f[key][:], order="A"
+                            ),  # ensure that deep copies are actually made.
+                        )
+                    except AttributeError:
+                        g.create_dataset(key, data=f[key])
+                    copyattrs(f[key].attrs, g[key].attrs)
+                    if hasattr(f, "index_map") and hasattr(g, "create_index_map"):
+                        for key in f.index_map.keys():
+                            g.create_index_map(key, f.index_map[key])
+
+        # make new object like the old one
+        new = BasicCont(distributed=self.distributed, comm=self.comm)
+        # move stuff from f to new
+        _copy(self, new)
+        return new
 
     @property
     def history(self):
