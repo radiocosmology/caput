@@ -2182,25 +2182,69 @@ def copyattrs(a1, a2, convert_strings=False):
         val = _map_json(val)
         a2[key] = val
 
-def _copy(f, g):
-    copyattrs(f.attrs, g.attrs, convert_strings=True)
-    for key in f.keys():
-        if is_group(f[key]):
-            g_key = g.create_group(key)
-            _copy(f[key], g_key)
+def _copy(g1, g2,
+    selections=None,
+    convert_dataset_strings=False,
+    convert_attribute_strings=True
+    ):
+    copyattrs(g1.attrs, g2.attrs, convert_strings=True)
+    for key in g1.keys():
+        entry = g1[key]
+        if is_group(entry):
+            g_key = g2.create_group(key)
+            _copy(entry, g_key,
+                selections,
+                convert_dataset_strings=convert_dataset_strings,
+                convert_attribute_strings=convert_attribute_strings)
         else:
             try:
-                g.create_dataset(
-                    key,
-                    shape=f[key].shape,
-                    dtype=f[key].dtype,
-                    data=np.ndarray.copy(
-                        f[key][:], order="A"
-                    ),  # ensure that deep copies are actually made; this needs to be generalized for HDF5 files.
+                selection = selections.get(
+                    entry.name, selections.get(entry.name[1:], slice(None))
                 )
             except AttributeError:
-                g.create_dataset(key, data=f[key])
-            copyattrs(f[key].attrs, g[key].attrs)
+                selection = slice(None)
+
+            if convert_dataset_strings:
+                # Convert unicode strings back into ascii byte strings. This will break
+                # if there are characters outside of the ascii range
+                if isinstance(g2, h5py.Group):
+                    data = ensure_bytestring(entry[selection])
+
+                # Convert strings in an HDF5 dataset into unicode
+                else:
+                    data = ensure_unicode(entry[selection])
+
+            elif isinstance(g2, h5py.Group):
+                data = check_unicode(entry)
+                data = data[selection]
+            else:
+                data = entry[selection]
+
+            try:
+                g2.create_dataset(
+                    key,
+                    shape=data.shape,
+                    dtype=data.dtype,
+                    data=np.ndarray.copy(entry[:], order ="A"),
+                    chunks=entry.chunks,
+                    compression=entry.compression,
+                    compression_opts=entry.compression_opts,
+                )
+            except AttributeError:
+                g2.create_dataset(
+                    key,
+                    shape=data.shape,
+                    dtype=data.dtype,
+                    data=data,
+                    chunks=entry.chunks,
+                    compression=entry.compression,
+                    compression_opts=entry.compression_opts,
+                )
+                UserWarning(f'Copy is not deep for attribute {key}')
+
+            copyattrs(
+                entry.attrs, g2[key].attrs, convert_strings=convert_attribute_strings
+            )
 
 def deep_group_copy(
     g1,
