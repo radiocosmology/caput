@@ -89,10 +89,10 @@ class TestGroup(unittest.TestCase):
         # copy it
 
         acopy = a.copy()
-        assert (a["first"][:] == acopy["first"][:]).all()
-        assert (a["second"]["third"][:] == acopy["second/third"][:]).all()
-        assert (
-            a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"]
+        self.assertTrue((a["first"][:] == acopy["first"][:]).all())
+        self.assertTrue((a["second"]["third"][:] == acopy["second/third"][:]).all())
+        self.assertTrue((
+            a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"])
         )
 
         # try changing data
@@ -105,6 +105,35 @@ class TestGroup(unittest.TestCase):
             a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"]
         )
 
+    def test_copy_shared(self):
+        # create a rudimentary data tree
+        a = memh5.MemDiskGroup()
+        a.create_dataset("first", data=np.arange(10))
+        b = a.create_group("second")
+        b.attrs["an_attribute"] = (1, 2, 3)
+        b.create_dataset("third", data=np.zeros(10))
+        b["third"].attrs["fill_value"] = 0 + 0j
+
+        # copy it
+
+        acopy = a.copy(shared=['first'])
+        self.assertTrue((a["first"][:] == acopy["first"][:]).all())
+        self.assertTrue((a["second"]["third"][:] == acopy["second/third"][:]).all())
+        self.assertTrue((
+            a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"]
+        ))
+
+        # try changing data; `first` is shared so verify that the copy is not deep
+        a["first"][:] += 1
+        self.assertTrue((a["first"][:] == acopy["first"][:]).all())
+        a["second"]["third"][:] += 1
+        self.assertTrue((a['second']["third"][:] != acopy['second']["third"][:]).all())
+
+        # try changing attrs
+        a["second"].attrs["an_attribute"] = (2, 3, 4)
+        self.assertTrue(not (
+            a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"]
+        ))
 
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""
