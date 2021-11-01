@@ -411,7 +411,7 @@ class MemGroup(_BaseGroup):
         selections=None,
         convert_dataset_strings=False,
         convert_attribute_strings=True,
-        **kwargs
+        **kwargs,
     ):
         """Create a new instance by copying from an hdf5 group.
 
@@ -484,7 +484,7 @@ class MemGroup(_BaseGroup):
         hints=True,
         convert_attribute_strings=True,
         convert_dataset_strings=False,
-        **kwargs
+        **kwargs,
     ):
         """Replicate object on disk in an hdf5 file.
 
@@ -574,7 +574,7 @@ class MemGroup(_BaseGroup):
         chunks=None,
         compression=None,
         compression_opts=None,
-        **kwargs
+        **kwargs,
     ):
         """Create a new dataset.
 
@@ -951,7 +951,7 @@ class MemDatasetCommon(MemDataset):
         chunks=None,
         compression=None,
         compression_opts=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -1105,7 +1105,7 @@ class MemDatasetDistributed(MemDataset):
         chunks=None,
         compression=None,
         compression_opts=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -1475,7 +1475,7 @@ class MemDiskGroup(_BaseGroup):
         detect_subclass=True,
         convert_attribute_strings=None,
         convert_dataset_strings=None,
-        **kwargs
+        **kwargs,
     ):
         """Create data object from analysis hdf5 file, store in memory or on disk.
 
@@ -1554,7 +1554,7 @@ class MemDiskGroup(_BaseGroup):
                 selections=sel,
                 convert_attribute_strings=convert_attribute_strings,
                 convert_dataset_strings=convert_dataset_strings,
-                **kwargs
+                **kwargs,
             )
             toclose = False
         else:
@@ -1729,7 +1729,7 @@ class MemDiskGroup(_BaseGroup):
         filename,
         convert_attribute_strings=None,
         convert_dataset_strings=None,
-        **kwargs
+        **kwargs,
     ):
         """Save data to hdf5 file.
 
@@ -1771,10 +1771,10 @@ class MemDiskGroup(_BaseGroup):
                 filename,
                 convert_attribute_strings=convert_attribute_strings,
                 convert_dataset_strings=convert_dataset_strings,
-                **kwargs
+                **kwargs,
             )
 
-    def copy(self,shared=None):
+    def copy(self, shared=None):
         """
         Traverses a MemGroup tree and deepcopies its datasets.
         If the dataset is not a np.array this will complain and fail.
@@ -1784,7 +1784,7 @@ class MemDiskGroup(_BaseGroup):
         # make new object like the old one
         new = self.__class__(distributed=self.distributed, comm=self.comm)
         # move stuff from self to new
-        _copy(self, new,shared=shared)
+        _copy(self, new, shared=shared)
         return new
 
 
@@ -2030,8 +2030,9 @@ class BasicCont(MemDiskGroup):
                         str(dist_axis),
                         name,
                     )
+
     def copy(self):
-        """ Calls copy() from MemDiskGroup and makes sure to copy the index_map """
+        """Calls copy() from MemDiskGroup and makes sure to copy the index_map"""
         new = super().copy()
 
         if hasattr(self, "index_map") and hasattr(new, "create_index_map"):
@@ -2182,21 +2183,27 @@ def copyattrs(a1, a2, convert_strings=False):
         val = _map_json(val)
         a2[key] = val
 
-def _copy(g1, g2,
+
+def _copy(
+    g1,
+    g2,
     shared=None,
     selections=None,
     convert_dataset_strings=False,
-    convert_attribute_strings=True
-    ):
+    convert_attribute_strings=True,
+):
     copyattrs(g1.attrs, g2.attrs, convert_strings=True)
     for key in g1.keys():
         entry = g1[key]
         if is_group(entry):
             g_key = g2.create_group(key)
-            _copy(entry, g_key,
+            _copy(
+                entry,
+                g_key,
                 selections,
                 convert_dataset_strings=convert_dataset_strings,
-                convert_attribute_strings=convert_attribute_strings)
+                convert_attribute_strings=convert_attribute_strings,
+            )
         else:
             try:
                 selection = selections.get(
@@ -2227,13 +2234,13 @@ def _copy(g1, g2,
                         key,
                         shape=data.shape,
                         dtype=data.dtype,
-                        data=np.ndarray.copy(entry[:], order ="A"),
+                        data=np.ndarray.copy(entry[:], order="A"),
                         chunks=entry.chunks,
                         compression=entry.compression,
                         compression_opts=entry.compression_opts,
                     )
                 except AttributeError:
-                    UserWarning(f'Copy is not deep for attribute {key}')
+                    UserWarning(f"Copy is not deep for attribute {key}")
                     g2.create_dataset(
                         key,
                         shape=data.shape,
@@ -2252,11 +2259,12 @@ def _copy(g1, g2,
                     chunks=entry.chunks,
                     compression=entry.compression,
                     compression_opts=entry.compression_opts,
-            )
+                )
 
             copyattrs(
                 entry.attrs, g2[key].attrs, convert_strings=convert_attribute_strings
             )
+
 
 def deep_group_copy(
     g1,
@@ -2372,7 +2380,7 @@ def _distributed_group_to_hdf5_serial(
     hints=True,
     convert_dataset_strings=False,
     convert_attribute_strings=True,
-    **kwargs
+    **kwargs,
 ):
     """Private routine to copy full data tree from distributed memh5 object
     into an HDF5 file.
@@ -2426,7 +2434,7 @@ def _distributed_group_to_hdf5_serial(
                 mode,
                 convert_dataset_strings=convert_dataset_strings,
                 convert_attribute_strings=convert_attribute_strings,
-                **kwargs
+                **kwargs,
             )
 
         # Write out distributed datasets (only the data, the attributes are written below)
@@ -2507,7 +2515,7 @@ def _distributed_group_to_hdf5_parallel(
     hints=True,
     convert_dataset_strings=False,
     convert_attribute_strings=True,
-    **kwargs
+    **kwargs,
 ):
     """Private routine to copy full data tree from distributed memh5 object
     into an HDF5 file.
@@ -2605,7 +2613,7 @@ def _distributed_group_from_hdf5(
     hints=True,
     convert_dataset_strings=False,
     convert_attribute_strings=True,
-    **kwargs
+    **kwargs,
 ):
     """
     Restore full tree from an HDF5 file into a distributed memh5 object.
