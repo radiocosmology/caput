@@ -91,8 +91,8 @@ class TestGroup(unittest.TestCase):
         acopy = a.copy()
         self.assertTrue((a["first"][:] == acopy["first"][:]).all())
         self.assertTrue((a["second"]["third"][:] == acopy["second/third"][:]).all())
-        self.assertTrue((
-            a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"])
+        self.assertTrue(
+            (a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"])
         )
 
         # try changing data
@@ -116,24 +116,28 @@ class TestGroup(unittest.TestCase):
 
         # copy it
 
-        acopy = a.copy(shared=['first'])
+        acopy = a.copy(shared=["first"])
         self.assertTrue((a["first"][:] == acopy["first"][:]).all())
         self.assertTrue((a["second"]["third"][:] == acopy["second/third"][:]).all())
-        self.assertTrue((
-            a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"]
-        ))
+        self.assertTrue(
+            (a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"])
+        )
 
         # try changing data; `first` is shared so verify that the copy is not deep
         a["first"][:] += 1
         self.assertTrue((a["first"][:] == acopy["first"][:]).all())
         a["second"]["third"][:] += 1
-        self.assertTrue((a['second']["third"][:] != acopy['second']["third"][:]).all())
+        self.assertTrue((a["second"]["third"][:] != acopy["second"]["third"][:]).all())
 
         # try changing attrs
         a["second"].attrs["an_attribute"] = (2, 3, 4)
-        self.assertTrue(not (
-            a["second"].attrs["an_attribute"] == acopy["second"].attrs["an_attribute"]
-        ))
+        self.assertTrue(
+            not (
+                a["second"].attrs["an_attribute"]
+                == acopy["second"].attrs["an_attribute"]
+            )
+        )
+
 
 class TestH5Files(unittest.TestCase):
     """Tests that make hdf5 objects, convert to mem and back."""
