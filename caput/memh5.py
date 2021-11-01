@@ -1774,7 +1774,7 @@ class MemDiskGroup(_BaseGroup):
                 **kwargs
             )
 
-    def copy(self):
+    def copy(self,shared=None):
         """
         Traverses a MemGroup tree and deepcopies its datasets.
         If the dataset is not a np.array this will complain and fail.
@@ -1784,7 +1784,7 @@ class MemDiskGroup(_BaseGroup):
         # make new object like the old one
         new = self.__class__(distributed=self.distributed, comm=self.comm)
         # move stuff from self to new
-        _copy(self, new)
+        _copy(self, new,shared=shared)
         return new
 
 
@@ -2183,6 +2183,7 @@ def copyattrs(a1, a2, convert_strings=False):
         a2[key] = val
 
 def _copy(g1, g2,
+    shared=None,
     selections=None,
     convert_dataset_strings=False,
     convert_attribute_strings=True
@@ -2220,17 +2221,29 @@ def _copy(g1, g2,
             else:
                 data = entry[selection]
 
-            try:
-                g2.create_dataset(
-                    key,
-                    shape=data.shape,
-                    dtype=data.dtype,
-                    data=np.ndarray.copy(entry[:], order ="A"),
-                    chunks=entry.chunks,
-                    compression=entry.compression,
-                    compression_opts=entry.compression_opts,
-                )
-            except AttributeError:
+            if not (shared and key in shared):
+                try:
+                    g2.create_dataset(
+                        key,
+                        shape=data.shape,
+                        dtype=data.dtype,
+                        data=np.ndarray.copy(entry[:], order ="A"),
+                        chunks=entry.chunks,
+                        compression=entry.compression,
+                        compression_opts=entry.compression_opts,
+                    )
+                except AttributeError:
+                    UserWarning(f'Copy is not deep for attribute {key}')
+                    g2.create_dataset(
+                        key,
+                        shape=data.shape,
+                        dtype=data.dtype,
+                        data=data,
+                        chunks=entry.chunks,
+                        compression=entry.compression,
+                        compression_opts=entry.compression_opts,
+                    )
+            else:
                 g2.create_dataset(
                     key,
                     shape=data.shape,
@@ -2239,8 +2252,7 @@ def _copy(g1, g2,
                     chunks=entry.chunks,
                     compression=entry.compression,
                     compression_opts=entry.compression_opts,
-                )
-                UserWarning(f'Copy is not deep for attribute {key}')
+            )
 
             copyattrs(
                 entry.attrs, g2[key].attrs, convert_strings=convert_attribute_strings
