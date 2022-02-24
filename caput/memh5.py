@@ -1132,7 +1132,7 @@ class MemDatasetCommon(MemDataset):
         self = cls.__new__(cls)
         super(MemDatasetCommon, self).__init__(**kwargs)
 
-        self._data = data
+        self._data = ensure_native_byteorder(data)
         self._chunks = chunks
         self._compression = compression
         self._compression_opts = compression_opts
@@ -2526,10 +2526,17 @@ def deep_group_copy(
             # Convert strings in an HDF5 dataset into unicode
             else:
                 data = ensure_unicode(data)
+
         elif to_file:
             # If we shouldn't convert we at least need to ensure there aren't any
             # Unicode characters before writing
             data = check_unicode(entry)
+
+        if not to_file:
+            # reading from h5py can result in arrays with explicit endian set
+            # which mpi4py cannot handle when Bcasting memh5.Group
+            # needed until fixed: https://github.com/mpi4py/mpi4py/issues/177
+            data = ensure_native_byteorder(data)
 
         return data.dtype, data.shape, data
 
@@ -2581,6 +2588,7 @@ def deep_group_copy(
         else:  # Is a dataset
             dtype, shape, data = _prepare_dataset(entry)
             compression_kwargs = _prepare_compression_args(entry)
+
             g2.create_dataset(
                 key,
                 shape=shape,
@@ -2798,6 +2806,9 @@ def _distributed_group_from_file(
                         if convert_dataset_strings:
                             cdata = ensure_unicode(cdata)
 
+                        # only needed until fixed: https://github.com/mpi4py/mpi4py/issues/177
+                        cdata = ensure_native_byteorder(cdata)
+
                     cdata = comm.bcast(cdata, root=0)
 
                     # Create dataset from array
@@ -2953,6 +2964,49 @@ def _convert_dtype(dt, type_from, type_to):
         return np.dtype(_iter_conv(dt.descr))
 
 
+def check_byteorder(arr_byteorder):
+    """Test if a native byteorder; if not, check if byteorder matches the architecture.
+
+    Parameters
+    ----------
+    arr_byteorder : np.dtype.byteorder
+        Array byteorder to check.
+
+    Returns
+    -------
+    check_byteorder : bool
+        True if the byteorder should be set to native. False, otherwise.
+    """
+
+    if arr_byteorder == "=":
+        return False
+
+    elif has_matching_byteorder(arr_byteorder):
+        return True
+
+    return False
+
+
+def has_matching_byteorder(arr_byteorder):
+    """Test if byteorder marches the architecture.
+
+    Parameters
+    ----------
+    arr_byteorder : np.dtype.byteorder
+        Array byteorder to check.
+
+    Returns
+    -------
+    has_matching_byteorder : bool
+        True if the byteorder matches the architecture.
+    """
+    from sys import byteorder
+
+    return (arr_byteorder == "<" and byteorder == "little") or (
+        arr_byteorder == ">" and byteorder == "big"
+    )
+
+
 def has_kind(dt, kind):
     """Test if a numpy datatype has any fields of a specified type.
 
@@ -3006,6 +3060,29 @@ def has_bytestring(dt):
     See `has_kind`.
     """
     return has_kind(dt, "S")
+
+
+def ensure_native_byteorder(arr):
+    """If architecture and arr byteorder are the same, ensure byteorder is native.
+
+    Because of https://github.com/mpi4py/mpi4py/issues/177 mpi4py does not handle
+    explicit byte order of little endian. A byteorder of native ("=" in numpy) however,
+    works fine.
+
+    Parameters
+    ----------
+    arr : np.ndarray
+        Input array.
+
+    Returns
+    -------
+    arr_conv : np.ndarray
+        The converted array. If no conversion was required, just returns `arr`.
+    """
+    if check_byteorder(arr.dtype.byteorder):
+        return arr.newbyteorder("=")
+    else:
+        return arr
 
 
 def ensure_bytestring(arr):
