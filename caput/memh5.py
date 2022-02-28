@@ -557,8 +557,6 @@ class MemGroup(_BaseGroup):
         hints=True,
         convert_attribute_strings=True,
         convert_dataset_strings=False,
-        compression=None,
-        compression_opts=None,
         **kwargs,
     ):
         """Replicate object on disk in an hdf5 file.
@@ -577,11 +575,6 @@ class MemGroup(_BaseGroup):
             understands. Default is `True`.
         convert_dataset_strings : bool, optional
             Try and convert dataset string types to bytestrings. Default is `False`.
-        compression : str
-            Name or identifier of HDF5 compression filter for the dataset.
-        compression_opts
-            Compression options for the dataset.
-            See HDF5 documentation for compression filters.
 
         """
 
@@ -592,8 +585,6 @@ class MemGroup(_BaseGroup):
             convert_attribute_strings,
             convert_dataset_strings,
             fileformats.HDF5,
-            compression,
-            compression_opts,
             **kwargs,
         )
 
@@ -605,8 +596,6 @@ class MemGroup(_BaseGroup):
         convert_attribute_strings=True,
         convert_dataset_strings=False,
         file_format=fileformats.HDF5,
-        compression=None,
-        compression_opts=None,
         **kwargs,
     ):
         """Replicate object on disk in an hdf5 or zarr file.
@@ -636,8 +625,6 @@ class MemGroup(_BaseGroup):
                     convert_attribute_strings=convert_attribute_strings,
                     convert_dataset_strings=convert_dataset_strings,
                     file_format=file_format,
-                    compression=compression,
-                    compression_opts=compression_opts,
                 )
         elif file_format == fileformats.HDF5:
             if h5py.get_config().mpi:
@@ -663,8 +650,6 @@ class MemGroup(_BaseGroup):
                 mode,
                 convert_attribute_strings=convert_attribute_strings,
                 convert_dataset_strings=convert_dataset_strings,
-                compression=compression,
-                compression_opts=compression_opts,
             )
 
     def create_group(self, name):
@@ -2415,8 +2400,6 @@ def deep_group_copy(
     convert_dataset_strings=False,
     convert_attribute_strings=True,
     file_format=fileformats.HDF5,
-    compression=None,
-    compression_opts=None,
 ):
     """
     Copy full data tree from one group to another.
@@ -2465,8 +2448,6 @@ def deep_group_copy(
                 convert_dataset_strings=convert_dataset_strings,
                 convert_attribute_strings=convert_attribute_strings,
                 file_format=file_format,
-                compression=compression,
-                compression_opts=compression_opts,
             )
         else:
             # look for selection for this dataset (also try withouth the leading "/")
@@ -2498,11 +2479,17 @@ def deep_group_copy(
             else:
                 data = entry[selection]
 
+            # get compression options/chunking for this dataset
+            chunks = entry.chunks
+            # TODO: is there a case where these properties don't exist?
+            #       e.g. if it's a zarr dataset?
+            compression = entry.compression
+            compression_opts = entry.compression_opts
+
+            # TODO: Am I missing something or is this branch not necessary?
+            #       I guess I'm still confused as to why a file_format is
+            #       required even for the in-memory case
             if isinstance(g2, file_format.module.Group):
-                compression_entry = getattr(entry, "compression", None)
-                if compression_entry is not None:
-                    compression = compression_entry
-                    compression_opts = getattr(entry, "compression_opts", None)
                 compression_kwargs = file_format.compression_kwargs(
                     compression=compression,
                     compression_opts=compression_opts,
@@ -2518,7 +2505,7 @@ def deep_group_copy(
                 shape=data.shape,
                 dtype=data.dtype,
                 data=data,
-                chunks=entry.chunks,
+                chunks=chunks,
                 **compression_kwargs,
             )
             copyattrs(
@@ -2813,8 +2800,6 @@ def _distributed_group_to_zarr(
     hints=True,
     convert_dataset_strings=False,
     convert_attribute_strings=True,
-    compression=None,
-    compression_opts=None,
     **_,
 ):
     """Private routine to copy full data tree from distributed memh5 object into a Zarr file.
@@ -2826,7 +2811,7 @@ def _distributed_group_to_zarr(
 
     # == Create some internal functions for doing the read ==
     # Function to perform a recursive clone of the tree structure
-    def _copy_to_file(memgroup, group, compression, compression_opts):
+    def _copy_to_file(memgroup, group):
 
         # Copy over attributes
         if memgroup.comm.rank == 0:
@@ -2844,14 +2829,10 @@ def _distributed_group_to_zarr(
                 if memgroup.comm.rank == 0:
                     group.create_group(key)
                 memgroup.comm.Barrier()
-                _copy_to_file(item, group[key], compression, compression_opts)
+                _copy_to_file(item, group[key])
 
             # If dataset, create dataset
             else:
-                if item.compression is not None:
-                    compression = item.compression
-                    compression_opts = item.compression_opts
-
                 # Check if we are in a distributed dataset
                 if isinstance(item, MemDatasetDistributed):
 
@@ -2862,8 +2843,8 @@ def _distributed_group_to_zarr(
                         group,
                         key,
                         chunks=item.chunks,
-                        compression=compression,
-                        compression_opts=compression_opts,
+                        compression=item.compression,
+                        compression_opts=item.compression_opts,
                         file_format=fileformats.Zarr,
                     )
                     dset = group[key]
@@ -2918,7 +2899,7 @@ def _distributed_group_to_zarr(
         store=fname, mode="r+", synchronizer=synchronizer
     ) as f:
         # Start recursive file write
-        _copy_to_file(group, f, compression, compression_opts)
+        _copy_to_file(group, f)
 
         if hints and group.comm.rank == 0:
             f.attrs["__memh5_distributed_file"] = True
