@@ -1172,7 +1172,17 @@ class MemDatasetCommon(MemDataset):
 
     @chunks.setter
     def chunks(self, val):
-        self._chunks = val
+        if val is None:
+            chunks = val
+        elif len(val) != len(self.shape):
+            raise ValueError(
+                f"Chunk size {val} is not compatible with dataset shape {self.shape}."
+            )
+        else:
+            chunks = ()
+            for i, l in enumerate(self.shape):
+                chunks += (min(val[i], l),)
+        self._chunks = chunks
 
     @property
     def compression(self):
@@ -1332,7 +1342,17 @@ class MemDatasetDistributed(MemDataset):
 
     @chunks.setter
     def chunks(self, val):
-        self._chunks = val
+        if val is None:
+            chunks = val
+        elif len(val) != len(self.shape):
+            raise ValueError(
+                f"Chunk size {val} is not compatible with dataset shape {self.shape}."
+            )
+        else:
+            chunks = ()
+            for i, l in enumerate(self.shape):
+                chunks += (min(val[i], l),)
+        self._chunks = chunks
 
     @property
     def compression(self):
