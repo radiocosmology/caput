@@ -100,7 +100,7 @@ def bit_truncate_weights(val, inv_var, fallback):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_weights_float(float[::1] val, float[::1] inv_var, float fallback):
+def bit_truncate_weights_float(float[:] val, float[:] inv_var, float fallback):
     """Truncate using a set of inverse variance weights.
 
     Giving the error as an inverse variance is particularly useful for data analysis.
@@ -139,7 +139,7 @@ def bit_truncate_weights_float(float[::1] val, float[::1] inv_var, float fallbac
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_weights_double(double[::1] val, double[::1] inv_var, double fallback):
+def bit_truncate_weights_double(double[:] val, double[:] inv_var, double fallback):
     """Truncate array of doubles using a set of inverse variance weights.
 
     Giving the error as an inverse variance is particularly useful for data analysis.
@@ -187,7 +187,7 @@ def bit_truncate_relative(val, prec):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_relative_float(float[::1] val, float prec):
+def bit_truncate_relative_float(float[:] val, float prec):
     """Truncate using a relative tolerance.
 
     Parameters
@@ -213,7 +213,7 @@ def bit_truncate_relative_float(float[::1] val, float prec):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_relative_double(cnp.float64_t[::1] val, cnp.float64_t prec):
+def bit_truncate_relative_double(cnp.float64_t[:] val, cnp.float64_t prec):
     """Truncate doubles using a relative tolerance.
 
     Parameters
@@ -239,7 +239,7 @@ def bit_truncate_relative_double(cnp.float64_t[::1] val, cnp.float64_t prec):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_max_complex(complex128[:, ::1] val, float prec, float prec_max_row):
+def bit_truncate_max_complex(complex128[:, :] val, float prec, float prec_max_row):
     """Truncate using a relative per element and per the maximum of the last dimension.
 
     This scheme allows elements to be truncated based on their own value and a
