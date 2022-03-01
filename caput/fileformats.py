@@ -23,6 +23,7 @@ except ModuleNotFoundError as e:
         f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters.: {e}"
     )
     compression_enabled = False
+    H5FILTER, H5_COMPRESS_LZ4 = None, None
 else:
     compression_enabled = True
 
