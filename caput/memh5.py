@@ -715,6 +715,10 @@ class MemGroup(_BaseGroup):
         distributed_axis : int, optional
             Axis to distribute the data over. If specified with initialisation
             data this will cause create a copy with the correct distribution.
+        compression : str or int
+            Name or identifier of HDF5 or Zarr compression filter.
+        compression_opts
+            See HDF5 and Zarr documentation for compression filters.
 
         Returns
         -------
@@ -1118,6 +1122,10 @@ class MemDatasetCommon(MemDataset):
         ----------
         data : np.ndarray
             Array to initialise from.
+        compression : str or int
+            Name or identifier of HDF5 or Zarr compression filter.
+        compression_opts
+            See HDF5 and Zarr documentation for compression filters.
 
         Returns
         -------

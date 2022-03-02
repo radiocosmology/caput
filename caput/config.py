@@ -482,8 +482,8 @@ def logging_config(default=None):
     return prop
 
 
-def file_format(default=None):
-    """A property type that accepts only "zarr", "hdf5" or None.
+def file_format(default="hdf5"):
+    """A property type that accepts only "zarr", or "hdf5".
 
     Returns the selected `caput.fileformat.FileFormat` subclass or `caput.fileformats.HDF5` if `value == default`.
 
@@ -500,7 +500,7 @@ def file_format(default=None):
     Raises
     ------
     ValueError
-        If the default value is not `None`, `"hdf5"` or `"zarr"`.
+        If the default value is not `"hdf5"` or `"zarr"`.
 
     Examples
     --------
@@ -530,9 +530,7 @@ def file_format(default=None):
             return fileformats.Zarr
         raise CaputConfigError(f"Input {repr(val)} needs to be one of {options})")
 
-    if default is not None and (
-        not isinstance(default, str) or default.lower() not in options
-    ):
+    if default is not isinstance(default, str) or default.lower() not in options:
         raise CaputConfigError(f"Default value {repr(default)} must be in {options}")
 
     return Property(proptype=_prop, default=default)
