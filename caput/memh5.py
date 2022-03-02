@@ -398,7 +398,7 @@ class MemGroup(_BaseGroup):
         """Create a new instance by deep copying an existing group.
 
         Agnostic as to whether the group to be copied is a `MemGroup` or an
-        `h5py.Group` (which includes `hdf5.File` and `zarr.File` objects).
+        `h5py.Group` (which includes `h5py.File` and `zarr.File` objects).
 
         """
 
@@ -2611,25 +2611,19 @@ def _distributed_group_to_hdf5_serial(
             arr = check_unicode(entry)
 
             if fileformats.HDF5.compression_enabled():
-                arr.to_hdf5(
-                    fname,
-                    entry.name,
-                    chunks=entry.chunks,
-                    *fileformats.HDF5.compression_kwargs(
-                        compression=entry.compression,
-                        compression_opts=entry.compression_opts,
-                    ),
-                )
+                chunks, compression, compression_opts = entry.chunks, *fileformats.HDF5.compression_kwargs(compression=entry.compression, compression_opts=entry.compression_opts)
             else:
                 # disable compression if not enabled for HDF5 files
                 # https://github.com/chime-experiment/Pipeline/issues/33
-                arr.to_hdf5(
-                    fname,
-                    entry.name,
-                    chunks=None,
-                    compression=None,
-                    compression_opts=None,
-                )
+                chunks, compression, compression_opts = None, None, None
+
+            arr.to_hdf5(
+                fname,
+                entry.name,
+                chunks=chunks,
+                compression=compression,
+                compression_opts=compression_opts,
+            )
 
         comm.Barrier()
 
@@ -2734,23 +2728,20 @@ def _distributed_group_to_hdf5_parallel(
 
                     # Write to file from MPIArray
                     if fileformats.HDF5.compression_enabled():
-                        data.to_hdf5(
-                            h5group,
-                            key,
-                            chunks=item.chunks,
-                            compression=item.compression,
-                            compression_opts=item.compression_opts,
-                        )
+                        chunks, compression, compression_opts = item.chunks, item.compression, item.compression_opts
                     else:
                         # disable compression if not enabled for HDF5 files
                         # https://github.com/chime-experiment/Pipeline/issues/33
-                        data.to_hdf5(
-                            h5group,
-                            key,
-                            chunks=None,
-                            compression=None,
-                            compression_opts=None,
-                        )
+                        chunks, compression, compression_opts = None, None, None
+
+                    data.to_hdf5(
+                        h5group,
+                        key,
+                        chunks=chunks,
+                        compression=compression,
+                        compression_opts=compression_opts,
+                    )
+
                     dset = h5group[key]
 
                     if hints:

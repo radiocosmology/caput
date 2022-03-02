@@ -510,7 +510,7 @@ def file_format(default=None):
 
             mode = file_format(default='zarr')
     """
-    options = ("hdf5", "zarr", None)
+    options = ("hdf5", "zarr")
 
     def _prop(val):
         from . import fileformats

@@ -234,7 +234,7 @@ def guess_file_format(name, default=HDF5):
 
     if name.endswith(".zarr") or pathlib.Path(name).is_dir():
         return Zarr
-    if name.endswith(".h5"):
+    if name.endswith(".h5") or name.endswith(".hdf5"):
         return HDF5
     return default
 
