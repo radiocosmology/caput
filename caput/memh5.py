@@ -2410,6 +2410,8 @@ def copyattrs(a1, a2, convert_strings=False):
     for key in sorted(a1):
         val = _map_unicode(a1[key])
         val = _map_json(val)
+        if isinstance(val, np.generic):  # zarr can't handle numpy types
+            val = val.item()
         a2[key] = val
 
 
