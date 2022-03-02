@@ -2620,7 +2620,8 @@ def _distributed_group_to_hdf5_serial(
             arr = check_unicode(entry)
 
             if fileformats.HDF5.compression_enabled():
-                chunks, compression, compression_opts = entry.chunks, *fileformats.HDF5.compression_kwargs(compression=entry.compression, compression_opts=entry.compression_opts)
+                chunks, compression_kwargs = entry.chunks, fileformats.HDF5.compression_kwargs(compression=entry.compression, compression_opts=entry.compression_opts)
+                compression, compression_opts = compression_kwargs['compression'], compression_kwargs['compression_opts']
             else:
                 # disable compression if not enabled for HDF5 files
                 # https://github.com/chime-experiment/Pipeline/issues/33
@@ -2767,26 +2768,21 @@ def _distributed_group_to_hdf5_parallel(
                         data = check_unicode(item)
 
                     if fileformats.HDF5.compression_enabled():
-                        dset = h5group.create_dataset(
-                            key,
-                            shape=data.shape,
-                            dtype=data.dtype,
-                            chunks=item.chunks,
-                            **fileformats.HDF5.compression_kwargs(
-                                item.compression, item.compression_opts
-                            ),
-                        )
+                        chunks, compression_kwargs = item.chunks, fileformats.HDF5.compression_kwargs(item.compression, item.compression_opts)
+                        compression, compression_opts = compression_kwargs['compression'], compression_kwargs['compression_kwargs']
                     else:
                         # disable compression if not enabled for HDF5 files
                         # https://github.com/chime-experiment/Pipeline/issues/33
-                        dset = h5group.create_dataset(
-                            key,
-                            shape=data.shape,
-                            dtype=data.dtype,
-                            chunks=None,
-                            compression=None,
-                            compression_opts=None,
-                        )
+                        chunks, compression, compression_opts = None
+
+                    dset = h5group.create_dataset(
+                        key,
+                        shape=data.shape,
+                        dtype=data.dtype,
+                        chunks=chunks,
+                        compression=compression,
+                        compression_opts = compression_opts,
+                    )
 
                     # Write common data from rank 0
                     if memgroup.comm.rank == 0:
