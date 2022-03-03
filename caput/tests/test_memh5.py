@@ -148,18 +148,13 @@ def test_file_sanity(test_file, file_open_function):
 
 
 @pytest.mark.parametrize(
-    "compression,compression_opts", [(None, None), ("bitshuffle", (None, "lz4"))]
-)
-@pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
         (lazy_fixture("filled_h5_file"), h5py.File, fileformats.HDF5),
         (lazy_fixture("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
     ],
 )
-def test_to_from_file(
-    test_file, file_open_function, file_format, compression, compression_opts
-):
+def test_to_from_file(test_file, file_open_function, file_format):
     """Tests that makes hdf5 objects, convert to mem and back."""
     m = memh5.MemGroup.from_file(test_file, file_format=file_format)
 
@@ -170,8 +165,6 @@ def test_to_from_file(
     m.to_file(
         test_file + ".new",
         file_format=file_format,
-        compression=compression,
-        compression_opts=compression_opts,
     )
 
     # Check that written file has same structure
@@ -203,6 +196,51 @@ def test_memdisk(test_file, file_format):
     assert np.all(
         f["/level1/level2/level3/new"][:] == m["/level1/level2/level3/new"][:]
     )
+
+@pytest.mark.parametrize(
+    "compression,compression_opts,chunks", [(None, None, None), ("bitshuffle", (None, "lz4"), (2, 3))]
+)
+@pytest.mark.parametrize(
+    "test_file,file_format",
+    [
+        (lazy_fixture("filled_h5_file"), fileformats.HDF5),
+        (lazy_fixture("filled_zarr_file"), fileformats.Zarr),
+    ],
+)
+def test_compression(test_file, file_format, compression, compression_opts, chunks):
+    # add a new compressed dataset
+    f = memh5.MemDiskGroup.from_file(test_file, file_format=file_format)
+    rng = np.random.default_rng(12345)
+    f.create_dataset(
+        "new",
+        data=rng.random((5, 7)),
+        chunks=chunks,
+        compression=compression,
+        compression_opts=compression_opts,
+    )
+    #f.flush()
+    f.save(
+        test_file + ".cmp",
+        convert_attribute_strings=True,
+        convert_dataset_strings=True,
+        file_format=file_format,
+    )
+    #f.close()
+
+    # read back compression parameters from file
+    with file_format.open(test_file + ".cmp") as fh:
+        if file_format is fileformats.HDF5:
+            if compression is not None:
+                # for some reason .compression doesn't get set...
+                assert str(fileformats.H5FILTER) in fh["new"]._filters
+            assert fh["new"].chunks == chunks
+        else:
+            if compression is None:
+                assert fh["new"].compressor is None
+                assert fh["new"].chunks == fh["new"].shape
+            else:
+                assert fh["new"].compressor is not None
+                assert fh["new"].chunks == chunks
 
 
 class TempSubClass(memh5.MemDiskGroup):
