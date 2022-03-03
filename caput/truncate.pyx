@@ -105,6 +105,9 @@ def bit_truncate_weights_float(float[:] val, float[:] inv_var, float fallback):
 
     Giving the error as an inverse variance is particularly useful for data analysis.
 
+    N.B. non-contiguous arrays are supported in order to allow real and imaginary parts
+    of numpy arrays to be truncated without making a copy.
+
     Parameters
     ----------
     val
@@ -143,6 +146,9 @@ def bit_truncate_weights_double(double[:] val, double[:] inv_var, double fallbac
     """Truncate array of doubles using a set of inverse variance weights.
 
     Giving the error as an inverse variance is particularly useful for data analysis.
+
+    N.B. non-contiguous arrays are supported in order to allow real and imaginary parts
+    of numpy arrays to be truncated without making a copy.
 
     Parameters
     ----------
@@ -190,6 +196,9 @@ def bit_truncate_relative(val, prec):
 def bit_truncate_relative_float(float[:] val, float prec):
     """Truncate using a relative tolerance.
 
+    N.B. non-contiguous arrays are supported in order to allow real and imaginary parts
+    of numpy arrays to be truncated without making a copy.
+
     Parameters
     ----------
     val
@@ -215,6 +224,9 @@ def bit_truncate_relative_float(float[:] val, float prec):
 @cython.wraparound(False)
 def bit_truncate_relative_double(cnp.float64_t[:] val, cnp.float64_t prec):
     """Truncate doubles using a relative tolerance.
+
+    N.B. non-contiguous arrays are supported in order to allow real and imaginary parts
+    of numpy arrays to be truncated without making a copy.
 
     Parameters
     ----------
