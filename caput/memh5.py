@@ -2628,8 +2628,17 @@ def _distributed_group_to_hdf5_serial(
             arr = check_unicode(entry)
 
             if fileformats.HDF5.compression_enabled():
-                chunks, compression_kwargs = entry.chunks, fileformats.HDF5.compression_kwargs(compression=entry.compression, compression_opts=entry.compression_opts)
-                compression, compression_opts = compression_kwargs['compression'], compression_kwargs['compression_opts']
+                (
+                    chunks,
+                    compression_kwargs,
+                ) = entry.chunks, fileformats.HDF5.compression_kwargs(
+                    compression=entry.compression,
+                    compression_opts=entry.compression_opts,
+                )
+                compression, compression_opts = (
+                    compression_kwargs["compression"],
+                    compression_kwargs["compression_opts"],
+                )
             else:
                 # disable compression if not enabled for HDF5 files
                 # https://github.com/chime-experiment/Pipeline/issues/33
@@ -2746,7 +2755,11 @@ def _distributed_group_to_hdf5_parallel(
 
                     # Write to file from MPIArray
                     if fileformats.HDF5.compression_enabled():
-                        chunks, compression, compression_opts = item.chunks, item.compression, item.compression_opts
+                        chunks, compression, compression_opts = (
+                            item.chunks,
+                            item.compression,
+                            item.compression_opts,
+                        )
                     else:
                         # disable compression if not enabled for HDF5 files
                         # https://github.com/chime-experiment/Pipeline/issues/33
@@ -2776,8 +2789,16 @@ def _distributed_group_to_hdf5_parallel(
                         data = check_unicode(item)
 
                     if fileformats.HDF5.compression_enabled():
-                        chunks, compression_kwargs = item.chunks, fileformats.HDF5.compression_kwargs(item.compression, item.compression_opts)
-                        compression, compression_opts = compression_kwargs['compression'], compression_kwargs['compression_kwargs']
+                        (
+                            chunks,
+                            compression_kwargs,
+                        ) = item.chunks, fileformats.HDF5.compression_kwargs(
+                            item.compression, item.compression_opts
+                        )
+                        compression, compression_opts = (
+                            compression_kwargs["compression"],
+                            compression_kwargs["compression_kwargs"],
+                        )
                     else:
                         # disable compression if not enabled for HDF5 files
                         # https://github.com/chime-experiment/Pipeline/issues/33
@@ -2789,7 +2810,7 @@ def _distributed_group_to_hdf5_parallel(
                         dtype=data.dtype,
                         chunks=chunks,
                         compression=compression,
-                        compression_opts = compression_opts,
+                        compression_opts=compression_opts,
                     )
 
                     # Write common data from rank 0
