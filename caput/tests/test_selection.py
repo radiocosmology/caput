@@ -9,7 +9,9 @@ from caput.tests.conftest import rm_all_files
 
 fsel = slice(1, 8, 2)
 isel = slice(1, 4)
+ind = [0, 2, 7]
 sel = {"dset1": (fsel, isel, slice(None)), "dset2": (fsel, slice(None))}
+index_sel = {"dset1": (fsel, ind, slice(None)), "dset2": (ind, slice(None))}
 
 
 @pytest.fixture
@@ -49,3 +51,8 @@ def test_H5FileSelect(container_on_disk, file_format):
     )
     assert np.all(m["dset1"][:] == container_on_disk[1][0][(fsel, isel, slice(None))])
     assert np.all(m["dset2"][:] == container_on_disk[1][1][(fsel, slice(None))])
+
+    # now test index selection
+    m = MemGroup.from_hdf5(container_on_disk[0], selections=index_sel)
+    assert np.all(m["dset1"][:] == container_on_disk[1][0][index_sel["dset1"]])
+    assert np.all(m["dset2"][:] == container_on_disk[1][1][index_sel["dset2"]])

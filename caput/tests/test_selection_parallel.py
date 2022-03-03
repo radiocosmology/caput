@@ -68,10 +68,14 @@ def zarr_file_select_parallel(datasets, zarr_file):
 )
 @pytest.mark.parametrize("fsel", [slice(1, 8, 2), slice(5, 8, 2)])
 @pytest.mark.parametrize("isel", [slice(1, 4), slice(5, 8, 2)])
-def test_FileSelect_distributed(container_on_disk, fsel, isel, file_format):
+@pytest.mark.parametrize("ind", [slice(None), [0, 2, 7]])
+def test_FileSelect_distributed(container_on_disk, fsel, isel, file_format, ind):
     """Load H5/Zarr file into parallel container while down-selecting axes."""
 
-    sel = {"dset1": (fsel, isel, slice(None)), "dset2": (fsel, slice(None))}
+    if ind == slice(None):
+        sel = {"dset1": (fsel, isel, slice(None)), "dset2": (fsel, slice(None))}
+    else:
+        sel = {"dset1": (fsel, ind, slice(None)), "dset2": (ind, slice(None))}
 
     # Tests are designed to run for 1, 2 or 4 processes
     assert 4 % comm.size == 0
@@ -84,12 +88,14 @@ def test_FileSelect_distributed(container_on_disk, fsel, isel, file_format):
         file_format=file_format,
     )
 
-    d1 = container_on_disk[1][0][(fsel, isel, slice(None))]
-    d2 = container_on_disk[1][1][(fsel, slice(None))]
+    d1 = container_on_disk[1][0][sel["dset1"]]
+    d2 = container_on_disk[1][1][sel["dset2"]]
 
     _, s, e = mpiutil.split_local(d1.shape[0], comm=comm)
+    d1slice = slice(s, e)
 
-    dslice = slice(s, e)
+    _, s, e = mpiutil.split_local(d2.shape[0], comm=comm)
+    d2slice = slice(s, e)
 
     # For debugging...
     # Need to dereference datasets as this is collective
@@ -98,11 +104,14 @@ def test_FileSelect_distributed(container_on_disk, fsel, isel, file_format):
     # for ri in range(comm.size):
     #     if ri == comm.rank:
     #         print(comm.rank)
-    #         print(md1.shape, d1.shape, d1[dslice].shape)
+    #         print(md1.shape, d1.shape, d1[d1slice].shape)
     #         print(md1[0, :2, :2] if md1.size else "Empty")
-    #         print(d1[dslice][0, :2, :2] if d1[dslice].size else "Empty")
+    #         print(d1[d1slice][0, :2, :2] if d1[d1slice].size else "Empty")
     #         print()
+    #         print(md2.shape, d2.shape, d2[d2slice].shape)
+    #         print(md2[0, :2] if md2.size else "Empty")
+    #         print(d2[d2slice][0, :2] if d2[d2slice].size else "Empty")
     #     comm.Barrier()
 
-    assert np.all(m["dset1"][:] == d1[dslice])
-    assert np.all(m["dset2"][:] == d2[dslice])
+    assert np.all(m["dset1"][:] == d1[d1slice])
+    assert np.all(m["dset2"][:] == d2[d2slice])
