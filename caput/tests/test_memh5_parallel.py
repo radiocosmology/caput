@@ -52,7 +52,7 @@ def test_create_dataset():
 
 
 @pytest.mark.parametrize(
-    "compression,compression_opts", [(None, None), ("bitshuffle", (None, "lz4"))]
+    "compression,compression_opts,chunks", [(None, None, None), ("bitshuffle", (None, "lz4"), (size // 2 + ((size // 2) == 0), 3))]
 )
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
@@ -65,7 +65,7 @@ def test_create_dataset():
         ),
     ],
 )
-def test_io(test_file, file_open_function, file_format, compression, compression_opts):
+def test_io(test_file, file_open_function, file_format, compression, compression_opts, chunks):
     """Test for I/O in MemGroup."""
 
     # Create distributed memh5 object
@@ -79,6 +79,9 @@ def test_io(test_file, file_open_function, file_format, compression, compression
         dtype=np.float64,
         distributed=True,
         distributed_axis=0,
+        compression=compression,
+        compression_opts=compression_opts,
+        chunks=chunks,
     )
     pdset[:] = rank
     pdset.attrs["const"] = 17
@@ -99,8 +102,6 @@ def test_io(test_file, file_open_function, file_format, compression, compression
         convert_attribute_strings=True,
         convert_dataset_strings=True,
         file_format=file_format,
-        compression=compression,
-        compression_opts=compression_opts,
     )
 
     # Test that the HDF5 file has the correct structure
@@ -120,6 +121,20 @@ def test_io(test_file, file_open_function, file_format, compression, compression
         # Check group structure is correct
         assert "hello" in f
         assert "world" in f["hello"]
+
+        # Check compression/chunks
+        if file_format is fileformats.Zarr:
+            if chunks is None:
+                assert f["parallel_data"].chunks == f["parallel_data"].shape
+                assert f["parallel_data"].compressor is None
+            else:
+                assert f["parallel_data"].chunks == chunks
+                assert f["parallel_data"].compressor is not None
+        elif file_format is fileformats.HDF5:
+            # compression should be disabled
+            # (for some reason .compression is not set...)
+            assert str(fileformats.H5FILTER) not in f["parallel_data"]._filters
+            assert f["parallel_data"].chunks == None
 
     # Test that the read in group has the same structure as the original
     g2 = memh5.MemGroup.from_file(
