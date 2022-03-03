@@ -2510,11 +2510,9 @@ def deep_group_copy(
                 data = entry[selection]
 
             # get compression options/chunking for this dataset
-            chunks = entry.chunks
-            # TODO: is there a case where these properties don't exist?
-            #       e.g. if it's a zarr dataset?
-            compression = entry.compression
-            compression_opts = entry.compression_opts
+            chunks = getattr(entry, "chunks", None)
+            compression = getattr(entry, "compression", None)
+            compression_opts = getattr(entry, "compression_opts", None)
 
             # TODO: Am I missing something or is this branch not necessary?
             #       I guess I'm still confused as to why a file_format is
