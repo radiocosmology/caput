@@ -530,7 +530,7 @@ def file_format(default="hdf5"):
             return fileformats.Zarr
         raise CaputConfigError(f"Input {repr(val)} needs to be one of {options})")
 
-    if default is not isinstance(default, str) or default.lower() not in options:
+    if (not isinstance(default, str)) or (default.lower() not in options):
         raise CaputConfigError(f"Default value {repr(default)} must be in {options}")
 
     return Property(proptype=_prop, default=default)
