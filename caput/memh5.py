@@ -2635,21 +2635,19 @@ def _distributed_group_to_hdf5_serial(
                     compression=entry.compression,
                     compression_opts=entry.compression_opts,
                 )
-                compression, compression_opts = (
-                    compression_kwargs["compression"],
-                    compression_kwargs["compression_opts"],
-                )
             else:
                 # disable compression if not enabled for HDF5 files
                 # https://github.com/chime-experiment/Pipeline/issues/33
-                chunks, compression, compression_opts = None, None, None
+                chunks, compression_kwargs = None, {
+                    "compression": None,
+                    "compression_opts": None,
+                }
 
             arr.to_hdf5(
                 fname,
                 entry.name,
                 chunks=chunks,
-                compression=compression,
-                compression_opts=compression_opts,
+                **compression_kwargs,
             )
 
         comm.Barrier()
@@ -2795,22 +2793,20 @@ def _distributed_group_to_hdf5_parallel(
                         ) = item.chunks, fileformats.HDF5.compression_kwargs(
                             item.compression, item.compression_opts
                         )
-                        compression, compression_opts = (
-                            compression_kwargs["compression"],
-                            compression_kwargs["compression_kwargs"],
-                        )
                     else:
                         # disable compression if not enabled for HDF5 files
                         # https://github.com/chime-experiment/Pipeline/issues/33
-                        chunks, compression, compression_opts = None
+                        chunks, compression_kwargs = None, {
+                            "compression": None,
+                            "compression_opts": None,
+                        }
 
                     dset = h5group.create_dataset(
                         key,
                         shape=data.shape,
                         dtype=data.dtype,
                         chunks=chunks,
-                        compression=compression,
-                        compression_opts=compression_opts,
+                        **compression_kwargs,
                     )
 
                     # Write common data from rank 0
