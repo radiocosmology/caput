@@ -312,7 +312,7 @@ class PSUtilProfiler(psutil.Process):
             self.cpu_percent()
             self._start_memory = self.memory_full_info().uss
             if psutil.MACOS:
-                self._start_memory = psutil.disk_io_counters()
+                self._start_disk_io = psutil.disk_io_counters()
             else:
                 self._start_disk_io = self.io_counters()
 
@@ -426,14 +426,14 @@ class PSUtilProfiler(psutil.Process):
                     cpu_times["system"],
                     cpu_times["children_user"],
                     cpu_times["children_system"],
-                    cpu_times["iowait"],
+                    cpu_times.get("iowait", "-"),
                     cpu_percent,
                     disk_io["read_count"],
                     disk_io["write_count"],
                     disk_io["read_bytes"],
                     disk_io["write_bytes"],
-                    disk_io["read_chars"],
-                    disk_io["write_chars"],
+                    disk_io.get("read_chars", "-"),
+                    disk_io.get("write_chars", "-"),
                     memory,
                     available_memory,
                     used_memory,
@@ -443,6 +443,8 @@ class PSUtilProfiler(psutil.Process):
     @property
     def cpu_count(self):
         """Number of cores available to this process."""
+        if psutil.MACOS:
+            return psutil.cpu_count()
         return len(self.cpu_affinity())
 
     @property
