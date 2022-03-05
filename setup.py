@@ -64,7 +64,7 @@ setup(
     extras_require={
         "mpi": ["mpi4py>=1.3"],
         "compression": [
-            "bitshuffle @ git+https://github.com/kiyo-masui/bitshuffle.git",
+            "bitshuffle",
             "numcodecs==0.7.3",
             "zarr==2.8.1",
         ],
