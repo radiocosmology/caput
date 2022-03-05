@@ -43,7 +43,7 @@ def zarr_file_select(datasets, zarr_file):
         (lazy_fixture("zarr_file_select"), fileformats.Zarr),
     ],
 )
-def test_H5FileSelect(container_on_disk, file_format):
+def test_file_select(container_on_disk, file_format):
     """Tests that makes hdf5 objects and tests selecting on their axes."""
 
     m = MemGroup.from_file(
@@ -52,7 +52,20 @@ def test_H5FileSelect(container_on_disk, file_format):
     assert np.all(m["dset1"][:] == container_on_disk[1][0][(fsel, isel, slice(None))])
     assert np.all(m["dset2"][:] == container_on_disk[1][1][(fsel, slice(None))])
 
+
+@pytest.mark.parametrize(
+    "container_on_disk, file_format",
+    [
+        (lazy_fixture("h5_file_select"), fileformats.HDF5),
+        pytest.param(lazy_fixture("zarr_file_select"), fileformats.Zarr, marks=pytest.mark.xfail(reason="Zarr doesn't support index selections.")),
+    ],
+)
+def test_file_select_index(container_on_disk, file_format):
+    """Tests that makes hdf5 objects and tests selecting on their axes."""
+
     # now test index selection
-    m = MemGroup.from_hdf5(container_on_disk[0], selections=index_sel)
+    m = MemGroup.from_file(
+        container_on_disk[0], selections=index_sel, file_format=file_format
+    )
     assert np.all(m["dset1"][:] == container_on_disk[1][0][index_sel["dset1"]])
     assert np.all(m["dset2"][:] == container_on_disk[1][1][index_sel["dset2"]])
