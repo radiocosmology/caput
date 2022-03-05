@@ -197,8 +197,10 @@ def test_memdisk(test_file, file_format):
         f["/level1/level2/level3/new"][:] == m["/level1/level2/level3/new"][:]
     )
 
+
 @pytest.mark.parametrize(
-    "compression,compression_opts,chunks", [(None, None, None), ("bitshuffle", (None, "lz4"), (2, 3))]
+    "compression,compression_opts,chunks",
+    [(None, None, None), ("bitshuffle", (None, "lz4"), (2, 3))],
 )
 @pytest.mark.parametrize(
     "test_file,file_format",
@@ -218,14 +220,14 @@ def test_compression(test_file, file_format, compression, compression_opts, chun
         compression=compression,
         compression_opts=compression_opts,
     )
-    #f.flush()
+    # f.flush()
     f.save(
         test_file + ".cmp",
         convert_attribute_strings=True,
         convert_dataset_strings=True,
         file_format=file_format,
     )
-    #f.close()
+    # f.close()
 
     # read back compression parameters from file
     with file_format.open(test_file + ".cmp") as fh:

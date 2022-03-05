@@ -58,15 +58,17 @@ def zarr_file_select_parallel(datasets, zarr_file):
     if comm.rank == 0:
         rm_all_files(zarr_file)
 
+
 @pytest.fixture
 def xfail_zarr_listsel(request):
-    file_format = request.getfixturevalue('file_format')
-    ind = request.getfixturevalue('ind')
+    file_format = request.getfixturevalue("file_format")
+    ind = request.getfixturevalue("ind")
 
     if file_format == fileformats.Zarr and isinstance(ind, (list, tuple)):
         request.node.add_marker(
             pytest.mark.xfail(reason="Zarr doesn't support list based indexing.")
         )
+
 
 @pytest.mark.parametrize(
     "container_on_disk, file_format",

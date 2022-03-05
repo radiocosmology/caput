@@ -57,7 +57,11 @@ def test_file_select(container_on_disk, file_format):
     "container_on_disk, file_format",
     [
         (lazy_fixture("h5_file_select"), fileformats.HDF5),
-        pytest.param(lazy_fixture("zarr_file_select"), fileformats.Zarr, marks=pytest.mark.xfail(reason="Zarr doesn't support index selections.")),
+        pytest.param(
+            lazy_fixture("zarr_file_select"),
+            fileformats.Zarr,
+            marks=pytest.mark.xfail(reason="Zarr doesn't support index selections."),
+        ),
     ],
 )
 def test_file_select_index(container_on_disk, file_format):

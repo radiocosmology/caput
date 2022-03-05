@@ -52,7 +52,11 @@ def test_create_dataset():
 
 
 @pytest.mark.parametrize(
-    "compression,compression_opts,chunks", [(None, None, None), ("bitshuffle", (None, "lz4"), (size // 2 + ((size // 2) == 0), 3))]
+    "compression,compression_opts,chunks",
+    [
+        (None, None, None),
+        ("bitshuffle", (None, "lz4"), (size // 2 + ((size // 2) == 0), 3)),
+    ],
 )
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
@@ -65,7 +69,9 @@ def test_create_dataset():
         ),
     ],
 )
-def test_io(test_file, file_open_function, file_format, compression, compression_opts, chunks):
+def test_io(
+    test_file, file_open_function, file_format, compression, compression_opts, chunks
+):
     """Test for I/O in MemGroup."""
 
     # Create distributed memh5 object
