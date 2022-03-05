@@ -17,46 +17,24 @@ comm = MPI.COMM_WORLD
 
 
 @pytest.fixture
-def h5_file_select_parallel(datasets, h5_file):
-    """Prepare an HDF5 file for the select_parallel tests."""
+def container_on_disk(datasets, file_name, file_format):
+    """Prepare a file for the select_parallel tests."""
     if comm.rank == 0:
         m1 = mpiarray.MPIArray.wrap(datasets[0], axis=0, comm=MPI.COMM_SELF)
         m2 = mpiarray.MPIArray.wrap(datasets[1], axis=0, comm=MPI.COMM_SELF)
         container = MemGroup(distributed=True, comm=MPI.COMM_SELF)
         container.create_dataset("dset1", data=m1, distributed=True)
         container.create_dataset("dset2", data=m2, distributed=True)
-        container.to_hdf5(h5_file)
+        container.to_file(file_name, file_format=file_format)
 
     comm.Barrier()
 
-    yield h5_file, datasets
+    yield file_name, datasets
 
     comm.Barrier()
 
     if comm.rank == 0:
-        rm_all_files(h5_file)
-
-
-@pytest.fixture
-def zarr_file_select_parallel(datasets, zarr_file):
-    """Prepare a Zarr file for the select_parallel tests."""
-    if comm.rank == 0:
-        m1 = mpiarray.MPIArray.wrap(datasets[0], axis=0, comm=MPI.COMM_SELF)
-        m2 = mpiarray.MPIArray.wrap(datasets[1], axis=0, comm=MPI.COMM_SELF)
-        container = MemGroup(distributed=True, comm=MPI.COMM_SELF)
-        container.create_dataset("dset1", data=m1, distributed=True)
-        container.create_dataset("dset2", data=m2, distributed=True)
-        container.to_file(zarr_file, file_format=fileformats.Zarr)
-
-    comm.Barrier()
-
-    yield zarr_file, datasets
-
-    comm.Barrier()
-
-    # tear down
-    if comm.rank == 0:
-        rm_all_files(zarr_file)
+        rm_all_files(file_name)
 
 
 @pytest.fixture
@@ -71,10 +49,10 @@ def xfail_zarr_listsel(request):
 
 
 @pytest.mark.parametrize(
-    "container_on_disk, file_format",
+    "file_name, file_format",
     [
-        (lazy_fixture("h5_file_select_parallel"), fileformats.HDF5),
-        (lazy_fixture("zarr_file_select_parallel"), fileformats.Zarr),
+        (lazy_fixture("h5_file"), fileformats.HDF5),
+        (lazy_fixture("zarr_file"), fileformats.Zarr),
     ],
 )
 @pytest.mark.parametrize("fsel", [slice(1, 8, 2), slice(5, 8, 2)])
