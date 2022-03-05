@@ -1223,7 +1223,7 @@ class MPIArray(np.ndarray):
         """
         from mpi4py import MPI
 
-        threshold_bytes = threshold * 2 ** 30
+        threshold_bytes = threshold * 2**30
         largest_size = self.comm.allreduce(self.nbytes, op=MPI.MAX)
         num_split = int(np.ceil(largest_size / threshold_bytes))
 

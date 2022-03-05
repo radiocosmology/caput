@@ -64,14 +64,14 @@ def ground_to_sph(x, y, lat):
         Hour Angle and declination in radians
     """
 
-    z = np.sqrt(1 - x ** 2 - y ** 2)
+    z = np.sqrt(1 - x**2 - y**2)
 
     xe = z * np.cos(lat) - y * np.sin(lat)
     ye = x
     ze = y * np.cos(lat) + z * np.sin(lat)
 
     ha = -1 * np.arctan2(ye, xe)
-    dec = np.arctan2(ze, np.sqrt(xe ** 2 + ye ** 2))
+    dec = np.arctan2(ze, np.sqrt(xe**2 + ye**2))
 
     return ha, dec
 

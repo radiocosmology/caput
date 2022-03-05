@@ -173,13 +173,13 @@ class PFB:
             # oversample. As we are doing real/inverse-real FFTs the actual length of
             # this array has the usual 1/2 N + 1 sizing.
             wf = np.fft.rfft(window_extended)
-            wfpad = np.zeros(N * self.oversample ** 2 // 2 + 1, dtype=np.complex128)
+            wfpad = np.zeros(N * self.oversample**2 // 2 + 1, dtype=np.complex128)
             wfpad[: wf.size] = np.abs(wf) ** 2
 
             # Calculate the ratio and the effective delays it is available at
             decorrelation_ratio = np.fft.irfft(wfpad)
             tau = np.fft.fftfreq(
-                N * self.oversample ** 2, d=(1.0 / (N * self.oversample))
+                N * self.oversample**2, d=(1.0 / (N * self.oversample))
             )
 
             # Extract only the relevant range of time
