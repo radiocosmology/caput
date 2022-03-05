@@ -140,7 +140,7 @@ def test_io(
             # compression should be disabled
             # (for some reason .compression is not set...)
             assert str(fileformats.H5FILTER) not in f["parallel_data"]._filters
-            assert f["parallel_data"].chunks == None
+            assert f["parallel_data"].chunks is None
 
     # Test that the read in group has the same structure as the original
     g2 = memh5.MemGroup.from_file(
