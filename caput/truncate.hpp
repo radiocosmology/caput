@@ -35,7 +35,7 @@ const int32_t IMPLICIT_BIT_FLOAT = 8388608;
 const int64_t IMPLICIT_BIT_DOUBLE = 4503599627370496L;
 
 // The maximum error we can have for the mantissa in a float (less than 2**30)
-const int32_t ERR_MAX_FLOAT = 1073741824;
+const int32_t ERR_MAX_FLOAT = 1073741823;
 
 // The maximum error we can have for the mantissa in a double (less than 2**30)
 const int64_t ERR_MAX_DOUBLE = 4611686018427387903L;
