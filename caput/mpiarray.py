@@ -821,7 +821,8 @@ class MPIArray(np.ndarray):
         # Split the axis to get the IO size under ~2GB (only if MPI-IO)
         split_axis, partitions = self._partition_io(skip=(not fh.is_mpi))
 
-        fh.create_dataset(
+        dset = _create_or_get_dset(
+            fh,
             dataset,
             shape=self.global_shape,
             dtype=self.dtype,
@@ -831,14 +832,14 @@ class MPIArray(np.ndarray):
         )
 
         # Read using collective MPI-IO if specified
-        with fh[dataset].collective if use_collective else DummyContext():
+        with dset.collective if use_collective else DummyContext():
 
             # Loop over partitions of the IO and perform them
             for part in partitions:
                 islice, fslice = _partition_sel(
                     sel, split_axis, self.global_shape[split_axis], part
                 )
-                fh[dataset][islice] = self[fslice]
+                dset[islice] = self[fslice]
 
         if fh.opened:
             fh.close()
@@ -914,7 +915,8 @@ class MPIArray(np.ndarray):
         split_axis, partitions = self._partition_io(skip=True)
 
         if self.comm.rank == 0:
-            group.create_dataset(
+            _create_or_get_dset(
+                group,
                 dataset,
                 shape=self.global_shape,
                 dtype=self.dtype,
@@ -1173,7 +1175,7 @@ class MPIArray(np.ndarray):
         filename : str
             File to write dataset into.
         dataset : string
-            Name of dataset to write into. Should not exist.
+            Name of dataset to write into.
         """
 
         ## Naive non-parallel implementation to start
@@ -1191,11 +1193,13 @@ class MPIArray(np.ndarray):
         if self.comm is None or self.comm.rank == 0:
 
             with h5py.File(filename, "a" if create else "r+") as fh:
-                if dataset in fh:
-                    raise Exception("Dataset should not exist.")
-
-                fh.create_dataset(dataset, self.global_shape, dtype=self.dtype)
-                fh[dataset][:] = np.array(0.0).astype(self.dtype)
+                dset = _create_or_get_dset(
+                    fh,
+                    dataset,
+                    self.global_shape,
+                    dtype=self.dtype,
+                )
+                dset[:] = np.array(0.0).astype(self.dtype)
 
         # wait until all processes see the created file
         while not os.path.exists(filename):
@@ -1344,6 +1348,31 @@ def _expand_sel(sel, naxis):
     if len(sel) < naxis:
         sel = list(sel) + [slice(None)] * (naxis - len(sel))
     return list(sel)
+
+
+def _create_or_get_dset(group, name, shape, dtype, **kwargs):
+    # Create a dataset if it doesn't exist, or test the existing one for compatibility
+    # and return
+    if name in group:
+        dset = group[name]
+        if dset.shape != shape:
+            raise RuntimeError(
+                "Dataset exists already but with incompatible shape."
+                f"Requested shape={shape}, but on disk shape={dset.shape}."
+            )
+        if dset.dtype != dtype:
+            raise RuntimeError(
+                "Dataset exists already but with incompatible dtype. "
+                f"Requested dtype={dtype}, on disk dtype={dset.dtype}."
+            )
+    else:
+        dset = group.create_dataset(
+            name,
+            shape=shape,
+            dtype=dtype,
+            **kwargs,
+        )
+    return dset
 
 
 class DummyContext:

@@ -150,6 +150,8 @@ def test_file_sanity(test_file, file_open_function):
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
+        (lazy_fixture("filled_h5_file"), h5py.File, None),
+        (lazy_fixture("filled_zarr_file"), zarr.open_group, None),
         (lazy_fixture("filled_h5_file"), h5py.File, fileformats.HDF5),
         (lazy_fixture("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
     ],
@@ -162,13 +164,11 @@ def test_to_from_file(test_file, file_open_function, file_format):
     with file_open_function(test_file, "r") as f:
         assertGroupsEqual(f, m)
 
-    m.to_file(
-        test_file + ".new",
-        file_format=file_format,
-    )
+    new_name = f"new.{test_file}"
+    m.to_file(new_name, file_format=file_format)
 
     # Check that written file has same structure
-    with file_open_function(test_file + ".new", "r") as f:
+    with file_open_function(new_name, "r") as f:
         assertGroupsEqual(f, m)
 
 
@@ -256,6 +256,8 @@ class TempSubClass(memh5.MemDiskGroup):
     [
         (lazy_fixture("h5_file"), fileformats.HDF5),
         (lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lazy_fixture("h5_file"), None),
+        (lazy_fixture("zarr_file"), None),
     ],
 )
 def test_io(test_file, file_format):
@@ -264,6 +266,8 @@ def test_io(test_file, file_format):
     tsc = TempSubClass()
     tsc.create_dataset("dset", data=np.arange(10))
     tsc.save(test_file, file_format=file_format)
+
+    actual_file_format = fileformats.guess_file_format(test_file)
 
     # Load it from disk
     tsc2 = memh5.MemDiskGroup.from_file(test_file, file_format=file_format)
@@ -283,18 +287,18 @@ def test_io(test_file, file_format):
         test_file, mode="r", ondisk=True, file_format=file_format
     ):
         # h5py will error if file already open
-        if file_format == fileformats.HDF5:
+        if actual_file_format == fileformats.HDF5:
             with pytest.raises(IOError):
-                file_format.open(test_file, "w")
+                actual_file_format.open(test_file, "w")
         # ...zarr will not
         else:
-            file_format.open(test_file, "w")
+            actual_file_format.open(test_file, "w")
 
     with memh5.MemDiskGroup.from_file(
         test_file, mode="r", ondisk=False, file_format=file_format
     ):
-        f = file_format.open(test_file, "w")
-        if file_format == fileformats.HDF5:
+        f = actual_file_format.open(test_file, "w")
+        if actual_file_format == fileformats.HDF5:
             f.close()
 
 
