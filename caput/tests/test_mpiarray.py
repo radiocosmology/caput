@@ -4,19 +4,17 @@ Designed to be run as an MPI job with four processes like::
 
     $ mpirun -np 4 python test_mpiarray.py
 """
-
-import os
 import pytest
-
+from pytest_lazyfixture import lazy_fixture
+import h5py
 import numpy as np
+import zarr
 
-from caput import mpiutil, mpiarray
+from caput import mpiutil, mpiarray, fileformats
 
 
-# pylint: disable=missing-function-docstring
-# pylint: disable=no-member
 def test_construction():
-
+    """Test local/global shape construction of MPIArray."""
     arr = mpiarray.MPIArray((10, 11), axis=1)
 
     l, s, _ = mpiutil.split_local(11)
@@ -32,7 +30,7 @@ def test_construction():
 
 
 def test_redistribution():
-
+    """Test redistributing an MPIArray."""
     gshape = (1, 11, 2, 14, 3, 4)
     nelem = np.prod(gshape)
     garr = np.arange(nelem).reshape(gshape)
@@ -52,7 +50,7 @@ def test_redistribution():
 
 
 def test_gather():
-
+    """Test MPIArray.gather()."""
     rank = mpiutil.rank
     size = mpiutil.size
     block = 2
@@ -76,7 +74,7 @@ def test_gather():
 
 
 def test_wrap():
-
+    """Test MPIArray.wrap()."""
     ds = mpiarray.MPIArray((10, 17))
 
     df = np.fft.rfft(ds, axis=1)
@@ -101,18 +99,19 @@ def test_wrap():
             mpiarray.MPIArray.wrap(df, axis=0)
 
 
-def test_io():
-
-    import h5py
-
-    # Cleanup directories
-    fname = "testdset.hdf5"
-
-    if mpiutil.rank0 and os.path.exists(fname):
-        os.remove(fname)
-
-    mpiutil.barrier()
-
+@pytest.mark.parametrize(
+    "filename, file_open_function, file_format",
+    [
+        (lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (
+            lazy_fixture("zarr_file_distributed"),
+            zarr.open_group,
+            fileformats.Zarr,
+        ),
+    ],
+)
+def test_io(filename, file_open_function, file_format):
+    """Test I/O of MPIArray."""
     gshape = (19, 17)
 
     ds = mpiarray.MPIArray(gshape, dtype=np.int64)
@@ -122,24 +121,27 @@ def test_io():
     _, s0, e0 = mpiutil.split_local(gshape[0])
     ds[:] = ga[s0:e0]
 
-    ds.redistribute(axis=1).to_hdf5(fname, "testds", create=True)
+    ds.redistribute(axis=1).to_file(
+        filename, "testds", create=True, file_format=file_format
+    )
 
     if mpiutil.rank0:
 
-        with h5py.File(fname, "r") as f:
-
+        with file_open_function(filename, "r") as f:
             h5ds = f["testds"][:]
 
             assert (h5ds == ga).all()
 
-    ds2 = mpiarray.MPIArray.from_hdf5(fname, "testds")
+    ds2 = mpiarray.MPIArray.from_file(filename, "testds", file_format=file_format)
 
     assert (ds2 == ds).all()
 
     mpiutil.barrier()
 
     # Check that reading over another distributed axis works
-    ds3 = mpiarray.MPIArray.from_hdf5(fname, "testds", axis=1)
+    ds3 = mpiarray.MPIArray.from_file(
+        filename, "testds", axis=1, file_format=file_format
+    )
     assert ds3.shape[0] == gshape[0]
     assert ds3.shape[1] == mpiutil.split_local(gshape[1])[0]
     ds3 = ds3.redistribute(axis=0)
@@ -147,16 +149,24 @@ def test_io():
     mpiutil.barrier()
 
     # Check a read with an arbitrary slice in there. This only checks the shape is correct.
-    ds4 = mpiarray.MPIArray.from_hdf5(
-        fname, "testds", axis=1, sel=(np.s_[3:10:2], np.s_[1:16:3])
+    ds4 = mpiarray.MPIArray.from_file(
+        filename,
+        "testds",
+        axis=1,
+        sel=(np.s_[3:10:2], np.s_[1:16:3]),
+        file_format=file_format,
     )
     assert ds4.shape[0] == 4
     assert ds4.shape[1] == mpiutil.split_local(5)[0]
     mpiutil.barrier()
 
     # Check the read with a slice along the axis being read
-    ds5 = mpiarray.MPIArray.from_hdf5(
-        fname, "testds", axis=1, sel=(np.s_[:], np.s_[3:15:2])
+    ds5 = mpiarray.MPIArray.from_file(
+        filename,
+        "testds",
+        axis=1,
+        sel=(np.s_[:], np.s_[3:15:2]),
+        file_format=file_format,
     )
     assert ds5.shape[0] == gshape[0]
     assert ds5.shape[1] == mpiutil.split_local(6)[0]
@@ -165,15 +175,16 @@ def test_io():
     mpiutil.barrier()
 
     # Check the read with a slice along the axis being read
-    ds6 = mpiarray.MPIArray.from_hdf5(
-        fname, "testds", axis=0, sel=(np.s_[:], np.s_[3:15:2])
+    ds6 = mpiarray.MPIArray.from_file(
+        filename,
+        "testds",
+        axis=0,
+        sel=(np.s_[:], np.s_[3:15:2]),
+        file_format=file_format,
     )
     ds6 = ds6.redistribute(axis=0)
     assert (ds6 == ds[:, 3:15:2]).all()
     mpiutil.barrier()
-
-    if mpiutil.rank0 and os.path.exists(fname):
-        os.remove(fname)
 
 
 def test_transpose():
@@ -458,7 +469,7 @@ def test_global_setslice():
 
     darr_complex[:] = 4
     assert darr_complex.dtype == np.complex64
-    assert (darr_complex == 4. + 0.j).all()
+    assert (darr_complex == 4.0 + 0.0j).all()
 
     darr_complex[:] = 2.0 + 1.345j
 
@@ -595,3 +606,38 @@ def test_reduce():
 
         with pytest.raises(ValueError):
             dist_array.allreduce()
+
+
+#
+# class Testmpiarray(unittest.TestCase):
+#
+#     def test_dataset(self):
+#
+#         fname = 'testdset.hdf5'
+#
+#         if mpiutil.rank0:
+#             if os.path.exists(fname):
+#                 os.remove(fname)
+#
+#         mpiutil.barrier()
+#
+#         class TestDataset(mpiarray.mpiarray):
+#             _common = {'a': None}
+#             _distributed = {'b': None}
+#
+#         td1 = TestDataset()
+#         td1.common['a'] = np.arange(12)
+#         td1.attrs['message'] = 'meh'
+#
+#         gshape = (19, 17)
+#         ds = mpiarray.MPIArray(gshape, dtype=np.float64)
+#         ds[:] = np.random.standard_normal(ds.local_shape)
+#
+#         td1.distributed['b'] = ds
+#         td1.to_hdf5(fname)
+#
+#         td2 = TestDataset.from_hdf5(fname)
+#
+#         assert (td1['a'] == td2['a']).all()
+#         assert (td1['b'] == td2['b']).all()
+#         assert (td1.attrs['message'] == td2.attrs['message'])

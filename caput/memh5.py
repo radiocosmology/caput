@@ -60,6 +60,7 @@ import logging
 import numpy as np
 import h5py
 
+from . import fileformats
 from . import mpiutil
 from . import mpiarray
 from . import misc
@@ -67,6 +68,13 @@ from . import misc
 
 logger = logging.getLogger(__name__)
 
+try:
+    import zarr
+except ImportError as err:
+    logger.info(f"zarr support disabled. Install zarr to change this: {err}")
+    zarr_available = False
+else:
+    zarr_available = True
 
 # Basic Classes
 # -------------
@@ -390,7 +398,7 @@ class MemGroup(_BaseGroup):
         """Create a new instance by deep copying an existing group.
 
         Agnostic as to whether the group to be copied is a `MemGroup` or an
-        `h5py.Group` (which includes `hdf5.File` objects).
+        `h5py.Group` (which includes `h5py.File` and `zarr.File` objects).
 
         """
 
@@ -398,8 +406,14 @@ class MemGroup(_BaseGroup):
             self = cls()
             deep_group_copy(group, self)
             return self
+        elif isinstance(group, (str, bytes)):
+            file_format = fileformats.guess_file_format(group)
+            return cls.from_file(group, file_format=file_format)
         else:
-            return cls.from_hdf5(group)
+            raise RuntimeError(
+                f"Can't create an instance from type {type(group).__name__} "
+                f"(expected MemGroup, str or bytes)."
+            )
 
     @classmethod
     def from_hdf5(
@@ -411,7 +425,7 @@ class MemGroup(_BaseGroup):
         selections=None,
         convert_dataset_strings=False,
         convert_attribute_strings=True,
-        **kwargs
+        **kwargs,
     ):
         """Create a new instance by copying from an hdf5 group.
 
@@ -443,8 +457,69 @@ class MemGroup(_BaseGroup):
             Root group of loaded file.
         """
 
+        return cls.from_file(
+            filename,
+            distributed,
+            hints,
+            comm,
+            selections,
+            convert_dataset_strings,
+            convert_attribute_strings,
+            file_format=fileformats.HDF5,
+            **kwargs,
+        )
+
+    @classmethod
+    def from_file(
+        cls,
+        filename,
+        distributed=False,
+        hints=True,
+        comm=None,
+        selections=None,
+        convert_dataset_strings=False,
+        convert_attribute_strings=True,
+        file_format=None,
+        **kwargs,
+    ):
+        """Create a new instance by copying from a file group.
+
+        Any keyword arguments are passed on to the constructor for `h5py.File` or
+        `zarr.File`.
+
+        Parameters
+        ----------
+        filename : string
+            Name of file to load.
+        distributed : boolean, optional
+            Whether to load file in distributed mode.
+        hints : boolean, optional
+            If in distributed mode use hints to determine whether datasets are
+            distributed or not.
+        comm : MPI.Comm, optional
+            MPI communicator to distributed over. If :obj:`None` use
+            :obj:`MPI.COMM_WORLD`.
+        selections : dict
+            If this is not None, it should map dataset names to axis selections as valid
+            numpy indexes.
+        convert_attribute_strings : bool, optional
+            Try and convert attribute string types to unicode. Default is `True`.
+        convert_dataset_strings : bool, optional
+            Try and convert dataset string types to unicode. Default is `False`.
+        file_format : `fileformats.FileFormat`, optional
+            File format to use. Default is `None`, i.e. guess from the name.
+
+        Returns
+        -------
+        group : memh5.Group
+            Root group of loaded file.
+        """
+
         if comm is None:
             comm = mpiutil.world
+
+        if file_format is None:
+            file_format = fileformats.guess_file_format(filename)
 
         if comm is None:
             if distributed:
@@ -456,7 +531,7 @@ class MemGroup(_BaseGroup):
 
         if not distributed or not hints:
             kwargs["mode"] = "r"
-            with h5py.File(filename, **kwargs) as f:
+            with file_format.open(filename, **kwargs) as f:
                 self = cls(distributed=distributed, comm=comm)
                 deep_group_copy(
                     f,
@@ -464,15 +539,17 @@ class MemGroup(_BaseGroup):
                     selections=selections,
                     convert_attribute_strings=convert_attribute_strings,
                     convert_dataset_strings=convert_dataset_strings,
+                    file_format=file_format,
                 )
         else:
-            self = _distributed_group_from_hdf5(
+            self = _distributed_group_from_file(
                 filename,
                 comm=comm,
                 hints=hints,
                 selections=selections,
                 convert_attribute_strings=convert_attribute_strings,
                 convert_dataset_strings=convert_dataset_strings,
+                file_format=file_format,
             )
 
         return self
@@ -484,7 +561,7 @@ class MemGroup(_BaseGroup):
         hints=True,
         convert_attribute_strings=True,
         convert_dataset_strings=False,
-        **kwargs
+        **kwargs,
     ):
         """Replicate object on disk in an hdf5 file.
 
@@ -502,33 +579,69 @@ class MemGroup(_BaseGroup):
             understands. Default is `True`.
         convert_dataset_strings : bool, optional
             Try and convert dataset string types to bytestrings. Default is `False`.
+
         """
 
+        self.to_file(
+            filename,
+            mode,
+            hints,
+            convert_attribute_strings,
+            convert_dataset_strings,
+            fileformats.HDF5,
+            **kwargs,
+        )
+
+    def to_file(
+        self,
+        filename,
+        mode="w",
+        hints=True,
+        convert_attribute_strings=True,
+        convert_dataset_strings=False,
+        file_format=None,
+        **kwargs,
+    ):
+        """Replicate object on disk in an hdf5 or zarr file.
+
+        Any keyword arguments are passed on to the constructor for `h5py.File` or `zarr.File`.
+
+        Parameters
+        ----------
+        filename : str
+            File to save into.
+        hints : boolean, optional
+            Whether to write hints into the file that described whether datasets
+            are distributed, or not.
+        convert_attribute_strings : bool, optional
+            Try and convert attribute string types to a unicode type that HDF5
+            understands. Default is `True`.
+        convert_dataset_strings : bool, optional
+            Try and convert dataset string types to bytestrings. Default is `False`.
+        file_format : `fileformats.FileFormat`, optional
+            File format to use. Default is `None`, i.e. guess from the name.
+        """
+        if file_format is None:
+            file_format = fileformats.guess_file_format(filename)
+
         if not self.distributed:
-            with h5py.File(filename, mode, **kwargs) as f:
+            with file_format.open(filename, mode, **kwargs) as f:
                 deep_group_copy(
                     self,
                     f,
                     convert_attribute_strings=convert_attribute_strings,
                     convert_dataset_strings=convert_dataset_strings,
+                    file_format=file_format,
                 )
         else:
-            if h5py.get_config().mpi:
-                _distributed_group_to_hdf5_parallel(
-                    self,
-                    filename,
-                    mode,
-                    convert_attribute_strings=convert_attribute_strings,
-                    convert_dataset_strings=convert_dataset_strings,
-                )
-            else:
-                _distributed_group_to_hdf5_serial(
-                    self,
-                    filename,
-                    mode,
-                    convert_attribute_strings=convert_attribute_strings,
-                    convert_dataset_strings=convert_dataset_strings,
-                )
+            _distributed_group_to_file(
+                self,
+                filename,
+                mode,
+                convert_attribute_strings=convert_attribute_strings,
+                convert_dataset_strings=convert_dataset_strings,
+                file_format=file_format,
+            )
 
     def create_group(self, name):
         """Create a group within the storage tree."""
@@ -574,7 +687,7 @@ class MemGroup(_BaseGroup):
         chunks=None,
         compression=None,
         compression_opts=None,
-        **kwargs
+        **kwargs,
     ):
         """Create a new dataset.
 
@@ -593,6 +706,11 @@ class MemGroup(_BaseGroup):
         distributed_axis : int, optional
             Axis to distribute the data over. If specified with initialisation
             data this will cause create a copy with the correct distribution.
+        compression : str or int
+            Name or identifier of HDF5 or Zarr compression filter.
+        compression_opts
+            See HDF5 and Zarr documentation for compression filters.
+            Compression options for the dataset.
 
         Returns
         -------
@@ -895,22 +1013,48 @@ class MemDataset(_MemObjMixin):
 
     @property
     def shape(self):
+        """
+        Shape of the dataset.
+
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     @property
     def dtype(self):
+        """
+        numpy data type of the dataset.
+
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     @property
     def chunks(self):
+        """
+        Chunk shape of the dataset.
+
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     @property
     def compression(self):
+        """
+        Name or identifier of HDF5 compression filter for the dataset.
+
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     @property
     def compression_opts(self):
+        """
+        Compression options for the dataset.
+
+        See HDF5 documentation for compression filters.
+        Not implemented in base class.
+        """
         raise NotImplementedError("Not implemented in base class.")
 
     def __getitem__(self, obj):
@@ -951,7 +1095,7 @@ class MemDatasetCommon(MemDataset):
         chunks=None,
         compression=None,
         compression_opts=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -970,6 +1114,11 @@ class MemDatasetCommon(MemDataset):
         ----------
         data : np.ndarray
             Array to initialise from.
+        compression : str or int
+            Name or identifier of HDF5 or Zarr compression filter.
+        compression_opts
+            See HDF5 and Zarr documentation for compression filters.
+            Compression options for the dataset.
 
         Returns
         -------
@@ -1024,7 +1173,17 @@ class MemDatasetCommon(MemDataset):
 
     @chunks.setter
     def chunks(self, val):
-        self._chunks = val
+        if val is None:
+            chunks = val
+        elif len(val) != len(self.shape):
+            raise ValueError(
+                f"Chunk size {val} is not compatible with dataset shape {self.shape}."
+            )
+        else:
+            chunks = ()
+            for i, l in enumerate(self.shape):
+                chunks += (min(val[i], l),)
+        self._chunks = chunks
 
     @property
     def compression(self):
@@ -1105,7 +1264,7 @@ class MemDatasetDistributed(MemDataset):
         chunks=None,
         compression=None,
         compression_opts=None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -1152,10 +1311,20 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def global_shape(self):
+        """
+        Global shape of the distributed dataset.
+
+        The shape of the whole array that is distributed between multiple nodes.
+        """
         return self._data.global_shape
 
     @property
     def local_shape(self):
+        """
+        Local shape of the distributed dataset.
+
+        The shape of the part of the distributed array that is allocated to *this* node.
+        """
         return self._data.local_shape
 
     @property
@@ -1164,15 +1333,27 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def dtype(self):
+        """The numpy data type of the dataset"""
         return self._data.dtype
 
     @property
     def chunks(self):
+        """The chunk shape of the dataset."""
         return self._chunks
 
     @chunks.setter
     def chunks(self, val):
-        self._chunks = val
+        if val is None:
+            chunks = val
+        elif len(val) != len(self.shape):
+            raise ValueError(
+                f"Chunk size {val} is not compatible with dataset shape {self.shape}."
+            )
+        else:
+            chunks = ()
+            for i, l in enumerate(self.shape):
+                chunks += (min(val[i], l),)
+        self._chunks = chunks
 
     @property
     def compression(self):
@@ -1192,6 +1373,7 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def distributed_axis(self):
+        """The index of the axis over which this dataset is distributed."""
         return self._data.axis
 
     @property
@@ -1282,9 +1464,11 @@ class MemDiskGroup(_BaseGroup):
     detect_subclass: boolean, optional
         If *data_group* is specified, whether to inspect for a
         '__memh5_subclass' attribute which specifies a subclass to return.
+    file_format : `fileformats.FileFormat`
+        File format to use. File format will be guessed if not supplied. Default `None`.
     """
 
-    def __init__(self, data_group=None, distributed=False, comm=None):
+    def __init__(self, data_group=None, distributed=False, comm=None, file_format=None):
 
         toclose = False
 
@@ -1306,14 +1490,20 @@ class MemDiskGroup(_BaseGroup):
         # Otherwise, presume it is an HDF5 Group-like object (which includes
         # MemGroup and h5py.Group).
         else:
-            data_group, toclose = get_h5py_File(data_group, mode="a")
-
-        if distributed and isinstance(data_group, h5py.Group):
-            raise ValueError(
-                "Distributed MemDiskGroup cannot be created around h5py objects."
+            data_group, toclose = get_file(
+                data_group, mode="a", file_format=file_format
             )
+            # Zarr arrays are automatically flushed and closed
+            toclose = False if file_format == fileformats.HDF5 else toclose
+
         # Check the distribution settings
-        elif distributed:
+        if distributed:
+            if isinstance(data_group, h5py.Group) or (
+                zarr_available and isinstance(data_group, zarr.Group)
+            ):
+                raise ValueError(
+                    "Distributed MemDiskGroup cannot be created around h5py or zarr objects."
+                )
             # Check parallel distribution is the same
             if not data_group.distributed:
                 raise ValueError(
@@ -1404,6 +1594,9 @@ class MemDiskGroup(_BaseGroup):
         if self.ondisk and hasattr(self, "_toclose") and self._toclose:
             self._storage_root.close()
 
+        if hasattr(self, "_lockfile") and (self.comm is None or self.comm.rank is None):
+            fileformats.remove_file_or_dir(self._lockfile)
+
     def __getitem__(self, name):
         """Retrieve an object.
 
@@ -1440,8 +1633,9 @@ class MemDiskGroup(_BaseGroup):
     @property
     def ondisk(self):
         """Whether the data is stored on disk as opposed to in memory."""
-        return hasattr(self, "_storage_root") and isinstance(
-            self._storage_root, h5py.File
+        return hasattr(self, "_storage_root") and (
+            isinstance(self._storage_root, h5py.File)
+            or (zarr_available and isinstance(self._storage_root, zarr.Group))
         )
 
     @classmethod
@@ -1475,7 +1669,8 @@ class MemDiskGroup(_BaseGroup):
         detect_subclass=True,
         convert_attribute_strings=None,
         convert_dataset_strings=None,
-        **kwargs
+        file_format=None,
+        **kwargs,
     ):
         """Create data object from analysis hdf5 file, store in memory or on disk.
 
@@ -1512,10 +1707,17 @@ class MemDiskGroup(_BaseGroup):
         <axis_name>_sel : list or slice
             Axis selections can be given to only read a subset of the containers. A
             slice can be given, or a list of specific array indices for that axis.
+        file_format : `fileformats.FileFormat`
+            File format to use. Default is `None`, i.e. guess from file name.
         **kwargs : any other arguments
             Any additional keyword arguments are passed to :class:`h5py.File`'s
             constructor if *file_* is a filename and silently ignored otherwise.
         """
+        if file_format is None and not is_group(file_):
+            file_format = fileformats.guess_file_format(file_)
+
+        if file_format == fileformats.Zarr and not zarr_available:
+            raise RuntimeError("Unable to read zarr file, please install zarr.")
 
         # Get a value for the conversion parameters, looking up on the class type if
         # not supplied
@@ -1524,8 +1726,12 @@ class MemDiskGroup(_BaseGroup):
         if convert_dataset_strings is None:
             convert_dataset_strings = getattr(cls, "convert_dataset_strings", False)
 
+        lockfile = None
+
         if not ondisk:
-            if isinstance(file_, h5py.Group):
+            if (zarr_available and isinstance(file_, zarr.Group)) or isinstance(
+                file_, h5py.Group
+            ):
                 file_ = file_.filename
 
             if "mode" in kwargs:
@@ -1547,14 +1753,15 @@ class MemDiskGroup(_BaseGroup):
             # Map selections to datasets
             sel = cls._make_selections(sel_args)
 
-            data = MemGroup.from_hdf5(
+            data = MemGroup.from_file(
                 file_,
                 distributed=distributed,
                 comm=comm,
                 selections=sel,
                 convert_attribute_strings=convert_attribute_strings,
                 convert_dataset_strings=convert_dataset_strings,
-                **kwargs
+                file_format=file_format,
+                **kwargs,
             )
             toclose = False
         else:
@@ -1564,8 +1771,11 @@ class MemDiskGroup(_BaseGroup):
                 toclose = False
             else:
                 kwargs.setdefault("mode", "a")
-                data = h5py.File(file_, **kwargs)
-                toclose = True
+                if distributed and file_format == fileformats.Zarr:
+                    lockfile = f"{file_}.sync"
+                    kwargs["synchronizer"] = zarr.ProcessSynchronizer(lockfile)
+                data = file_format.open(file_, **kwargs)
+                toclose = file_format == fileformats.HDF5
 
         # Here we explicitly avoid calling __init__ on any derived class. Like
         # with a pickle we want to restore the saved state only.
@@ -1575,11 +1785,16 @@ class MemDiskGroup(_BaseGroup):
         self._finish_setup()
 
         self._toclose = toclose
+
+        if lockfile is not None:
+            self._comm = comm
+            self._lockfile = lockfile
         return self
 
     # Methods for manipulating and building the class. #
 
-    def group_name_allowed(self, name):
+    @staticmethod
+    def group_name_allowed(name):
         """Used by subclasses to restrict creation of and access to groups.
 
         This method is called by :meth:`create_group`, :meth:`require_group`,
@@ -1603,7 +1818,8 @@ class MemDiskGroup(_BaseGroup):
         """
         return True
 
-    def dataset_name_allowed(self, name):
+    @staticmethod
+    def dataset_name_allowed(name):
         """Used by subclasses to restrict creation of and access to datasets.
 
         This method is called by :meth:`create_dataset`,
@@ -1663,7 +1879,7 @@ class MemDiskGroup(_BaseGroup):
             return self._data.dataset_common_to_distributed(name, distributed_axis)
         else:
             raise RuntimeError(
-                "Can not convert a h5py dataset %s to distributed" % name
+                "Can not convert a h5py or zarr dataset %s to distributed" % name
             )
 
     def dataset_distributed_to_common(self, name):
@@ -1683,7 +1899,7 @@ class MemDiskGroup(_BaseGroup):
             return self._data.dataset_distributed_to_common(name)
         else:
             raise RuntimeError(
-                "Can not convert a h5py dataset %s to distributed" % name
+                "Can not convert a h5py or zarr dataset %s to distributed" % name
             )
 
     def create_group(self, name):
@@ -1704,8 +1920,23 @@ class MemDiskGroup(_BaseGroup):
         else:
             return self.__class__.from_file(self._data)
 
-    def to_disk(self, filename, **kwargs):
-        """Return a version of this data that lives on disk."""
+    def to_disk(self, filename, file_format=fileformats.HDF5, **kwargs):
+        """
+        Return a version of this data that lives on disk.
+
+        Parameters
+        ----------
+        filename : str
+            File name.
+        file_format : `fileformats.FileFormat`
+            File format to use. Default `fileformats.HDF5`.
+        **kwargs
+            Keyword arguments passed through to the file creating, e.g. `mode`.
+
+        Returns
+        -------
+        Instance of this data object that is written to disk.
+        """
 
         if not isinstance(self._data, MemGroup):
             msg = "This data already lives on disk.  Copying to new file anyway."
@@ -1715,8 +1946,10 @@ class MemDiskGroup(_BaseGroup):
                 "Cannot run to_disk on a distributed object. Try running save instead."
             )
 
-        self.save(filename)
-        return self.__class__.from_file(filename, ondisk=True, **kwargs)
+        self.save(filename, file_format=file_format)
+        return self.__class__.from_file(
+            filename, ondisk=True, file_format=file_format, **kwargs
+        )
 
     def flush(self):
         """Flush the buffers of the underlying hdf5 file if on disk."""
@@ -1729,9 +1962,10 @@ class MemDiskGroup(_BaseGroup):
         filename,
         convert_attribute_strings=None,
         convert_dataset_strings=None,
-        **kwargs
+        file_format=fileformats.HDF5,
+        **kwargs,
     ):
-        """Save data to hdf5 file.
+        """Save data to hdf5/zarr file.
 
         Parameters
         ----------
@@ -1745,9 +1979,13 @@ class MemDiskGroup(_BaseGroup):
             Try and convert dataset string types to bytestrings before saving to
             HDF5. If not specified, look up the name as a class attribute to find a
             default, and otherwise use `False`.
+        file_format : `fileformats.FileFormat`
+            File format to use. Default `fileformats.HDF5`.
         **kwargs
             Keyword arguments passed through to the file creating, e.g. `mode`.
         """
+        if file_format == fileformats.Zarr and not zarr_available:
+            raise RuntimeError("Unable to write to zarr file, please install zarr.")
 
         # Get a value for the conversion parameters, looking up on the instance if
         # not supplied
@@ -1763,15 +2001,18 @@ class MemDiskGroup(_BaseGroup):
 
             self.attrs["__memh5_subclass"] = clspath
 
-        if isinstance(self._data, h5py.File):
-            with h5py.File(filename, **kwargs) as f:
+        if (zarr_available and isinstance(self._data, zarr.Group)) or isinstance(
+            self._data, h5py.File
+        ):
+            with file_format.open(filename, **kwargs) as f:
                 deep_group_copy(self._data, f)
         else:
-            self._data.to_hdf5(
+            self._data.to_file(
                 filename,
                 convert_attribute_strings=convert_attribute_strings,
                 convert_dataset_strings=convert_dataset_strings,
-                **kwargs
+                file_format=file_format,
+                **kwargs,
             )
 
 
@@ -2046,18 +2287,25 @@ def is_group(obj):
 
 
 def get_h5py_File(f, **kwargs):
-    """Checks if input is an `h5py.File` or filename and returns the former.
+    """Convenience function in order to not break old functionality."""
+    return get_file(f, file_format=fileformats.HDF5, **kwargs)
+
+
+def get_file(f, file_format=None, **kwargs):
+    """Checks if input is a `zarr`/`h5py.File` or filename and returns the former.
 
     Parameters
     ----------
-    f : h5py Group or filename string
+    f : h5py/zarr Group or filename string
+    file_format : `fileformats.FileFormat`
+            File format to use. File format will be guessed if not supplied. Default `None`.
     **kwargs : all keyword arguments
-        Passed to :class:`h5py.File` constructor. If `f` is already an open file,
+        Passed to :class:`h5py.File` constructor or `zarr.open_group`. If `f` is already an open file,
         silently ignores all keywords.
 
     Returns
     -------
-    f : hdf5 group
+    f : hdf5 or zarr group
     opened : bool
         Whether the a file was opened or not (i.e. was already open).
 
@@ -2066,28 +2314,28 @@ def get_h5py_File(f, **kwargs):
     # Figure out if F is a file or a filename, and whether the file should be
     # closed.
     if is_group(f):
-        opened = False
-        # if kwargs:
-        #    msg = "Got some keyword arguments but File is alrady open."
-        #    warnings.warn(msg)
+        return f, False
     else:
-        opened = True
+        if file_format is None:
+            file_format = fileformats.guess_file_format(f)
+        if file_format == fileformats.Zarr and not zarr_available:
+            raise RuntimeError("Unable to open zarr file. Please install zarr.")
         try:
-            f = h5py.File(f, **kwargs)
+            f = file_format.open(f, **kwargs)
         except IOError as e:
             msg = "Opening file %s caused an error: " % str(f)
             raise IOError(msg + str(e)) from e
-    return f, opened
+        return f, True
 
 
 def copyattrs(a1, a2, convert_strings=False):
-    """Copy attributes from one h5py/memh5 attribute object to another.
+    """Copy attributes from one h5py/zarr/memh5 attribute object to another.
 
     Parameters
     ----------
-    a1 : h5py/memh5 object
+    a1 : h5py/zarr/memh5 object
         Attributes to copy from.
-    a1 : h5py/memh5 object
+    a1 : h5py/zarr/memh5 object
         Attributes to copy into.
     convert_strings : bool, optional
         Convert string attributes (or lists/arrays of them) to ensure that they are
@@ -2147,7 +2395,14 @@ def copyattrs(a1, a2, convert_strings=False):
                 # Let the default method raise the TypeError
                 return json.JSONEncoder.default(self, o)
 
-        if isinstance(value, dict) and isinstance(a2, h5py.AttributeManager):
+        if (
+            isinstance(value, (dict, np.ndarray, datetime.datetime))
+            and zarr_available
+            and isinstance(a2, zarr.attrs.Attributes)
+        ) or (
+            isinstance(value, (dict, datetime.datetime))
+            and isinstance(a2, h5py.AttributeManager)
+        ):
             # Save to JSON converting datetimes.
             encoder = Memh5JSONEncoder()
             value = json_prefix + encoder.encode(value)
@@ -2159,6 +2414,8 @@ def copyattrs(a1, a2, convert_strings=False):
     for key in sorted(a1):
         val = _map_unicode(a1[key])
         val = _map_json(val)
+        if isinstance(val, np.generic):  # zarr can't handle numpy types
+            val = val.item()
         a2[key] = val
 
 
@@ -2168,12 +2425,16 @@ def deep_group_copy(
     selections=None,
     convert_dataset_strings=False,
     convert_attribute_strings=True,
+    file_format=fileformats.HDF5,
+    skip_distributed=False,
+    postprocess=None,
 ):
     """
     Copy full data tree from one group to another.
 
     Copies from g1 to g2. An axis downselection can be specified by supplying the
-    parameter 'selections'. For example to select the first two indexes in g1["foo"]["bar"], do
+    parameter 'selections'. For example to select the first two indexes in
+    g1["foo"]["bar"], do
 
     >>> g1 = MemGroup()
     >>> foo = g1.create_group("foo")
@@ -2185,9 +2446,9 @@ def deep_group_copy(
 
     Parameters
     ----------
-    g1 : h5py.Group
+    g1 : h5py.Group or zarr.Group
         Deep copy from this group.
-    g2 : h5py.Group
+    g2 : h5py.Group or zarr.Group
         Deep copy to this group.
     selections : dict
         If this is not None, it should have a subset of the same hierarchical structure
@@ -2198,59 +2459,143 @@ def deep_group_copy(
         unicode.
     convert_dataset_strings : bool, optional
         Convert strings within datasets to ensure that they are unicode.
+    file_format : `fileformats.FileFormat`
+        File format to use. Default `fileformats.HDF5`.
+    skip_distributed : bool, optional
+        If `True` skip the write for any distributed dataset, and return a list of the
+        names of all datasets that were skipped. If `False` (default) throw a
+        `ValueError` if any distributed datasets are encountered.
+    postprocess : function, optional
+        A function that takes is called on each node, with the source and destination
+        entries, and can modify either.
+
+    Returns
+    -------
+    distributed_dataset_names : list
+        Names of the distributed datasets if `skip_distributed` is True. Otherwise
+        `None` is returned.
     """
 
-    copyattrs(g1.attrs, g2.attrs, convert_strings=convert_attribute_strings)
+    distributed_dset_names = []
 
-    # Sort to ensure consistent insertion order
-    for key in sorted(g1):
-        entry = g1[key]
-        if is_group(entry):
-            g2.create_group(key)
-            deep_group_copy(
-                entry,
-                g2[key],
-                selections,
-                convert_dataset_strings=convert_dataset_strings,
-                convert_attribute_strings=convert_attribute_strings,
+    # only the case if zarr is not installed
+    if file_format.module is None:
+        raise RuntimeError("Can't deep_group_copy zarr file. Please install zarr.")
+    to_file = isinstance(g2, file_format.module.Group)
+
+    # Prepare a dataset for writing out, applying selections and transforming any
+    # datatypes
+    # Returns: (dtype, shape, data_to_write)
+    def _prepare_dataset(dset):
+
+        # Look for a selection for this dataset (also try without the leading "/")
+        try:
+            selection = selections.get(
+                dset.name, selections.get(dset.name[1:], slice(None))
+            )
+        except AttributeError:
+            selection = slice(None)
+
+        # Check if this is a distributed dataset and figure out if we can make this work
+        # out
+        if to_file and isinstance(dset, MemDatasetDistributed):
+            if not skip_distributed:
+                raise ValueError(
+                    f"Cannot write out a distributed dataset ({dset.name}) "
+                    "via this method."
+                )
+            elif selection != slice(None):
+                raise ValueError(
+                    "Cannot apply a slice when writing out a distributed dataset "
+                    f"({dset.name}) via this method."
+                )
+            else:
+                # If we get here, we should create the dataset, but not write out any data into it (i.e. return None)
+                distributed_dset_names.append(dset.name)
+                return dset.dtype, dset.shape, None
+
+        # Extract the data for the selection
+        data = entry[selection]
+
+        if convert_dataset_strings:
+            # Convert unicode strings back into ascii byte strings. This will break
+            # if there are characters outside of the ascii range
+            if to_file:
+                data = ensure_bytestring(data)
+
+            # Convert strings in an HDF5 dataset into unicode
+            else:
+                data = ensure_unicode(data)
+        elif to_file:
+            # If we shouldn't convert we at least need to ensure there aren't any
+            # Unicode characters before writing
+            data = check_unicode(entry)
+
+        return data.dtype, data.shape, data
+
+    # get compression options/chunking for this dataset
+    # Returns dict of compression and chunking arguments for create_dataset
+    def _prepare_compression_args(dset):
+        compression = getattr(dset, "compression", None)
+        compression_opts = getattr(dset, "compression_opts", None)
+
+        if to_file:
+            # massage args according to file format
+            compression_kwargs = file_format.compression_kwargs(
+                compression=compression,
+                compression_opts=compression_opts,
+                compressor=getattr(dset, "compressor", None),
             )
         else:
-            # look for selection for this dataset (also try withouth the leading "/")
-            try:
-                selection = selections.get(
-                    entry.name, selections.get(entry.name[1:], slice(None))
-                )
-            except AttributeError:
-                selection = slice(None)
+            # in-memory case; use HDF5 compression args format for this case
+            compression_kwargs = fileformats.HDF5.compression_kwargs(
+                compression=compression, compression_opts=compression_opts
+            )
+        compression_kwargs["chunks"] = getattr(dset, "chunks", None)
 
-            if convert_dataset_strings:
-                # Convert unicode strings back into ascii byte strings. This will break
-                # if there are characters outside of the ascii range
-                if isinstance(g2, h5py.Group):
-                    data = ensure_bytestring(entry[selection])
+        # disable compression if not enabled for HDF5 files
+        # https://github.com/chime-experiment/Pipeline/issues/33
+        if (
+            to_file
+            and file_format == fileformats.HDF5
+            and not fileformats.HDF5.compression_enabled()
+            and isinstance(dset, MemDatasetDistributed)
+        ):
+            compression_kwargs = {}
 
-                # Convert strings in an HDF5 dataset into unicode
-                else:
-                    data = ensure_unicode(entry[selection])
+        return compression_kwargs
 
-            elif isinstance(g2, h5py.Group):
-                data = check_unicode(entry)
-                data = data[selection]
-            else:
-                data = entry[selection]
+    # Do a non-recursive traversal of the tree, recreating the structure and attributes,
+    # and copying over any non-distributed datasets
+    stack = [g1]
+    while stack:
 
+        entry = stack.pop()
+        key = entry.name
+
+        if is_group(entry):
+            if key != g1.name:
+                # Only create group if we are above the starting level
+                g2.create_group(key)
+            stack += [entry[k] for k in sorted(entry, reverse=True)]
+        else:  # Is a dataset
+            dtype, shape, data = _prepare_dataset(entry)
+            compression_kwargs = _prepare_compression_args(entry)
             g2.create_dataset(
                 key,
-                shape=data.shape,
-                dtype=data.dtype,
+                shape=shape,
+                dtype=dtype,
                 data=data,
-                chunks=entry.chunks,
-                compression=entry.compression,
-                compression_opts=entry.compression_opts,
+                **compression_kwargs,
             )
-            copyattrs(
-                entry.attrs, g2[key].attrs, convert_strings=convert_attribute_strings
-            )
+
+        target = g2[key]
+        copyattrs(entry.attrs, target.attrs, convert_strings=convert_attribute_strings)
+
+        if postprocess:
+            postprocess(entry, target)
+
+    return distributed_dset_names if skip_distributed else None
 
 
 def format_abs_path(path):
@@ -2269,250 +2614,112 @@ def format_abs_path(path):
     return out
 
 
-def _distributed_group_to_hdf5_serial(
+def _distributed_group_to_file(
     group,
     fname,
     mode,
     hints=True,
     convert_dataset_strings=False,
     convert_attribute_strings=True,
-    **kwargs
+    file_format=None,
+    serial=False,
+    **kwargs,
 ):
-    """Private routine to copy full data tree from distributed memh5 object
-    into an HDF5 file.
+    """Copy full data tree from distributed memh5 object into the destination file.
 
-    This version explicitly serialises all IO.
+    This routine works in two stages:
+
+    - First rank=0 copies all of the groups, attributes and non-distributed datasets
+    into the target file. The distributed datasets are identified and created in this
+    step, but their contents are not written. This is done by `deep_group_copy` to try
+    and centralize as much of the copying code.
+    - In the second step, the distributed datasets are written to disk. This is mostly
+    offloaded to `MPIArray.to_file`, but some code around this needs to change depending
+    on the file type, and if the data can be written in parallel.
     """
-
-    if not group.distributed:
-        raise RuntimeError(
-            "This should only run on distributed datasets [%s]." % group.name
-        )
 
     comm = group.comm
 
-    # Create group (or file)
+    def apply_hints(source, dest):
+        if dest.name == "/":
+            dest.attrs["__memh5_distributed_file"] = True
+        elif isinstance(source, MemDatasetCommon):
+            dest.attrs["__memh5_distributed_dset"] = False
+        elif isinstance(source, MemDatasetDistributed):
+            dest.attrs["__memh5_distributed_dset"] = True
+
+    # Walk the full structure and separate out what we need to write
     if comm.rank == 0:
-
-        # If this is the root group, create the file and copy the file level
-        # attrs
-        if group.name == "/":
-            with h5py.File(fname, mode, **kwargs) as f:
-                copyattrs(
-                    group.attrs, f.attrs, convert_strings=convert_attribute_strings
-                )
-
-                if hints:
-                    f.attrs["__memh5_distributed_file"] = True
-
-        # Create this group and copy attrs
-        else:
-            with h5py.File(fname, "r+", **kwargs) as f:
-                g = f.create_group(group.name)
-                copyattrs(
-                    group.attrs, g.attrs, convert_strings=convert_attribute_strings
-                )
-
-    comm.Barrier()
-
-    # Write out groups and distributed datasets, these operations must be done
-    # collectively
-    # Sort to ensure insertion order is identical
-    for key in sorted(group):
-
-        entry = group[key]
-
-        # Groups are written out by recursing
-        if is_group(entry):
-            _distributed_group_to_hdf5_serial(
-                entry,
-                fname,
-                mode,
+        with file_format.open(fname, mode) as fh:
+            distributed_dataset_names = deep_group_copy(
+                group,
+                fh,
                 convert_dataset_strings=convert_dataset_strings,
                 convert_attribute_strings=convert_attribute_strings,
-                **kwargs
+                skip_distributed=True,
+                file_format=file_format,
+                postprocess=(apply_hints if hints else None),
             )
+    else:
+        distributed_dataset_names = None
 
-        # Write out distributed datasets (only the data, the attributes are written below)
-        elif isinstance(entry, MemDatasetDistributed):
+    distributed_dataset_names = comm.bcast(distributed_dataset_names)
 
-            arr = check_unicode(entry)
+    def _write_distributed_datasets(dest):
+        for name in distributed_dataset_names:
+            dset = group[name]
+            data = check_unicode(dset)
 
-            arr.to_hdf5(
-                fname,
-                entry.name,
-                chunks=entry.chunks,
-                compression=entry.compression,
-                compression_opts=entry.compression_opts,
+            data.to_file(
+                dest,
+                name,
+                chunks=dset.chunks,
+                compression=dset.compression,
+                compression_opts=dset.compression_opts,
+                file_format=file_format,
             )
-
         comm.Barrier()
 
-    # Write out common datasets, and the attributes on distributed datasets
-    if comm.rank == 0:
+    # Write out the distributed parts of the file, this needs to be done slightly
+    # differently depending on the actual format we want to use (and if HDF5+MPI is
+    # available)
+    # NOTE: need to use mode r+ as the file should already exist
+    if file_format == fileformats.Zarr:
 
-        with h5py.File(fname, "r+", **kwargs) as f:
+        with fileformats.ZarrProcessSynchronizer(
+            f".{fname}.sync", group.comm
+        ) as synchronizer, zarr.open_group(
+            store=fname, mode="r+", synchronizer=synchronizer
+        ) as f:
+            _write_distributed_datasets(f)
 
-            for key, entry in group.items():
+    elif file_format == fileformats.HDF5:
 
-                # Write out common datasets and copy their attrs
-                if isinstance(entry, MemDatasetCommon):
+        # Use MPI IO if possible, else revert to serialising
+        if h5py.get_config().mpi:
+            # Open file on all ranks
+            with misc.open_h5py_mpi(fname, "r+", comm=group.comm) as f:
+                if not f.is_mpi:
+                    raise RuntimeError("Could not create file %s in MPI mode" % fname)
+                _write_distributed_datasets(f)
+        else:
+            _write_distributed_datasets(fname)
 
-                    # Deal with unicode numpy datasets that aren't supported by HDF5
-                    if convert_dataset_strings:
-                        # Attempt to coerce to a type that HDF5 supports
-                        data = ensure_bytestring(entry.data)
-                    else:
-                        data = check_unicode(entry)
-
-                    dset = f.create_dataset(
-                        entry.name,
-                        data=data,
-                        chunks=entry.chunks,
-                        compression=entry.compression,
-                        compression_opts=entry.compression_opts,
-                    )
-                    copyattrs(
-                        entry.attrs,
-                        dset.attrs,
-                        convert_strings=convert_attribute_strings,
-                    )
-
-                    if hints:
-                        dset.attrs["__memh5_distributed_dset"] = False
-
-                # Copy the attributes over for a distributed dataset
-                elif isinstance(entry, MemDatasetDistributed):
-
-                    if entry.name not in f:
-                        raise RuntimeError(
-                            "Distributed dataset should already have been created."
-                        )
-
-                    copyattrs(
-                        entry.attrs,
-                        f[entry.name].attrs,
-                        convert_strings=convert_attribute_strings,
-                    )
-
-                    if hints:
-                        f[entry.name].attrs["__memh5_distributed_dset"] = True
-                        f[entry.name].attrs[
-                            "__memh5_distributed_axis"
-                        ] = entry.distributed_axis
-
-    comm.Barrier()
+    else:
+        raise ValueError(f"Unknown format={file_format}")
 
 
-def _distributed_group_to_hdf5_parallel(
-    group,
-    fname,
-    mode,
-    hints=True,
-    convert_dataset_strings=False,
-    convert_attribute_strings=True,
-    **kwargs
-):
-    """Private routine to copy full data tree from distributed memh5 object
-    into an HDF5 file.
-    This version paralellizes all IO."""
-
-    # == Create some internal functions for doing the read ==
-    # Function to perform a recursive clone of the tree structure
-    def _copy_to_file(memgroup, h5group):
-
-        # Copy over attributes
-        copyattrs(
-            memgroup.attrs, h5group.attrs, convert_strings=convert_attribute_strings
-        )
-
-        # Sort the items to ensure we insert in a consistent order across ranks
-        for key in sorted(memgroup):
-
-            item = memgroup[key]
-
-            # If group, create the entry and the recurse into it
-            if is_group(item):
-                new_group = h5group.create_group(key)
-                _copy_to_file(item, new_group)
-
-            # If dataset, create dataset
-            else:
-
-                # Check if we are in a distributed dataset
-                if isinstance(item, MemDatasetDistributed):
-
-                    data = check_unicode(item)
-
-                    # Write to file from MPIArray
-                    data.to_hdf5(
-                        h5group,
-                        key,
-                        chunks=item.chunks,
-                        compression=item.compression,
-                        compression_opts=item.compression_opts,
-                    )
-                    dset = h5group[key]
-
-                    if hints:
-                        dset.attrs["__memh5_distributed_dset"] = True
-                        dset.attrs["__memh5_distributed_axis"] = item.distributed_axis
-
-                # Create common dataset (collective)
-                else:
-
-                    # Convert from unicode to bytestring
-                    if convert_dataset_strings:
-                        data = ensure_bytestring(item.data)
-                    else:
-                        data = check_unicode(item)
-
-                    dset = h5group.create_dataset(
-                        key,
-                        shape=data.shape,
-                        dtype=data.dtype,
-                        chunks=item.chunks,
-                        compression=item.compression,
-                        compression_opts=item.compression_opts,
-                    )
-
-                    # Write common data from rank 0
-                    if memgroup.comm.rank == 0:
-                        dset[:] = data
-
-                    if hints:
-                        dset.attrs["__memh5_distributed_dset"] = False
-
-                # Copy attributes over into dataset
-                copyattrs(
-                    item.attrs, dset.attrs, convert_strings=convert_attribute_strings
-                )
-
-    # Open file on all ranks
-    with misc.open_h5py_mpi(fname, mode, comm=group.comm) as f:
-        if not f.is_mpi:
-            raise RuntimeError("Could not create file %s in MPI mode" % fname)
-
-        # Start recursive file write
-        _copy_to_file(group, f)
-
-        if hints:
-            f.attrs["__memh5_distributed_file"] = True
-
-    # Final synchronisation
-    group.comm.Barrier()
-
-
-def _distributed_group_from_hdf5(
+def _distributed_group_from_file(
     fname,
     comm=None,
-    hints=True,
+    _=True,  # usually `hints`, but hints do not do anything in this method
     convert_dataset_strings=False,
     convert_attribute_strings=True,
-    **kwargs
+    file_format=fileformats.HDF5,
+    **kwargs,
 ):
     """
-    Restore full tree from an HDF5 file into a distributed memh5 object.
+    Restore full tree from an HDF5 file or Zarr group into a distributed memh5 object.
 
     A `selections=` parameter may be supplied as parts of 'kwargs'. See
     `_deep_group_copy' for a description.
@@ -2565,8 +2772,13 @@ def _distributed_group_from_hdf5(
                     distributed_axis = item.attrs.get("__memh5_distributed_axis", 0)
 
                     # Read from file into MPIArray
-                    pdata = mpiarray.MPIArray.from_hdf5(
-                        h5group, key, axis=distributed_axis, comm=comm, sel=selection
+                    pdata = mpiarray.MPIArray.from_file(
+                        h5group,
+                        key,
+                        axis=distributed_axis,
+                        comm=comm,
+                        sel=selection,
+                        file_format=file_format,
                     )
 
                     # Create dataset from MPIArray
@@ -2594,10 +2806,14 @@ def _distributed_group_from_hdf5(
                 # Copy attributes over into dataset
                 _copy_attrs_bcast(item, dset, convert_strings=convert_attribute_strings)
 
-    # Open file on all ranks
-    with misc.open_h5py_mpi(fname, "r", comm=comm) as f:
+    if file_format == fileformats.HDF5:
+        # Open file on all ranks
+        with misc.open_h5py_mpi(fname, "r", comm=comm) as f:
 
-        # Start recursive file read
+            # Start recursive file read
+            _copy_from_file(f, group, selections)
+    else:
+        f = file_format.open(fname, "r")
         _copy_from_file(f, group, selections)
 
     # Final synchronisation
