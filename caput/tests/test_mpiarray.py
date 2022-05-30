@@ -4,7 +4,6 @@ Designed to be run as an MPI job with four processes like::
 
     $ mpirun -np 4 python test_mpiarray.py
 """
-
 import pytest
 from pytest_lazyfixture import lazy_fixture
 import h5py
@@ -86,6 +85,7 @@ def test_wrap():
 
     assert isinstance(da, mpiarray.MPIArray)
     assert da.global_shape == (10, 9)
+    assert da.axis == 0
 
     l0, _, _ = mpiutil.split_local(10)
 
@@ -188,7 +188,7 @@ def test_io(filename, file_open_function, file_format):
 
 
 def test_transpose():
-    """Test MPIArray.transpose()."""
+
     gshape = (1, 11, 2, 14)
 
     l0, s0, _ = mpiutil.split_local(11)
@@ -250,7 +250,7 @@ def test_transpose():
 
 
 def test_reshape():
-    """Test MPIArray.reshape()."""
+
     gshape = (1, 11, 2, 14)
 
     l0, s0, _ = mpiutil.split_local(11)
@@ -275,8 +275,9 @@ def test_reshape():
     assert arr2.axis == 0
 
 
+# pylint: disable=too-many-statements
 def test_global_getslice():
-    """Test MPIArray.global_slice."""
+
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -284,7 +285,7 @@ def test_global_getslice():
 
     # Initialise the distributed array
     for li, _ in darr.enumerate(axis=0):
-        darr[li] = 10 * (10 * rank + li) + np.arange(20)
+        darr.local_array[li] = 10 * (10 * rank + li) + np.arange(20)
 
     # Construct numpy array which should be equivalent to the global array
     whole_array = (
@@ -309,6 +310,7 @@ def test_global_getslice():
     res = local_array[:, 3:5]
 
     assert isinstance(arr, mpiarray.MPIArray)
+    assert arr.axis == 0
     assert (arr == res).all()
 
     # Check a single element extracted from the non-parallel axis
@@ -316,7 +318,10 @@ def test_global_getslice():
     res = local_array[:, 3]
     assert (arr == res).all()
 
-    # These tests denpend on the size being at least 2.
+    # Check that slices contain MPIArray attributes
+    assert hasattr(arr, "comm") and (arr.comm == darr.comm)
+
+    # These tests depend on the size being at least 2.
     if size > 1:
         # Check a slice on the parallel axis
         arr = darr.global_slice[:7, 3:5]
@@ -351,6 +356,53 @@ def test_global_getslice():
 
     assert dslice.global_shape == (10, size * 5)
     assert dslice.local_shape == (10, 5)
+    assert dslice.axis == 1
+
+    # Check that directly indexing into distributed axis returns a numpy array equal to
+    # local array indexing
+    darr = mpiarray.MPIArray((size,), axis=0)
+    with pytest.warns(UserWarning):
+        assert (darr[0] == darr.local_array[0]).all()
+
+    # Check that a single index into a non-parallel axis works
+    darr = mpiarray.MPIArray((4, size), axis=1)
+    darr[:] = rank
+    assert (darr[0] == rank).all()
+    assert darr[0].axis == 0
+    # check that direct slicing into distributed axis returns a numpy array for local array slicing
+    with pytest.warns(UserWarning):
+        assert (darr[2, 0] == darr.local_array[2, 0]).all()
+
+    darr = mpiarray.MPIArray((20, size * 5), axis=1)
+    darr[:] = rank
+    # But, you can directly index with global_slice
+    if size > 1:
+        dslice = darr.global_slice[2, 6]
+        if rank != 1:
+            assert dslice is None
+        else:
+            assert (dslice == rank).all()
+
+    # Check that printing the array does not trigger
+    # an exception
+    assert str(darr)
+
+    # more direct indexing into distributed with global_slice
+    # the global slice should return a numpy array on rank=1, and None everywhere else
+    if size >= 2:
+        darr = mpiarray.MPIArray((20, 10, size * 5), axis=2)
+        darr[:] = rank
+        dslice = darr.global_slice[:, :, 6]
+        if rank != 1:
+            assert dslice is None
+        else:
+            nparr = np.ndarray((20, 10))
+            nparr[:] = rank
+            assert isinstance(dslice, np.ndarray)
+            assert (dslice == nparr).all()
+
+        # check that directly slicing a distributed axis returns a local array
+        assert (darr[:, :, 2:3] == darr.local_array[:, :, 2:3]).all()
 
     # Check ellipsis and slice at the end
     darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
@@ -368,7 +420,6 @@ def test_global_getslice():
 
 
 def test_global_setslice():
-    """Test setting MPIArray.global_slice."""
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -414,6 +465,150 @@ def test_global_setslice():
     whole_array[:, 8] = whole_array[:, 9]
 
     assert (darr == local_array).all()
+
+    # test setting complex dtypes
+
+    darr_complex = mpiarray.MPIArray((size * 5, 20), axis=0, dtype=np.complex64)
+
+    darr_complex[:] = 4
+    assert darr_complex.dtype == np.complex64
+    assert (darr_complex == 4.0 + 0.0j).all()
+
+    darr_complex[:] = 2.0 + 1.345j
+
+    assert darr_complex.dtype == np.complex64
+    assert (darr_complex == 2.0 + 1.345j).all()
+
+    darr_float = mpiarray.MPIArray((size * 5, 20), axis=0, dtype=np.float64)
+
+    darr_float[:] = 4.0
+    assert darr_float.dtype == np.float64
+    assert (darr_float == 4.0).all()
+
+
+def test_outer_ufunc():
+    rank = mpiutil.rank
+    size = mpiutil.size
+
+    dist_arr = mpiarray.MPIArray((size, 4), axis=0)
+    dist_arr[:] = rank
+
+    dist_arr_add = dist_arr + dist_arr
+
+    dist_arr_add = dist_arr + dist_arr
+    dist_arr_mul = 2 * dist_arr
+
+    # check that you can add two MPIArrays with the same shape
+    assert (dist_arr_add == 2 * rank).all()
+
+    # Check that you can multiply an MPIArray against a scalar
+    assert (dist_arr_mul == 2 * rank).all()
+
+    # Check that basic output MPI attributes are correct
+    assert hasattr(dist_arr_add, "axis") and hasattr(dist_arr_add, "comm")
+
+    assert dist_arr_add.axis == 0
+
+    assert dist_arr_add.comm is dist_arr.comm
+
+    # add differently shaped MPIArrays, with broadcasting
+    dist_arr_2 = mpiarray.MPIArray((size, 1), axis=0)
+    dist_arr_2[:] = rank - 1
+    assert (dist_arr + dist_arr_2 == 2 * rank - 1).all()
+    assert (dist_arr + dist_arr_2).axis == 0
+
+    # check that subtracting arrays with two different distributed axis fails
+    # pylint: disable=expression-not-assigned
+    with pytest.raises(mpiarray.AxisException):
+        mpiarray.MPIArray((size, 4), axis=0) - mpiarray.MPIArray((size, 4), axis=1)
+
+    # check that outer ufunc on arrays that cannot be broadcast fails
+    with pytest.raises(ValueError):
+        np.multiply(
+            mpiarray.MPIArray((size, 3), axis=0), mpiarray.MPIArray((size, 4), axis=0)
+        )
+    # pylint: enable=expression-not-assigned
+
+    # test ufuncs with complex dtypes
+
+    dist_complex = mpiarray.MPIArray((size, 4), axis=0, dtype=np.complex64)
+    dist_complex_add = dist_complex + dist_complex
+
+    assert (dist_complex_add == dist_complex + dist_complex).all()
+    assert dist_complex_add.dtype == np.complex64
+
+
+def test_reduce():
+
+    rank = mpiutil.rank
+    size = mpiutil.size
+
+    dist_array = mpiarray.MPIArray((size, 4, 3), axis=0)
+    dist_array[:] = rank
+
+    # sums across non-distributed axes should be permitted, and work as usual
+    assert (dist_array.sum(axis=1) == 4 * rank).all()
+
+    # sum() should reduce across all non-distributed axes
+    sum_all = dist_array.sum()
+    assert (sum_all == 4 * 3 * rank).all()
+
+    assert sum_all.local_shape == (1,)
+
+    assert sum_all.global_shape == (size,)
+
+    # sum across a smaller numbered axes
+    # this will result in an axes reduction
+    dist_array = mpiarray.MPIArray((size, 4, 3), axis=1)
+    dist_array[:] = rank
+
+    assert (dist_array.sum(axis=0) == 4 * rank).all()
+
+    # check that the new axes was calculated accordingly
+    assert (dist_array.sum(axis=0)).axis == 0
+
+    assert dist_array.sum(axis=0, keepdims=True).axis == 1
+
+    sum_all = dist_array.sum()
+    assert (sum_all == 4 * 3 * rank).all()
+
+    assert sum_all.local_shape == (1,)
+
+    assert sum_all.global_shape == (size,)
+
+    assert mpiarray.MPIArray((size, 4), axis=1).sum(axis=0).axis == 0
+
+    # test AllReduce
+    if size > 1:
+        from mpi4py import MPI
+
+        # Test comm.Allreduce
+        dist_array = mpiarray.MPIArray((size, 4), axis=1)
+        dist_array[:] = 1
+
+        df_sum = np.sum(dist_array, axis=0)
+
+        df_total = np.zeros_like(df_sum)
+
+        dist_array.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
+
+        assert (df_total == 4 * size).all()
+
+        # Test MPIArray.allreduce()
+
+        # MPIArray.sum().allreduce() should give the scalar sum of
+        # all entries
+        df_sum = dist_array.sum()
+        df_total = np.zeros_like(df_sum)
+
+        assert dist_array.sum().allreduce() == 4 * size
+
+        df_sum.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
+
+        assert df_total == dist_array.sum().allreduce()
+
+        with pytest.raises(ValueError):
+            dist_array.allreduce()
 
 
 #
