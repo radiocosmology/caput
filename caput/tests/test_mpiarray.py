@@ -611,36 +611,56 @@ def test_reduce():
             dist_array.allreduce()
 
 
-#
-# class Testmpiarray(unittest.TestCase):
-#
-#     def test_dataset(self):
-#
-#         fname = 'testdset.hdf5'
-#
-#         if mpiutil.rank0:
-#             if os.path.exists(fname):
-#                 os.remove(fname)
-#
-#         mpiutil.barrier()
-#
-#         class TestDataset(mpiarray.mpiarray):
-#             _common = {'a': None}
-#             _distributed = {'b': None}
-#
-#         td1 = TestDataset()
-#         td1.common['a'] = np.arange(12)
-#         td1.attrs['message'] = 'meh'
-#
-#         gshape = (19, 17)
-#         ds = mpiarray.MPIArray(gshape, dtype=np.float64)
-#         ds[:] = np.random.standard_normal(ds.local_shape)
-#
-#         td1.distributed['b'] = ds
-#         td1.to_hdf5(fname)
-#
-#         td2 = TestDataset.from_hdf5(fname)
-#
-#         assert (td1['a'] == td2['a']).all()
-#         assert (td1['b'] == td2['b']).all()
-#         assert (td1.attrs['message'] == td2.attrs['message'])
+def test_slice_newaxis():
+
+    rank = mpiutil.rank
+    size = mpiutil.size
+
+    # Test inserting an axis before a normal axis
+    dist_array = mpiarray.MPIArray((4, size, 3), axis=1)
+    dist_array[:] = rank
+    new_dist_array = dist_array[np.newaxis, :, :, :]
+    assert new_dist_array.shape == (1, 4, 1, 3)
+    assert new_dist_array.global_shape == (1, 4, size, 3)
+    assert (new_dist_array[:] == rank).all()
+
+    # Test inserting an axis before the distributed axis
+    new_dist_array = dist_array[:, np.newaxis, :, :]
+    assert new_dist_array.shape == (4, 1, 1, 3)
+    assert new_dist_array.global_shape == (4, 1, size, 3)
+    assert (new_dist_array[:] == rank).all()
+
+
+def test_slice_ellipsis():
+
+    rank = mpiutil.rank
+    size = mpiutil.size
+
+    dist_array = mpiarray.MPIArray((4, size, 3), axis=1)
+    dist_array[:] = rank
+
+    # Test selecting an axis at the end via an ellipsis
+    new_dist_array = dist_array[..., 0]
+    assert new_dist_array.shape == (4, 1)
+    assert new_dist_array.global_shape == (4, size)
+    assert (new_dist_array[:] == rank).all()
+
+    # Test inserting an axis at the end via an ellipsis
+    new_dist_array = dist_array[..., np.newaxis]
+    assert new_dist_array.shape == (4, 1, 3, 1)
+    assert new_dist_array.global_shape == (4, size, 3, 1)
+    assert (new_dist_array[:] == rank).all()
+
+
+def test_slice_npint64():
+
+    rank = mpiutil.rank
+    size = mpiutil.size
+
+    # Test inserting an axis before a normal axis
+    dist_array = mpiarray.MPIArray((4, size, 3), axis=1)
+    dist_array[:] = rank
+    new_dist_array = dist_array[np.int64(2), :, :]
+    assert new_dist_array.shape == (1, 3)
+    assert new_dist_array.global_shape == (size, 3)
+    assert (new_dist_array[:] == rank).all()
