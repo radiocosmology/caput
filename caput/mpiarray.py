@@ -234,14 +234,15 @@ MPI.Comm
 mpi4py.MPI.Comm provides a wide variety of functions for communications across nodes
 https://mpi4py.readthedocs.io/en/stable/overview.html?highlight=allreduce#collective-communications
 
-They provide an upper-case and lower-case variant of many functions.
-With MPIArrays, please use the uppercase variant of the function. The lower-case variants involve
-an intermediate pickling process, which can lead to malformed arrays.
+They provide an upper-case and lower-case variant of many functions.  With MPIArrays,
+please use the uppercase variant of the function. The lower-case variants involve an
+intermediate pickling process, which can lead to malformed arrays.
 
 """
 import os
 import time
 import logging
+from typing import Tuple, Any
 
 import numpy as np
 
@@ -394,12 +395,13 @@ class MPIArray(np.ndarray):
         # if smaller than number of axes, extend with `slice(None, None, None)`
         if not isinstance(v, tuple):
             v = (v,)
-        if len(v) < len(self.global_shape):
-            v = v + (slice(None, None, None),) * (len(self.global_shape) - len(v))
+
+        v, axis_map, final_map = sanitize_slice(v, self.ndim)
 
         # __getitem__ should not be receiving sub-slices or direct indexes on the
         # distributed axis. global_slice should be used for both
-        dist_axis_index = v[self.axis]
+        dist_axis = axis_map[self.axis]
+        dist_axis_index = v[dist_axis]
         if (dist_axis_index != slice(None, None, None)) and (
             dist_axis_index != slice(0, self.local_array.shape[self.axis], None)
         ):
@@ -420,24 +422,14 @@ class MPIArray(np.ndarray):
             )
             return self.local_array.__getitem__(v)
 
-        # Figure out which is the axis number for the distributed axis after the slicing
-        # by removing slice axes which are just ints from the mapping.
-        # int slices will result in that axis being reduced
-        # and the distributed axis number dropping by 1.
-        dist_axis = [
-            index
-            for index, sl in enumerate(v)
-            if not isinstance(sl, int) and not isinstance(sl, np.int64)
-        ]
+        # Calculate the final position of the distributed axis
+        final_dist_axis = final_map[axis_map[self.axis]]
 
-        try:
-            dist_axis = dist_axis.index(self.axis)
-        except ValueError as e:
-            raise AxisException(
-                "Failed to calculate new distributed axis for output of this slice"
-            ) from e
+        if final_dist_axis is None:
+            # Should not get here
+            raise IndexError("Distributed axis does not appear in final output.")
 
-        if dist_axis == self.axis:
+        if final_dist_axis == self.axis:
             return super().__getitem__(v)
 
         # the MPIArray array_finalize assumes that the output distributed axis
@@ -456,12 +448,15 @@ class MPIArray(np.ndarray):
         if not new_global_shape:
             return arr_sliced
 
-        new_global_shape[dist_axis] = self.global_shape[self.axis]
+        new_global_shape[final_dist_axis] = self.global_shape[self.axis]
 
         # create an mpi array, with the appropriate parameters
         # fill it with the contents of the slice
         arr_mpi = MPIArray(
-            tuple(new_global_shape), axis=dist_axis, comm=self._comm, dtype=self.dtype
+            tuple(new_global_shape),
+            axis=final_dist_axis,
+            comm=self._comm,
+            dtype=self.dtype,
         )
         arr_mpi[:] = arr_sliced[:]
         return arr_mpi
@@ -869,8 +864,8 @@ class MPIArray(np.ndarray):
 
         if self.local_shape != (1,):
             raise ValueError(
-                "MPIArray.allreduce()'s usage is restricted to arrays with a single element per rank.\n"
-                f"rank {self.comm.rank} has shape {self.local_shape}"
+                "MPIArray.allreduce()'s is limited to arrays with a single element per "
+                f"rank, but rank={self.comm.rank} has shape-{self.local_shape}."
             )
 
         result_arr = np.zeros_like(self)
@@ -1884,6 +1879,100 @@ def _create_or_get_dset(group, name, shape, dtype, **kwargs):
             **kwargs,
         )
     return dset
+
+
+def sanitize_slice(
+    sl: Tuple[Any], naxis: int
+) -> Tuple[Tuple[Any], Tuple[int], Tuple[int]]:
+    """Sanitize and extract information from the arguments to an array indexing.
+
+    Parameters
+    ----------
+    sl
+        A tuple representing the arguments to array indexing.
+    naxis
+        The total number of axes in the array being indexed.
+
+    Returns
+    -------
+    new_slice
+        An equivalent slice that has been sanitized, i.e. ellipsis expanded, all indices
+        cast to ints etc.
+    axis_map
+        For each axis in the input array, give the position of that axis in the
+        sanitized slice.
+    final_map
+        For each position in the `sl`, give the axis position it corresponds to in the
+        final array.
+
+    Raises
+    ------
+    IndexError
+        For incompatible slices, such as too many axes.
+    """
+
+    orig_sl = sl
+
+    # Add an Ellipsis at the very end if it isn't present elsewhere
+    if Ellipsis not in sl:
+        sl += (Ellipsis,)
+
+    # Convert all np.int types (which are valid arguments) to ints
+    sl = tuple(int(s) if isinstance(s, np.integer) else s for s in sl)
+
+    num_added = 0
+    num_removed = 0
+    ell_ind = None
+
+    for ii, s in enumerate(sl):
+
+        if s == np.newaxis:
+            num_added += 1
+        elif isinstance(s, int):
+            num_removed += 1
+        elif s == Ellipsis:
+            ell_ind = ii
+
+    # print(num_added, num_removed, ell_ind)
+
+    # Calculate the number of slices to add instead of the ellipsis
+    ell_length = naxis - len(sl) + num_added + 1
+
+    if ell_length < 0:
+        raise IndexError(
+            f"slice={orig_sl} passed into MPIArray with {naxis} dims is too long."
+        )
+
+    # Expand Ellipsis
+    sl = sl[:ell_ind] + tuple([slice(None)] * ell_length) + sl[(ell_ind + 1) :]
+
+    axis_map = []
+
+    final_positions = []
+    output_ind = 0
+
+    # Extract the axis mappings
+    for ii, s in enumerate(sl):
+
+        # Any slice entry that's not a newaxis should map to an axis in the original
+        # array
+        if s is not np.newaxis:
+            axis_map.append(ii)
+
+        # Exact integer indices will remove an axis from the final output
+        if isinstance(s, int):
+            final_positions.append(None)
+        else:
+            final_positions.append(output_ind)
+            output_ind += 1
+
+    if len(axis_map) > naxis:
+        # Shouldn't actually hit this issue
+        raise IndexError(
+            f"slice={orig_sl} passed into MPIArray with {naxis} dims is too long."
+        )
+
+    return sl, tuple(axis_map), tuple(final_positions)
 
 
 class DummyContext:
