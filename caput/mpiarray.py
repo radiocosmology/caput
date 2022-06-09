@@ -242,7 +242,10 @@ intermediate pickling process, which can lead to malformed arrays.
 import os
 import time
 import logging
-from typing import Tuple, Any
+from typing import Tuple, Any, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from mpi4py import MPI
 
 import numpy as np
 
@@ -329,7 +332,8 @@ class _global_resolver:
             else:
                 stop = local_length
 
-            # If step is defined we don't need to adjust this, but it's no longer a complete slice
+            # If step is defined we don't need to adjust this, but it's no longer a
+            # complete slice
             if step is not None:
                 fullslice = False
 
@@ -352,7 +356,8 @@ class _global_resolver:
         # If not a full slice, return a numpy array (or None)
         if not is_fullslice:
 
-            # If the distributed axis has a None, that means there is no data at that index on this rank
+            # If the distributed axis has a None, that means there is no data at that
+            # index on this rank
             if slobj[self.axis] is None:
                 return None
             else:
@@ -392,7 +397,6 @@ class MPIArray(np.ndarray):
         # Return an MPIArray view
 
         # ensure slobj is a tuple, with one entry for every axis
-        # if smaller than number of axes, extend with `slice(None, None, None)`
         if not isinstance(v, tuple):
             v = (v,)
 
@@ -432,11 +436,10 @@ class MPIArray(np.ndarray):
         if final_dist_axis == self.axis:
             return super().__getitem__(v)
 
-        # the MPIArray array_finalize assumes that the output distributed axis
-        # is the same as the source
-        # since the number for the distributed axes has changed, we
+        # the MPIArray array_finalize assumes that the output distributed axis is the
+        # same as the source since the number for the distributed axes has changed, we
         # will need a fresh MPIArray object
-
+        # First we do the actual slice on the numpy arrays
         arr_sliced = self.local_array.__getitem__(v)
 
         # determine the shape of the new array
@@ -448,17 +451,14 @@ class MPIArray(np.ndarray):
         if not new_global_shape:
             return arr_sliced
 
-        new_global_shape[final_dist_axis] = self.global_shape[self.axis]
-
-        # create an mpi array, with the appropriate parameters
-        # fill it with the contents of the slice
-        arr_mpi = MPIArray(
-            tuple(new_global_shape),
-            axis=final_dist_axis,
-            comm=self._comm,
-            dtype=self.dtype,
+        # Create a view of the numpy sliced array as an MPIArray.
+        arr_mpi = self._view_from_data_and_params(
+            arr_sliced,
+            final_dist_axis,
+            self.global_shape[self.axis],
+            self.local_offset[self.axis],
+            self.comm,
         )
-        arr_mpi[:] = arr_sliced[:]
         return arr_mpi
 
     def __setitem__(self, slobj, value):
@@ -636,6 +636,35 @@ class MPIArray(np.ndarray):
         return _global_resolver(self)
 
     @classmethod
+    def _view_from_data_and_params(
+        cls,
+        array: np.ndarray,
+        axis: int,
+        global_length: int,
+        local_start: int,
+        comm: "MPI.IntraComm",
+    ) -> "MPIArray":
+        """Create an MPIArray view of a numpy array."""
+
+        # Set shape and offset
+        lshape = array.shape
+        global_shape = list(lshape)
+        global_shape[axis] = global_length
+
+        loffset = [0] * len(lshape)
+        loffset[axis] = local_start
+
+        # Setup attributes of class
+        dist_arr = array.view(cls)
+        dist_arr.global_shape = tuple(global_shape)
+        dist_arr.axis = axis
+        dist_arr.local_shape = tuple(lshape)
+        dist_arr.local_offset = tuple(loffset)
+        dist_arr.comm = comm
+
+        return dist_arr
+
+    @classmethod
     def wrap(cls, array, axis, comm=None):
         """Turn a set of numpy arrays into a distributed MPIArray object.
 
@@ -684,23 +713,7 @@ class MPIArray(np.ndarray):
         if layout_issue:
             raise Exception("Cannot wrap, distributed axis local length is incorrect.")
 
-        # Set shape and offset
-        lshape = array.shape
-        global_shape = list(lshape)
-        global_shape[axis] = totallen
-
-        loffset = [0] * len(lshape)
-        loffset[axis] = local_start
-
-        # Setup attributes of class
-        dist_arr = array.view(cls)
-        dist_arr.global_shape = tuple(global_shape)
-        dist_arr.axis = axis
-        dist_arr.local_shape = tuple(lshape)
-        dist_arr.local_offset = tuple(loffset)
-        dist_arr.comm = comm
-
-        return dist_arr
+        return cls._view_from_data_and_params(array, axis, totallen, local_start, comm)
 
     def redistribute(self, axis):
         """Change the axis that the array is distributed over.
@@ -1932,8 +1945,6 @@ def sanitize_slice(
             num_removed += 1
         elif s == Ellipsis:
             ell_ind = ii
-
-    # print(num_added, num_removed, ell_ind)
 
     # Calculate the number of slices to add instead of the ellipsis
     ell_length = naxis - len(sl) + num_added + 1
