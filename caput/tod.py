@@ -123,6 +123,11 @@ class Reader:
         # Fetch all meta data.
         time = np.copy(data_empty.time)
         first_file, toclose = memh5.get_file(files[0], file_format=file_format)
+
+        # HACK: we need to aget the time_axes into _copy_non_time_data, this
+        # makes it work, although I'm not sure how it ever worked correctly
+        # previously
+        first_file.time_axes = data_empty.time_axes
         datasets = _copy_non_time_data(first_file)
         # Zarr arrays are flushed automatically flushed and closed
         if toclose and (file_format == fileformats.HDF5):
