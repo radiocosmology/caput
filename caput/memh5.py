@@ -2514,7 +2514,7 @@ def deep_group_copy(
                 return dset.dtype, dset.shape, None
 
         # Extract the data for the selection
-        data = entry[selection]
+        data = dset[selection]
 
         if convert_dataset_strings:
             # Convert unicode strings back into ascii byte strings. This will break
