@@ -2110,8 +2110,8 @@ class BasicCont(MemDiskGroup):
     def reverse_map(self):
         """Stores the reverse map from product index to stack index.
 
-        Do not try to add a new index_map by assigning to an item of this
-        property. Use :meth:`~BasicCont.create_index_map` instead.
+        Do not try to add a new reverse_map by assigning to an item of this
+        property. Use :meth:`~BasicCont.create_reverse_map` instead.
 
         Returns
         -------
@@ -2119,9 +2119,8 @@ class BasicCont(MemDiskGroup):
             Entry is a 1D arrays used to map from product index to stack index.
 
         """
-
         out = {}
-        for name, value in self._data["reverse_map"].items():
+        for name, value in self._data.get("reverse_map", {}).items():
             out[name] = value[:]
         return ro_dict(out)
 
