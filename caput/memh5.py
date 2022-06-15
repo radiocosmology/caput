@@ -1770,7 +1770,7 @@ class MemDiskGroup(_BaseGroup):
                 data = file_
                 toclose = False
             else:
-                kwargs.setdefault("mode", "a")
+                kwargs.setdefault("mode", "r")
                 if distributed and file_format == fileformats.Zarr:
                     lockfile = f"{file_}.sync"
                     kwargs["synchronizer"] = zarr.ProcessSynchronizer(lockfile)
