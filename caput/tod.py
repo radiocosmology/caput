@@ -9,6 +9,7 @@ sensible operation.
 
 import glob
 import inspect
+from typing import Any, Tuple
 
 import numpy as np
 import h5py
@@ -289,7 +290,7 @@ def concatenate(
         Which datasets to include.  Default is all of them.
     dataset_filter : callable with one or two arguments
         Function for preprocessing all datasets.  Useful for changing data
-        types etc. Takes a dataset as an arguement and should return a
+        types etc. Takes a dataset as an argument and should return a
         dataset (either h5py or memh5). Optionally may accept a second
         argument that is slice along the time axis, which the filter should
         apply.
@@ -569,50 +570,70 @@ def _copy_non_time_data(
         # all our non-time dependant information from the first entry.
         data = data[0]
 
-    if out is not None:
-        memh5.copyattrs(
-            data.attrs, out.attrs, convert_strings=convert_attribute_strings
-        )
+    # First do a non-recursive walk over the tree to determine which entries are TO
+    # datasets, and which are items we need to copy
+    to_copy = []
+    stack = [data]
+    while stack:
 
-    for key, entry in data.items():
-        if key in ["index_map", "reverse_map"]:
+        entry = stack.pop()
+
+        if entry.name in ["index_map", "reverse_map"]:
             # XXX exclude index map and reverse map.
             continue
-        if memh5.is_group(entry):
-            if out is not None:
-                sub_out = out.require_group(key)
-            else:
-                sub_out = None
-            _copy_non_time_data(
-                entry,
-                sub_out,
-                to_dataset_names,
-                convert_attribute_strings,
-                convert_dataset_strings,
-            )
+
+        # Check if this is a dataset with a time axis
+        if _dset_has_axis(entry, data.time_axes):
+            to_dataset_names.append(entry.name)
         else:
-            # Check if any axis is a 'time' axis
-            if "axis" in entry.attrs and set(data.time_axes).intersection(
-                memh5.bytes_to_unicode(entry.attrs["axis"])
-            ):
-                to_dataset_names.append(entry.name)
-            elif out is not None:
+            # Add children into the stack to walk
+            if memh5.is_group(entry):
+                stack += [entry[k] for k in sorted(entry, reverse=True)]
+            to_copy.append(entry)
+
+    # ... then if we need to copy do a second pass iterating over the list of items to
+    # copy.
+    if out is not None:
+
+        # to_copy should have been constructed in a breadth first order, so parents will
+        # be created before their children
+        for entry in to_copy:
+
+            if memh5.is_group(entry):
+                target = out if entry.name == "/" else out.require_group(entry.name)
+            else:
                 arr = (
                     memh5.ensure_unicode(entry.data)
                     if convert_dataset_strings
                     else entry.data
                 )
-                out.create_dataset(key, shape=entry.shape, dtype=entry.dtype, data=arr)
-                memh5.copyattrs(
-                    entry.attrs, out[key].attrs, convert_strings=convert_dataset_strings
+                target = out.create_dataset(
+                    entry.name,
+                    shape=entry.shape,
+                    dtype=entry.dtype,
+                    data=arr,
                 )
+            memh5.copyattrs(
+                entry.attrs, target.attrs, convert_strings=convert_attribute_strings
+            )
+
     to_dataset_names = [n[1:] if n[0] == "/" else n for n in to_dataset_names]
     return to_dataset_names
 
 
+def _dset_has_axis(entry: Any, axes: Tuple[str]) -> bool:
+    """Check if `entry` is a dataset with an axis named in `axes`."""
+
+    if memh5.is_group(entry):
+        return False
+
+    # Assume is a dataset
+    dset_axes = entry.attrs.get("axis", ())
+
+    return len(set(dset_axes).intersection(axes)) > 0
+
+
 # XXX andata still calls these.
-
-
 def _start_stop_inds(start, stop, ntime):
     if start is None:
         start = 0
