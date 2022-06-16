@@ -350,13 +350,21 @@ def concatenate(
     for axis, index_map in first_data.index_map.items():
         if axis in concatenation_axes:
             # Initialize the dataset.
-            dtype = index_map.dtype
+            if convert_dataset_strings:
+                dtype = memh5.dtype_to_unicode(index_map.dtype)
+            else:
+                dtype = index_map.dtype
             out.create_index_map(
                 axis, np.empty(shape=(stop[axis] - start[axis],), dtype=dtype)
             )
         else:
             # Just copy it.
-            out.create_index_map(axis, index_map)
+            out.create_index_map(
+                axis,
+                memh5.ensure_unicode(index_map)
+                if convert_dataset_strings
+                else index_map,
+            )
 
     # Copy over the reverse maps.
     for axis, reverse_map in first_data.reverse_map.items():
@@ -395,7 +403,11 @@ def concatenate(
                 current_concat_index_start[axis],
                 current_concat_index_n[axis],
             )
-            out.index_map[axis][out_slice] = data.index_map[axis][in_slice]
+            out.index_map[axis][out_slice] = (
+                memh5.ensure_unicode(data.index_map[axis][in_slice])
+                if convert_attribute_strings
+                else data.index_map[axis][in_slice]
+            )
         # Now copy over the datasets and flags.
         this_dataset_names = _copy_non_time_data(
             data,
