@@ -1015,6 +1015,8 @@ class SkyfieldWrapper:
         The JPL ephemeris to use. Defaults to `'de421.bsp'`.
     """
 
+    mirror_url = "https://bao.chimenet.ca/skyfield/"
+
     def __init__(self, path=None, expire=None, ephemeris="de421.bsp"):
 
         import os
@@ -1075,11 +1077,25 @@ class SkyfieldWrapper:
         try:
             self._timescale = self.load.timescale(builtin=False)
             return self._timescale
-        except IOError as e:
-            raise IOError(
-                "Could not find existing Skyfield timescale data at %s"
-                % self.load.directory
-            ) from e
+        except IOError:
+            warnings.warn(
+                "Could not get timescale data from an official source. Trying the "
+                "CHIME mirror, but the products are likely out of date."
+            )
+            timescale_files = ["Leap_Second.dat", "finals2000A.all"]
+            try:
+                for file in timescale_files:
+                    self.load.download(self.mirror_url + file)
+                self._timescale = self.load.timescale(builtin=False)
+            except IOError as e:
+                raise IOError(
+                    "Could not get ephemeris either from an existing installation at "
+                    f"{self.load.directory}, an official download source or the CHIME "
+                    f"mirror. If you can find a working mirror of "
+                    f"{timescale_files} try using "
+                    '`caput.time.skyfield_wrapper.load.download("<mirror_url>") '
+                    "to download directly."
+                ) from e
 
     _ephemeris = None
 
@@ -1094,14 +1110,29 @@ class SkyfieldWrapper:
         try:
             self._ephemeris = self.load(self._ephemeris_name)
             return self._ephemeris
-        except IOError as e:
-            raise IOError(
-                "Could not find existing Skyfield ephemeris data at %s"
-                % self.load.directory
-            ) from e
+        except IOError:
+            warnings.warn(
+                "Could not get ephemeris data from an official source. Trying the "
+                "CHIME mirror, but the products are likely out of date."
+            )
+            try:
+                self.load.download(self.mirror_url + self._ephemeris_name)
+                self._ephemeris = self.load(self._ephemeris_name)
+            except IOError as e:
+                raise IOError(
+                    "Could not get ephemeris either from an existing installation at "
+                    f"{self.load.directory}, an official download source or the CHIME "
+                    f"mirror. If you can find a working mirror of "
+                    "{self._ephemeris_name} try using "
+                    '`caput.time.skyfield_wrapper.load.download("<mirror_url>") '
+                    "to download directly."
+                ) from e
 
     def reload(self):
-        """Reload the Skyfield data regardless of the `expire` setting."""
+        """Reload the Skyfield data regardless of the `expire` setting.
+
+        This will only load the data from the official sources.
+        """
 
         # Download the timescale file and ephemeris
         self.load.download("finals2000A.all")
