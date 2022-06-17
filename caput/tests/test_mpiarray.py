@@ -651,6 +651,13 @@ def test_slice_ellipsis():
     assert new_dist_array.global_shape == (4, size, 3, 1)
     assert (new_dist_array[:] == rank).all()
 
+    bool_sel = np.ones(3, dtype=bool)
+    bool_sel[2:] = False
+    new_dist_array = dist_array[..., bool_sel]
+    assert new_dist_array.shape == (4, 1, 2)
+    assert new_dist_array.global_shape == (4, size, 2)
+    assert (new_dist_array == rank).all()
+
 
 def test_slice_npint64():
 

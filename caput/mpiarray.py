@@ -1927,7 +1927,10 @@ def sanitize_slice(
     orig_sl = sl
 
     # Add an Ellipsis at the very end if it isn't present elsewhere
-    if Ellipsis not in sl:
+    num_ellipsis = sum([s is Ellipsis for s in sl])
+    if num_ellipsis > 1:
+        raise IndexError(f"Found more than one Ellipsis in slice {sl}")
+    elif num_ellipsis == 0:
         sl += (Ellipsis,)
 
     # Convert all np.int types (which are valid arguments) to ints
@@ -1939,11 +1942,11 @@ def sanitize_slice(
 
     for ii, s in enumerate(sl):
 
-        if s == np.newaxis:
+        if s is np.newaxis:
             num_added += 1
         elif isinstance(s, int):
             num_removed += 1
-        elif s == Ellipsis:
+        elif s is Ellipsis:
             ell_ind = ii
 
     # Calculate the number of slices to add instead of the ellipsis
