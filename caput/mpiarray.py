@@ -1097,22 +1097,32 @@ class MPIArray(np.ndarray):
         # collective IO to work around an h5py issue (#965)
         no_null_slices = self.global_shape[self.axis] >= self.comm.size
 
-        # Only use collective IO if:
-        # - there are no null slices (h5py bug)
-        # - we are not distributed over axis=0 as there is no advantage for
-        #   collective IO which is usually slow
-        # - unless we want to use compression/chunking
-        # TODO: change if h5py bug fixed
-        # https://github.com/h5py/h5py/issues/965
-        # TODO: better would be a test on contiguous IO size
-        use_collective = (
-            fh.is_mpi and no_null_slices and (self.axis > 0 or compression is not None)
-        )
+        # Decide whether to use collective IO. There are a few relevant aspects to this
+        # one:
+        # - we must use collective IO if writing chunked/compressed data. If it's not
+        #   available we cannot compress the data
+        # - we cannot use collective IO if there are null slices present (h5py bug)
+        # - due to coordination overhead and no speed up from the writing, collective IO
+        #   is typically slower if the the data is striped across axis=0, so we should
+        #   disable
 
-        if fh.is_mpi and (not use_collective):
+        # TODO: change if h5py bug fixed https://github.com/h5py/h5py/issues/965
+        collective_will_not_work = not (fh.is_mpi and no_null_slices)
+
+        if compression is not None and collective_will_not_work:
             # Need to disable compression if we can't use collective IO
-            logger.error("Cannot use collective IO, disabling compression")
+            logger.warn(
+                "Cannot use collective IO, must disable compression. "
+                f"MPI enabled: {fh.is_mpi}, null slice present: {not no_null_slices}."
+            )
             chunks, compression, compression_opts = None, None, None
+
+        # TODO: better would be a test on contiguous IO size
+        faster_without_collective = self.axis == 0
+
+        use_collective = (compression is not None) or not (
+            collective_will_not_work or faster_without_collective
+        )
 
         sel = self._make_selections()
 
