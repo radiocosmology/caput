@@ -557,6 +557,10 @@ def test_reduce():
 
     assert sum_all.global_shape == (size,)
 
+    # Reductions should fail across the distributed axis
+    with pytest.raises(mpiarray.AxisException):
+        dist_array.sum(axis=0)
+
     # sum across a smaller numbered axes
     # this will result in an axes reduction
     dist_array = mpiarray.MPIArray((size, 4, 3), axis=1)
@@ -609,6 +613,26 @@ def test_reduce():
 
         with pytest.raises(ValueError):
             dist_array.allreduce()
+
+
+def test_multi_reduce():
+    # Test that reductions over multiple axes don't break things
+    size = mpiutil.size
+
+    dist_array = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
+    dist_array.local_array[:] = 1.0
+
+    with pytest.raises(mpiarray.AxisException):
+        dist_array.sum(axis=(0, 1))
+
+    a = dist_array.sum(axis=(1, 2))
+    assert np.all(a.local_array, 16.0)
+
+    dist_array = mpiarray.MPIArray((4, 4, size), axis=2, dtype=np.float64)
+    dist_array.local_array[:] = 1.0
+
+    b = dist_array.sum(axis=(0, 1))
+    assert np.all(b.local_array, 16.0)
 
 
 def test_slice_newaxis():
