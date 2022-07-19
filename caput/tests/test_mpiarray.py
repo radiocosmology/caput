@@ -486,7 +486,7 @@ def test_global_setslice():
     assert (darr_float == 4.0).all()
 
 
-def test_outer_ufunc():
+def test_call_ufunc():
     rank = mpiutil.rank
     size = mpiutil.size
 
