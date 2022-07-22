@@ -103,5 +103,5 @@ def test_FileSelect_distributed(container_on_disk, fsel, isel, file_format, ind)
     #         print(d2[d2slice][0, :2] if d2[d2slice].size else "Empty")
     #     comm.Barrier()
 
-    assert np.all(m["dset1"][:] == d1[d1slice])
-    assert np.all(m["dset2"][:] == d2[d2slice])
+    assert np.all(m["dset1"][:].local_array == d1[d1slice])
+    assert np.all(m["dset2"][:].local_array == d2[d2slice])
