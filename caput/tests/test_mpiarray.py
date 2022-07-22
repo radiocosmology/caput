@@ -43,10 +43,10 @@ def test_redistribution():
     arr[:] = garr[:, s0:e0]
 
     arr2 = arr.redistribute(axis=3)
-    assert (arr2 == garr[:, :, :, s1:e1]).view(np.ndarray).all()
+    assert (arr2.local_array == garr[:, :, :, s1:e1]).all()
 
     arr3 = arr.redistribute(axis=5)
-    assert (arr3 == garr[:, :, :, :, :, s2:e2]).view(np.ndarray).all()
+    assert (arr3.local_array == garr[:, :, :, :, :, s2:e2]).all()
 
 
 def test_gather():
@@ -303,7 +303,7 @@ def test_global_getslice():
     local_array_T = whole_array[:, (rank * 5) : ((rank + 1) * 5)]
 
     # Check that these are the same
-    assert (local_array == darr).all()
+    assert (local_array == darr.local_array).all()
 
     # Check a simple slice on the non-parallel axis
     arr = darr.global_slice[:, 3:5]
@@ -311,12 +311,12 @@ def test_global_getslice():
 
     assert isinstance(arr, mpiarray.MPIArray)
     assert arr.axis == 0
-    assert (arr == res).all()
+    assert (arr.local_array == res).all()
 
     # Check a single element extracted from the non-parallel axis
     arr = darr.global_slice[:, 3]
     res = local_array[:, 3]
-    assert (arr == res).all()
+    assert (arr.local_array == res).all()
 
     # Check that slices contain MPIArray attributes
     assert hasattr(arr, "comm") and (arr.comm == darr.comm)
@@ -446,25 +446,25 @@ def test_global_setslice():
     darr.global_slice[:, 6] = -2.0
     local_array[:, 6] = -2.0
 
-    assert (darr == local_array).all()
+    assert (darr.local_array == local_array).all()
 
     # Check a partial assignment along the parallel axis
     darr.global_slice[7:, 7:9] = -3.0
     whole_array[7:, 7:9] = -3.0
 
-    assert (darr == local_array).all()
+    assert (darr.local_array == local_array).all()
 
     # Check assignment of a single index on the parallel axis
     darr.global_slice[6] = np.arange(20.0)
     whole_array[6] = np.arange(20.0)
 
-    assert (darr == local_array).all()
+    assert (darr.local_array == local_array).all()
 
     # Check copy of one column into the other
     darr.global_slice[:, 8] = darr.global_slice[:, 9]
     whole_array[:, 8] = whole_array[:, 9]
 
-    assert (darr == local_array).all()
+    assert (darr.local_array == local_array).all()
 
     # test setting complex dtypes
 
