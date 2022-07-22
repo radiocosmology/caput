@@ -1757,27 +1757,33 @@ class MPIArray(np.ndarray):
 
             # Where should the distributed axis lie in this array (even if it's not an
             # MPIArray)
-            local_dist_axis = axis - max_dim + inp.ndim
+            cur_dist_axis = axis - max_dim + inp.ndim
 
             if isinstance(inp, MPIArray):
                 try:
-                    _check_dist_axis(inp, local_dist_axis, length, offset)
+                    _check_dist_axis(inp, cur_dist_axis, length, offset)
                 except Exception as e:
                     raise AxisException(
                         f"Input argument {ii} has an incompatible distributed axis."
                     ) from e
-            elif local_dist_axis >= 0:
-                if local_length > 1 and inp.shape[local_dist_axis] == local_length:
+            elif cur_dist_axis >= 0:
+
+                cur_axis_length = inp.shape[cur_dist_axis]
+
+                if cur_axis_length == 1:
+                    # Can broadcast. Great!
+                    continue
+                elif cur_axis_length == local_length:
                     warnings.warn(
                         "A ufunc is combining an MPIArray with a numpy array that "
                         "matches exactly the local part of the distributed axis. This "
                         "is very fragile and may fail on other ranks. "
-                        f"Numpy array shape: {inp.shape}; dist axis: {local_dist_axis}."
+                        f"Numpy array shape: {inp.shape}; dist axis: {cur_dist_axis}."
                     )
-                elif inp.shape[local_dist_axis] != 1:
+                elif cur_axis_length != 1:
                     raise AxisException(
                         f"Input argument {ii} is a numpy array, but has shape != 1 on "
-                        f"the distributed axis (length={inp.shape[local_dist_axis]})."
+                        f"the distributed axis (length={cur_axis_length})."
                     )
 
         return axis, length, offset
