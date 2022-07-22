@@ -554,6 +554,35 @@ def test_ufunc_broadcast():
     dist_arr3 = dist_arr1 + dist_arr2
     assert (dist_arr3 == 2 * dist_arr1).all()
 
+    # Test a broadcast against a numpy array of the same dimensionality
+    nondist_arr = 2 * np.ones((4, 1))
+    assert (dist_arr1 * nondist_arr == 2 * rank).all()
+
+    # Test a broadcast against a numpy array of the same dimensionality, but with a
+    # mismatch on the "distributed" axis. This should fail
+    nondist_arr = np.ones((4, 3))
+    with pytest.raises(ValueError):
+        _ = dist_arr1 * nondist_arr
+
+    # Test a broadcast against a numpy array of lower dimensionality, with the
+    # distributed axis being one of the axes on the non distributed array
+    nondist_arr = 2 * np.ones((1,))
+    assert (dist_arr1 * nondist_arr == 2 * rank).all()
+
+    # Test a broadcast against a numpy array of lower dimensionality, with the
+    # distributed axis being one of the axes implicitly added to the numpy array
+    dist_arr3 = mpiarray.MPIArray((size, 4), axis=0)
+    dist_arr3.local_array[:] = rank
+    nondist_arr = 2 * np.ones((4,))
+    assert (dist_arr3 * nondist_arr == 2 * rank).all()
+
+    # Test a broadcast against a numpy array of higher dimensionality, with the
+    # distributed axis being one of the axes on the non distributed array
+    nondist_arr = 2 * np.ones((1, 4, 1))
+    t = dist_arr1 * nondist_arr
+    assert t.global_shape == (1, 4, size)
+    assert (t == 2 * rank).all()
+
 
 def test_ufunc_2output():
 
