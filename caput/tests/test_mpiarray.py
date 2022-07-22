@@ -486,7 +486,7 @@ def test_global_setslice():
     assert (darr_float == 4.0).all()
 
 
-def test_call_ufunc():
+def test_ufunc_call():
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -538,7 +538,53 @@ def test_call_ufunc():
     assert dist_complex_add.dtype == np.complex64
 
 
-def test_reduce():
+def test_ufunc_broadcast():
+    # Test a call ufunc where one of the arguments will get broadcasted to a higher
+    # dimensionality
+
+    rank = mpiutil.rank
+    size = mpiutil.size
+
+    dist_arr1 = mpiarray.MPIArray((4, size), axis=1)
+    dist_arr1.local_array[:] = rank
+
+    dist_arr2 = mpiarray.MPIArray((size,), axis=0)
+    dist_arr2.local_array[:] = rank
+
+    dist_arr3 = dist_arr1 + dist_arr2
+    assert (dist_arr3 == 2 * dist_arr1).all()
+
+
+def test_ufunc_2output():
+
+    # Test a ufunc (divmod) which will return two outputs simultaneously
+    rank = mpiutil.rank
+    size = mpiutil.size
+
+    dist_arr = mpiarray.MPIArray((size, 4), axis=0)
+    dist_arr[:] = rank
+
+    quotient, remainder = np.divmod(dist_arr, 2)
+
+    # Check that the arrays come back as MPIArrays with the correct structure
+    assert isinstance(quotient, mpiarray.MPIArray)
+    assert isinstance(remainder, mpiarray.MPIArray)
+
+    assert quotient.shape == dist_arr.shape
+    assert remainder.shape == dist_arr.shape
+
+    assert quotient.axis == dist_arr.axis
+    assert remainder.axis == dist_arr.axis
+
+    assert quotient.local_offset == dist_arr.local_offset
+    assert remainder.local_offset == dist_arr.local_offset
+
+    # Check they have the expected values
+    assert (quotient.local_array == (rank // 2)).all()
+    assert (remainder.local_array == (rank % 2)).all()
+
+
+def test_ufunc_reduce():
 
     rank = mpiutil.rank
     size = mpiutil.size
@@ -615,7 +661,7 @@ def test_reduce():
             dist_array.allreduce()
 
 
-def test_multi_reduce():
+def test_ufunc_reduce_multi():
     # Test that reductions over multiple axes don't break things
     size = mpiutil.size
 
@@ -626,13 +672,65 @@ def test_multi_reduce():
         dist_array.sum(axis=(0, 1))
 
     a = dist_array.sum(axis=(1, 2))
-    assert np.all(a.local_array, 16.0)
+    assert np.all(a.local_array == 16.0)
 
     dist_array = mpiarray.MPIArray((4, 4, size), axis=2, dtype=np.float64)
     dist_array.local_array[:] = 1.0
 
     b = dist_array.sum(axis=(0, 1))
-    assert np.all(b.local_array, 16.0)
+    assert np.all(b.local_array == 16.0)
+
+
+def test_ufunc_accumulate():
+    # Test that reductions over multiple axes don't break things
+    size = mpiutil.size
+
+    dist_array = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
+    dist_array.local_array[:] = 1.0
+
+    dist_array_cumsum = np.cumsum(dist_array, axis=2)
+
+    assert dist_array_cumsum.shape == (1, 4, 4)
+    assert dist_array_cumsum.axis == 0
+
+    assert (dist_array_cumsum.local_array == np.arange(1.0, 5.0)).all()
+
+
+def test_ufunc_misc():
+    # Test miscellaneous ufunc related issues
+
+    size = mpiutil.size
+
+    dist_array1 = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
+    dist_array2 = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
+    dist_array1.local_array[:] = 1.0
+    dist_array2.local_array[:] = 1.0
+
+    ## Check that unsupported operations types fail
+    # Check that an outer call fails
+    with pytest.raises(mpiarray.UnsupportedOperation):
+        np.multiply.outer(dist_array1, dist_array2)
+
+    # Check that a reduceat call fails
+    with pytest.raises(mpiarray.UnsupportedOperation):
+        np.multiply.reduceat(dist_array1, [0, 2], axis=1)
+
+    # Check that an at call fails
+    with pytest.raises(mpiarray.UnsupportedOperation):
+        np.exp.at(dist_array1, [(0, 2, 1)])
+
+    # Check that where arguments are not supported
+    with pytest.raises(mpiarray.UnsupportedOperation):
+        np.exp(dist_array1, where=(dist_array2 == 1.0))
+
+    # Check that feeding in one positional argument is interpreted as an out argument
+    dist_array3 = np.exp(dist_array1, dist_array2)
+    assert dist_array2 is dist_array3
+    assert (dist_array2.local_array == np.exp(dist_array1.local_array)).all()
+
+    # Check that feeding in too many arguments actually does fail
+    with pytest.raises(TypeError):
+        np.exp(dist_array1, dist_array2, dist_array1)
 
 
 def test_slice_newaxis():
