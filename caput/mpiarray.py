@@ -242,6 +242,7 @@ import os
 import time
 import logging
 from typing import Sequence, Tuple, Any, TYPE_CHECKING, Union
+import warnings
 
 if TYPE_CHECKING:
     from mpi4py import MPI
@@ -1736,30 +1737,48 @@ class MPIArray(np.ndarray):
                 [inp.ndim if isinstance(inp, np.ndarray) else -1 for inp in inputs]
             )
         ]
-
-        if not isinstance(max_dim_input, MPIArray):
-            raise ValueError("Highest dimensional input must be an MPIArray.")
-
-        axis = max_dim_input.axis
-        length = max_dim_input.global_shape[axis]
-        offset = max_dim_input.local_offset[axis]
-
         max_dim = max_dim_input.ndim
+
+        # Find the first MPIArray in the argument list and use this to determine the
+        # distributed axis location
+        first_mpi_array = next(inp for inp in inputs if isinstance(inp, MPIArray))
+        axis = max_dim + first_mpi_array.axis - first_mpi_array.ndim
+        length = first_mpi_array.global_shape[first_mpi_array.axis]
+        offset = first_mpi_array.local_offset[first_mpi_array.axis]
+        local_length = first_mpi_array.local_shape[first_mpi_array.axis]
 
         # Check that all input arguments have a consistently located distributed axis,
         # while accounting for the fact that numpy will left-pad with length-1
         # dimensions when broadcasting
         for ii, inp in enumerate(inputs):
 
-            if not isinstance(inp, MPIArray):
+            if not isinstance(inp, np.ndarray):
                 continue
 
-            try:
-                _check_dist_axis(inp, axis - max_dim + inp.ndim, length, offset)
-            except Exception as e:
-                raise AxisException(
-                    f"Input argument {ii} has an incompatible distributed axis."
-                ) from e
+            # Where should the distributed axis lie in this array (even if it's not an
+            # MPIArray)
+            local_dist_axis = axis - max_dim + inp.ndim
+
+            if isinstance(inp, MPIArray):
+                try:
+                    _check_dist_axis(inp, local_dist_axis, length, offset)
+                except Exception as e:
+                    raise AxisException(
+                        f"Input argument {ii} has an incompatible distributed axis."
+                    ) from e
+            elif local_dist_axis >= 0:
+                if local_length > 1 and inp.shape[local_dist_axis] == local_length:
+                    warnings.warn(
+                        "A ufunc is combining an MPIArray with a numpy array that "
+                        "matches exactly the local part of the distributed axis. This "
+                        "is very fragile and may fail on other ranks. "
+                        f"Numpy array shape: {inp.shape}; dist axis: {local_dist_axis}."
+                    )
+                elif inp.shape[local_dist_axis] != 1:
+                    raise AxisException(
+                        f"Input argument {ii} is a numpy array, but has shape != 1 on "
+                        f"the distributed axis (length={inp.shape[local_dist_axis]})."
+                    )
 
         return axis, length, offset
 
