@@ -203,9 +203,8 @@ result in an exception
 >>> (mpiarray.MPIArray((mpiutil.size, 4), axis=0) -
 ...  mpiarray.MPIArray((mpiutil.size, 4), axis=1))  # doctest: +NORMALIZE_WHITESPACE
 Traceback (most recent call last):
-...
-caput.mpiarray.AxisException: The distributed axis for all MPIArrays in an expression
-should be the same
+    ...
+caput.mpiarray.AxisException: Input argument 1 has an incompatible distributed axis.
 
 Summation across a non-parallel axis
 
@@ -242,12 +241,13 @@ intermediate pickling process, which can lead to malformed arrays.
 import os
 import time
 import logging
-from typing import Tuple, Any, TYPE_CHECKING
+from typing import Sequence, Tuple, Any, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from mpi4py import MPI
 
 import numpy as np
+import numpy.typing as npt
 
 from caput import fileformats, mpiutil, misc
 
@@ -1184,7 +1184,8 @@ class MPIArray(np.ndarray):
                 f"Can't write to zarr file. Please install zarr and numcodecs: {err}"
             )
 
-        # Blosc may share incorrect global state amongst processes causing programs to hang.
+        # Blosc may share incorrect global state amongst processes causing programs to
+        # hang.
         # See https://zarr.readthedocs.io/en/stable/tutorial.html#parallel-computing-and-synchronization
         numcodecs.blosc.use_threads = False
 
@@ -1591,7 +1592,13 @@ class MPIArray(np.ndarray):
     # which facilitates the use of a diverse set of ufuncs
     # some which return nothing, and some which return something
 
-    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+    def __array_ufunc__(
+        self,
+        ufunc: np.ufunc,
+        method: str,
+        *inputs: Union["MPIArray", npt.ArrayLike],
+        **kwargs,
+    ):
         """Handles ufunc operations for MPIArray.
 
         In NumPy, ufuncs are the various fundamental operations applied to
@@ -1602,97 +1609,202 @@ class MPIArray(np.ndarray):
         need to be converted into ndarrays, otherwise NumPy reports a
         NotImplemented error.
 
-        The distributed axis for all input MPIArrays, is expected to be the same.
-        Operations across the distributed axis, will not be permitted.
+        Not all ufunc methods make sense when operating over distributed inputs. The
+        "__call__", "reduce", and "accumulate" types are supported, but the "outer",
+        "at" and "reduceat" types have more complex behaviour that can't be easily
+        generalised to a distributed case so they are not supported.
 
-        The new array will either be distributed over that axis, or possibly
-        one axis down for `reduce` methods.
+        Each of the supported types has slightly different restrictions:
 
-        For operations that normally return a scalar, the scalars will be
-        wrapped into a 1D array, distributed across axis 0.
+        - "__call__": for single array operations there are no restrictions (e.g.
+        `np.exp`), for binary operations (e.g. `A + B`) both operands must share
+        broadcast against each other and have the same shape distributed axis, which
+        must be at a position consistent with the broadcasting.
+        - "accumulate": the accumulation axis must not be the distributed axis,
+        otherwise there are no restrictions (e.g. `np.cumsum`).
+        - "reduce": the reduction cannot take place along the distributed axis (i.e.
+        `axis` must not include the distributed axis), *except* for a total reduction
+        over all axes (`axis = None`) which will return an array with a single element
+        on each rank.
+
+        For all of these method types `out` keyword arguments, used for directly placing
+        the result in an existing array, are supported. However `where` arguments, used
+        for selecting which elements to apply the function to, are not.
+
+        If you the operation that you want to do is not supported then you should use
+        numpy arrays directly to achieve what you want, first using
+        `MPIArray.local_array` to get the local numpy data, then applying the ufunc, and
+        finally using an `MPIArray.wrap` call to construct a distributed array from the
+        output.
 
         Parameters
         ----------
         ufunc: <function>
             ufunc object that was called
         method: str
-            indicates which ufunc method was called.
-            one of "__call__", "reduce", "reduceat", "accumulate", "outer", "inner"
+            indicates which ufunc method was called. Only the methods "__call__",
+            "accumulate" and "reduce" are supported. The other defined methods "outer",
+            "reduceat" and "at" will cause a ValueError to be thrown.
         inputs: tuple
-            tuple of the input arguments to the ufunc.
-            At least one of the inputs is an MPIArray.
+            tuple of the input arguments to the ufunc.  At least one of the inputs is an
+            MPIArray.
         kwargs: dict
-            dictionary containing the optional input arguments of the ufunc.
-            Important kwargs considered here are 'out' and 'axis'.
+            dictionary containing the optional input arguments of the ufunc.  Important
+            kwargs considered here are 'out' and 'axis'.
         """
-        # pylint: disable=no-member
-        # known problem with super().__array_ufunc__
 
-        args = []
+        # Each ufunc application method must have a corresponding function that both
+        # validates the inputs and arguments are appropriate (same distributed axis
+        # etc.), and infers and returns the parameters of the output distributed axis
+        # (i.e. it's position, length and the offset on this rank)
+        _validation_fn = {
+            "__call__": self._array_ufunc_call,
+            "accumulate": self._array_ufunc_accumulate,
+            "reduce": self._array_ufunc_reduce,
+        }.get(method, None)
 
-        # convert all local arrays into ndarrays
-        args, dist_axis = _mpi_to_ndarray(inputs)
-
-        if "axis" in kwargs and (kwargs["axis"] == dist_axis):
-            raise AxisException(
-                f"operations along the distributed axis (in this case, {dist_axis}) "
-                "are not allowed."
+        if _validation_fn is None:
+            raise UnsupportedOperation(
+                f"ufunc method type '{method}' is not supported for MPIArrays. Try "
+                "using `.local_array` to convert to a pure numpy array first, and the "
+                "use `MPIArray.wrap` to reconstruct an MPIArray at the end."
             )
 
-        # 'out' kwargs contain arrays that the ufunc places the results into
-        # this views the local part of the output arrays into an ndarray
-        # that the ufunc knows how to work with
-        outputs = kwargs.get("out", None)
-        if outputs:
-            out_args, _ = _mpi_to_ndarray(outputs)
-            kwargs["out"] = tuple(out_args)
-        else:
-            outputs = (None,) * ufunc.nout
-
-        results = super().__array_ufunc__(ufunc, method, *args, **kwargs)
-
-        # that ufunc was not implemented for ndarrays
-        if results is NotImplemented:
-            return NotImplemented
-
-        # operation was performed in-place, so we can just return
-        if method == "at":
-            return
-
-        if ufunc.nout == 1:
-            results = (results,)
-
-        if "reduce" in method and (
-            results[0].shape or getattr(outputs[0], "shape", None)
+        # Where arguments are not supported, except where the value is a simple `True`,
+        # which is used as a default
+        if "where" in kwargs and not (
+            isinstance(kwargs["where"], bool) and kwargs["where"]
         ):
-            # reduction methods eliminate axes, so the distributed axis
-            # might need to be recalculated
-            # except when the user explicitly specifies keepdims
-            if not kwargs.get("keepdims", False) and (kwargs["axis"] < dist_axis):
-                dist_axis -= 1
+            raise UnsupportedOperation(
+                "MPIArray ufunc calls do not support 'where' arguments, but "
+                f"where={kwargs['where']} was found. Try using numpy arrays directly "
+                "if you really need to use a 'where' argument."
+            )
 
+        comm = _get_common_comm(inputs)
+
+        new_dist_axis, global_length, offset = _validation_fn(ufunc, *inputs, **kwargs)
+
+        # Check that all out arguments are valid MPIArrays, and then convert into numpy
+        # arrays
+        if "out" in kwargs:
+            out_args = kwargs.get("out", None)
+            kwargs["out"] = _mpi_to_ndarray(out_args, only_mpiarray=True)
+
+            # Check the distribution of the output arguments makes sense
+            for ii, array in enumerate(out_args):
+                try:
+                    _check_dist_axis(array, new_dist_axis, global_length, offset, comm)
+                except Exception as e:
+                    raise ValueError(
+                        f"Output argument at position {ii} does not match expectation."
+                    ) from e
+        else:
+            out_args = [None] * ufunc.nout
+
+        results = _ensure_list(
+            super().__array_ufunc__(ufunc, method, *_mpi_to_ndarray(inputs), **kwargs)
+        )
+
+        # Convert any outputs back into valid MPIArrays if required
         ret = []
+        for res, out in zip(results, out_args):
+            # If out is None a new *numpy* array was initialised for the results. We
+            # need to turn this into an MPIArray using the inferrred distribution
+            if out is None:
+                # Result is a scalar, so we want to return this as a 1D distributed
+                # vector
+                if not res.shape:
+                    res = res.reshape(1)
 
-        for result, output in zip(results, outputs):
-            # case: results were placed in the array specified by `out`; return as is
-            if output is not None:
-                if hasattr(output, "axis") and output.axis != dist_axis:
-                    raise AxisException(
-                        "provided output MPIArray's distributed axis is not consistent "
-                        f"with expected output distributed axis. Expected {dist_axis}; "
-                        f"Actual {output.axis}"
-                    )
-                ret.append(output)
-            else:
-                # case: the result is an ndarray; wrap it into an MPIArray
-                if result.shape:
-                    ret.append(MPIArray.wrap(result, axis=dist_axis))
-                # case: result is a scalar; convert to 1-d vector, distributed across
-                # axis 0
-                else:
-                    ret.append(MPIArray.wrap(np.reshape(result, (1,)), axis=0))
+                # Convert into an an MPIArray
+                out = MPIArray._view_from_data_and_params(
+                    res, new_dist_axis, global_length, offset, comm
+                )
+
+            ret.append(out)
 
         return ret[0] if len(ret) == 1 else tuple(ret)
+
+    def _array_ufunc_call(self, ufunc, *inputs, **kwargs):
+        # Validate and infer the final distributed axis for a standard ufunc call
+
+        # For a 'call' the highest dimensional array should determine the dimensionality
+        # of the output, so we find that
+        max_dim_input = inputs[
+            np.argmax(
+                [inp.ndim if isinstance(inp, np.ndarray) else -1 for inp in inputs]
+            )
+        ]
+
+        if not isinstance(max_dim_input, MPIArray):
+            raise ValueError("Highest dimensional input must be an MPIArray.")
+
+        axis = max_dim_input.axis
+        length = max_dim_input.global_shape[axis]
+        offset = max_dim_input.local_offset[axis]
+
+        max_dim = max_dim_input.ndim
+
+        # Check that all input arguments have a consistently located distributed axis,
+        # while accounting for the fact that numpy will left-pad with length-1
+        # dimensions when broadcasting
+        for ii, inp in enumerate(inputs):
+
+            if not isinstance(inp, MPIArray):
+                continue
+
+            try:
+                _check_dist_axis(inp, axis - max_dim + inp.ndim, length, offset)
+            except Exception as e:
+                raise AxisException(
+                    f"Input argument {ii} has an incompatible distributed axis."
+                ) from e
+
+        return axis, length, offset
+
+    def _array_ufunc_accumulate(self, ufunc, input_, *, axis, **kwargs):
+        # Validate and infer the final distributed axis for a ufunc accumulation
+        # An accumulation should give an array the same shape as the input
+        if axis == input_.axis:
+            raise AxisException(
+                f"Can not accumulate over the distributed axis (axis={input_.axis})"
+            )
+
+        return (
+            input_.axis,
+            input_.global_shape[input_.axis],
+            input_.local_offset[input_.axis],
+        )
+
+    def _array_ufunc_reduce(self, ufunc, input_, *, axis, keepdims=False, **kwargs):
+        # Validate and infer the final distributed axis for a ufunc reduction
+
+        # If we are doing a complete reduction (indicated by axis=None), the output will
+        # be a vector with one element per rank. Directly return parameters to represent
+        # that.
+        if axis is None:
+            return (0, input_.comm.size, input_.comm.rank)
+
+        # Get the normalised set of axes to reduce over
+        axis = set(ax if ax >= 0 else input_.ndim + ax for ax in _ensure_list(axis))
+
+        if input_.axis in axis:
+            raise AxisException(
+                f"Can not reduce over the distributed axis (axis={input_.axis})"
+            )
+
+        # Calculate the final position of the distributed axis
+        final_dist_axis = input_.axis
+        for ii, s in enumerate(input_.shape):
+            if ii in axis and ii < input_.axis and not keepdims:
+                final_dist_axis -= 1
+
+        return (
+            final_dist_axis,
+            input_.global_shape[final_dist_axis],
+            input_.local_offset[final_dist_axis],
+        )
 
     # pylint: enable=inconsistent-return-statements
     # pylint: enable=too-many-branches
@@ -1805,6 +1917,15 @@ def _len_slice(slice_, n):
         return len(slice_)
 
 
+def _ensure_list(x: Any) -> list:
+    # Guarantee the output is a list, by turning any scalars into a single-element list,
+    # and turning sets or tuples into a list
+    if isinstance(x, (list, tuple, set)):
+        return list(x)
+    else:
+        return [x]
+
+
 def _reslice(slice_, n, subslice):
     # For a slice along an axis of length n, return the slice that would select the
     # slice(start, end) elements of the final array.
@@ -1834,49 +1955,114 @@ def _expand_sel(sel, naxis):
     return list(sel)
 
 
-def _mpi_to_ndarray(inputs):
+def _check_dist_axis(
+    array: MPIArray,
+    dist_axis: int,
+    global_length: int,
+    offset: int,
+    comm: "MPI.IntraComm" = None,
+):
+
+    if comm and array.comm != comm:
+        raise ValueError(
+            "MPIArray not distributed over expected communicator. "
+            f"Expected {comm}, got {array.comm}."
+        )
+
+    if array.axis != dist_axis:
+        raise AxisException(
+            "provided MPIArray's distributed axis is not consistent "
+            f"with the expected distributed axis. Expected {dist_axis}; "
+            f"Actual {array.axis}"
+        )
+
+    arr_length = array.global_shape[dist_axis]
+    if arr_length != global_length:
+        raise AxisException(
+            "output argument distributed axis length does not match expected. "
+            f"Expected {global_length}, actual {arr_length}."
+        )
+
+    arr_offset = array.local_offset[dist_axis]
+    if arr_offset != offset:
+        raise AxisException(
+            "output argument distributed axis offset does not match expected. "
+            f"Expected {offset}, actual {arr_offset}."
+        )
+
+
+def _get_common_comm(
+    inputs: Sequence[Union[MPIArray, npt.ArrayLike, None]]
+) -> "MPI.IntraComm":
+    """Get a common MPI communicator from a set of arguments.
+
+    Parameters
+    ----------
+    inputs
+        A mixture of MPIArrays, numpy arrays, scalars and None types.
+
+    Returns
+    -------
+    MPI.IntraComm
+        The communicator shared by all MPIArray arguments. Throws an exception if there
+        is no common communicator, returns None if no MPIArrays are present.
+    """
+    comm = None
+    for array in inputs:
+        if isinstance(array, MPIArray):
+            if comm is None:
+                comm = array.comm
+            else:
+                if comm != array.comm:
+                    raise ValueError(
+                        "The communicator should be the same for all MPIArrays."
+                    )
+    return comm
+
+
+def _mpi_to_ndarray(
+    inputs: Sequence[Union[MPIArray, npt.ArrayLike, None]],
+    only_mpiarray: bool = False,
+) -> Tuple[Union[npt.ArrayLike, None], ...]:
+    # ) -> Tuple[List[Union[np.ndarray, None]], int, "MPI.IntraComm"]:
     """Ensure a list with mixed MPIArrays and ndarrays are all ndarrays.
 
     Additionally, ensure that all of the MPIArrays are distributed along the same axis.
 
     Parameters
     ----------
-    inputs : list of MPIArrays and ndarrays
+    inputs
         All MPIArrays should be distributed along the same axis.
+    only_mpiarray
+        Throw an error if we received anything other than an MPIArray or None.
 
     Returns
     -------
-    args : list of ndarrays
+    args
         The ndarrays are built from the local view of inputed MPIArrays.
-    dist_axis : int
+    dist_axis
         The axis that all of the MPIArrays were distributed on.
+    comm
+        The MPI communicator being used.
     """
     args = []
-    dist_axis = None
 
     for array in inputs:
         if isinstance(array, MPIArray):
             if not hasattr(array, "axis"):
                 raise AxisException(
-                    "An input to a ufunc has an MPIArray, which is missing its axis property."
-                    "If using a lower-case MPI.Comm function, please use its upper-case alternative."
-                    "Pickling does not preserve the axis property."
-                    "Otherwise, please file an issue on caput with a stacktrace."
+                    "An input to a ufunc has an MPIArray, which is missing its axis "
+                    "property. If using a lower-case MPI.Comm function, please use "
+                    "its upper-case alternative. Pickling does not preserve the axis "
+                    "property. Otherwise, please file an issue with a stacktrace."
                 )
-            if dist_axis is None:
-                dist_axis = array.axis
-            else:
-                if dist_axis != array.axis:
-                    raise AxisException(
-                        "The distributed axis for all MPIArrays in an expression "
-                        "should be the same"
-                    )
-
             args.append(array.local_array)
-        else:
+        elif array is None or not only_mpiarray:
             args.append(array)
+        else:
+            raise ValueError("Only MPIArrays or None values are allowed.")
 
-    return (args, dist_axis)
+    return tuple(args)
 
 
 def _create_or_get_dset(group, name, shape, dtype, **kwargs):
@@ -2009,8 +2195,16 @@ class DummyContext:
         return False
 
 
-class AxisException(Exception):
+class AxisException(ValueError):
     """Exception for distributed axes related errors with MPIArrays."""
+
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+
+class UnsupportedOperation(ValueError):
+    """Exception for when an operation cannot be performed with an MPIArray."""
 
     def __init__(self, message):
         self.message = message
