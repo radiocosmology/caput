@@ -203,9 +203,8 @@ result in an exception
 >>> (mpiarray.MPIArray((mpiutil.size, 4), axis=0) -
 ...  mpiarray.MPIArray((mpiutil.size, 4), axis=1))  # doctest: +NORMALIZE_WHITESPACE
 Traceback (most recent call last):
-...
-caput.mpiarray.AxisException: The distributed axis for all MPIArrays in an expression
-should be the same
+    ...
+caput.mpiarray.AxisException: Input argument 1 has an incompatible distributed axis.
 
 Summation across a non-parallel axis
 
