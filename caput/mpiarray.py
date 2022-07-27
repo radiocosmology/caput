@@ -1896,6 +1896,46 @@ class MPIArray(np.ndarray):
         return
 
 
+def zeros(*args, **kwargs) -> MPIArray:
+    """Generate an MPIArray filled with zeros.
+
+    Parameters
+    ----------
+    args, kwargs
+        Arguments passed straight through to the `MPIArray` constructor.
+
+    Returns
+    -------
+    MPIArray
+        The filled MPIArray.
+    """
+
+    arr = MPIArray(*args, **kwargs)
+    arr[:] = 0
+
+    return arr
+
+
+def ones(*args, **kwargs) -> MPIArray:
+    """Generate an MPIArray filled with ones.
+
+    Parameters
+    ----------
+    args, kwargs
+        Arguments passed straight through to the `MPIArray` constructor.
+
+    Returns
+    -------
+    MPIArray
+        The filled MPIArray.
+    """
+
+    arr = MPIArray(*args, **kwargs)
+    arr[:] = 1
+
+    return arr
+
+
 def _partition_sel(sel, split_axis, n, slice_):
     """
     Re-slice a selection along a new axis.

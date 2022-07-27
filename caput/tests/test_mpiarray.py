@@ -824,3 +824,25 @@ def test_slice_npint64():
     assert new_dist_array.shape == (1, 3)
     assert new_dist_array.global_shape == (size, 3)
     assert (new_dist_array[:] == rank).all()
+
+
+def test_mpi_array_fill():
+
+    rank = mpiutil.rank
+    size = mpiutil.size
+
+    arr_zero = mpiarray.zeros((4, size, 17), axis=1, dtype=np.float32)
+    assert (arr_zero == 0).all()
+    assert arr_zero.axis == 1
+    assert arr_zero.global_shape == (4, size, 17)
+    assert arr_zero.shape == (4, 1, 17)
+    assert arr_zero.local_offset == (0, rank, 0)
+    assert arr_zero.dtype == np.float32
+
+    arr_ones = mpiarray.ones((4, size, 17), axis=1, dtype=int)
+    assert (arr_ones == 1).all()
+    assert arr_ones.axis == 1
+    assert arr_ones.global_shape == (4, size, 17)
+    assert arr_ones.shape == (4, 1, 17)
+    assert arr_ones.local_offset == (0, rank, 0)
+    assert arr_ones.dtype == int
