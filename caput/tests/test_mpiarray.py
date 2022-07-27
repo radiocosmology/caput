@@ -638,18 +638,20 @@ def test_ufunc_reduce():
 
     # sum across a smaller numbered axes
     # this will result in an axes reduction
-    dist_array = mpiarray.MPIArray((size, 4, 3), axis=1)
+    dist_array = mpiarray.MPIArray((5, size, 3), axis=1)
     dist_array[:] = rank
 
-    assert (dist_array.sum(axis=0) == 4 * rank).all()
+    sum_array_0 = dist_array.sum(axis=0)
+    assert (sum_array_0 == 5 * rank).all()
 
     # check that the new axes was calculated accordingly
-    assert (dist_array.sum(axis=0)).axis == 0
+    assert sum_array_0.axis == 0
+    assert sum_array_0.global_shape == (size, 3)
 
     assert dist_array.sum(axis=0, keepdims=True).axis == 1
 
     sum_all = dist_array.sum()
-    assert (sum_all == 4 * 3 * rank).all()
+    assert (sum_all == 5 * 3 * rank).all()
 
     assert sum_all.local_shape == (1,)
 

@@ -1827,8 +1827,8 @@ class MPIArray(np.ndarray):
 
         return (
             final_dist_axis,
-            input_.global_shape[final_dist_axis],
-            input_.local_offset[final_dist_axis],
+            input_.global_shape[input_.axis],
+            input_.local_offset[input_.axis],
         )
 
     # pylint: enable=inconsistent-return-statements
