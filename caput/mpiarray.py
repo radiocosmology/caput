@@ -1465,7 +1465,25 @@ class MPIArray(np.ndarray):
 
         return arr
 
+    def copy(self, *args, **kwargs):
+        """Return a copy of the MPIArray.
+
+        Returns
+        -------
+        arr_copy : MPIArray
+        """
+        return MPIArray.wrap(
+            self.view(np.ndarray).copy(*args, **kwargs), axis=self.axis, comm=self.comm
+        )
+
     def ravel(self, *args, **kwargs):
+        """This method is explicitly not implemented and will
+        return a NotImplementedError.
+
+        Raises
+        ------
+        NotImplementedError
+        """
         raise NotImplementedError(
             "Method 'ravel' is not implemented for distributed arrays. "
             "Try using '.local_array'."
@@ -1873,8 +1891,6 @@ class MPIArray(np.ndarray):
             raise AxisException(
                 f"Distributed axis {axis} does not exist in global shape {global_shape}"
             ) from e
-
-        print(global_shape, axis, axlen)
 
         global_shape[axis] = axlen
 

@@ -249,6 +249,26 @@ def test_transpose():
     assert arr4.axis == 2
 
 
+def test_copy():
+    # Test that standard numpy.copy() method works
+    # for MPIArrays
+    size = mpiutil.size
+
+    arr = mpiarray.ones((3, size, 14), axis=1, dtype=np.float32)
+    arr2 = arr.copy()
+
+    assert (arr == arr2).all()
+
+    # Check type
+    assert isinstance(arr2, mpiarray.MPIArray)
+
+    # Check global shape
+    assert arr.global_shape == arr2.global_shape
+
+    # Check axis
+    assert arr2.axis == 1
+
+
 def test_reshape():
 
     gshape = (1, 11, 2, 14)
@@ -848,7 +868,7 @@ def test_mpi_array_fill():
     assert arr_ones.dtype == int
 
 
-def test_ravel():
+def test_call_ravel():
     size = mpiutil.size
 
     arr_ones = mpiarray.ones((4, size, 17), axis=1)
@@ -856,7 +876,7 @@ def test_ravel():
         arr_ones.ravel()
 
 
-def test_median():
+def test_call_median():
     size = mpiutil.size
 
     arr_ones = mpiarray.ones((4, size, 17), axis=1)
