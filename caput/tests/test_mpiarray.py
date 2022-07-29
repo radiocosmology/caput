@@ -860,7 +860,12 @@ def test_median():
     size = mpiutil.size
 
     arr_ones = mpiarray.ones((4, size, 17), axis=1)
-    with pytest.raises(NotImplementedError):
+    # Check that this will fail correctly when trying to
+    # take median across the distributed axis
+    with pytest.raises(mpiarray.AxisException):
         np.median(arr_ones, axis=1)
-    
-    np.median(arr_ones.local_array, axis=1)
+    # Check that the median fails due to .ravel() call
+    with pytest.raises(NotImplementedError):
+        np.median(arr_ones, axis=0)
+    # Check that median call with local array works
+    assert (np.median(arr_ones.local_array, axis=0) == np.ones(arr_ones.shape)).all()

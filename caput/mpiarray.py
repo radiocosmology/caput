@@ -1378,25 +1378,6 @@ class MPIArray(np.ndarray):
 
         return rdata
 
-    # def copy(self, *args, **kwargs):
-    #     """Return a copy of the MPIArray.
-
-    #     Returns
-    #     -------
-    #     arr_copy : MPIArray
-    #     """
-    #     # global_len = len(self.view(np.ndarray)[self.axis])
-    #     # local_start = 0
-
-    #     return MPIArray.wrap(
-    #     # return MPIArray._view_from_data_and_params(
-    #         self.view(np.ndarray).copy(*args, **kwargs), axis=self.axis, 
-    #         # global_length=global_len,
-    #         # local_start=local_start,
-    #         comm=self.comm,
-
-    #     )
-
     def gather(self, rank=0):
         """Gather a full copy onto a specific rank.
 
@@ -1483,6 +1464,12 @@ class MPIArray(np.ndarray):
             arr[tuple(dest_slice)] = tbuf
 
         return arr
+
+    def ravel(self, *args, **kwargs):
+        raise NotImplementedError(
+            "Method 'ravel' is not implemented for distributed arrays. "
+            "Try using '.local_array'."
+        )
 
     def _to_hdf5_serial(self, filename, dataset, create=False):
         """Write into an HDF5 dataset.
@@ -1666,7 +1653,6 @@ class MPIArray(np.ndarray):
         # validates the inputs and arguments are appropriate (same distributed axis
         # etc.), and infers and returns the parameters of the output distributed axis
         # (i.e. it's position, length and the offset on this rank)
-        print(ufunc, method)
 
         _validation_fn = {
             "__call__": self._array_ufunc_call,
