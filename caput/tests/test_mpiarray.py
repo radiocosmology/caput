@@ -846,3 +846,21 @@ def test_mpi_array_fill():
     assert arr_ones.shape == (4, 1, 17)
     assert arr_ones.local_offset == (0, rank, 0)
     assert arr_ones.dtype == int
+
+
+def test_ravel():
+    size = mpiutil.size
+
+    arr_ones = mpiarray.ones((4, size, 17), axis=1)
+    with pytest.raises(NotImplementedError):
+        arr_ones.ravel()
+
+
+def test_median():
+    size = mpiutil.size
+
+    arr_ones = mpiarray.ones((4, size, 17), axis=1)
+    with pytest.raises(NotImplementedError):
+        np.median(arr_ones, axis=1)
+    
+    np.median(arr_ones.local_array, axis=1)
