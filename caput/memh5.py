@@ -1389,7 +1389,14 @@ class MemDatasetDistributed(MemDataset):
         axis : integer
             Axis to distribute over.
         """
-        self._data = self._data.redistribute(axis=axis)
+        if self._storage_root is not None:
+            # This is a view, and we should modify the base dataset
+            base_dset = self._storage_root[self.name]
+            base_dset.redistribute(axis=axis)
+            self._data = base_dset._data
+        else:
+            # This is the the base dataset, call the MPIArray redistribution
+            self._data = self._data.redistribute(axis=axis)
 
     def __getitem__(self, obj):
         return self._data.global_slice[obj]
