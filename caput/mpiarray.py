@@ -414,16 +414,18 @@ class MPIArray(np.ndarray):
 
             if isinstance(dist_axis_index, int):
                 warnings.warn(
-                    "You are indexing directly into the distributed axis."
-                    "Returning a view into the local array."
-                    "Please use global_slice, or .local_array before indexing instead."
+                    "You are indexing directly into the distributed axis "
+                    "returning a view into the local array. "
+                    "Please use global_slice, or .local_array before indexing instead.",
+                    stacklevel=2,
                 )
 
                 return self.local_array.__getitem__(v)
             warnings.warn(
-                "You are directly sub-slicing the distributed axis."
-                "Returning a view into the local array."
-                "Please use global_slice, or .local_array before indexing."
+                "You are directly sub-slicing the distributed axis "
+                "returning a view into the local array. "
+                "Please use global_slice, or .local_array before indexing.",
+                stacklevel=2,
             )
             return self.local_array.__getitem__(v)
 
@@ -1791,7 +1793,8 @@ class MPIArray(np.ndarray):
                         "A ufunc is combining an MPIArray with a numpy array that "
                         "matches exactly the local part of the distributed axis. This "
                         "is very fragile and may fail on other ranks. "
-                        f"Numpy array shape: {inp.shape}; dist axis: {cur_dist_axis}."
+                        f"Numpy array shape: {inp.shape}; dist axis: {cur_dist_axis}.",
+                        stacklevel=3,
                     )
                 elif cur_axis_length != 1:
                     raise AxisException(
