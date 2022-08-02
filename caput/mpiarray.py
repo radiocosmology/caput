@@ -1709,6 +1709,12 @@ class MPIArray(np.ndarray):
         # arrays
         if "out" in kwargs:
             out_args = kwargs.get("out", None)
+            if not all(isinstance(x, MPIArray) for x in out_args):
+                raise TypeError(
+                    "At least one output is not an MPIArray. This can happen if a ufunc "
+                    "is trying to modify a np.ndarray in-place using values from a MPIArray. "
+                    "Try using .local_array or cast the np.ndarray to MPIArray."
+                )
             kwargs["out"] = _mpi_to_ndarray(out_args, only_mpiarray=True)
 
             # Check the distribution of the output arguments makes sense
