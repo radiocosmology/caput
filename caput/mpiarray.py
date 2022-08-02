@@ -1378,17 +1378,6 @@ class MPIArray(np.ndarray):
 
         return rdata
 
-    def copy(self):
-        """Return a copy of the MPIArray.
-
-        Returns
-        -------
-        arr_copy : MPIArray
-        """
-        return MPIArray.wrap(
-            self.view(np.ndarray).copy(), axis=self.axis, comm=self.comm
-        )
-
     def gather(self, rank=0):
         """Gather a full copy onto a specific rank.
 
@@ -1475,6 +1464,30 @@ class MPIArray(np.ndarray):
             arr[tuple(dest_slice)] = tbuf
 
         return arr
+
+    def copy(self, *args, **kwargs):
+        """Return a copy of the MPIArray.
+
+        Returns
+        -------
+        arr_copy : MPIArray
+        """
+        return MPIArray.wrap(
+            self.view(np.ndarray).copy(*args, **kwargs), axis=self.axis, comm=self.comm
+        )
+
+    def ravel(self, *args, **kwargs):
+        """This method is explicitly not implemented and will
+        return a NotImplementedError.
+
+        Raises
+        ------
+        NotImplementedError
+        """
+        raise NotImplementedError(
+            "Method 'ravel' is not implemented for distributed arrays. "
+            "Try using '.local_array'."
+        )
 
     def _to_hdf5_serial(self, filename, dataset, create=False):
         """Write into an HDF5 dataset.
@@ -1658,6 +1671,7 @@ class MPIArray(np.ndarray):
         # validates the inputs and arguments are appropriate (same distributed axis
         # etc.), and infers and returns the parameters of the output distributed axis
         # (i.e. it's position, length and the offset on this rank)
+
         _validation_fn = {
             "__call__": self._array_ufunc_call,
             "accumulate": self._array_ufunc_accumulate,
@@ -1670,7 +1684,6 @@ class MPIArray(np.ndarray):
                 "using `.local_array` to convert to a pure numpy array first, and the "
                 "use `MPIArray.wrap` to reconstruct an MPIArray at the end."
             )
-
         # Where arguments are not supported, except where the value is a simple `True`,
         # which is used as a default
         if "where" in kwargs and not (

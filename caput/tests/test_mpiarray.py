@@ -249,6 +249,26 @@ def test_transpose():
     assert arr4.axis == 2
 
 
+def test_copy():
+    # Test that standard numpy.copy() method works
+    # for MPIArrays
+    size = mpiutil.size
+
+    arr = mpiarray.ones((3, size, 14), axis=1, dtype=np.float32)
+    arr2 = arr.copy()
+
+    assert (arr == arr2).all()
+
+    # Check type
+    assert isinstance(arr2, mpiarray.MPIArray)
+
+    # Check global shape
+    assert arr.global_shape == arr2.global_shape
+
+    # Check axis
+    assert arr2.axis == 1
+
+
 def test_reshape():
 
     gshape = (1, 11, 2, 14)
@@ -846,3 +866,26 @@ def test_mpi_array_fill():
     assert arr_ones.shape == (4, 1, 17)
     assert arr_ones.local_offset == (0, rank, 0)
     assert arr_ones.dtype == int
+
+
+def test_call_ravel():
+    size = mpiutil.size
+
+    arr_ones = mpiarray.ones((4, size, 17), axis=1)
+    with pytest.raises(NotImplementedError):
+        arr_ones.ravel()
+
+
+def test_call_median():
+    size = mpiutil.size
+
+    arr_ones = mpiarray.ones((4, size, 17), axis=1)
+    # Check that this will fail correctly when trying to
+    # take median across the distributed axis
+    with pytest.raises(mpiarray.AxisException):
+        np.median(arr_ones, axis=1)
+    # Check that the median fails due to .ravel() call
+    with pytest.raises(NotImplementedError):
+        np.median(arr_ones, axis=0)
+    # Check that median call with local array works
+    assert (np.median(arr_ones.local_array, axis=0) == np.ones(arr_ones.shape)).all()
