@@ -884,7 +884,7 @@ class MPIArray(np.ndarray):
                 f"rank, but rank={self.comm.rank} has shape-{self.local_shape}."
             )
 
-        result_arr = np.zeros_like(self)
+        result_arr = np.zeros((1,), dtype=self.dtype)
         self.comm.Allreduce(self, result_arr, MPI.SUM if op is None else op)
         return result_arr[0]
 

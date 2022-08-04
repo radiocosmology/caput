@@ -4,6 +4,7 @@ Designed to be run as an MPI job with four processes like::
 
     $ mpirun -np 4 python test_mpiarray.py
 """
+from typing import Union, Any
 import pytest
 from pytest_lazyfixture import lazy_fixture
 import h5py
@@ -11,6 +12,15 @@ import numpy as np
 import zarr
 
 from caput import mpiutil, mpiarray, fileformats
+
+
+def _arange_dtype(N: int, dtype: Union[np.dtype, str]) -> np.ndarray:
+    dtype = np.dtype(dtype)
+
+    if dtype.kind == "U":
+        return np.array([f"{ii}" for ii in range(N)], dtype=dtype)
+    else:
+        return np.arange(N, dtype=dtype)
 
 
 def test_construction():
@@ -29,17 +39,20 @@ def test_construction():
     assert arr.local_shape == (10, l)
 
 
-def test_redistribution():
+@pytest.mark.parametrize(
+    "dtype", [np.int64, np.float32, pytest.param("U16", marks=pytest.mark.xfail)]
+)
+def test_redistribution(dtype):
     """Test redistributing an MPIArray."""
     gshape = (1, 11, 2, 14, 3, 4)
     nelem = np.prod(gshape)
-    garr = np.arange(nelem).reshape(gshape)
+    garr = _arange_dtype(nelem, dtype=dtype).reshape(gshape)
 
     _, s0, e0 = mpiutil.split_local(11)
     _, s1, e1 = mpiutil.split_local(14)
     _, s2, e2 = mpiutil.split_local(4)
 
-    arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
+    arr = mpiarray.MPIArray(gshape, axis=1, dtype=dtype)
     arr[:] = garr[:, s0:e0]
 
     arr2 = arr.redistribute(axis=3)
@@ -49,46 +62,22 @@ def test_redistribution():
     assert (arr3.local_array == garr[:, :, :, :, :, s2:e2]).all()
 
 
-def test_gather():
-    """Test MPIArray.gather()."""
+@pytest.mark.parametrize(
+    "dtype",
+    [np.int64, np.float32, "U16"],
+)
+def test_gather(dtype):
+    """Test MPIArray.gather() including for unicode data which doesn't work natively."""
     rank = mpiutil.rank
     size = mpiutil.size
     block = 2
 
     global_shape = (2, 3, size * block)
-    global_array = np.zeros(global_shape, dtype=np.float64)
-    global_array[..., :] = np.arange(size * block)
+    global_array = np.zeros(global_shape, dtype=dtype)
+    global_array[..., :] = _arange_dtype(size * block, dtype=dtype)
 
-    arr = mpiarray.MPIArray(global_shape, dtype=np.float64, axis=2)
+    arr = mpiarray.MPIArray(global_shape, dtype=dtype, axis=2)
     arr[:] = global_array[..., (rank * block) : ((rank + 1) * block)]
-
-    assert (arr.allgather() == global_array).all()
-
-    gather_rank = 1 if size > 1 else 0
-    ga = arr.gather(rank=gather_rank)
-
-    if rank == gather_rank:
-        assert (ga == global_array).all()
-    else:
-        assert ga is None
-
-
-def test_gather_unicode():
-    """Test MPIArray.gather() for an array of numpy unicode items.
-
-    This test is interesting as mpi4py doesn't really like dealing with the type.
-    """
-    rank = mpiutil.rank
-    size = mpiutil.size
-    block = 2
-
-    global_shape = (2, 3, size * block)
-    global_array = np.ndarray(global_shape, dtype="U16")
-
-    global_array[..., :] = [f"{ii:016d}" for ii in range(size * block)]
-
-    arr = mpiarray.MPIArray(global_shape, dtype="U16", axis=2)
-    arr.local_array[:] = global_array[..., (rank * block) : ((rank + 1) * block)]
 
     assert (arr.allgather() == global_array).all()
 
@@ -450,7 +439,8 @@ def test_global_getslice():
             assert (dslice == nparr).all()
 
         # check that directly slicing a distributed axis returns a local array
-        assert (darr[:, :, 2:3] == darr.local_array[:, :, 2:3]).all()
+        with pytest.warns(UserWarning):
+            assert (darr[:, :, 2:3] == darr.local_array[:, :, 2:3]).all()
 
     # Check ellipsis and slice at the end
     darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
