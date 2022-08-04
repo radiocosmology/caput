@@ -1706,8 +1706,8 @@ class MPIArray(np.ndarray):
             if not all(isinstance(x, MPIArray) for x in out_args):
                 raise TypeError(
                     "At least one output is not an MPIArray. This can happen if a ufunc "
-                    "is trying to modify a np.array in-place using values from a MPIArray. "
-                    "Try using .local_array or cast the np.array to MPIArray."
+                    "is trying to modify a np.ndarray in-place using values from a MPIArray. "
+                    "Try using .local_array or cast the np.ndarray to MPIArray."
                 )
             kwargs["out"] = _mpi_to_ndarray(out_args, only_mpiarray=True)
 
