@@ -73,6 +73,34 @@ def test_gather():
         assert ga is None
 
 
+def test_gather_unicode():
+    """Test MPIArray.gather() for an array of numpy unicode items.
+
+    This test is interesting as mpi4py doesn't really like dealing with the type.
+    """
+    rank = mpiutil.rank
+    size = mpiutil.size
+    block = 2
+
+    global_shape = (2, 3, size * block)
+    global_array = np.ndarray(global_shape, dtype="U16")
+
+    global_array[..., :] = [f"{ii:016d}" for ii in range(size * block)]
+
+    arr = mpiarray.MPIArray(global_shape, dtype="U16", axis=2)
+    arr.local_array[:] = global_array[..., (rank * block) : ((rank + 1) * block)]
+
+    assert (arr.allgather() == global_array).all()
+
+    gather_rank = 1 if size > 1 else 0
+    ga = arr.gather(rank=gather_rank)
+
+    if rank == gather_rank:
+        assert (ga == global_array).all()
+    else:
+        assert ga is None
+
+
 def test_wrap():
     """Test MPIArray.wrap()."""
     ds = mpiarray.MPIArray((10, 17))

@@ -1380,6 +1380,22 @@ class MPIArray(np.ndarray):
 
         return rdata
 
+    @property
+    def _native_type(self) -> bool:
+        """Is this array a type understood by mpi4py."""
+        try:
+            _ = mpiutil.typemap(self.dtype)
+            return True
+        except KeyError:
+            return False
+
+    def _prep_buf(self, x: np.ndarray) -> np.ndarray:
+        """Prepare a buffer for sending/recv by turning into a view of the bytes."""
+        if self._native_type:
+            return x
+        else:
+            return x.view(np.byte).reshape(x.shape + (self.itemsize,))
+
     def gather(self, rank=0):
         """Gather a full copy onto a specific rank.
 
@@ -1393,6 +1409,7 @@ class MPIArray(np.ndarray):
         arr : np.ndarray, or None
             The full global array on the specified rank.
         """
+
         if self.comm.rank == rank:
             arr = np.ndarray(self.global_shape, dtype=self.dtype)
         else:
@@ -1407,14 +1424,14 @@ class MPIArray(np.ndarray):
                 # Construct a temporary array for the data to be received into
                 tshape = list(self.global_shape)
                 tshape[self.axis] = n
-                tbuf = np.ndarray(tshape, dtype=self.dtype)
+                tbuf = np.empty(tshape, dtype=self.dtype)
 
                 # Set up the non-blocking receive request
-                request = self.comm.Irecv(tbuf, source=ri)
+                request = self.comm.Irecv(self._prep_buf(tbuf), source=ri)
 
             # Send the data
             if self.comm.rank == ri:
-                self.comm.Isend(self.view(np.ndarray), dest=rank)
+                self.comm.Isend(self._prep_buf(self.local_array), dest=rank)
 
             if self.comm.rank == rank:
 
@@ -1444,7 +1461,7 @@ class MPIArray(np.ndarray):
         arr : np.ndarray
             The full global array.
         """
-        arr = np.ndarray(self.global_shape, dtype=self.dtype)
+        arr = np.empty(self.global_shape, dtype=self.dtype)
 
         splits = mpiutil.split_all(self.global_shape[self.axis], self.comm)
 
@@ -1456,9 +1473,9 @@ class MPIArray(np.ndarray):
             tbuf = np.ndarray(tshape, dtype=self.dtype)
 
             if self.comm.rank == ri:
-                tbuf[:] = self
+                tbuf[:] = self.local_array
 
-            self.comm.Bcast(tbuf, root=ri)
+            self.comm.Bcast(self._prep_buf(tbuf), root=ri)
 
             # Copy the array into the correct place
             dest_slice = [slice(None)] * len(self.shape)
