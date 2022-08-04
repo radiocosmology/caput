@@ -241,7 +241,7 @@ intermediate pickling process, which can lead to malformed arrays.
 import os
 import time
 import logging
-from typing import Sequence, Tuple, Any, TYPE_CHECKING, Union
+from typing import Sequence, Tuple, Union, Any, TYPE_CHECKING
 import warnings
 
 if TYPE_CHECKING:
@@ -718,17 +718,17 @@ class MPIArray(np.ndarray):
 
         return cls._view_from_data_and_params(array, axis, totallen, local_start, comm)
 
-    def redistribute(self, axis):
+    def redistribute(self, axis: int) -> "MPIArray":
         """Change the axis that the array is distributed over.
 
         Parameters
         ----------
-        axis : integer
+        axis
             Axis to distribute over.
 
         Returns
         -------
-        array : MPIArray
+        array
             A new copy of the array distributed over the specified axis. Note
             that the local section will have changed.
         """
@@ -737,22 +737,8 @@ class MPIArray(np.ndarray):
         if self.axis == axis or self.comm is None:
             return self
 
-        # Test to see if the datatype is one understood by MPI, this can
-        # probably be fixed up at somepoint by creating a datatype of the right
-        # number of bytes
-        try:
-            mpiutil.typemap(self.dtype)
-        except KeyError:
-            if self.comm.rank == 0:
-                import warnings
-
-                warnings.warn(
-                    "Cannot redistribute array of compound datatypes." " Sorry!!"
-                )
-            return self
-
         # Get a view of the array
-        arr = self.view(np.ndarray)
+        arr = self.local_array
 
         if self.comm.size == 1:
             # only one process
@@ -780,8 +766,7 @@ class MPIArray(np.ndarray):
             requests_recv = []
 
             trans_arr = np.empty(new_shape, dtype=arr.dtype)
-            mpitype = mpiutil.typemap(arr.dtype)
-            buffers = list()
+            buffers = []
 
             # Cut out the right blocks of the local array to send around
             blocks = np.array_split(arr, np.insert(eac, 0, sac[0]), axis)[1:]
@@ -799,19 +784,21 @@ class MPIArray(np.ndarray):
                     if self.comm.rank == ir:
                         # Send the message
                         request = self.comm.Isend(
-                            [blocks[ic].flatten(), mpitype], dest=ic, tag=tag
+                            self._prep_buf(np.ascontiguousarray(blocks[ic])),
+                            dest=ic,
+                            tag=tag,
                         )
 
                         requests_send.append([ir, ic, request])
 
                     if self.comm.rank == ic:
-                        buffer_shape = np.asarray(new_shape)
+                        buffer_shape = list(new_shape)
                         buffer_shape[axis] = eac[ic] - sac[ic]
                         buffer_shape[self.axis] = ear[ir] - sar[ir]
-                        buffers.append(np.ndarray(buffer_shape, dtype=arr.dtype))
+                        buffers.append(np.empty(buffer_shape, dtype=arr.dtype))
 
                         request = self.comm.Irecv(
-                            [buffers[ir], mpitype], source=ir, tag=tag
+                            self._prep_buf(buffers[ir]), source=ir, tag=tag
                         )
                         requests_recv.append([ir, ic, request])
 
@@ -1380,21 +1367,21 @@ class MPIArray(np.ndarray):
 
         return rdata
 
-    @property
-    def _native_type(self) -> bool:
-        """Is this array a type understood by mpi4py."""
-        try:
-            _ = mpiutil.typemap(self.dtype)
-            return True
-        except KeyError:
-            return False
+    def _prep_buf(self, x: np.ndarray) -> Tuple[np.ndarray, "MPI.Datatype"]:
+        """Prepare a buffer for sending/recv by mpi4py.
 
-    def _prep_buf(self, x: np.ndarray) -> np.ndarray:
-        """Prepare a buffer for sending/recv by turning into a view of the bytes."""
-        if self._native_type:
-            return x
-        else:
-            return x.view(np.byte).reshape(x.shape + (self.itemsize,))
+        If this is array is a supported datatype it just returns a simple buffer spec,
+        if not, it will create a view of the underlying bytes, and return that alongside
+        an MPI.BYTE datatype.
+        """
+        try:
+            mpi_dtype = mpiutil.typemap(self.dtype)
+            return (x, mpi_dtype)
+        except KeyError:
+            return (
+                x.view(np.byte).reshape(x.shape + (self.itemsize,)),
+                mpiutil.MPI.BYTE,
+            )
 
     def gather(self, rank=0):
         """Gather a full copy onto a specific rank.

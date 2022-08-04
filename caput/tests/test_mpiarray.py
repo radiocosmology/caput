@@ -4,7 +4,7 @@ Designed to be run as an MPI job with four processes like::
 
     $ mpirun -np 4 python test_mpiarray.py
 """
-from typing import Union, Any
+from typing import Union
 import pytest
 from pytest_lazyfixture import lazy_fixture
 import h5py
@@ -40,7 +40,8 @@ def test_construction():
 
 
 @pytest.mark.parametrize(
-    "dtype", [np.int64, np.float32, pytest.param("U16", marks=pytest.mark.xfail)]
+    "dtype",
+    [np.int64, np.float32, "U16"],
 )
 def test_redistribution(dtype):
     """Test redistributing an MPIArray."""
