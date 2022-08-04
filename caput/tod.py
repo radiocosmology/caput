@@ -579,6 +579,7 @@ def _copy_non_time_data(
     # datasets, and which are items we need to copy
     to_copy = []
     stack = [data]
+
     while stack:
 
         entry = stack.pop()
@@ -608,9 +609,9 @@ def _copy_non_time_data(
                 target = out if entry.name == "/" else out.require_group(entry.name)
             else:
                 arr = (
-                    memh5.ensure_unicode(entry.data)
+                    memh5.ensure_unicode(entry[:])
                     if convert_dataset_strings
-                    else entry.data
+                    else entry[:]
                 )
                 target = out.create_dataset(
                     entry.name,
@@ -632,8 +633,9 @@ def _dset_has_axis(entry: Any, axes: Tuple[str]) -> bool:
     if memh5.is_group(entry):
         return False
 
-    # Assume is a dataset
-    dset_axes = entry.attrs.get("axis", ())
+    # Assume is a dataset. We need to ensure the output strings are Unicode as h5py may
+    # return them as byte strings if the input is an h5py.Dataset
+    dset_axes = memh5.bytes_to_unicode(entry.attrs.get("axis", ()))
 
     return len(set(dset_axes).intersection(axes)) > 0
 
