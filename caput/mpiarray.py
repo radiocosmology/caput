@@ -575,6 +575,82 @@ class MPIArray(np.ndarray):
         """
         return self.view(np.ndarray)
 
+    def right_pad(self, n: int) -> np.ndarray:
+        """
+        Array of n adjacent indices along the distributed
+        axis from the right/upper adjacent ranks. Any empty values
+        are filled with NaN.
+
+        Returns
+        -------
+        right_pad : np.ndarray
+            [..., n, ...] slice from right-adjacent ranks along
+            distributed axis, filled with 'NaN's where no values
+            found.
+        """
+        # Get the shape of the pad array and fill with nan
+        pad_shape = list(self.local_shape)
+        pad_shape[self.axis] = n
+        pad = np.full(pad_shape, np.nan, dtype=self.dtype)
+
+        # Get the global index of the adjacent rank
+        rel = self.local_offset[self.axis] + self.local_shape[self.axis]
+
+        # Get a global slice of n rows in the adjacent ranks.
+        # If this is the top rank, the array will be empty.
+        sl = [slice(None)] * len(self.shape)
+        sl[self.axis] = slice(rel, min(rel + n, self.global_shape[self.axis]))
+        pad_fill = self.global_slice[sl]
+
+        # If values were found from adjacent ranks, fill the nan
+        # array with as many as possible.
+        if pad_fill:
+            sl = [slice(None)] * len(pad.shape)
+            sl[self.axis] = slice(0, min(pad.shape, pad_fill.shape)[self.axis])
+            pad[tuple(sl)] = pad_fill
+
+        return pad
+
+    def left_pad(self, n: int) -> np.ndarray:
+        """
+        Array of the n adjacent indices along the distributed
+        axis from the left/lower adjacent ranks. Any empty values
+        are filled with NaN.
+
+        Returns
+        -------
+        left_pad : np.ndarray
+            [..., n, ...] slice from left-adjacent ranks along
+            distributed axis, filled with 'NaN's where no values
+            found.
+        """
+        # Get the shape of the pad array and fill with nan
+        pad_shape = list(self.local_shape)
+        pad_shape[self.axis] = n
+        pad = np.full(pad_shape, np.nan, dtype=self.dtype)
+
+        # Get the highest global index of the adjacent rank. Note
+        # that this is technically the first index of the local rank.
+        rel = self.local_offset[self.axis]
+
+        # Get a global slice of n rows in the adjacent ranks.
+        # If this is the bottom rank, the array wil be empty.
+        sl = [slice(None)] * len(self.shape)
+        sl[self.axis] = slice(max(0, rel - n), rel)
+        pad_fill = self.global_slice[sl]
+
+        # If values were found from adjacent ranks, fill the nan
+        # array with as many as possible.
+        if pad_fill:
+            sl = [slice(None)] * len(pad.shape)
+            sl[self.axis] = slice(
+                pad.shape[self.axis] - min(pad.shape, pad_fill.shape)[self.axis],
+                pad.shape[self.axis],
+            )
+            pad[tuple(sl)] = pad_fill
+
+        return pad
+
     @property
     def comm(self):
         """
