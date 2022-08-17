@@ -576,6 +576,22 @@ class MPIArray(np.ndarray):
         return self.view(np.ndarray)
 
     @property
+    def local_bounds(self) -> slice:
+        """
+        Global bounds of the local array along the
+        distributed axis.
+
+        Returns
+        -------
+        local_bounds
+        """
+
+        return slice(
+            self.local_offset[self.axis],
+            self.local_offset[self.axis] + self.local_shape[self.axis],
+        )
+
+    @property
     def comm(self):
         """
         The communicator over which the array is distributed.
