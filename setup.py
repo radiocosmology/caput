@@ -65,7 +65,7 @@ setup(
         "mpi": ["mpi4py>=1.3"],
         "compression": [
             "bitshuffle",
-            "numcodecs==0.7.3",
+            "numcodecs>=0.7.3",
             "zarr==2.8.1",
         ],
         "profiling": ["psutil", "pyinstrument"],
