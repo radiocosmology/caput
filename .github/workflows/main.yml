@@ -62,7 +62,7 @@ jobs:
         pip install h5py
         pip install -r requirements.txt
         pip install zarr==2.8.1
-        pip install mpi4py numcodecs==0.7.3 bitshuffle
+        pip install mpi4py numcodecs>=0.7.3 bitshuffle
         pip install pytest pytest-lazy-fixture
         python setup.py develop
 
