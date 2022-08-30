@@ -756,12 +756,17 @@ class MPIArray(np.ndarray):
         # Get a view of the array
         arr = self.local_array
 
+        # Create a new MPIArray object out of the data
+        dist_arr = MPIArray(
+            self.global_shape, axis=axis, dtype=self.dtype, comm=self.comm
+        )
+
         if self.comm.size == 1:
             # only one process
             if arr.shape[self.axis] == self.global_shape[self.axis]:
                 # We are working on a single node and being asked to do
                 # a trivial transpose.
-                trans_arr = arr.copy()
+                dist_arr.local_array[:] = arr.copy()
 
             else:
                 raise ValueError(
@@ -769,19 +774,21 @@ class MPIArray(np.ndarray):
                     % (self.global_shape, self.shape)
                 )
         else:
+            # Get the size of the local array block on the target axis
             pc, _, _ = mpiutil.split_local(arr.shape[axis], comm=self.comm)
+            # Get the start and end of each subrange on the distributed axis
             _, sar, ear = mpiutil.split_all(
                 self.global_shape[self.axis], comm=self.comm
             )
+            # Get the start and end of each subrange on the target axis
             _, sac, eac = mpiutil.split_all(arr.shape[axis], comm=self.comm)
 
+            # Get the new target local shape
             new_shape = np.asarray(self.global_shape)
             new_shape[axis] = pc
 
             requests_send = []
             requests_recv = []
-
-            trans_arr = np.empty(new_shape, dtype=arr.dtype)
             buffers = []
 
             # Cut out the right blocks of the local array to send around
@@ -835,8 +842,7 @@ class MPIArray(np.ndarray):
 
             self.comm.Barrier()
 
-            # For each frequency iterate over all receives and wait until
-            # completion
+            # For each node iterate over all receives and wait until completion
             for ir, ic, request in requests_recv:
 
                 stat = mpiutil.MPI.Status()
@@ -849,14 +855,8 @@ class MPIArray(np.ndarray):
                         f"{self.comm.rank}) *****"
                     )
 
-            # Put together the blocks we received
-            np.concatenate(buffers, self.axis, trans_arr)
-
-        # Create a new MPIArray object out of the data
-        dist_arr = MPIArray(
-            self.global_shape, axis=axis, dtype=self.dtype, comm=self.comm
-        )
-        dist_arr[:] = trans_arr
+            # Put together the blocks we received directly into the new array
+            np.concatenate(buffers, axis=self.axis, out=dist_arr.view(np.ndarray))
 
         return dist_arr
 
