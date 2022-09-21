@@ -2237,7 +2237,7 @@ class BasicCont(MemDiskGroup):
                     # Try processing if this is a string
                     if isinstance(axis, str):
                         if "axis" in item.attrs and axis in item.attrs["axis"]:
-                            axis = np.argwhere(item.attrs["axis"] == axis)[0, 0]
+                            axis = list(item.attrs["axis"]).index(axis)
                         else:
                             continue
 
