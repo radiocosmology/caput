@@ -1025,12 +1025,10 @@ class MPIArray(np.ndarray):
         sel[axis] = _reslice(sel[axis], dshape[axis], slice(lstart, lend))
         sel = tuple(sel)
 
-        # Split the axis to get the IO size under ~2GB (only if MPI-IO)
-        split_axis, partitions = dist_arr._partition_io(
-            skip=file_format == fileformats.HDF5 and not fh.is_mpi
-        )
-
         if file_format == fileformats.HDF5:
+            # Split the axis to get the IO size under ~2GB (only if MPI-IO)
+            split_axis, partitions = dist_arr._partition_io(skip=(not fh.is_mpi))
+
             # Check that there are no null slices, otherwise we need to turn off
             # collective IO to work around an h5py issue (#965)
             no_null_slices = dist_arr.global_shape[axis] >= dist_arr.comm.size
@@ -1057,11 +1055,8 @@ class MPIArray(np.ndarray):
             if fh.opened:
                 fh.close()
         else:
-            for part in partitions:
-                islice, fslice = _partition_sel(
-                    sel, split_axis, dshape[split_axis], part
-                )
-                dist_arr[fslice] = dset[islice]
+            # If using zarr we can directly read the full dataset into the final array
+            dset.get_basic_selection(sel, out=dist_arr)
 
         return dist_arr
 
