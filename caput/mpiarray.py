@@ -1594,10 +1594,10 @@ class MPIArray(np.ndarray):
 
         threshold_bytes = threshold * 2**30
         largest_size = self.comm.allreduce(self.nbytes, op=MPI.MAX)
-        num_split = int(np.ceil(largest_size / threshold_bytes))
+        min_axis_size = int(np.ceil(largest_size / threshold_bytes))
 
         # Return early if we can
-        if skip or num_split == 1:
+        if skip or min_axis_size == 1:
             return 0, [slice(0, self.local_shape[0])]
 
         if self.ndim == 1:
@@ -1605,7 +1605,10 @@ class MPIArray(np.ndarray):
 
         # Try and find the axis to split over
         for split_axis in range(self.ndim):
-            if split_axis != self.axis and self.global_shape[split_axis] >= num_split:
+            if (
+                split_axis != self.axis
+                and self.global_shape[split_axis] >= min_axis_size
+            ):
                 break
         else:
             raise RuntimeError(
@@ -1614,12 +1617,20 @@ class MPIArray(np.ndarray):
                 % (threshold, self.global_shape, self.axis)
             )
 
-        logger.debug("Splitting along axis %i, %i ways", split_axis, num_split)
+        axis_length = self.global_shape[split_axis]
+        slice_length = axis_length // min_axis_size
+        boundaries = list(range(0, axis_length + 1, slice_length))
 
-        # Figure out the start and end of the splits and return
-        _, starts, ends = mpiutil.split_m(self.global_shape[split_axis], num_split)
+        # Add the axis length at the end (if required) so we can can construct the start
+        # end pairs
+        if boundaries[-1] != axis_length:
+            boundaries.append(axis_length)
 
-        slices = [slice(start, end) for start, end in zip(starts, ends)]
+        # Construct the set of slices to apply
+        slices = [slice(s, e) for s, e in zip(boundaries[:-1], boundaries[1:])]
+
+        logger.debug("Splitting along axis %i, %i ways", split_axis, len(slices))
+
         return split_axis, slices
 
     # pylint: disable=inconsistent-return-statements
