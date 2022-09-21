@@ -974,13 +974,17 @@ class MPIArray(np.ndarray):
             # Read the file. Opening with MPI if requested, and we can
             fh = misc.open_h5py_mpi(f, "r", use_mpi=use_mpi, comm=comm)
         elif file_format == fileformats.Zarr:
-            # Blosc may share incorrect global state amongst processes causing programs to hang.
-            # See https://zarr.readthedocs.io/en/stable/tutorial.html#parallel-computing-and-synchronization
             try:
-                import numcodecs
+                import numcodecs  # noqa: F401
             except ImportError:
                 raise RuntimeError("Install numcodecs to read from zarr files.")
-            numcodecs.blosc.use_threads = False
+
+            # NOTE: blosc may share incorrect global state amongst processes causing programs to hang.
+            # See https://zarr.readthedocs.io/en/stable/tutorial.html#parallel-computing-and-synchronization
+            # I think this has now been resolved
+            # (https://github.com/zarr-developers/numcodecs/pull/42), so I'm
+            # reenabling threads, but we should be careful
+            # numcodecs.blosc.use_threads = False
 
             if isinstance(f, str):
                 fh = file_format.open(f, "r")
@@ -1184,16 +1188,18 @@ class MPIArray(np.ndarray):
         """
         try:
             import zarr
-            import numcodecs
+            import numcodecs  # noqa: F401
         except ImportError as err:
             raise RuntimeError(
                 f"Can't write to zarr file. Please install zarr and numcodecs: {err}"
             )
 
-        # Blosc may share incorrect global state amongst processes causing programs to
-        # hang.
+        # NOTE: blosc may share incorrect global state amongst processes causing programs to hang.
         # See https://zarr.readthedocs.io/en/stable/tutorial.html#parallel-computing-and-synchronization
-        numcodecs.blosc.use_threads = False
+        # I think this has now been resolved
+        # (https://github.com/zarr-developers/numcodecs/pull/42), so I'm
+        # reenabling threads, but we should be careful
+        # numcodecs.blosc.use_threads = False
 
         mode = "a" if create else "r+"
         extra_args = fileformats.Zarr.compression_kwargs(
