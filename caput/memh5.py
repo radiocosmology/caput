@@ -2661,6 +2661,7 @@ def _distributed_group_to_file(
             dest.attrs["__memh5_distributed_dset"] = False
         elif isinstance(source, MemDatasetDistributed):
             dest.attrs["__memh5_distributed_dset"] = True
+            dest.attrs["__memh5_distributed_axis"] = source.distributed_axis
 
     # Walk the full structure and separate out what we need to write
     if comm.rank == 0:
