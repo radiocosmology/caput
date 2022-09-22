@@ -299,15 +299,19 @@ appropriate dictionary); and then added to the pipeline using the
 To inject products into the pipeline, use the :class:`~Input` and supply it an
 iterator as an argument. Each item will be fed into the pipeline one by one. To take
 outputs from the pipeline, simply use the :class:`~Output` task. By default this
-simply saves everything it receives into a list, but it can be given a callback
-function to apply processing to each argument in turn.
+simply saves everything it receives into a list (which can be accessed via the task's
+`outputs` attribute, e.g. with `save_output.outputs` after running the example below),
+but it can be given a callback function to apply processing to each argument in turn.
 
 >>> m = Manager()
 >>> m.add_task(Input(["platypus", "dinosaur"]), out="key1")
 >>> cook = CookEggs()
 >>> cook.style = "coddled"
 >>> m.add_task(cook, in_="key1")
->>> m.add_task(Output(lambda x: print("I love %s eggs!" % x)), in_="key1")
+>>> save_output = Output()
+>>> m.add_task(save_output, in_="key1")
+>>> print_output = Output(lambda x: print("I love %s eggs!" % x))
+>>> m.add_task(print_output, in_="key1")
 >>> m.run()
 Setting up CookEggs.
 Cooking coddled platypus eggs.
