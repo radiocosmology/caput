@@ -450,8 +450,13 @@ def moving_weighted_median(data, weights, size, method="split"):
     if data.ndim == 2:
         if any(np.asarray(size) % 2 == 0):
             raise ValueError('Need an uneven window size (got {}).'.format(size))
-
-        return _mwm_2D(data, weights, size, c_method)
+        # Window moves along column rather than row, so if the window size 
+        # in dim 1 is larger than dim 0 this will run significantly faster
+        # on the transposed array
+        if size[0] < size[1]:
+            return _mwm_2D(data.T, weights.T, tuple(reversed(size)), c_method).T
+        else:
+            return _mwm_2D(data, weights, size, c_method)
     raise NotImplementedError('weighted_median() is only implemented for 1 and 2 dimensions, not {}'
                          .format(data.ndim))
 
