@@ -355,20 +355,32 @@ def weighted_median(A, W, method="split"):
 
 def _check_arrays(data, weights):
 
-    # make sure this is numpy arrays
+    # make sure these are numpy arrays
     if not isinstance(data, np.ndarray):
         data = np.array(data, dtype=np.float64)
     if not isinstance(weights, np.ndarray):
         weights = np.array(weights, dtype=np.float64)
 
-    if data.dtype != np.dtype(np.float64):
-        raise ValueError('Expected data to be numpy.float64 (got {}).'.format(data.dtype))
-    if weights.dtype != np.dtype(np.float64):
-        raise ValueError('Expected weights to be numpy.float64 (got {}).'
-                         .format(weights.dtype))
+    # Ensure data is numeric
+    if not np.issubdtype(data.dtype, np.number):
+        raise ValueError(
+            f"Data must be a subdtype of numpy.number (got {data.dtype})"
+        )
+    if not np.issubdtype(weights.dtype, np.number):
+        raise ValueError(
+            f"Weights must be a subdtype of numpy.number (got {weights.dtype})"
+        )
+    # Ensure data is not complex
+    if np.iscomplexobj(data):
+        raise ValueError(f"Data must be real (got {data.dtype})")
+    if np.iscomplexobj(weights):
+        raise ValueError(f"Weights must be real (got {weights.dtype})")
+
     if data.ndim != weights.ndim:
-        raise ValueError('Expected data and weights to have same dimensions (is {} and {}).'
-                         .format(data.ndim, weights.ndim))
+        raise ValueError(
+            f"Expected data and weights to have same dimensions "
+            f"(is {data.ndim} and {weights.ndim})."
+        )
 
     return data, weights
 
@@ -444,7 +456,7 @@ def moving_weighted_median(data, weights, size, method="split"):
                          .format(data.ndim))
 
 
-def _mwm_1D(np.ndarray[np.float64_t, ndim=1] data, np.ndarray[np.float64_t, ndim=1] weights, size,
+def _mwm_1D(np.ndarray[data_t, ndim=1] data, np.ndarray[weight_t, ndim=1] weights, size,
             method):
 
     cdef Py_ssize_t len_data = data.shape[0]
@@ -490,7 +502,7 @@ def _mwm_1D(np.ndarray[np.float64_t, ndim=1] data, np.ndarray[np.float64_t, ndim
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
-def _mwm_2D(np.ndarray[np.float64_t, ndim=2] data, np.ndarray[np.float64_t, ndim=2] weights, size,
+def _mwm_2D(np.ndarray[data_t, ndim=2] data, np.ndarray[weight_t, ndim=2] weights, size,
             char method):
 
     # The 2D moving window goes through the matrix row-by-row, to simplify keeping track of
