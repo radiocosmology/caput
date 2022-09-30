@@ -66,7 +66,7 @@ setup(
         "compression": [
             "bitshuffle",
             "numcodecs>=0.7.3",
-            "zarr==2.8.1",
+            "zarr>=2.11.0",
         ],
         "profiling": ["psutil", "pyinstrument"],
     },
