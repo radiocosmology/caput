@@ -3,7 +3,9 @@
 import datetime
 import gc
 import json
+from pathlib import Path
 import warnings
+from zipfile import ZipFile
 
 import h5py
 import numpy as np
@@ -101,11 +103,26 @@ def filled_h5_file(h5_file):
 
 @pytest.fixture
 def filled_zarr_file(zarr_file):
-    """Provides an H5 file with some content."""
+    """Provides a .zarr file with some content."""
     with zarr.open_group(zarr_file, "w") as f:
         fill_test_file(f)
-    f["level1"]["level2"].attrs["small"] = [0, 1, 2]
+        f["level1"]["level2"].attrs["small"] = [0, 1, 2]
     yield zarr_file
+
+
+@pytest.fixture
+def filled_zarrzip_file(filled_zarr_file):
+    """Provides a .zarr.zip file with some content."""
+
+    zarrzip_file = filled_zarr_file + ".zip"
+
+    zp = Path(filled_zarr_file)
+    with ZipFile(zarrzip_file, "w", compresslevel=0) as zfh:
+        for f in zp.rglob("*"):
+            arcname = str(f.relative_to(zp))
+            zfh.write(f, arcname=arcname)
+
+    yield zarrzip_file
 
 
 def assertGroupsEqual(a, b):
@@ -152,8 +169,10 @@ def test_file_sanity(test_file, file_open_function):
     [
         (lazy_fixture("filled_h5_file"), h5py.File, None),
         (lazy_fixture("filled_zarr_file"), zarr.open_group, None),
+        (lazy_fixture("filled_zarrzip_file"), zarr.open_group, None),
         (lazy_fixture("filled_h5_file"), h5py.File, fileformats.HDF5),
         (lazy_fixture("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
+        (lazy_fixture("filled_zarrzip_file"), zarr.open_group, fileformats.Zarr),
     ],
 )
 def test_to_from_file(test_file, file_open_function, file_format):
@@ -328,11 +347,28 @@ def zarr_basiccont_file(zarr_file, history_dict):
     yield zarr_file, history_dict
 
 
+@pytest.fixture
+def zarrzip_basiccont_file(zarr_basiccont_file):
+    """Provides a BasicCont file as .zarr.zip."""
+    zarr_file, history_dict = zarr_basiccont_file
+
+    zarrzip_file = zarr_file + ".zip"
+
+    zp = Path(zarr_file)
+    with ZipFile(zarrzip_file, "w", compresslevel=0) as zfh:
+        for f in zp.rglob("*"):
+            arcname = str(f.relative_to(zp))
+            zfh.write(f, arcname=arcname)
+
+    yield zarrzip_file, history_dict
+
+
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
         (lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
         (lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
+        (lazy_fixture("zarrzip_basiccont_file"), fileformats.Zarr),
     ],
 )
 def test_access(test_file, file_format):
