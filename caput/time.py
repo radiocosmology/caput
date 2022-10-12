@@ -1076,7 +1076,6 @@ class SkyfieldWrapper:
 
         try:
             self._timescale = self.load.timescale(builtin=False)
-            return self._timescale
         except IOError:
             warnings.warn(
                 "Could not get timescale data from an official source. Trying the "
@@ -1086,6 +1085,7 @@ class SkyfieldWrapper:
             try:
                 for file in timescale_files:
                     self.load.download(self.mirror_url + file)
+
                 self._timescale = self.load.timescale(builtin=False)
             except IOError as e:
                 raise IOError(
@@ -1096,6 +1096,8 @@ class SkyfieldWrapper:
                     '`caput.time.skyfield_wrapper.load.download("<mirror_url>") '
                     "to download directly."
                 ) from e
+
+        return self._timescale
 
     _ephemeris = None
 
