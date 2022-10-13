@@ -221,7 +221,7 @@ def guess_file_format(name, default=HDF5):
 
     Parameters
     ----------
-    name : str
+    name : str or pathlib.Path
         File name.
     default : FileFormat or None
         Fallback value if format can't be guessed. Default `fileformats.HDF5`.
@@ -232,6 +232,9 @@ def guess_file_format(name, default=HDF5):
         File format guessed.
     """
     import pathlib
+
+    if isinstance(name, pathlib.Path):
+        name = str(name)
 
     if name.endswith(".zarr.zip"):
         return Zarr
