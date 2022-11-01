@@ -16,7 +16,7 @@ ctypedef fused real_or_complex:
 @cython.wraparound(False)
 @cython.boundscheck(False)
 @cython.cdivision(True)
-cpdef invert_no_zero(real_or_complex [:] array, real_or_complex [:] out):
+cpdef _invert_no_zero(real_or_complex [:] array, real_or_complex [:] out):
 
     cdef bint cond
     cdef Py_ssize_t i = 0
