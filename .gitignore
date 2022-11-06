@@ -7,6 +7,9 @@
 # C extensions
 *.so
 
+# Data files
+caput/data/
+
 # Packages
 *.egg
 *.egg-info
