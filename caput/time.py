@@ -228,6 +228,10 @@ class Observer:
 
     _obs = None
 
+    def get_current_lsd(self) -> float:
+        """Get the current LSD."""
+        return self.lsd(datetime_to_unix(datetime.utcnow())).astype(np.float64)
+
     def skyfield_obs(self):
         """Create a Skyfield topos object for the current location.
 
