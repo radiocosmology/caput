@@ -1,5 +1,6 @@
 """ Collection of assorted tools.
 """
+from typing import Iterable
 
 import numpy as np
 from caput._fast_tools import _invert_no_zero
@@ -45,3 +46,23 @@ def invert_no_zero(x, out=None):
     )
 
     return out
+
+
+def unique_ordered(x: Iterable) -> list:
+    """Take unique values from an iterable with order preserved.
+
+    Parameters
+    ----------
+    x : Iterable
+        An iterable to get unique values from
+
+    Returns
+    -------
+    unique : list
+        unique items in x with order preserved
+    """
+    seen = set()
+    # So the method is only resolved once
+    seen_add = seen.add
+
+    return [i for i in x if not (i in seen or seen_add(i))]
