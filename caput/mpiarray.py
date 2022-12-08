@@ -1435,7 +1435,18 @@ class MPIArray(np.ndarray):
 
             # Send the data
             if self.comm.rank == ri:
-                self.comm.Isend(self._prep_buf(self.local_array), dest=rank)
+                request = self.comm.Isend(self._prep_buf(self.local_array), dest=rank)
+
+                # Wait until the data has been sent
+                stat = mpiutil.MPI.Status()
+                request.Wait(status=stat)
+
+                if stat.error != mpiutil.MPI.SUCCESS:
+                    logger.error(
+                        "**** ERROR in MPI SEND (source: %i,  dest rank: %i) *****",
+                        ri,
+                        rank,
+                    )
 
             if self.comm.rank == rank:
 
