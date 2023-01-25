@@ -1163,8 +1163,6 @@ class _OneAndOne(TaskBase):
     input_root = config.Property(default="None", proptype=str)
     output_root = config.Property(default="None", proptype=str)
     output_format = config.file_format()
-    output_compression = config.Property(default=None, proptype=str)
-    output_compression_opts = config.Property(default=None)
 
     def __init__(self):
         # Inspect the `process` method to see how many arguments it takes.
@@ -1274,8 +1272,6 @@ class _OneAndOne(TaskBase):
                 output_filename,
                 output,
                 file_format=self.output_format,
-                compression=self.output_compression,
-                compression_opts=self.output_compression_opts,
             )
         return output
 
