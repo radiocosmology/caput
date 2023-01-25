@@ -81,6 +81,10 @@ class HDF5(FileFormat):
     @staticmethod
     def open(*args, **kwargs):
         """Open an HDF5 file using h5py."""
+        # H5py versions >= 2.7.0 can't handle compression= passed as an arg to File().
+        if "compression" in kwargs:
+            _ = kwargs.pop("compression", None)
+            _ = kwargs.pop("compression_opts", None)
         return h5py.File(*args, **kwargs)
 
     @staticmethod
