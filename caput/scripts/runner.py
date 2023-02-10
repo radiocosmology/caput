@@ -83,6 +83,9 @@ def load_venv(configfile):
         click.echo("Path defined in 'cluster'/'venv' doesn't exist ({})".format(base))
         sys.exit(1)
 
+    if (base.parent / "code").exists():
+        _load_venv_egg(base.parent / "code")
+
     site_packages = base / "lib" / "python{}".format(sys.version[:3]) / "site-packages"
     prev_sys_path = list(sys.path)
 
@@ -95,7 +98,18 @@ def load_venv(configfile):
         if item not in prev_sys_path:
             new_sys_path.append(item)
             sys.path.remove(item)
+
     sys.path[:0] = new_sys_path
+
+
+def _load_venv_egg(codepath):
+    """Directly oad the venv code under cluster/venv in the given
+    configfile, where the venv uses egg links. Modifies sys.path.
+    """
+
+    packages = [f.path for f in os.scandir(codepath) if f.is_dir()]
+    sys.path = packages + sys.path
+
 
 
 @cli.command()
