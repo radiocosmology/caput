@@ -2205,10 +2205,22 @@ class BasicCont(MemDiskGroup):
         index_map : read only dictionary
             Entries are 1D arrays used to interpret the axes of datasets.
         """
-        out = {}
-        for name, value in self._data["index_map"].items():
-            out[name] = value[:]
-        return ro_dict(out)
+        return ro_dict({k: v[:] for k, v in self._data["index_map"].items()})
+
+    @property
+    def index_attrs(self):
+        """Exposes the attributes of each index_map entry.
+
+        Allows the user to implement custom behaviour associated with
+        the axis. Assignment to this dictionary does nothing but it does
+        allow attribute values to be changed.
+
+        Returns
+        -------
+        index_attrs : read-write dict
+            Attribute dicts for each index_map entry
+        """
+        return ro_dict({k: v.attrs for k, v in self._data["index_map"].items()})
 
     @property
     def reverse_map(self):
