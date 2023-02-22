@@ -62,6 +62,10 @@ def test_redistribution(dtype):
     arr3 = arr.redistribute(axis=5)
     assert (arr3.local_array == garr[:, :, :, :, :, s2:e2]).all()
 
+    assert arr.local_array.flags.c_contiguous
+    assert arr2.local_array.flags.c_contiguous
+    assert arr3.local_array.flags.c_contiguous
+
 
 @pytest.mark.parametrize(
     "dtype",
