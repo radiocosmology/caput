@@ -6,6 +6,8 @@
 
 # C extensions
 *.so
+*.c
+*.cpp
 
 # Data files
 caput/data/
