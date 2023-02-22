@@ -18,6 +18,9 @@ instead of::
 
 import logging
 import sys
+import os
+import re
+import psutil
 import time
 import warnings
 from types import ModuleType
@@ -41,6 +44,7 @@ try:
 
     _comm = MPI.COMM_WORLD
     world = _comm
+    world_scomm = _comm.Split_type(MPI.COMM_TYPE_SHARED)
 
     rank = _comm.Get_rank()
     size = _comm.Get_size()
@@ -135,6 +139,131 @@ def close(aprocs):
     if rank0:
         for i in list(set(range(size)) - set(aprocs)):
             _comm.isend(_close_message(), dest=i)
+
+
+def can_allocate(
+    nbytes: int,
+    scope: str = "shared",
+    comm: "MPI.Intracomm" = _comm,
+    scomm: "MPI.Intracomm" = None,
+) -> bool:
+    """Check if nbytes of memory is available to allocate.
+
+    nbytes can be the number of bytes allocated per process,
+    number of bytes allocated in all shared memory, or number of
+    bytes allocated globally when there are processes which do
+    not share memory.
+
+    Parameters
+    ----------
+    nbytes
+        number of bytes that we want to allocate
+    scope
+        whether to find available memory on a global, per-node, or
+        per-process basis
+    comm
+        MPI communicator
+    scomm
+        MPI shared memory communicator
+
+    Returns
+    -------
+    available
+        True if there is enough memory available
+    """
+    # Shared memory comm is used to communicate only between
+    # processes on the same node.
+    if scomm is None:
+        if comm is world:
+            scomm = world_scomm
+        else:
+            scomm = comm.Split_type(MPI.COMM_TYPE_SHARED)
+
+    try:
+        available_memory_node = available_memory_shared()
+    except Exception as e:
+        # We probably don't want this to fail if it can't get the available
+        # memory, but it should definitey warn about it
+        warnings.warn(f"Unable to check available memory: {repr(e)}", RuntimeWarning)
+        return True
+
+    if scope == "shared":
+        can_alloc = nbytes < available_memory_node
+
+    elif scope == "process":
+        # Get all memory desired in the shared space. If only
+        # some subset of all processes are trying to allocate
+        # memory they will be allowed to do so
+        nbytes = scomm.allreduce(np.array(nbytes), op=MPI.SUM)
+
+        can_alloc = nbytes < available_memory_node
+
+    elif scope == "global":
+        available = np.array(available_memory_node) // scomm.size
+
+        can_alloc = nbytes < comm.allreduce(available, op=MPI.SUM)
+
+    else:
+        raise ValueError(
+            f"Scope must be one of (process, shared, global). Got {scope}."
+        )
+
+    return can_alloc
+
+
+def available_memory_shared() -> int:
+    """Shared memory in bytes available to a process.
+
+    If the process is controlled by a cgroup, cgroup memory
+    allocations are used. Assumes that all processes are part
+    of the same cgroup.
+
+    Returns
+    -------
+    available
+        Memory available in bytes
+
+    Raises
+    ------
+    OSError
+    """
+    # These files aren't very big so we can just read the whole thing
+    try:
+        cgrouptxt = open(f"/proc/{os.getpid()}/cgroup").read()
+    except FileNotFoundError:
+        # No cgroup file means no cgroup
+        return psutil.virtual_memory().available
+    except OSError as e:
+        # This could happen for a number of reasons, but since it
+        # wasn't a non-existant file that triggered it it should
+        # be handled differently
+        raise OSError("Failed to get cgroup file information") from e
+
+    # This should only find anything if the process is in a v1 cgroup
+    cgroup = re.findall(r"(?<=memory:).*", cgrouptxt)
+    cgroup = cgroup[0].strip() if cgroup else "/"
+
+    if cgroup == "/":
+        # No cgroup or a v2 cgroup
+        return psutil.virtual_memory().available
+
+    # Look at memory.stat file for the current process.
+    # This should only be reached if the process is in a v1 cgroup
+    try:
+        memorystat = open(f"/sys/fs/cgroup/memory/{cgroup}/memory.stat").read()
+        mem_used = open(f"/sys/fs/cgroup/memory/{cgroup}/memory.usage_in_bytes").read()
+    except OSError as e:
+        # It doesn't really matter why this failed but it should inform
+        # about failure. This probably shouldn't happen anyway
+        raise OSError(f"Failed to get memory info for cgroup {cgroup}") from e
+
+    # Memory limit imposed on the cgroup
+    mem_limit = re.findall(r"(?<=hierarchical_memory_limit).*", memorystat)
+    mem_limit = int(mem_limit[0].strip()) if mem_limit else 0
+    # Approximate memory used by the cgroup
+    mem_used = int(mem_used)
+
+    return mem_limit - mem_used
 
 
 def partition_list(full_list, i, n, method="con"):
