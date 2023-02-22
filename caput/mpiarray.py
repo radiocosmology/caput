@@ -731,6 +731,8 @@ class MPIArray(np.ndarray):
     def redistribute(self, axis: int) -> "MPIArray":
         """Change the axis that the array is distributed over.
 
+        Guarantees that the result is c-contiguous.
+
         Parameters
         ----------
         axis
@@ -742,111 +744,98 @@ class MPIArray(np.ndarray):
             A new copy of the array distributed over the specified axis. Note
             that the local section will have changed.
         """
-
         # Check to see if this is the current distributed axis
         if self.axis == axis or self.comm is None:
             return self
 
-        # Get a view of the array
-        arr = self.local_array
+        # Check to make sure there is enough memory to perform the redistribution.
+        # Must be able to allocate the target array and 2 buffers. We allocate
+        # slightly more space than needed to be safe
+        min_req_mem = int((1 + 4 / self.comm.size) * self.local_array.nbytes)
 
-        # Create a new MPIArray object out of the data
+        if not mpiutil.can_allocate(min_req_mem, scope="process", comm=self.comm):
+            raise MemoryError(
+                f"Cannot allocate {min_req_mem} bytes required for redistribute."
+            )
+
+        # Make a new distributed array
         dist_arr = MPIArray(
             self.global_shape, axis=axis, dtype=self.dtype, comm=self.comm
         )
 
-        if self.comm.size == 1:
-            # only one process
-            if arr.shape[self.axis] == self.global_shape[self.axis]:
-                # We are working on a single node and being asked to do
-                # a trivial transpose.
-                dist_arr.local_array[:] = arr.copy()
+        # Get views into local and target arrays
+        arr = self.local_array
+        target_arr = dist_arr.local_array
+        # Avoid repeat mpi property calls
+        csize = self.comm.size
+        crank = self.comm.rank
 
+        if csize == 1:
+            if arr.shape[self.axis] == self.global_shape[self.axis]:
+                # We are working on a single node.
+                target_arr[:] = arr
             else:
                 raise ValueError(
-                    "Global shape %s is incompatible with local arrays shape %s"
-                    % (self.global_shape, self.shape)
+                    f"Global shape {self.global_shape} is incompatible with local "
+                    f"array shape {self.shape}"
                 )
         else:
-            # Get the size of the local array block on the target axis
-            pc, _, _ = mpiutil.split_local(arr.shape[axis], comm=self.comm)
-            # Get the start and end of each subrange on the distributed axis
-            _, sar, ear = mpiutil.split_all(
-                self.global_shape[self.axis], comm=self.comm
-            )
-            # Get the start and end of each subrange on the target axis
-            _, sac, eac = mpiutil.split_all(arr.shape[axis], comm=self.comm)
-
-            # Get the new target local shape
-            new_shape = np.asarray(self.global_shape)
-            new_shape[axis] = pc
-
-            requests_send = []
-            requests_recv = []
-            buffers = []
-
-            # Cut out the right blocks of the local array to send around
+            # Get the start and end of each subrange of interest
+            _, sac, eac = mpiutil.split_all(self.global_shape[axis], self.comm)
+            _, sar, ear = mpiutil.split_all(self.global_shape[self.axis], self.comm)
+            # Split the soruce array into properly sized blocks for sending
             blocks = np.array_split(arr, np.insert(eac, 0, sac[0]), axis)[1:]
+            # Create fixed-size contiguous buffers for sending and receiving
+            buffer_shape = list(target_arr.shape)
+            buffer_shape[self.axis] = max(ear - sar)
+            buffer_shape[axis] = max(eac - sac)
+            # Pre-allocate buffers and buffer type
+            recv_buffer = np.empty(buffer_shape, dtype=self.dtype)
+            send_buffer = np.empty_like(recv_buffer)
+            buf_type = self._prep_buf(send_buffer)[1]
 
-            # Iterate over all processes row wise
-            for ir in range(self.comm.size):
-                # Iterate over all processes column wise
-                for ic in range(self.comm.size):
-                    # Construct a unique tag
-                    tag = ir * self.comm.size + ic
+            # Empty slices for target, send buf, recv buf
+            targetsl = [slice(None)] * len(buffer_shape)
+            sendsl = [slice(None)] * len(buffer_shape)
+            recvsl = [slice(None)] * len(buffer_shape)
+            # Send and recv buf have some fixed axis slices per rank
+            sendsl[self.axis] = slice(ear[crank] - sar[crank])
+            recvsl[axis] = slice(eac[crank] - sac[crank])
 
-                    # Send and receive the messages as non-blocking passes
-                    if self.comm.rank == ir:
-                        # Send the message
-                        request = self.comm.Isend(
-                            self._prep_buf(np.ascontiguousarray(blocks[ic])),
-                            dest=ic,
-                            tag=tag,
-                        )
+            mpistatus = mpiutil.MPI.Status()
 
-                        requests_send.append([ir, ic, request])
+            # Cyclically pass messages forward to i adjacent rank
+            for i in range(csize):
+                send_to = (crank + i) % csize
+                recv_from = (crank - i) % csize
 
-                    if self.comm.rank == ic:
-                        buffer_shape = list(new_shape)
-                        buffer_shape[axis] = eac[ic] - sac[ic]
-                        buffer_shape[self.axis] = ear[ir] - sar[ir]
-                        buffers.append(np.empty(buffer_shape, dtype=arr.dtype))
+                # Write send data into send buffer location
+                sendsl[axis] = slice(eac[send_to] - sac[send_to])
+                send_buffer[tuple(sendsl)] = blocks[send_to]
 
-                        request = self.comm.Irecv(
-                            self._prep_buf(buffers[ir]), source=ir, tag=tag
-                        )
-                        requests_recv.append([ir, ic, request])
+                self.comm.Sendrecv(
+                    sendbuf=(send_buffer, buf_type),
+                    dest=send_to,
+                    sendtag=(csize * crank + send_to),
+                    recvbuf=(recv_buffer, buf_type),
+                    source=recv_from,
+                    recvtag=(csize * recv_from + crank),
+                    status=mpistatus,
+                )
 
-            # Wait for all processes to have started their messages
-            self.comm.Barrier()
-
-            # For each node iterate over all sends and wait until completion
-            for ir, ic, request in requests_send:
-                stat = mpiutil.MPI.Status()
-
-                request.Wait(status=stat)
-
-                if stat.error != mpiutil.MPI.SUCCESS:
+                if mpistatus.error != mpiutil.MPI.SUCCESS:
                     logger.error(
-                        f"**** ERROR in MPI SEND (r: {ir} c: {ic} rank: {self.comm.rank}) *****"
+                        f"**** ERROR in MPI SEND/RECV "
+                        f"(rank={crank}, "
+                        f"target={send_to}, "
+                        f"receive={recv_from}) ****"
                     )
 
-            self.comm.Barrier()
+                # Write buffer into target location
+                targetsl[self.axis] = slice(sar[recv_from], ear[recv_from])
+                recvsl[self.axis] = slice(ear[recv_from] - sar[recv_from])
 
-            # For each node iterate over all receives and wait until completion
-            for ir, ic, request in requests_recv:
-                stat = mpiutil.MPI.Status()
-
-                request.Wait(status=stat)
-
-                if stat.error != mpiutil.MPI.SUCCESS:
-                    logger.error(
-                        f"**** ERROR in MPI RECV (r: {ir} c: {ic} rank: "
-                        f"{self.comm.rank}) *****"
-                    )
-
-            # Put together the blocks we received directly into the new array
-            np.concatenate(buffers, axis=self.axis, out=dist_arr.view(np.ndarray))
+                target_arr[tuple(targetsl)] = recv_buffer[tuple(recvsl)]
 
         return dist_arr
 
@@ -879,6 +868,7 @@ class MPIArray(np.ndarray):
 
         result_arr = np.zeros((1,), dtype=self.dtype)
         self.comm.Allreduce(self, result_arr, MPI.SUM if op is None else op)
+
         return result_arr[0]
 
     def enumerate(self, axis):
