@@ -33,7 +33,6 @@ testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
 ### Tests
 def test_default_params():
-
     person1 = Person()
 
     assert person1.name == "Bill"
@@ -42,7 +41,6 @@ def test_default_params():
 
 
 def test_set_params():
-
     person = Person()
     person.name = "Mick"
 
@@ -50,7 +48,6 @@ def test_set_params():
 
 
 def test_read_config():
-
     person = Person()
     person.read_config(testdict)
 
@@ -59,7 +56,6 @@ def test_read_config():
 
 
 def test_inherit_read_config():
-
     person = PersonWithPet()
     person.read_config(testdict)
 
@@ -69,7 +65,6 @@ def test_inherit_read_config():
 
 
 def test_pickle():
-
     person = PersonWithPet()
     person.read_config(testdict)
     person2 = pickle.loads(pickle.dumps(person))
@@ -80,7 +75,6 @@ def test_pickle():
 
 
 def test_list_type():
-
     lt = ListTypeTests()
 
     with pytest.raises(config.CaputConfigError):

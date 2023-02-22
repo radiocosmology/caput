@@ -30,7 +30,6 @@ for file in files:
 
 
 def test_epoch():
-
     # At the J2000 epoch, sidereal time and transit RA should be the same.
     epoch = datetime(2000, 1, 1, 11, 58, 56)
 
@@ -79,7 +78,6 @@ def test_transit_array():
 
 
 def test_delta():
-
     delta = np.arange(0, 200000, 1000)  # Seconds.
     # time.time() when I wrote this.  No leap seconds for the next few
     # days.
@@ -156,7 +154,6 @@ def test_reverse_lsa():
 
 
 def test_lsa_array():
-
     dt = datetime(2000, 1, 1, 12, 0, 0)
 
     t1 = ctime.datetime_to_unix(dt)
@@ -181,7 +178,6 @@ def test_lsa_array():
 
 
 def test_lsd():
-
     """Test Local Earth Rotation Day (LSD) definition."""
 
     obs = ctime.Observer(113.2, 62.4)
@@ -203,7 +199,6 @@ def test_lsd():
 
 
 def test_lsd_array():
-
     dt = datetime(2025, 1, 1, 12, 0, 0)
 
     t1 = ctime.datetime_to_unix(dt)
@@ -228,7 +223,6 @@ def test_lsd_array():
 
 
 def test_era_accuracy():
-
     # Pick a time to check the ERA around
     dts = ctime.ensure_unix(datetime(2000, 1, 1))
 
@@ -292,7 +286,6 @@ def test_time_precision():
 
 
 def test_datetime_to_unix():
-
     unix_time = time.time()
     dt = datetime.utcfromtimestamp(unix_time)
     new_unix_time = ctime.datetime_to_unix(dt)
@@ -341,7 +334,6 @@ def test_era_known():
 
 
 def test_era_inverse():
-
     # Check a full forward/inverse cycle
     dt = datetime(2016, 4, 3, 2, 1, 0)
     t1 = ctime.datetime_to_unix(dt)
@@ -431,7 +423,6 @@ def test_transit_times(chime, eph):
 
 
 def test_rise_set_times(chime, eph):
-
     dts = datetime(2020, 11, 5)
     dte = datetime(2020, 11, 7)
 

@@ -73,7 +73,6 @@ def py_mwm_1d(values, weights, size):
 
     # slide a window of size <size> over the value array and get weighted median inside window
     for i in range(len(values)):
-
         # size is bigger than value array
         if i + size // 2 >= len(values) and i - size // 2 < 0:
             medians.append(py_weighted_median(values, weights))
@@ -115,7 +114,6 @@ def py_mwm_nd(values, weights, size):
 
     # iterate over n-dim array
     for index, _ in np.ndenumerate(values):
-
         # get the edge indides of the window
         lbound = np.subtract(index, r, dtype=int)
         hbound = np.add(index, r + 1, dtype=int)
@@ -146,7 +144,6 @@ class TestMWM(unittest.TestCase):
         assert py_weighted_median([1, 3, 3, 7], [0, 7, 7, 0]) == 3
 
     def test_the_nd_test(self):
-
         # 2D
         values = [[1, 2, 3], [2, 3, 1], [3, 1, 2]]
         mwm = py_mwm_nd(values, values, (3, 3))
@@ -155,7 +152,6 @@ class TestMWM(unittest.TestCase):
         )
 
     def test_wm(self):
-
         # As we return the same type as the input, the split median will get rounded down
         assert weighted_median(
             [1, 2, 3, 4, 5, 6, 7, 8], [1, 0, 0, 0, 0, 0, 0, 1]
@@ -355,7 +351,6 @@ class TestMWM(unittest.TestCase):
 
     # weights are all zeros for a region that is smaller than the window
     def test_small_zero_weight(self):
-
         window = (3, 3)
         zero_shape = (2, 2)
         shape = (10, 10)
@@ -371,7 +366,6 @@ class TestMWM(unittest.TestCase):
     # weights are all zeros for a region that is the size of the window, this has historically
     # caused a segfault
     def test_med_zero_weight(self):
-
         window = (3,)
         zero_shape = (3,)
         shape = (10,)

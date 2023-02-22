@@ -211,12 +211,10 @@ def template_run(ctx, templatefile, submit, var, overwrite):
 
     # Loop over the outer product of all the variables
     for vars_single in itertools.product(*vardict.values()):
-
         # Construct a dict mapping each variable name to its value
         vardict_single = dict(zip(vardict.keys(), vars_single))
 
         with tempfile.NamedTemporaryFile("w") as tfh:
-
             # Output the set of variable values used in this iteratin
             var_string = " ".join([f"{k}={v}" for k, v in vardict_single.items()])
             click.echo(f"Running script with {var_string}")
@@ -385,7 +383,6 @@ def queue(
 
     # If the system is specified update the current config with it
     if "system" in conf:
-
         system = conf["system"]
 
         if system not in system_defaults:
@@ -420,7 +417,6 @@ def queue(
     jobdir = workdir / "job/"
     statusfile = jobdir / "STATUS"
     if jobdir.exists():
-
         if overwrite == "never":
             click.echo(f"Job already exists at {workdir}. Skipping.")
             return

@@ -260,7 +260,6 @@ class _global_resolver:
     # Private class implementing the global sampling for MPIArray
 
     def __init__(self, array):
-
         self.array = array
         self.axis = array.axis
         self.offset = array.local_offset[self.axis]
@@ -350,13 +349,11 @@ class _global_resolver:
         return tuple(slice_list), fullslice
 
     def __getitem__(self, slobj):
-
         # Resolve the slice object
         slobj, is_fullslice = self._resolve_slice(slobj)
 
         # If not a full slice, return a numpy array (or None)
         if not is_fullslice:
-
             # If the distributed axis has a None, that means there is no data at that
             # index on this rank
             if slobj[self.axis] is None:
@@ -365,14 +362,12 @@ class _global_resolver:
                 return self.array.local_array[slobj]
 
         else:
-
             # Fix up slobj for axes where there is no data
             slobj = tuple(slice(None, None, None) if sl is None else sl for sl in slobj)
 
             return self.array[slobj]
 
     def __setitem__(self, slobj, value):
-
         slobj, _ = self._resolve_slice(slobj)
 
         # If the distributed axis has a None, that means that index is not available on
@@ -614,7 +609,6 @@ class MPIArray(np.ndarray):
         self._comm = var
 
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
-
         # if mpiutil.world is None:
         #     raise RuntimeError('There is no mpi4py installation. Aborting.')
 
@@ -796,10 +790,8 @@ class MPIArray(np.ndarray):
 
             # Iterate over all processes row wise
             for ir in range(self.comm.size):
-
                 # Iterate over all processes column wise
                 for ic in range(self.comm.size):
-
                     # Construct a unique tag
                     tag = ir * self.comm.size + ic
 
@@ -830,7 +822,6 @@ class MPIArray(np.ndarray):
 
             # For each node iterate over all sends and wait until completion
             for ir, ic, request in requests_send:
-
                 stat = mpiutil.MPI.Status()
 
                 request.Wait(status=stat)
@@ -844,7 +835,6 @@ class MPIArray(np.ndarray):
 
             # For each node iterate over all receives and wait until completion
             for ir, ic, request in requests_recv:
-
                 stat = mpiutil.MPI.Status()
 
                 request.Wait(status=stat)
@@ -1044,7 +1034,6 @@ class MPIArray(np.ndarray):
 
             # Read using collective MPI-IO if specified
             with dset.collective if use_collective else DummyContext():
-
                 # Loop over partitions of the IO and perform them
                 for part in partitions:
                     islice, fslice = _partition_sel(
@@ -1146,7 +1135,6 @@ class MPIArray(np.ndarray):
 
         # Read using collective MPI-IO if specified
         with dset.collective if use_collective else DummyContext():
-
             # Loop over partitions of the IO and perform them
             for part in partitions:
                 islice, fslice = _partition_sel(
@@ -1422,9 +1410,7 @@ class MPIArray(np.ndarray):
         splits = mpiutil.split_all(self.global_shape[self.axis], self.comm)
 
         for ri, (n, s, e) in enumerate(zip(*splits)):
-
             if self.comm.rank == rank:
-
                 # Construct a temporary array for the data to be received into
                 tshape = list(self.global_shape)
                 tshape[self.axis] = n
@@ -1449,7 +1435,6 @@ class MPIArray(np.ndarray):
                     )
 
             if self.comm.rank == rank:
-
                 # Wait until the data has arrived
                 stat = mpiutil.MPI.Status()
                 request.Wait(status=stat)
@@ -1481,7 +1466,6 @@ class MPIArray(np.ndarray):
         splits = mpiutil.split_all(self.global_shape[self.axis], self.comm)
 
         for ri, (n, s, e) in enumerate(zip(*splits)):
-
             # Construct a temporary array for the data to be received into
             tshape = list(self.global_shape)
             tshape[self.axis] = n
@@ -1550,7 +1534,6 @@ class MPIArray(np.ndarray):
             )
 
         if self.comm is None or self.comm.rank == 0:
-
             with h5py.File(filename, "a" if create else "r+") as fh:
                 dset = _create_or_get_dset(
                     fh,
@@ -1573,11 +1556,9 @@ class MPIArray(np.ndarray):
 
         size = 1 if self.comm is None else self.comm.size
         for ri in range(size):
-
             rank = 0 if self.comm is None else self.comm.rank
             if ri == rank:
                 with h5py.File(filename, "r+") as fh:
-
                     start = dist_arr.local_offset[0]
                     end = start + dist_arr.local_shape[0]
 
@@ -1815,7 +1796,6 @@ class MPIArray(np.ndarray):
         # while accounting for the fact that numpy will left-pad with length-1
         # dimensions when broadcasting
         for ii, inp in enumerate(inputs):
-
             if not isinstance(inp, np.ndarray):
                 continue
 
@@ -1831,7 +1811,6 @@ class MPIArray(np.ndarray):
                         f"Input argument {ii} has an incompatible distributed axis."
                     ) from e
             elif cur_dist_axis >= 0:
-
                 cur_axis_length = inp.shape[cur_dist_axis]
 
                 if cur_axis_length == 1:
@@ -2092,7 +2071,6 @@ def _check_dist_axis(
     offset: int,
     comm: "MPI.IntraComm" = None,
 ):
-
     if comm and array.comm != comm:
         raise ValueError(
             "MPIArray not distributed over expected communicator. "
@@ -2267,7 +2245,6 @@ def sanitize_slice(
     ell_ind = None
 
     for ii, s in enumerate(sl):
-
         if s is np.newaxis:
             num_added += 1
         elif isinstance(s, int):
@@ -2293,7 +2270,6 @@ def sanitize_slice(
 
     # Extract the axis mappings
     for ii, s in enumerate(sl):
-
         # Any slice entry that's not a newaxis should map to an axis in the original
         # array
         if s is not np.newaxis:

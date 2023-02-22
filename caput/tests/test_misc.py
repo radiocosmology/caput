@@ -21,7 +21,6 @@ class TestLock(unittest.TestCase):
         lockfile_name = os.path.join(self.dir, "." + base + ".lock")
 
         with misc.lock_file(newfile_name) as fname:
-
             # Check lock file has been created
             self.assertTrue(os.path.exists(lockfile_name))
 
@@ -46,7 +45,6 @@ class TestLock(unittest.TestCase):
 
         with pytest.raises(RuntimeError):
             with misc.lock_file(newfile_name) as fname:
-
                 # Create a stub file
                 with open(fname, "w+") as fh:
                     fh.write("hello")
@@ -67,7 +65,6 @@ class TestLock(unittest.TestCase):
 
         with pytest.raises(RuntimeError):
             with misc.lock_file(newfile_name, preserve=True) as fname:
-
                 # Create a stub file
                 with open(fname, "w+") as fh:
                     fh.write("hello")

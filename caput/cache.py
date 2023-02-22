@@ -63,7 +63,6 @@ class cached_property:
         self._value_cache = weakref.WeakKeyDictionary()
 
     def __get__(self, obj, objtype=None):
-
         if obj is None:
             return self
 

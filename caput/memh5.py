@@ -780,10 +780,8 @@ class MemGroup(_BaseGroup):
             and dtype is data.dtype
             and hasattr(data, "view")
         ):
-
             # Create parallel array if requested
             if distributed:
-
                 # Ensure we are creating from an MPIArray
                 if not isinstance(data, mpiarray.MPIArray):
                     raise TypeError(
@@ -824,7 +822,6 @@ class MemGroup(_BaseGroup):
         else:
             # Just copy the data.
             if distributed:
-
                 # Ensure that distributed_axis is set.
                 if distributed_axis is None:
                     raise RuntimeError(
@@ -1476,7 +1473,6 @@ class MemDiskGroup(_BaseGroup):
     """
 
     def __init__(self, data_group=None, distributed=False, comm=None, file_format=None):
-
         toclose = False
 
         if comm is None:
@@ -2229,11 +2225,9 @@ class BasicCont(MemDiskGroup):
 
             # Okay, we've found a distributed dataset, let's try and redistribute it
             if isinstance(item, MemDatasetDistributed):
-
                 naxis = len(item.shape)
 
                 for axis in dist_axis:
-
                     # Try processing if this is a string
                     if isinstance(axis, str):
                         if "axis" in item.attrs and axis in item.attrs["axis"]:
@@ -2243,7 +2237,6 @@ class BasicCont(MemDiskGroup):
 
                     # Process if axis is an integer
                     elif isinstance(axis, int):
-
                         # Deal with negative axis index
                         if axis < 0:
                             axis = naxis + axis
@@ -2354,14 +2347,12 @@ def copyattrs(a1, a2, convert_strings=False):
     json_prefix = "!!_memh5_json:"
 
     def _map_unicode(value):
-
         if not convert_strings:
             return value
 
         # Any arrays of numpy type unicode strings must be transformed before being
         # copied into HDF5
         if isinstance(a2, h5py.AttributeManager):
-
             # As h5py will coerce the value to an array anyway, do it now such
             # that the following test works
             if isinstance(value, (tuple, list)):
@@ -2493,7 +2484,6 @@ def deep_group_copy(
     # datatypes
     # Returns: (dtype, shape, data_to_write)
     def _prepare_dataset(dset):
-
         # Look for a selection for this dataset (also try without the leading "/")
         try:
             selection = selections.get(
@@ -2582,7 +2572,6 @@ def deep_group_copy(
     # and copying over any non-distributed datasets
     stack = [g1]
     while stack:
-
         entry = stack.pop()
         key = entry.name
 
@@ -2700,7 +2689,6 @@ def _distributed_group_to_file(
     # available)
     # NOTE: need to use mode r+ as the file should already exist
     if file_format == fileformats.Zarr:
-
         with fileformats.ZarrProcessSynchronizer(
             f".{fname}.sync", group.comm
         ) as synchronizer, zarr.open_group(
@@ -2709,7 +2697,6 @@ def _distributed_group_to_file(
             _write_distributed_datasets(f)
 
     elif file_format == fileformats.HDF5:
-
         # Use MPI IO if possible, else revert to serialising
         if h5py.get_config().mpi:
             # Open file on all ranks
@@ -2757,13 +2744,11 @@ def _distributed_group_from_file(
 
     # Function to perform a recursive clone of the tree structure
     def _copy_from_file(h5group, memgroup, selections=None):
-
         # Copy over attributes
         _copy_attrs_bcast(h5group, memgroup, convert_strings=convert_attribute_strings)
 
         # Sort items to ensure consistent order
         for key in sorted(h5group):
-
             item = h5group[key]
             try:
                 selection = selections.get(
@@ -2778,12 +2763,10 @@ def _distributed_group_from_file(
 
             # If dataset, create dataset
             else:
-
                 # Check if we are in a distributed dataset
                 if ("__memh5_distributed_dset" in item.attrs) and item.attrs[
                     "__memh5_distributed_dset"
                 ]:
-
                     distributed_axis = item.attrs.get("__memh5_distributed_axis", 0)
 
                     # Read from file into MPIArray
@@ -2827,7 +2810,6 @@ def _distributed_group_from_file(
     if file_format == fileformats.HDF5:
         # Open file on all ranks
         with misc.open_h5py_mpi(fname, "r", comm=comm) as f:
-
             # Start recursive file read
             _copy_from_file(f, group, selections)
     else:
@@ -2952,7 +2934,6 @@ def _convert_dtype(dt, type_from, type_to):
         items = []
 
         for item in x:
-
             name = item[0]
             type_ = item[1]
 
@@ -3036,7 +3017,6 @@ def has_kind(dt, kind):
 
     # For compound types we must recurse over the full compound type structure
     def _iter_conv(x):
-
         for item in x:
             type_ = item[1]
 

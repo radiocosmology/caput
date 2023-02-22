@@ -9,7 +9,6 @@ from caput import tod
 
 class TestConcatenation(unittest.TestCase):
     def setUp(self):
-
         chan = np.arange(15)
         ntime = [15, 67, 35, 23, 91]
         delta_t = 12.0
@@ -36,7 +35,6 @@ class TestConcatenation(unittest.TestCase):
         self.todlist = todlist
 
     def test_from_files(self):
-
         data = tod.TOData.from_mult_files(self.todlist)
         self.assertTrue(
             np.all(
@@ -47,7 +45,6 @@ class TestConcatenation(unittest.TestCase):
         self.assertEqual(data["dset1"].shape, (self.nchan, self.ntime))
 
     def test_reader(self):
-
         reader = tod.Reader(self.todlist)
         reader.time_sel = (7, 87)
         reader.dataset_sel = ("dset1",)
@@ -64,7 +61,6 @@ class TestConcatenation(unittest.TestCase):
         self.assertEqual(list(data.keys()), ["dset1"])
 
     def test_reader_time_range(self):
-
         reader = tod.Reader(self.todlist)
         reader.select_time_range(start_time=300.0, stop_time=500.0)
 

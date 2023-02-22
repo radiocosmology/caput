@@ -768,14 +768,12 @@ class Manager(config.Reader):
         # Get the parameters and initialize the class.
         params = {}
         if "params" in task_spec:
-
             # If params is a dict, assume params are inline
             if isinstance(task_spec["params"], dict):
                 params.update(task_spec["params"])
 
             # Otherwise assume it's a list of keys
             else:
-
                 param_keys = task_spec["params"]
 
                 # Must be a list of keys, convert if only one key was specified.

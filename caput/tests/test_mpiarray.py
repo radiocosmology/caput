@@ -144,7 +144,6 @@ def test_io(filename, file_open_function, file_format):
     )
 
     if mpiutil.rank0:
-
         with file_open_function(filename, "r") as f:
             h5ds = f["testds"][:]
 
@@ -206,7 +205,6 @@ def test_io(filename, file_open_function, file_format):
 
 
 def test_transpose():
-
     gshape = (1, 11, 2, 14)
 
     l0, s0, _ = mpiutil.split_local(11)
@@ -288,7 +286,6 @@ def test_copy():
 
 
 def test_reshape():
-
     gshape = (1, 11, 2, 14)
 
     l0, s0, _ = mpiutil.split_local(11)
@@ -315,7 +312,6 @@ def test_reshape():
 
 # pylint: disable=too-many-statements
 def test_global_getslice():
-
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -624,7 +620,6 @@ def test_ufunc_broadcast():
 
 
 def test_ufunc_2output():
-
     # Test a ufunc (divmod) which will return two outputs simultaneously
     rank = mpiutil.rank
     size = mpiutil.size
@@ -653,7 +648,6 @@ def test_ufunc_2output():
 
 
 def test_ufunc_reduce():
-
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -804,7 +798,6 @@ def test_ufunc_misc():
 
 
 def test_slice_newaxis():
-
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -824,7 +817,6 @@ def test_slice_newaxis():
 
 
 def test_slice_ellipsis():
-
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -852,7 +844,6 @@ def test_slice_ellipsis():
 
 
 def test_slice_npint64():
-
     rank = mpiutil.rank
     size = mpiutil.size
 
@@ -866,7 +857,6 @@ def test_slice_npint64():
 
 
 def test_mpi_array_fill():
-
     rank = mpiutil.rank
     size = mpiutil.size
 
