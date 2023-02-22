@@ -216,7 +216,6 @@ class Observer:
     lsd_start_day = config.utc_time(default=datetime(2000, 1, 1, 11, 58, 56))
 
     def __init__(self, lon=0.0, lat=0.0, alt=0.0, lsd_start=None, sf_wrapper=None):
-
         self.longitude = lon
         self.latitude = lat
         self.altitude = alt
@@ -500,7 +499,6 @@ class Observer:
         t_unix = skyfield_time_to_unix(t_sf)
 
         if return_dec:
-
             if len(transits) > 0:
                 pos = self.skyfield_obs().at(t_sf).observe(source)
                 dec = pos.cirs_radec(epoch=t_sf)[1]._degrees
@@ -911,7 +909,6 @@ def leap_seconds_between(time_a, time_b):
     # Check that the shift is an integer number of seconds. I don't know why
     # this wouldn't be true, but if it's not it means things have gone crazy
     if np.any(np.abs(time_shift - time_shift_int) > 0.01):
-
         raise RuntimeError(
             "Time shifts between TT and UTC does not seem to"
             + " be an integer number of seconds."
@@ -975,7 +972,6 @@ def naive_datetime_to_utc(dt):
         global _warned_utc_datetime
 
         if not _warned_utc_datetime:
-
             warnings.warn(
                 "Skyfield not installed. Cannot add UTC timezone to datetime."
             )
@@ -1022,7 +1018,6 @@ class SkyfieldWrapper:
     mirror_url = "https://bao.chimenet.ca/skyfield/"
 
     def __init__(self, path=None, expire=None, ephemeris="de421.bsp"):
-
         import os
 
         self._ephemeris_name = ephemeris
@@ -1035,7 +1030,6 @@ class SkyfieldWrapper:
             )
 
         if path is None:
-
             if "CAPUT_SKYFIELD_PATH" in os.environ:
                 path = os.environ["CAPUT_SKYFIELD_PATH"]
             else:
@@ -1186,7 +1180,6 @@ def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kw
 
     # Search through intervals
     for xa, xb, fa, fb in zip(x_init[:-1], x_init[1:], f_init[:-1], f_init[1:]):
-
         # Entries are the same sign, so there is no solution in between.
         # NOTE: we need to deal with the case where one edge might be an exact root,
         # hence the strictly greater than 0.0

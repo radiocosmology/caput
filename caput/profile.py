@@ -53,7 +53,6 @@ class Profiler:
             self.path = Path(path)
 
     def __enter__(self):
-
         if not self.profile:
             return
 
@@ -70,7 +69,6 @@ class Profiler:
             self._pr.start()
 
     def __exit__(self, *args, **kwargs):
-
         if not self.profile:
             return
 
@@ -151,7 +149,6 @@ class IOUsage:
         self._start = self._get_io()
 
     def __exit__(self, *args, **kwargs):
-
         f = self._get_io()
 
         for name in f:
@@ -246,11 +243,9 @@ class PSUtilProfiler(psutil.Process):
         super().__init__()
 
         if self._use_profiler and not self.path.exists():
-
             import csv
 
             with open(self.path, mode="w") as fp:
-
                 colnames = [
                     "task_name",
                     "time_s",

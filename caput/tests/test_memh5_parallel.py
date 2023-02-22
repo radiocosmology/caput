@@ -112,7 +112,6 @@ def test_io(
 
     # Test that the HDF5 file has the correct structure
     with file_open_function(test_file, "r") as f:
-
         # Test that the file attributes are correct
         assert f["parallel_data"].attrs["const"] == 17
 

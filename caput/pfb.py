@@ -98,7 +98,6 @@ class PFB:
     """
 
     def __init__(self, ntap, lblock, window=None, oversample=4):
-
         self.ntap = ntap
         self.lblock = lblock
 
@@ -162,7 +161,6 @@ class PFB:
         """
 
         if self._decorr_interp is None:
-
             N = self.ntap * self.lblock
 
             # Calculate the window and zero pad the array by a factor of oversample

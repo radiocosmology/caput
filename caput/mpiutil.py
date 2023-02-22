@@ -66,7 +66,6 @@ def enable_mpi_exception_handler():
     logger.debug("Installing MPI aware exception handler.")
 
     def mpi_excepthook(exc_type, exc_obj, exc_tb):
-
         # Run the standard exception handler, but try to ensure the output is flushed
         # out before aborting
         sys.__excepthook__(exc_type, exc_obj, exc_tb)
@@ -528,13 +527,11 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
     # Iterate over all processes row wise
     for ir in range(comm.size):
-
         # Get the start and end of each set of rows
         sir, eir = sar[ir], ear[ir]
 
         # Iterate over all processes column wise
         for ic in range(comm.size):
-
             # Get the start and end of each set of columns
             sic, eic = sac[ic], eac[ic]
 
@@ -543,7 +540,6 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
             # Send and receive the messages as non-blocking passes
             if comm.rank == ir:
-
                 # Construct the block to send by cutting out the correct
                 # columns
                 block = row_array[:, sic:eic].copy()
@@ -553,7 +549,6 @@ def transpose_blocks(row_array, shape, comm=_comm):
                 requests_send.append([ir, ic, request])
 
             if comm.rank == ic:
-
                 # Receive the message into the correct set of rows of recv_buffer
                 request = comm.Irecv(
                     [recv_buffer[sir:eir], mpitype], source=ir, tag=tag
@@ -565,7 +560,6 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
     # For each node iterate over all sends and wait until completion
     for ir, ic, request in requests_send:
-
         stat = MPI.Status()
 
         request.Wait(status=stat)
@@ -579,7 +573,6 @@ def transpose_blocks(row_array, shape, comm=_comm):
 
     # For each frequency iterate over all receives and wait until completion
     for ir, ic, request in requests_recv:
-
         stat = MPI.Status()
 
         request.Wait(status=stat)
@@ -625,7 +618,6 @@ def allocate_hdf5_dataset(fname, dsetname, shape, dtype, comm=_comm):
     state = None
 
     if comm is None or comm.rank == 0:
-
         # Create/open file
         f = h5py.File(fname, "a")
 
@@ -728,7 +720,6 @@ class MPILogFilter(logging.Filter):  # pylint: disable=too-few-public-methods
         level_all: int = logging.WARN,
         comm: Optional["MPI.Intracomm"] = None,
     ):
-
         super().__init__()
 
         self.add_mpi_info = add_mpi_info
@@ -740,7 +731,6 @@ class MPILogFilter(logging.Filter):  # pylint: disable=too-few-public-methods
         self.size = comm.size if comm else size
 
     def filter(self, record):
-
         # Add MPI info if desired
         try:
             record.mpi_rank

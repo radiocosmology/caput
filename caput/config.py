@@ -285,7 +285,6 @@ def float_in_range(start, end, default=None):
     """
 
     def _prop(val):
-
         val = float(val)
 
         if val < start or val > end:
@@ -328,7 +327,6 @@ def enum(options, default=None):
     """
 
     def _prop(val):
-
         if val not in options:
             raise CaputConfigError(f"Input {val} not in {options}")
 
@@ -376,7 +374,6 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
     """
 
     def _prop(val):
-
         if not isinstance(val, (list, tuple)):
             raise CaputConfigError(
                 "Expected to receive a list, but got '%s.'" % repr(val)
@@ -461,7 +458,6 @@ def logging_config(default=None):
         checked_config = {}
         loglevels = ["DEBUG", "INFO", "WARNING", "ERROR", "NOTSET"]
         for key, level in config.items():
-
             level = level.upper()
             if level not in loglevels:
                 raise ValueError(

@@ -46,7 +46,6 @@ def vectorize(**base_kwargs):
             return arr
 
         def __get__(self, obj, objtype=None):
-
             # As a descriptor, this gets called whenever this is used to wrap a
             # function, and simply binds it to the instance
 
@@ -108,7 +107,6 @@ def scalarize(dtype=np.float64):
 
             # Special handling for the slightly awkward skyfield types
             if isinstance(x, timelib.Time):
-
                 if isinstance(x.tt, np.ndarray):
                     scalar = False
                 else:
@@ -129,7 +127,6 @@ def scalarize(dtype=np.float64):
             return (x, scalar, len(x) == 0)
 
         def __get__(self, obj, objtype=None):
-
             # As a descriptor, this gets called whenever this is used to wrap a
             # function, and simply binds it to the instance
 
@@ -173,7 +170,6 @@ def listize(**_):
             return self.func(*new_args, **kwargs)
 
         def __get__(self, obj, objtype=None):
-
             # As a descriptor, this gets called whenever this is used to wrap a
             # function, and simply binds it to the instance
 
@@ -269,7 +265,6 @@ class lock_file:
     """
 
     def __init__(self, name, preserve=False, comm=None):
-
         if comm is not None and not hasattr(comm, "rank"):
             raise ValueError("comm argument does not seem to be an MPI communicator.")
 
@@ -280,7 +275,6 @@ class lock_file:
         self.preserve = preserve
 
     def __enter__(self):
-
         if self.rank0:
             with open(self.lockfile, "w+") as fh:
                 fh.write("")
@@ -288,9 +282,7 @@ class lock_file:
         return self.tmpfile
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-
         if self.rank0:
-
             # Check if exception was raised and delete the temp file if needed
             if exc_type is not None:
                 if not self.preserve:

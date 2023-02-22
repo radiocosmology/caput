@@ -112,7 +112,6 @@ class Reader:
     data_class = TOData
 
     def __init__(self, files, file_format=None):
-
         # If files is a filename, or pattern, turn into list of files.
         if isinstance(files, str):
             files = sorted(glob.glob(files))
@@ -581,7 +580,6 @@ def _copy_non_time_data(
     stack = [data]
 
     while stack:
-
         entry = stack.pop()
 
         if entry.name in ["index_map", "reverse_map"]:
@@ -600,11 +598,9 @@ def _copy_non_time_data(
     # ... then if we need to copy do a second pass iterating over the list of items to
     # copy.
     if out is not None:
-
         # to_copy should have been constructed in a breadth first order, so parents will
         # be created before their children
         for entry in to_copy:
-
             if memh5.is_group(entry):
                 target = out if entry.name == "/" else out.require_group(entry.name)
             else:
