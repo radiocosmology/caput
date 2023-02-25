@@ -33,9 +33,22 @@ class TOData(memh5.BasicCont):
     def time(self):
         """Representation of the "time" axis.
 
-        The value of ``self.index_map['time']``.
+        By convention, this should always return the floating point UTC UNIX time in
+        seconds for the *centre* of each time sample.
         """
-        return self.index_map["time"][:]
+        try:
+            time = self.index_map["time"][:]["ctime"]
+        except (IndexError, ValueError):
+            time = self.index_map["time"][:]
+
+        # This method should always return the time centres, so a shift is applied
+        # based on the time index_map entry alignment
+        alignment = self.index_attrs["time"].get("alignment", 0)
+
+        if alignment != 0:
+            time = time + alignment * (abs(np.median(np.diff(time))) / 2)
+
+        return time
 
     @classmethod
     def from_mult_files(
