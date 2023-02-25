@@ -396,6 +396,7 @@ def concatenate(
                 if convert_dataset_strings
                 else index_map,
             )
+        memh5.copyattrs(first_data.index_attrs[axis], out.index_attrs[axis])
 
     # Copy over the reverse maps.
     for axis, reverse_map in first_data.reverse_map.items():
