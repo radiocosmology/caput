@@ -74,6 +74,23 @@ class TestConcatenation(unittest.TestCase):
         )
         self.assertTrue(np.all(data["dset2"][:] == data.index_map["time"]))
 
+    def test_index_attr(self):
+        for d in self.todlist:
+            d.index_attrs["time"]["alignment"] = 1
+
+        data = tod.TOData.from_mult_files(self.todlist)
+
+        # Check that the alignment has been copied properly
+        self.assertTrue(data.index_attrs["time"]["alignment"] == 1)
+
+        # Check that the shift has been applied properly
+        self.assertTrue(
+            np.allclose(
+                data.index_map["time"][:],
+                data.time[:] - (abs(np.median(np.diff(data.time[:]))) / 2),
+            )
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
