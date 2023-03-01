@@ -5,6 +5,7 @@ from pytest_lazyfixture import lazy_fixture
 import numpy as np
 import h5py
 import zarr
+import copy
 
 from caput import fileformats, memh5, mpiarray, mpiutil
 
@@ -228,3 +229,31 @@ def test_redistribute():
     assert g["data"].distributed_axis == 0
     g.redistribute(1)
     assert g["data"].distributed_axis == 1
+
+
+# Unit test for MemDataset
+
+
+def test_dataset_copy():
+    # Check for string types
+    x = memh5.MemDatasetDistributed(shape=(4, 5), dtype=np.float32)
+    x[:] = 0
+
+    # Check a deepcopy using .copy
+    y = x.copy()
+    assert x == y
+    y[:] = 1
+    # Check this this is in fact a deep copy
+    assert x != y
+
+    # This is a shallow copy
+    y = x.copy(shallow=True)
+    assert x == y
+    y[:] = 1
+    assert x == y
+
+    # Check a deepcopy using copy.deepcopy
+    y = copy.deepcopy(x)
+    assert x == y
+    y[:] = 2
+    assert x != y
