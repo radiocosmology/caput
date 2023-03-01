@@ -66,3 +66,72 @@ def unique_ordered(x: Iterable) -> list:
     seen_add = seen.add
 
     return [i for i in x if not (i in seen or seen_add(i))]
+
+
+def allequal(obj1, obj2):
+    """Check if two objects are equal.
+
+    This comparison can check standard python types and numpy types,
+    even in the case where they are nested (ex: a dict with a numpy
+    array as a value).
+
+    Parameters
+    ----------
+    obj1 : scalar, list, tuple, dict, or np.ndarray
+    obj2 : scalar, list, tuple, dict, or np.ndarray
+    """
+    try:
+        _assert_equal(obj1, obj2)
+    except AssertionError:
+        return False
+    return True
+
+
+def _assert_equal(obj1, obj2):
+    """Assert two objects are equal.
+
+    This comparison can check standard python types and numpy types,
+    even in the case where they are nested (ex: a dict with a numpy
+    array as a value).
+
+    For more information:
+    https://numpy.org/doc/stable/reference/generated/numpy.testing.assert_equal.html
+
+    Parameters
+    ----------
+    obj1 : scalar, list, tuple, dict, or np.ndarray
+    obj2 : scalar, list, tuple, dict, or np.ndarray
+    """
+    __tracebackhide__ = True
+    if isinstance(obj1, dict):
+        # Check that the dict-type objects are equivalent
+        if not isinstance(obj2, dict):
+            raise AssertionError(repr(type(obj2)))
+        _assert_equal(len(obj1), len(obj2))
+        # Check that each key:value pair are equal
+        for k in obj1.keys():
+            if k not in obj2:
+                raise AssertionError(repr(k))
+            _assert_equal(obj1[k], obj2[k])
+
+        return
+
+    if isinstance(obj1, (list, tuple)) and isinstance(obj2, (list, tuple)):
+        # Check that the sequence-type objects are equivalent
+        _assert_equal(len(obj1), len(obj2))
+        # Check that each item is the same
+        for k in range(len(obj1)):
+            _assert_equal(obj1[k], obj2[k])
+
+        return
+
+    # If both objects are np.ndarray subclasses, check that they
+    # have the same type
+    if isinstance(obj1, np.ndarray) and isinstance(obj2, np.ndarray):
+        assert type(obj1) == type(obj2)
+
+        obj1 = obj1.view(np.ndarray)
+        obj2 = obj2.view(np.ndarray)
+
+    # Check all other built-in types and numpy types are equal
+    np.testing.assert_equal(obj1, obj2)
