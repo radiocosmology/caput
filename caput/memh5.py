@@ -62,6 +62,7 @@ import logging
 
 import numpy as np
 import h5py
+from copy import deepcopy
 
 from . import fileformats
 from . import mpiutil
@@ -984,16 +985,49 @@ class MemDataset(_MemObjMixin):
     def _group_class(self):
         return MemGroup
 
+    def copy(self, order: str = "A", shallow: bool = False) -> MemDataset:
+        """Create a new MemDataset from an existing one.
+
+        This creates a deep copy by default.
+
+        Parameters
+        ----------
+        order
+            Memory layout of copied data. See
+            https://numpy.org/doc/stable/reference/generated/numpy.copy.html
+        shallow
+            True if this should be a shallow copy
+
+        Returns
+        -------
+        new_data
+            deep copy of this dataset
+        """
+        new = self.__class__.__new__(self.__class__)
+        super(MemDataset, new).__init__(name=self.name, storage_root=self._storage_root)
+
+        _copy = deepcopy if not shallow else lambda x: x
+        # Call the properties rather than the underlying values so that an error
+        # is properly raised if they are not implemented. Blindly use deepcopy as
+        # we don't make assumptions about immutability
+        new._chunks = _copy(self.chunks)
+        new._compression = _copy(self.compression)
+        new._compression_opts = _copy(self.compression_opts)
+        new._attrs = _copy(self._attrs)
+
+        if shallow:
+            new._data = self._data
+        else:
+            new._data = deep_copy_dataset(self._data, order=order)
+
+        return new
+
+    def __deepcopy__(self, memo, /) -> MemDataset:
+        """Called when copy.deepcopy is called on this class"""
+        return self.copy()
+
     def view(self):
-        cls = self.__class__
-        out = cls.__new__(cls)
-        super(MemDataset, out).__init__(name=self.name, storage_root=self._storage_root)
-        out._attrs = self._attrs
-        out._data = self._data
-        out.chunks = self.chunks
-        out.compression = self.compression
-        out.compression_opts = self.compression_opts
-        return out
+        return self.copy(shallow=True)
 
     @property
     def attrs(self):
@@ -2269,12 +2303,7 @@ class BasicCont(MemDiskGroup):
 def attrs2dict(attrs):
     """Safely copy an h5py attributes object to a dictionary."""
 
-    out = {}
-    for key, value in attrs.items():
-        if isinstance(value, np.ndarray):
-            value = value.copy()
-        out[key] = value
-    return out
+    return {k: deepcopy(v) for k, v in attrs.items()}
 
 
 def is_group(obj):
