@@ -51,6 +51,11 @@ Richard 40.0
 Richard 40.0 Sooty
 
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from . import fileformats
 
 import logging
 
@@ -478,19 +483,19 @@ def logging_config(default=None):
     return prop
 
 
-def file_format(default=None):
+def file_format(default: str | fileformats.FileFormat | None = None) -> Property:
     """A property type that accepts only "zarr", or "hdf5".
 
     Returns the selected `caput.fileformat.FileFormat` subclass or `caput.fileformats.HDF5` if `value == default`.
 
     Parameters
     ----------
-    default : optional
-        The optional default value.
+    default
+        A string or type object specifying the fileformat
 
     Returns
     -------
-    prop : Property
+    prop
         A property instance setup to validate a file format.
 
     Raises
@@ -514,16 +519,21 @@ def file_format(default=None):
         if val is None:
             return None
 
+        if issubclass(val, fileformats.FileFormat):
+            return val
+
         if not isinstance(val, str):
-            CaputConfigError(
+            raise CaputConfigError(
                 f"Input {repr(val)} is of type {type(val).__name__} (expected str or None)."
             )
 
         val = val.lower()
+
         if val == "hdf5":
             return fileformats.HDF5
         if val == "zarr":
             return fileformats.Zarr
+
         raise CaputConfigError(f"Input {repr(val)} needs to be one of {options})")
 
     if default is not None and (
