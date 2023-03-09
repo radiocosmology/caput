@@ -545,9 +545,21 @@ class MPIArray(np.ndarray):
         )
 
     @property
-    def comm(self) -> MPI.Intracomm:
+    def local_selections(self) -> tuple:
+        """Tuple of slices to correctly index local array.
+
+        Returns
+        -------
+        local_selections
         """
-        The communicator over which the array is distributed.
+        sel = [slice(None)] * self.ndim
+        sel[self.axis] = self.local_bounds
+
+        return tuple(sel)
+
+    @property
+    def comm(self) -> MPI.Intracomm:
+        """The communicator over which the array is distributed.
 
         Returns
         -------
@@ -1666,7 +1678,10 @@ class MPIArray(np.ndarray):
             # Loop over partitions of the IO and perform them
             for part in partitions:
                 islice, fslice = _partition_sel(
-                    sel, split_axis, self.global_shape[split_axis], part
+                    self.local_selections,
+                    split_axis,
+                    self.global_shape[split_axis],
+                    part,
                 )
                 dset[islice] = self[fslice]
 
@@ -1741,8 +1756,6 @@ class MPIArray(np.ndarray):
                 f"Can't write to {f} (Expected a zarr.Group or str filename)."
             )
 
-        sel = self._make_selections()
-
         # Split the axis
         split_axis, partitions = self._partition_io(skip=True)
 
@@ -1759,7 +1772,7 @@ class MPIArray(np.ndarray):
 
         for part in partitions:
             islice, fslice = _partition_sel(
-                sel, split_axis, self.global_shape[split_axis], part
+                self.local_selections, split_axis, self.global_shape[split_axis], part
             )
             group[dataset][islice] = self.local_array[fslice]
         self.comm.Barrier()
@@ -1806,29 +1819,16 @@ class MPIArray(np.ndarray):
 
         self.comm.Barrier()
 
-        if self.axis == 0:
-            dist_arr = self
-        else:
-            dist_arr = self.redistribute(axis=0)
-
         size = 1 if self.comm is None else self.comm.size
+        rank = 0 if self.comm is None else self.comm.rank
+
+        # Write out each rank serially
         for ri in range(size):
-            rank = 0 if self.comm is None else self.comm.rank
             if ri == rank:
                 with h5py.File(filename, "r+") as fh:
-                    start = dist_arr.local_offset[0]
-                    end = start + dist_arr.local_shape[0]
+                    fh[dataset][self.local_selections] = self.local_array[:]
 
-                    fh[dataset][start:end] = dist_arr
-
-            dist_arr.comm.Barrier()
-
-    def _make_selections(self) -> list:
-        """Make selections for writing local data to distributed file."""
-        # Construct slices for axis
-        sel = ([slice(None, None)] * self.axis) + [self.local_bounds]
-
-        return _expand_sel(sel, self.ndim)
+            self.comm.Barrier()
 
     def _partition_io(self, skip=False, threshold=1.99):
         """Split IO of this array into local sections under `threshold`.
