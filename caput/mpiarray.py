@@ -1625,25 +1625,23 @@ class MPIArray(np.ndarray):
                 )
 
         mode = "a" if create else "r+"
-        fh = misc.open_h5py_mpi(f, mode, self.comm)
+        fh = misc.open_h5py_mpi(f, mode, use_mpi=True, comm=self.comm)
 
-        # Check that there are no null slices, otherwise we need to turn off
-        # collective IO to work around an h5py issue (#965)
-        no_null_slices = self.global_shape[self.axis] >= self.comm.size
-
-        # Decide whether to use collective IO. There are a few relevant aspects to this
-        # one:
-        # - we must use collective IO if writing chunked/compressed data. If it's not
+        # Decide whether to use collective IO. There are a few relevant aspects:
+        # - We must use collective IO if writing chunked/compressed data. If it's not
         #   available we cannot compress the data
-        # - we cannot use collective IO if there are null slices present (h5py bug)
-        # - due to coordination overhead and no speed up from the writing, collective IO
-        #   is typically slower if the the data is striped across axis=0, so we should
-        #   disable
+        # - We cannot use collective IO if there are null slices present (h5py bug).
+        #   Change if h5py bug fixed https://github.com/h5py/h5py/issues/965
+        # - Due to coordination overhead and no speed up from the writing, collective IO
+        #   is typically slower if the the data is striped across axis = 0, so we should
+        #   disable. TODO: better would be a test on contiguous IO size
 
-        # TODO: change if h5py bug fixed https://github.com/h5py/h5py/issues/965
-        collective_will_not_work = not (fh.is_mpi and no_null_slices)
+        # Check for null slices
+        no_null_slices = self.global_shape[self.axis] >= self.comm.size
+        # Ensure h5py is mpi-enabled and we are not distributed in axis 0
+        use_collective = fh.is_mpi and (self.axis != 0) and no_null_slices
 
-        if compression is not None and collective_will_not_work:
+        if not use_collective and compression is not None:
             # Need to disable compression if we can't use collective IO
             logger.warn(
                 "Cannot use collective IO, must disable compression. "
@@ -1651,18 +1649,7 @@ class MPIArray(np.ndarray):
             )
             chunks, compression, compression_opts = None, None, None
 
-        # TODO: better would be a test on contiguous IO size
-        faster_without_collective = self.axis == 0
-
-        use_collective = (compression is not None) or not (
-            collective_will_not_work or faster_without_collective
-        )
-
-        sel = self._make_selections()
-
-        # Split the axis to get the IO size under ~2GB (only if MPI-IO)
-        split_axis, partitions = self._partition_io(skip=(not fh.is_mpi))
-
+        # Get the dataset to save into
         dset = _create_or_get_dset(
             fh,
             dataset,
@@ -1672,6 +1659,9 @@ class MPIArray(np.ndarray):
             compression=compression,
             compression_opts=compression_opts,
         )
+
+        # Split the axis to get the IO size under ~2GB (only if MPI-IO)
+        split_axis, partitions = self._partition_io(skip=(not fh.is_mpi))
 
         # Read using collective MPI-IO if specified
         with dset.collective if use_collective else DummyContext():
@@ -1684,6 +1674,8 @@ class MPIArray(np.ndarray):
                     part,
                 )
                 dset[islice] = self[fslice]
+
+        self.comm.Barrier()
 
         if fh.opened:
             fh.close()
@@ -1775,7 +1767,9 @@ class MPIArray(np.ndarray):
                 self.local_selections, split_axis, self.global_shape[split_axis], part
             )
             group[dataset][islice] = self.local_array[fslice]
+
         self.comm.Barrier()
+
         if self.comm.rank == 0 and lockfile is not None:
             fileformats.remove_file_or_dir(lockfile)
 
