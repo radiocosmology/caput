@@ -368,8 +368,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
 
 
 class MemGroup(_BaseGroup):
-    """
-    In memory implementation of the :class:`h5py.Group`.
+    """In memory implementation of the :class:`h5py.Group`.
 
     This class doubles as the memory implementation of :class:`h5py.File`,
     object, since the distinction between a file and a group for in-memory data
@@ -1996,6 +1995,33 @@ class MemDiskGroup(_BaseGroup):
 
         if self.ondisk:
             self._data.flush()
+
+    def copy(self, shared: list = [], shallow: bool = False) -> MemDiskGroup:
+        """Return a deep copy of this class or subclass.
+
+        Parameters
+        ----------
+        shared
+            dataset names to share (i.e. don't deep copy)
+        shallow
+            True if this should be a shallow copy
+
+        Returns
+        -------
+        copy
+            Copy of this group
+        """
+        cls = self.__class__.__new__(self.__class__)
+        MemDiskGroup.__init__(cls, distributed=self.distributed, comm=self.comm)
+        deep_group_copy(
+            self._data, cls._data, deep_copy_dsets=not shallow, shared=shared
+        )
+
+        return cls
+
+    def __deepcopy__(self, memo, /) -> MemDiskGroup:
+        """Called when copy.deepcopy is called on this class"""
+        return self.copy()
 
     def save(
         self,
