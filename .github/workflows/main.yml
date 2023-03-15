@@ -26,16 +26,22 @@ jobs:
 
       - name: Install pip dependencies
         run: |
-          pip install pylint==2.7.0 pylint-ignore flake8 pytest black mpi4py pyinstrument psutil pytest-lazy-fixture
+          pip install ruff pytest black mpi4py pyinstrument psutil pytest-lazy-fixture
           pip install -r requirements.txt
           python setup.py develop
           pip install .[compression]
 
-      - name: Run flake8
-        run: flake8 --show-source --ignore=E501,E741,E203,W503,E266 caput
+      # - name: Run flake8
+      #   run: flake8 --show-source --ignore=E501,E741,E203,W503 caput
 
       - name: Check code with black
         run: black --check .
+
+      - name: Run ruff (flake8 and pydocstyle)
+        run: ruff check .
+
+      # - name: Run pydocstyle
+      #   run: pydocstyle --ignore=D105,D107,D203,D213,D400,D401,D402,D413,D416 caput
 
   run-tests:
 
