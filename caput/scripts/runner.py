@@ -1,3 +1,5 @@
+"""CLI interface to run caput pipelines."""
+
 import itertools
 import os
 import sys
@@ -286,7 +288,7 @@ def queue(
     psutil=False,
     overwrite="never",
 ):
-    """Queue a pipeline on a cluster from the given CONFIGFILE.
+    r"""Queue a pipeline on a cluster from the given CONFIGFILE.
 
     This queues the job, using parameters from the `cluster` section of the
     submitted YAML file.
@@ -339,7 +341,6 @@ def queue(
         may be slow, if the temporary and final directories are not on the
         same filesystem.
     """
-
     import shutil
     import yaml
 
@@ -361,8 +362,8 @@ def queue(
     with open(configfile, "r") as f:
         yconf = yaml.safe_load(f)
 
-    ## Global configuration
-    ## Create output directory and copy over params file.
+    # Global configuration
+    # Create output directory and copy over params file.
     if "cluster" not in yconf:
         raise ValueError('Configuration file must have an "cluster" section.')
 
@@ -568,12 +569,12 @@ fi
 
 
 def expandpath(path):
-    """Expand any variables, user directories in path"""
+    """Expand any variables, user directories in path."""
     return Path(os.path.expandvars(path)).expanduser().resolve()
 
 
 def fixpath(path):
-    """Turn path to an absolute path"""
+    """Turn path to an absolute path."""
     return Path(path).resolve()
 
 

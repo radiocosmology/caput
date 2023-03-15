@@ -1,5 +1,5 @@
-""" Collection of assorted tools.
-"""
+"""Collection of assorted tools."""
+
 from typing import Iterable
 
 import numpy as np
@@ -15,7 +15,9 @@ def invert_no_zero(x, out=None):
     Parameters
     ----------
     x : np.ndarray
-    out : np.ndarray
+        Array to invert
+    out : np.ndarray, optional
+        Output array to insert results
 
     Returns
     -------
@@ -78,7 +80,9 @@ def allequal(obj1, obj2):
     Parameters
     ----------
     obj1 : scalar, list, tuple, dict, or np.ndarray
+        Object to compare
     obj2 : scalar, list, tuple, dict, or np.ndarray
+        Object to compare
     """
     try:
         _assert_equal(obj1, obj2)
@@ -100,7 +104,9 @@ def _assert_equal(obj1, obj2):
     Parameters
     ----------
     obj1 : scalar, list, tuple, dict, or np.ndarray
+        Object to compare
     obj2 : scalar, list, tuple, dict, or np.ndarray
+        Object to compare
     """
     __tracebackhide__ = True
     if isinstance(obj1, dict):

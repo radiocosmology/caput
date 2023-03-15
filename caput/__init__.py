@@ -1,9 +1,7 @@
-"""
-caput
+"""caput.
 
 Submodules
-==========
-
+----------
 .. autosummary::
     :toctree: _autosummary
 

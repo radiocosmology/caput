@@ -293,8 +293,7 @@ class PSUtilProfiler(psutil.Process):
         self.stop()
 
     def start(self):
-        """
-        Start profiling.
+        """Start profiling.
 
         Results generated when `stop` is called are based on this start time.
 
@@ -312,8 +311,7 @@ class PSUtilProfiler(psutil.Process):
                 self._start_disk_io = self.io_counters()
 
     def stop(self):
-        """
-        Stop profiler. Dump results to csv file and/or log and/or set results on self.usage.
+        """Stop profiler. Dump results to csv file and/or log and/or set results on self.usage.
 
         `start` must be called first.
 

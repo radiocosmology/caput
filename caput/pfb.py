@@ -56,7 +56,6 @@ def sinc_hann(ntap, lblock):
     -------
     window : np.ndarray[ntap * lblock]
     """
-
     return sinc_window(ntap, lblock) * np.hanning(ntap * lblock)
 
 
@@ -74,7 +73,6 @@ def sinc_hamming(ntap, lblock):
     -------
     window : np.ndarray[ntap * lblock]
     """
-
     return sinc_window(ntap, lblock) * np.hamming(ntap * lblock)
 
 
@@ -117,7 +115,6 @@ class PFB:
         pfb : np.ndarray[:, lblock // 2]
             Array of PFB frequencies.
         """
-
         # Number of blocks
         nblock = timestream.size // self.lblock - (self.ntap - 1)
 
@@ -143,7 +140,7 @@ class PFB:
     _decorr_interp = None
 
     def decorrelation_ratio(self, delay):
-        """Calculates the decorrelation caused by a relative relay of two timestreams.
+        """Calculate the decorrelation caused by a relative relay of two timestreams.
 
         This is caused by the fact that the PFB is generated from a finite
         time window of data.
@@ -159,7 +156,6 @@ class PFB:
         decorrelation : array_like
             The decorrelation ratio.
         """
-
         if self._decorr_interp is None:
             N = self.ntap * self.lblock
 

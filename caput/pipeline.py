@@ -1,5 +1,4 @@
-"""
-Data Analysis and Simulation Pipeline.
+"""Data Analysis and Simulation Pipeline.
 
 A data analysis pipeline is completely specified by a YAML file that specifies
 both what tasks are to be run and the parameters that go to those tasks.
@@ -28,8 +27,7 @@ Task base classes
 
 
 Examples
-========
-
+--------
 Basic Tasks
 -----------
 
@@ -391,7 +389,7 @@ class PipelineRuntimeError(Exception):
 
 
 class PipelineStopIteration(Exception):
-    """This stops the iteration of `next()` in pipeline tasks.
+    """Stop the iteration of `next()` in pipeline tasks.
 
     Pipeline tasks should raise this excetions in the `next()` method to stop
     the iteration of the task and to proceed to `finish()`.
@@ -422,8 +420,7 @@ class _PipelineFinished(Exception):
 
 
 def _get_versions(modules):
-    """
-    Get the versions of a list of python modules.
+    """Get the versions of a list of python modules.
 
     Parameters
     ----------
@@ -527,7 +524,6 @@ class Manager(config.Reader):
         -------
         self: Pipeline object
         """
-
         try:
             with open(file_name) as f:
                 yaml_doc = f.read()
@@ -585,8 +581,7 @@ class Manager(config.Reader):
         return self
 
     def _setup_logging(self, lint=False):
-        """
-        Set up logging based on the config.
+        """Set up logging based on the config.
 
         Parameters
         ----------
@@ -617,7 +612,6 @@ class Manager(config.Reader):
             If a task stage returns the wrong number of outputs.
 
         """
-
         # Run the pipeline.
         while self.tasks:
             for task in list(self.tasks):  # Copy list so we can alter it.
@@ -660,8 +654,7 @@ class Manager(config.Reader):
 
     @staticmethod
     def _check_task_output(out, task):
-        """
-        Check if task stage's output is as expected.
+        """Check if task stage's output is as expected.
 
         Returns
         -------
@@ -695,7 +688,6 @@ class Manager(config.Reader):
 
     def _setup_tasks(self):
         """Create and setup all tasks from the task list."""
-
         all_out_values = {t.get("out", None) for t in self.task_specs}
 
         # Setup all tasks in the task listk
@@ -736,7 +728,6 @@ class Manager(config.Reader):
 
     def _setup_task(self, task_spec):
         """Set up a pipeline task from the spec given in the tasks list."""
-
         # Check that only the expected keys are in the task spec.
         for key in task_spec.keys():
             if key not in ["type", "params", "requires", "in", "out"]:
@@ -865,9 +856,7 @@ class TaskBase(config.Reader):
         May be overridden with no arguments.  Will be called after any
         `config.Property` attributes are set and after 'input' and 'requires'
         keys are set up.
-
         """
-
         pass
 
     def setup(self, requires=None):
@@ -879,13 +868,12 @@ class TaskBase(config.Reader):
 
         Any return values will be treated as pipeline data-products as
         specified by the `out` keys in the pipeline setup.
-
         """
-
         pass
 
     def validate(self):
         """Validate the task after instantiation."""
+        pass
 
     def next(self, input=None):
         """Iterative analysis stage of pipeline task.
@@ -900,9 +888,7 @@ class TaskBase(config.Reader):
 
         Any return values will be treated as pipeline data-products as
         specified by the `out` keys in the pipeline setup.
-
         """
-
         raise PipelineStopIteration()
 
     def finish(self):
@@ -912,9 +898,7 @@ class TaskBase(config.Reader):
 
         Any return values will be treated as pipeline data-products as
         specified by the `out` keys in the pipeline setup.
-
         """
-
         pass
 
     @property
@@ -931,9 +915,7 @@ class TaskBase(config.Reader):
         and `finish()` must always be parallelized internally.
 
         Usage of this has not implemented.
-
         """
-
         return False
 
     @property
@@ -941,9 +923,7 @@ class TaskBase(config.Reader):
         """Override to return `True` if caching results is implemented.
 
         No caching infrastructure has yet been implemented.
-
         """
-
         return False
 
     # Pipeline Infrastructure
@@ -959,7 +939,6 @@ class TaskBase(config.Reader):
 
     def _setup_keys(self, in_=None, out=None, requires=None):
         """Setup the 'requires', 'in' and 'out' keys for this task."""
-
         # Put pipeline in state such that `setup` is the next stage called.
         self._pipeline_advance_state()
         # Parse the task spec.
@@ -1024,9 +1003,7 @@ class TaskBase(config.Reader):
 
         Also performs some clean up tasks and checks associated with changing
         stages.
-
         """
-
         if not hasattr(self, "_pipeline_state"):
             self._pipeline_state = "setup"
         elif self._pipeline_state == "setup":
@@ -1059,9 +1036,7 @@ class TaskBase(config.Reader):
         Execute `setup()`, `next()`, `finish()` or raise `PipelineFinished`
         depending on the state of the task.  Advance the state to the next
         stage if applicable.
-
         """
-
         if self._pipeline_state == "setup":
             # Check if we have all the required input data.
             for req in self._requires:
@@ -1108,9 +1083,7 @@ class TaskBase(config.Reader):
         as inputs to `setup()` ('requires') and `next()` ('in').  If there is a
         match, store the corresponding data product to be used in the next
         invocation of these methods.
-
         """
-
         n_keys = len(keys)
         for ii in range(n_keys):
             key = keys[ii]
@@ -1128,7 +1101,7 @@ class TaskBase(config.Reader):
                             "`setup()` already run."
                         )
                         raise PipelineRuntimeError(msg)
-                    if not self._requires[jj] is None:
+                    if self._requires[jj] is not None:
                         msg = "'requires' data product set more than once."
                         raise PipelineRuntimeError(msg)
                     else:
@@ -1152,7 +1125,7 @@ class TaskBase(config.Reader):
 
 
 class _OneAndOne(TaskBase):
-    """Base class for tasks that have (at most) one input and one output
+    """Base class for tasks that have (at most) one input and one output.
 
     This is not a user base class and simply holds code that is common to
     `SingleBase` and `IterBase`.
@@ -1173,13 +1146,12 @@ class _OneAndOne(TaskBase):
 
     def process(self, input):
         """Override this method with your data processing task."""
-
         output = input
+
         return output
 
     def validate(self):
-        """
-        Validate the task after instantiation.
+        """Validate the task after instantiation.
 
         May be overriden to add any special task validation before the task is run.
         This is called by the :py:class:`Manager` after it's added to the pipeline and has special attributes like
@@ -1235,7 +1207,6 @@ class _OneAndOne(TaskBase):
 
     def read_process_write(self, input, input_filename, output_filename):
         """Reads input, executes any processing and writes output."""
-
         # Read input if needed.
         if input is None and not self._no_input:
             if input_filename is None:
@@ -1275,27 +1246,22 @@ class _OneAndOne(TaskBase):
 
     def read_input(self, filename):
         """Override to implement reading inputs from disk."""
-
         raise NotImplementedError()
 
     def cast_input(self, input):
         """Override to support accepting pipeline inputs of variouse types."""
-
         return input
 
     def read_output(self, filename):
         """Override to implement reading outputs from disk.
 
         Used for result cacheing.
-
         """
-
         raise NotImplementedError()
 
     @staticmethod
     def write_output(filename, output, file_format=None, **kwargs):
         """Override to implement reading inputs from disk."""
-
         raise NotImplementedError()
 
 
@@ -1344,7 +1310,6 @@ class SingleBase(_OneAndOne):
 
     def next(self, input=None):
         """Should not need to override."""
-
         # This should only be called once.
         try:
             if self.done:
@@ -1408,7 +1373,6 @@ class IterBase(_OneAndOne):
 
     def next(self, input=None):
         """Should not need to override."""
-
         # Sort out filenames.
         if self.iteration >= len(self.file_middles):
             if not self.input_root == "None":
@@ -1441,7 +1405,6 @@ class H5IOMixin:
 
     Provides the methods `read_input`, `read_output` and `write_output` for
     hdf5 data.
-
     """
 
     # TODO, implement reading on disk (i.e. no copy to memory).
@@ -1450,7 +1413,6 @@ class H5IOMixin:
     @staticmethod
     def read_input(filename):
         """Method for reading hdf5 input."""
-
         from caput import memh5
 
         return memh5.MemGroup.from_hdf5(filename, mode="r")
@@ -1458,7 +1420,6 @@ class H5IOMixin:
     @staticmethod
     def read_output(filename):
         """Method for reading hdf5 output (from caches)."""
-
         # Replicate code from read_input in case read_input is overridden.
         from caput import memh5
 
@@ -1466,8 +1427,7 @@ class H5IOMixin:
 
     @staticmethod
     def write_output(filename, output, file_format=None, **kwargs):
-        """
-        Method for writing hdf5/zarr output.
+        """Method for writing hdf5/zarr output.
 
         Parameters
         ----------
@@ -1479,8 +1439,9 @@ class H5IOMixin:
         file_format : fileformats.Zarr, fileformats.HDF5 or None
             File format to use. If this is not specified, the file format is guessed based on the type of
             `output` or the `filename`. If guessing is not successful, HDF5 is used.
+        **kwargs : dict
+            Arbitrary keyword arguments.
         """
-
         from caput import memh5
         import h5py
 
@@ -1553,7 +1514,6 @@ class BasicContMixin:
 
     Provides the methods `read_input`, `read_output` and `write_output` for
     BasicCont data which gets written to HDF5 files.
-
     """
 
     # TODO, implement reading on disk (i.e. no copy to memory).
@@ -1565,7 +1525,6 @@ class BasicContMixin:
 
     def read_input(self, filename):
         """Method for reading hdf5 input."""
-
         from caput import memh5
 
         return memh5.BasicCont.from_file(
@@ -1574,7 +1533,6 @@ class BasicContMixin:
 
     def read_output(self, filename):
         """Method for reading hdf5 output (from caches)."""
-
         # Replicate code from read_input in case read_input is overridden.
         from caput import memh5
 
@@ -1584,8 +1542,7 @@ class BasicContMixin:
 
     @staticmethod
     def write_output(filename, output, file_format=None, **kwargs):
-        """
-        Method for writing output to disk.
+        """Method for writing output to disk.
 
         Parameters
         ----------
@@ -1595,12 +1552,9 @@ class BasicContMixin:
             Data to be written.
         file_format : `fileformats.FileFormat`
             File format to use. Default `fileformats.HDF5`.
-
-        Returns
-        -------
-
+        **kwargs : dict
+            Arbitrary keyword arguments.
         """
-
         from caput import memh5
 
         file_format = fileformats.check_file_format(filename, file_format, output)
@@ -1628,7 +1582,6 @@ class SingleH5Base(H5IOMixin, SingleBase):
     """Base class for tasks with hdf5 input and output.
 
     Inherits from :class:`H5IOMixin` and :class:`SingleBase`.
-
     """
 
     pass
@@ -1638,7 +1591,6 @@ class IterH5Base(H5IOMixin, IterBase):
     """Base class for iterating over hdf5 input and output.
 
     Inherits from :class:`H5IOMixin` and :class:`IterBase`.
-
     """
 
     pass
@@ -1658,7 +1610,6 @@ class Input(TaskBase):
 
     def next(self):
         """Pop and return the first element of inputs."""
-
         if self._iter is None:
             self._iter = iter(self.inputs)
 
@@ -1690,7 +1641,6 @@ class Output(TaskBase):
 
     def next(self, in_):
         """Pop and return the first element of inputs."""
-
         if self.callback:
             in_ = self.callback(in_)
 
@@ -1708,9 +1658,7 @@ def _format_product_keys(keys):
     are keys representing data products.  This function gets that key from the
     task's entry of the task list, defaults to zero, and ensures it's formated
     as a sequence of strings.
-
     """
-
     if keys is None:
         return []
 
