@@ -35,15 +35,18 @@ class PrintEggs(TaskBase):
         super().__init__(*args, **kwargs)
 
     def setup(self, requires=None):
+        """Run setup."""
         print("Setting up PrintEggs.")
 
     def next(self, _input=None):
+        """Run next."""
         if self.i >= len(self.eggs):
             raise PipelineStopIteration()
         print("Spam and %s eggs." % self.eggs[self.i])
         self.i += 1
 
     def finish(self):
+        """Run finish."""
         print("Finished PrintEggs.")
 
 
@@ -57,9 +60,11 @@ class GetEggs(TaskBase):
         super().__init__(*args, **kwargs)
 
     def setup(self, requires=None):
+        """Run setup."""
         print("Setting up GetEggs.")
 
     def next(self, _input=None):
+        """Run next."""
         if self.i >= len(self.eggs):
             raise PipelineStopIteration()
         egg = self.eggs[self.i]
@@ -67,6 +72,7 @@ class GetEggs(TaskBase):
         return egg
 
     def finish(self):
+        """Run finish."""
         print("Finished GetEggs.")
 
 
@@ -76,21 +82,27 @@ class CookEggs(IterBase):
     style = config.Property(proptype=str)
 
     def setup(self, requires=None):
+        """Run setup."""
         print("Setting up CookEggs.")
 
     def process(self, _input):
+        """Run process."""
         print("Cooking %s %s eggs." % (self.style, input))
 
     def finish(self):
+        """Run finish."""
         print("Finished CookEggs.")
 
     def read_input(self, filename):
+        """Run read input not implemented."""
         raise NotImplementedError()
 
     def read_output(self, filename):
+        """Run read output not implemented."""
         raise NotImplementedError()
 
     def write_output(self, filename, output, file_format=None, **kwargs):
+        """Run write output not implemented."""
         raise NotImplementedError()
 
 
@@ -114,8 +126,7 @@ cook_params:
 
 
 def run_pipeline(parameters=None, configstr=eggs_pipeline_conf):
-    """
-    Run `caput.scripts.runner run` with given parameters and config.
+    """Run `caput.scripts.runner run` with given parameters and config.
 
     Parameters
     ----------
@@ -128,9 +139,7 @@ def run_pipeline(parameters=None, configstr=eggs_pipeline_conf):
     -------
     result : `click.testing.Result`
         Holds the captured result. Try accessing e.g. `result.exit_code`, `result.output`.
-
     """
-
     with tempfile.NamedTemporaryFile("w+") as configfile:
         configfile.write(configstr)
         configfile.flush()

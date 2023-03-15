@@ -1,15 +1,13 @@
-"""
-Useful functions for radio interferometry.
-
+"""Useful functions for radio interferometry.
 
 Coordinates
-===========
+-----------
 - :py:meth:`sph_to_ground`
 - :py:meth:`ground_to_sph`
 - :py:meth:`project_distance`
 
 Interferometry
-==============
+--------------
 - :py:meth:`fringestop_phase`
 """
 
@@ -36,7 +34,6 @@ def sph_to_ground(ha, lat, dec):
     x, y, z : array_like
         The projected angular position in ground fixed XYZ coordinates.
     """
-
     x = -1 * np.cos(dec) * np.sin(ha)
     y = np.cos(lat) * np.sin(dec) - np.sin(lat) * np.cos(dec) * np.cos(ha)
     z = np.sin(lat) * np.sin(dec) + np.cos(lat) * np.cos(dec) * np.cos(ha)
@@ -63,7 +60,6 @@ def ground_to_sph(x, y, lat):
     ha, dec: array_like
         Hour Angle and declination in radians
     """
-
     z = np.sqrt(1 - x**2 - y**2)
 
     xe = z * np.cos(lat) - y * np.sin(lat)
@@ -99,7 +95,6 @@ def projected_distance(ha, lat, dec, x, y, z=0.0):
     dist : np.ndarray
         The projected distance. Has whatever units x, y, z did.
     """
-
     # We could use `sph_to_ground` here, but it's likely to be more memory
     # efficient to do this directly
     dist = x * (-1 * np.cos(dec) * np.sin(ha))
@@ -136,7 +131,6 @@ def fringestop_phase(ha, lat, dec, u, v, w=0.0):
         The phase required to *correct* the fringeing. Shape is
         given by the broadcast of the arguments together.
     """
-
     phase = -2.0j * np.pi * projected_distance(ha, lat, dec, u, v, w)
 
     return np.exp(phase, out=phase)

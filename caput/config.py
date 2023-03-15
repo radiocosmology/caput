@@ -1,13 +1,11 @@
-"""
-Configure class attributes using values from a dictionary.
+"""Configure class attributes using values from a dictionary.
 
 This module to defines strictly typed attributes of a class, that can be loaded
 from an input dictionary. This is particularly useful for loading a class from
 a YAML document.
 
 Examples
-========
-
+--------
 In this example we set up a class to store information about a person.
 
 >>> class Person(Reader):
@@ -84,7 +82,6 @@ class Property:
             If None (default), attempt to use the attribute name from the
             class.
         """
-
         self.proptype = (lambda x: x) if proptype is None else proptype
         self.default = default
         self.key = key
@@ -131,7 +128,6 @@ class Property:
         CaputConfigError
             If there was an error in the config dict.
         """
-
         self._set_propname(obj)
 
         if self.key is None:
@@ -173,8 +169,11 @@ class Reader:
         ----------
         config : dict
             Dictionary of configuration values.
+        *args : list
+            Variable length argument list
+        **kwargs : dict
+            Arbitrary keyword arguments.
         """
-
         c = cls(*args, **kwargs)
         c.read_config(config)
 
@@ -238,7 +237,7 @@ class Reader:
 
 
 def utc_time(default=None):
-    """A property for representing UTC as UNIX time.
+    """Property for representing UTC as UNIX time.
 
     Parameters
     ----------
@@ -266,7 +265,7 @@ def utc_time(default=None):
 
 
 def float_in_range(start, end, default=None):
-    """A property type that tests if its input is within the given range.
+    """Property type that tests if its input is within the given range.
 
     Parameters
     ----------
@@ -303,7 +302,7 @@ def float_in_range(start, end, default=None):
 
 
 def enum(options, default=None):
-    """A property type that accepts only a set of possible values.
+    """Property type that accepts only a set of possible values.
 
     Parameters
     ----------
@@ -346,7 +345,7 @@ def enum(options, default=None):
 
 
 def list_type(type_=None, length=None, maxlength=None, default=None):
-    """A property type that validates lists against required properties.
+    """Property type that validates lists against required properties.
 
     Parameters
     ----------
@@ -422,8 +421,7 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
 
 
 def logging_config(default=None):
-    """
-    A Property type that validates the caput logging config.
+    """Property type that validates the caput logging config.
 
     Allows the type to be either a string (for backward compatibility) or a dict
     setting log levels per module.
@@ -484,7 +482,7 @@ def logging_config(default=None):
 
 
 def file_format(default: str | fileformats.FileFormat | None = None) -> Property:
-    """A property type that accepts only "zarr", or "hdf5".
+    """Property type that accepts only "zarr", or "hdf5".
 
     Returns the selected `caput.fileformat.FileFormat` subclass or `caput.fileformats.HDF5` if `value == default`.
 
@@ -551,14 +549,14 @@ class _line_dict(dict):
 
 
 class SafeLineLoader(SafeLoader):
-    """
-    YAML loader that tracks line numbers.
+    """YAML loader that tracks line numbers.
 
     Adds the line number information to every YAML block. This is useful for
     debugging and to describe linting errors.
     """
 
     def construct_mapping(self, node, deep=False):
+        """Construct the line mapping."""
         mapping = super().construct_mapping(node, deep=deep)
         mapping = _line_dict(mapping)
 
@@ -568,11 +566,10 @@ class SafeLineLoader(SafeLoader):
 
 
 class CaputConfigError(Exception):
-    """
-    There was an error in the configuration.
+    """There was an error in the configuration.
 
     Parameters
-    ==========
+    ----------
     message : str
         Message / description of error
     file_ : str

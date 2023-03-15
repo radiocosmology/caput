@@ -1,9 +1,7 @@
-"""
-An array class for containing MPI distributed array.
+"""An array class for containing MPI distributed array.
 
 Examples
-========
-
+--------
 This example performs a transfrom from time-freq to lag-m space. This involves
 Fourier transforming each of these two axes of the distributed array::
 
@@ -470,8 +468,7 @@ class MPIArray(np.ndarray):
 
     @property
     def global_shape(self):
-        """
-        Global array shape.
+        """Global array shape.
 
         Returns
         -------
@@ -481,19 +478,18 @@ class MPIArray(np.ndarray):
 
     @global_shape.setter
     def global_shape(self, var):
-        """
-        Set global array shape.
+        """Set global array shape.
 
         Parameters
         ----------
         var : tuple
+            New global shape
         """
         self._global_shape = var
 
     @property
     def axis(self):
-        """
-        Axis we are distributed over.
+        """Axis we are distributed over.
 
         Returns
         -------
@@ -503,19 +499,20 @@ class MPIArray(np.ndarray):
 
     @axis.setter
     def axis(self, var):
-        """
-        Set axis we are distributed over.
+        """Set axis we are distributed over.
+
+        This does not redistribute the array.
 
         Parameters
         ----------
         var : int
+            New distributed axis
         """
         self._axis = var
 
     @property
     def local_shape(self):
-        """
-        Shape of local section.
+        """Shape of local section.
 
         Returns
         -------
@@ -525,19 +522,18 @@ class MPIArray(np.ndarray):
 
     @local_shape.setter
     def local_shape(self, var):
-        """
-        Set shape of local section.
+        """Set shape of local section.
 
         Parameters
         ----------
         var : tuple
+            New local shape
         """
         self._local_shape = var
 
     @property
     def local_offset(self):
-        """
-        Offset into global array.
+        """Offset into global array.
 
         This is equivalent to the global-index of
         the [0, 0, ...] element of the local section.
@@ -550,19 +546,18 @@ class MPIArray(np.ndarray):
 
     @local_offset.setter
     def local_offset(self, var):
-        """
-        Set offset into global array.
+        """Set offset into global array.
 
         Parameters
         ----------
         var : tuple
+            New local offset
         """
         self._local_offset = var
 
     @property
     def local_array(self):
-        """
-        The view of the local numpy array.
+        """The view of the local numpy array.
 
         Returns
         -------
@@ -572,15 +567,12 @@ class MPIArray(np.ndarray):
 
     @property
     def local_bounds(self) -> slice:
-        """
-        Global bounds of the local array along the
-        distributed axis.
+        """Global bounds of the local array along the distributed axis.
 
         Returns
         -------
         local_bounds
         """
-
         return slice(
             self.local_offset[self.axis],
             self.local_offset[self.axis] + self.local_shape[self.axis],
@@ -588,8 +580,7 @@ class MPIArray(np.ndarray):
 
     @property
     def comm(self):
-        """
-        The communicator over which the array is distributed.
+        """The communicator over which the array is distributed.
 
         Returns
         -------
@@ -599,16 +590,17 @@ class MPIArray(np.ndarray):
 
     @comm.setter
     def comm(self, var):
-        """
-        Set the communicator over which the array is distributed.
+        """Set the communicator over which the array is distributed.
 
         Parameters
         ----------
         var : MPI.Comm
+            New communicator
         """
         self._comm = var
 
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
+        """Make a new MPIArray."""
         # if mpiutil.world is None:
         #     raise RuntimeError('There is no mpi4py installation. Aborting.')
 
@@ -639,8 +631,7 @@ class MPIArray(np.ndarray):
 
     @property
     def global_slice(self):
-        """
-        Return an objects that presents a view of the array with global slicing.
+        """Return an objects that presents a view of the array with global slicing.
 
         Returns
         -------
@@ -658,7 +649,6 @@ class MPIArray(np.ndarray):
         comm: "MPI.IntraComm",
     ) -> "MPIArray":
         """Create an MPIArray view of a numpy array."""
-
         # Set shape and offset
         lshape = array.shape
         global_shape = list(lshape)
@@ -700,7 +690,6 @@ class MPIArray(np.ndarray):
         dist_array : MPIArray
             An MPIArray view of the input.
         """
-
         # from mpi4py import MPI
 
         if comm is None:
@@ -1056,7 +1045,10 @@ class MPIArray(np.ndarray):
             File to write dataset into.
         dataset : string
             Name of dataset to write into. Should not exist.
+        create : bool, optional
+            True if a new file should be created (if needed)
         chunks
+            Chunking arguments
         compression : str or int
             Name or identifier of HDF5 compression filter.
         compression_opts
@@ -1152,7 +1144,10 @@ class MPIArray(np.ndarray):
             File to write dataset into.
         dataset : string
             Name of dataset to write into. Should not exist.
+        create : bool, optional
+            True if a new file should be created (if needed)
         chunks
+            Chunking arguments
         compression : str or int
             Name or identifier of HDF5 compression filter.
         compression_opts
@@ -1246,12 +1241,17 @@ class MPIArray(np.ndarray):
             File to write dataset into.
         dataset : string
             Name of dataset to write into. Should not exist.
+        create : bool, optional
+            True if a new file should be created (if needed)
         chunks
+            Chunking arguments
         compression : str or int
             Name or identifier of HDF5 compression filter.
         compression_opts
             See HDF5 documentation for compression filters.
             Compression options for the dataset.
+        file_format : :class:`fileforats.FileFormat`
+            File format interface class
         """
         if chunks is None and hasattr(self, "chunks"):
             logger.error(f"getting chunking opts from mpiarray: {self.chunks}")
@@ -1299,7 +1299,6 @@ class MPIArray(np.ndarray):
         array : MPIArray
             Transposed MPIArray as a view of the original data.
         """
-
         tdata = np.ndarray.transpose(self, *axes)
 
         if len(axes) == 1 and isinstance(axes[0], (tuple, list)):
@@ -1332,7 +1331,6 @@ class MPIArray(np.ndarray):
         array : MPIArray
             Reshaped MPIArray as a view of the original data.
         """
-
         if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
             shape = tuple(shape[0])
 
@@ -1391,7 +1389,6 @@ class MPIArray(np.ndarray):
         arr : np.ndarray, or None
             The full global array on the specified rank.
         """
-
         if self.comm.rank == rank:
             arr = np.ndarray(self.global_shape, dtype=self.dtype)
         else:
@@ -1485,8 +1482,10 @@ class MPIArray(np.ndarray):
         )
 
     def ravel(self, *args, **kwargs):
-        """This method is explicitly not implemented and will
-        return a NotImplementedError.
+        """Method is explicitly not implemented.
+
+        This method would return a flattened view of the entire
+        array, which is not supported across the distributed axis.
 
         Raises
         ------
@@ -1509,9 +1508,10 @@ class MPIArray(np.ndarray):
             File to write dataset into.
         dataset : string
             Name of dataset to write into.
+        create : bool, optional
+            True if a new file should be created (if needed)
         """
-
-        ## Naive non-parallel implementation to start
+        # Naive non-parallel implementation to start
 
         import h5py
 
@@ -1682,7 +1682,6 @@ class MPIArray(np.ndarray):
             dictionary containing the optional input arguments of the ufunc.  Important
             kwargs considered here are 'out' and 'axis'.
         """
-
         # Each ufunc application method must have a corresponding function that both
         # validates the inputs and arguments are appropriate (same distributed axis
         # etc.), and infers and returns the parameters of the output distributed axis
@@ -1869,8 +1868,7 @@ class MPIArray(np.ndarray):
     # pylint: enable=too-many-branches
 
     def __array_finalize__(self, obj):
-        """
-        Finalizes the creation of the MPIArray, when viewed.
+        """Finalizes the creation of the MPIArray, when viewed.
 
         Note: If you wish to create an MPIArray from an ndarray, please use wrap().
         Do not use ndarray.view(MPIArray).
@@ -1943,7 +1941,6 @@ def zeros(*args, **kwargs) -> MPIArray:
     MPIArray
         The filled MPIArray.
     """
-
     arr = MPIArray(*args, **kwargs)
     arr[:] = 0
 
@@ -1963,7 +1960,6 @@ def ones(*args, **kwargs) -> MPIArray:
     MPIArray
         The filled MPIArray.
     """
-
     arr = MPIArray(*args, **kwargs)
     arr[:] = 1
 
@@ -1971,8 +1967,7 @@ def ones(*args, **kwargs) -> MPIArray:
 
 
 def _partition_sel(sel, split_axis, n, slice_):
-    """
-    Re-slice a selection along a new axis.
+    """Re-slice a selection along a new axis.
 
     Take a selection (a tuple of slices) and re-slice along the split_axis (which has
     length n).
@@ -1985,7 +1980,8 @@ def _partition_sel(sel, split_axis, n, slice_):
         New split axis
     n : int
         Length of split axis
-    slice_
+    slice_ : List[slice]
+        New slice along new axis
 
     Returns
     -------
@@ -2217,7 +2213,6 @@ def sanitize_slice(
     IndexError
         For incompatible slices, such as too many axes.
     """
-
     orig_sl = sl
 
     # Add an Ellipsis at the very end if it isn't present elsewhere

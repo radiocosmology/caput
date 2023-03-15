@@ -774,7 +774,7 @@ def test_ufunc_misc():
     dist_array1.local_array[:] = 1.0
     dist_array2.local_array[:] = 1.0
 
-    ## Check that unsupported operations types fail
+    # Check that unsupported operations types fail
     # Check that an outer call fails
     with pytest.raises(mpiarray.UnsupportedOperation):
         np.multiply.outer(dist_array1, dist_array2)

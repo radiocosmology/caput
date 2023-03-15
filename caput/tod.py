@@ -1,5 +1,4 @@
-"""
-Data formats for Time Ordered Data.
+"""Data formats for Time Ordered Data.
 
 This module contains data containers, data formats, and utilities based on
 :mod:`caput.memh5`. The data represented must have an axis representing time,
@@ -35,9 +34,7 @@ class TOData(memh5.BasicCont):
         """Representation of the "time" axis.
 
         The value of ``self.index_map['time']``.
-
         """
-
         return self.index_map["time"][:]
 
     @classmethod
@@ -53,16 +50,42 @@ class TOData(memh5.BasicCont):
     ):
         """Create new data object by concatenating a series of objects.
 
-        Parameters
-        ----------
-
         Accepts any parameter for :func:`concatenate` (which controls the
         concatenation) or this class's constructor (which controls the
         initialization of each file). By default, each file is opened with
         `ondisk=True` and `mode='r'`.
 
-        """
+        Parameters
+        ----------
+        files : list of :class:`TOData`.
+            These are assumed to be identical in
+            every way except along the axes representing time, over which they
+            are concatenated. All other data and attributes are simply copied
+            from the first entry of the list.
+        data_group : `h5py.Group`, hdf5 filename or `memh5.Group`, optional
+            Underlying hdf5 like container that will store the data for the
+            BaseData instance.
+        start : int or dict with keys ``data_list[0].time_axes``, optional
+            In the aggregate datasets at what index to start.  Every thing before
+            this index is excluded.
+        stop : int or dict with keys ``data_list[0].time_axes``, optional
+            In the aggregate datasets at what index to stop.  Every thing after
+            this index is excluded.
+        datasets : sequence of strings, optional
+            Which datasets to include.  Default is all of them.
+        dataset_filter : callable with one or two arguments
+            Function for preprocessing all datasets.  Useful for changing data
+            types etc. Takes a dataset as an argument and should return a
+            dataset (either h5py or memh5). Optionally may accept a second
+            argument that is slice along the time axis, which the filter should
+            apply.
+        **kwargs : dict
+            Arbitrary keyword arguments.
 
+        Returns
+        -------
+        data : :class:`TOData`
+        """
         if "mode" not in kwargs:
             kwargs["mode"] = "r"
         if "ondisk" not in kwargs:
@@ -86,9 +109,7 @@ class TOData(memh5.BasicCont):
 
         Method accepts scalar times in supported formats and converts them
         to the same format as ``self.time``.
-
         """
-
         return time
 
 
@@ -163,9 +184,7 @@ class Reader:
         -------
         time_sel : pair of ints
             Start and stop indices for reading along the time axis.
-
         """
-
         return self._time_sel
 
     @time_sel.setter
@@ -213,9 +232,7 @@ class Reader:
         stop_time : scalar time
             Affects the second element of :attr:`~Reader.time_sel`.  Default
             leaves it unchanged.
-
         """
-
         if start_time is not None:
             start_time = self.data_class.convert_time(start_time)
             start = np.where(self.time >= start_time)[0][0]
@@ -242,9 +259,7 @@ class Reader:
         data : :class:`TOData`
             Data read from :attr:`~Reader.files` based on the selections made
             by user.
-
         """
-
         return self.data_class.from_mult_files(
             self.files,
             data_group=out_group,
@@ -306,9 +321,7 @@ def concatenate(
     Returns
     -------
     data : :class:`TOData`
-
     """
-
     if dataset_filter is None:
 
         def dataset_filter(d):
@@ -533,12 +546,10 @@ def concatenate(
 
 
 def ensure_file_list(files):
-    """Tries to interpret the input as a sequence of files
+    """Tries to interpret the input as a sequence of files.
 
     Expands filename wildcards ("globs") and casts sequeces to a list.
-
     """
-
     if memh5.is_group(files):
         files = [files]
     elif isinstance(files, str):
@@ -563,9 +574,7 @@ def _copy_non_time_data(
     Return list of all time-order dataset names. Leading '/' is stripped off.
 
     If *out* is `None` do not copy.
-
     """
-
     if to_dataset_names is None:
         to_dataset_names = []
 
@@ -625,7 +634,6 @@ def _copy_non_time_data(
 
 def _dset_has_axis(entry: Any, axes: Tuple[str]) -> bool:
     """Check if `entry` is a dataset with an axis named in `axes`."""
-
     if memh5.is_group(entry):
         return False
 

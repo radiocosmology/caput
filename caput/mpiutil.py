@@ -1,5 +1,4 @@
-"""
-Utilities for making MPI usage transparent.
+"""Utilities for making MPI usage transparent.
 
 This module exposes much of the functionality of :mod:`mpi4py` but will still
 run in serial if mpi is not present on the system. It is thus useful for
@@ -307,7 +306,7 @@ mpilist = partition_list_mpi
 
 
 def mpirange(*args, **kargs):
-    """An MPI aware version of `range`, each process gets its own sub section."""
+    """MPI aware version of `range`, each process gets its own sub section."""
     full_list = list(range(*args))
 
     method = kargs.get("method", "con")
@@ -317,11 +316,13 @@ def mpirange(*args, **kargs):
 
 
 def barrier(comm=_comm):
+    """Call comm.Barrier() if MPI is enabled."""
     if comm is not None and comm.size > 1:
         comm.Barrier()
 
 
 def bcast(data, root=0, comm=_comm):
+    """Call comm.bcast if MPI is enabled."""
     if comm is not None and comm.size > 1:
         return comm.bcast(data, root=root)
     else:
@@ -329,6 +330,7 @@ def bcast(data, root=0, comm=_comm):
 
 
 def allreduce(sendobj, op=None, comm=_comm):
+    """Call comm.allreduce if MPI is enabled."""
     if comm is not None and comm.size > 1:
         return comm.allreduce(sendobj, op=(op or MPI.SUM))
     else:
@@ -377,7 +379,6 @@ def parallel_map(func, glist, root=None, method="con", comm=_comm):
     results : list
         Global list of results.
     """
-
     # Synchronize
     barrier(comm=comm)
 
@@ -441,8 +442,7 @@ def typemap(dtype):
 
 
 def split_m(n, m):
-    """
-    Split a range (0, n-1) into m sub-ranges of similar length
+    """Split a range (0, n-1) into m sub-ranges of similar length.
 
     Parameters
     ----------
@@ -476,8 +476,7 @@ def split_m(n, m):
 
 
 def split_all(n, comm=_comm):
-    """
-    Split a range (0, n-1) into sub-ranges for each MPI Process.
+    """Split a range (0, n-1) into sub-ranges for each MPI Process.
 
     Parameters
     ----------
@@ -499,16 +498,15 @@ def split_all(n, comm=_comm):
     --------
     :func:`split_m`, :func:`split_local`
     """
-
     m = size if comm is None else comm.size
 
     return split_m(n, m)
 
 
 def split_local(n, comm=_comm):
-    """
-    Split a range (0, n-1) into sub-ranges for each MPI Process. This returns
-    the parameters only for the current rank.
+    """Split a range (0, n-1) into sub-ranges for each MPI Process.
+
+    This returns the parameters only for the current rank.
 
     Parameters
     ----------
@@ -530,7 +528,6 @@ def split_local(n, comm=_comm):
     --------
     :func:`split_all`, :func:`split_local`
     """
-
     pse = split_all(n, comm=comm)
     m = rank if comm is None else comm.rank
 
@@ -538,8 +535,7 @@ def split_local(n, comm=_comm):
 
 
 def gather_local(global_array, local_array, local_start, root=0, comm=_comm):
-    """
-    Gather data array in each process to the global array in `root` process.
+    """Gather data array in each process to the global array in `root` process.
 
     Parameters
     ----------
@@ -555,7 +551,6 @@ def gather_local(global_array, local_array, local_start, root=0, comm=_comm):
         MPI communicator that array is distributed over. Default is MPI.COMM_WORLD.
 
     """
-
     local_size = local_array.shape
 
     if comm is None or comm.size == 1:
@@ -602,7 +597,8 @@ def gather_local(global_array, local_array, local_start, root=0, comm=_comm):
 
 
 def transpose_blocks(row_array, shape, comm=_comm):
-    """
+    """Swap 2D matrix split from row-wise to columnwise.
+
     Take a 2D matrix which is split between processes row-wise and split it
     column wise between processes.
 
@@ -620,7 +616,6 @@ def transpose_blocks(row_array, shape, comm=_comm):
     col_array : np.ndarray
         Local section of the global array (split column wise).
     """
-
     if comm is None or comm.size == 1:
         # only one process
         if row_array.shape[:-1] == shape[:-1]:
@@ -741,7 +736,6 @@ def allocate_hdf5_dataset(fname, dsetname, shape, dtype, comm=_comm):
         Size of the dataset in bytes.
 
     """
-
     import h5py
 
     state = None
@@ -775,7 +769,9 @@ def allocate_hdf5_dataset(fname, dsetname, shape, dtype, comm=_comm):
 
 
 def lock_and_write_buffer(obj, fname, offset, size):
-    """Write the contents of a buffer to disk at a given offset, and explicitly
+    """Write buffer contents to disk at a given locked offset.
+
+    Write the contents of a buffer to disk at a given offset, and explicitly
     lock the region of the file whilst doing so.
 
     Parameters
@@ -813,7 +809,6 @@ def lock_and_write_buffer(obj, fname, offset, size):
 
 def parallel_rows_write_hdf5(fname, dsetname, local_data, shape, comm=_comm):
     """Write out array (distributed across processes row wise) into a HDF5 in parallel."""
-
     offset, _ = allocate_hdf5_dataset(
         fname, dsetname, shape, local_data.dtype, comm=comm
     )
@@ -860,6 +855,7 @@ class MPILogFilter(logging.Filter):  # pylint: disable=too-few-public-methods
         self.size = comm.size if comm else size
 
     def filter(self, record):
+        """Return True if we should filter the record."""
         # Add MPI info if desired
         try:
             record.mpi_rank
@@ -902,6 +898,7 @@ class SelfWrapper(ModuleType):
             raise AttributeError("module 'mpiutil' has no attribute '%s'" % name)
 
     def __call__(self, **kwargs):
+        """Call self with set module."""
         return SelfWrapper(self.self_module, kwargs)
 
 

@@ -1,5 +1,4 @@
-r"""
-Routines for calculation and of solar and sidereal times.
+r"""Routines for calculation and of solar and sidereal times.
 
 This module can:
 
@@ -267,7 +266,6 @@ class Observer:
         -------
         lsa : float
         """
-
         era = unix_to_era(time)
 
         lsa = (era + self.longitude) % 360.0
@@ -278,8 +276,7 @@ class Observer:
 
     @listize()
     def lsa_to_unix(self, lsa, time0):
-        """Convert a Local Stellar Angle (LSA) on a given
-        day to a UNIX time.
+        """Convert a Local Stellar Angle (LSA) on a given day to a UNIX time.
 
         Parameters
         ----------
@@ -294,7 +291,6 @@ class Observer:
         time : scalar or np.ndarray
             Corresponding UNIX time.
         """
-
         era = (lsa - self.longitude) % 360.0
 
         return era_to_unix(era, time0)
@@ -325,7 +321,6 @@ class Observer:
         -------
         lsd : float or array of
         """
-
         # Get fractional part from LRA
         frac_part = self.unix_to_lsa(time) / 360.0
 
@@ -348,13 +343,12 @@ class Observer:
         Parameters
         ----------
         lsd : float or array of
-
+            Local Stellar Day to convert to unix
         Returns
         -------
         time :  float or array of
             UNIX time
         """
-
         # Find the approximate UNIX time
         approx_unix = self.lsd_zero() + lsd * 3600 * 24 * SIDEREAL_S
 
@@ -381,7 +375,6 @@ class Observer:
         lst : float or array of
             The apparent LST in degrees.
         """
-
         st = unix_to_skyfield_time(unix)
 
         return (st.gast * 15.0 + self.longitude) % 360.0
@@ -408,7 +401,6 @@ class Observer:
 
         Notes
         -----
-
         It is not clear that this calculation includes nutation and stellar
         aberration.  See the discussion
         `on stackoverflow <http://stackoverflow.com/questions/11970713>`_.
@@ -422,7 +414,6 @@ class Observer:
         PyEphem uses all geocentric latitudes, which I don't think affects
         this calculation.
         """
-
         # Initialize Skyfield location object.
         obs = self.skyfield_obs()
 
@@ -477,7 +468,6 @@ class Observer:
         dec : np.ndarray
             Only returned if `return_dec` is set. Declination of source at transit.
         """
-
         if isinstance(source, float):
             source = skyfield_star_from_ra_dec(source, 0.0)
 
@@ -674,7 +664,6 @@ def unix_to_skyfield_time(unix_time):
     -------
     time : :class:`skyfield.timelib.Time`
     """
-
     ts = skyfield_wrapper.timescale
 
     days, seconds = divmod(unix_time, 24 * 3600.0)
@@ -727,7 +716,6 @@ def unix_to_era(unix_time):
     era : float or array of
         The Earth Rotation Angle in degrees.
     """
-
     from skyfield import earthlib
 
     t = unix_to_skyfield_time(unix_time)
@@ -760,7 +748,6 @@ def era_to_unix(era, time0):
     unix_time : float or array of.
         Unix/POSIX time.
     """
-
     era0 = unix_to_era(time0)
 
     diff_era_deg = (era - era0) % 360.0  # Convert from degrees in seconds (time)
@@ -788,15 +775,14 @@ def unix_to_datetime(unix_time):
         Unix/POSIX time.
 
     Returns
-    --------
+    -------
     dt : :class:`datetime.datetime`
+        datetime object from the provided time
 
     See Also
     --------
     :func:`datetime_to_unix`
-
     """
-
     dt = datetime.utcfromtimestamp(unix_time)
 
     return naive_datetime_to_utc(dt)
@@ -811,6 +797,7 @@ def datetime_to_unix(dt):
     Parameters
     ----------
     dt : :class:`datetime.datetime`
+        datetime object to convert to unix
 
     Returns
     -------
@@ -821,7 +808,6 @@ def datetime_to_unix(dt):
     --------
     :func:`unix_to_datetime`
     :meth:`datetime.datetime.utcfromtimestamp`
-
     """
     # Noting that this operation is ignorant of leap seconds.
     dt = naive_datetime_to_utc(dt)
@@ -839,6 +825,7 @@ def datetime_to_timestr(dt):
     Parameters
     ----------
     dt : :class:`datetime.datetime`
+        datetime object to convert to timestring
 
     Returns
     -------
@@ -848,9 +835,7 @@ def datetime_to_timestr(dt):
     See Also
     --------
     :func:`timestr_to_datetime`
-
     """
-
     return dt.strftime("%Y%m%dT%H%M%SZ")
 
 
@@ -872,7 +857,6 @@ def timestr_to_datetime(time_str):
     :func:`datetime_to_timestr`
 
     """
-
     return datetime.strptime(time_str[:15], "%Y%m%dT%H%M%S")
 
 
@@ -892,7 +876,6 @@ def leap_seconds_between(time_a, time_b):
     int : bool
         The number of leap seconds between *time_a* and *time_b*.
     """
-
     # Construct the elapse UNIX time
     delta_unix = time_b - time_a
 
@@ -932,7 +915,6 @@ def ensure_unix(time):
     unix_time : float, or array of
         Output time.
     """
-
     if isinstance(time[0], datetime):
         return datetime_to_unix(time)
     elif isinstance(time[0], str):
@@ -957,6 +939,7 @@ def naive_datetime_to_utc(dt):
     Parameters
     ----------
     dt : datetime
+        datetime object without 'tzinfo'
 
     Returns
     -------
@@ -986,7 +969,7 @@ def time_of_day(time):
 
     Parameters
     ----------
-    time_date : float (UNIX time), or datetime
+    time : float (UNIX time), or datetime
         Find the start time of the day that `time` is in.
 
     Returns
@@ -1048,10 +1031,11 @@ class SkyfieldWrapper:
 
     @property
     def load(self):
-        """A :class:`skyfield.iokit.Loader` object to be used in the same way as
-        `skyfield.api.load`, in case you want something other than `timescale`
-        or `ephemeris`."""
+        """A :class:`skyfield.iokit.Loader` object.
 
+        This is to be used in the same way as `skyfield.api.load`,
+        in case you want something other than `timescale` or `ephemeris`.
+        """
         if self._load is None:
             raise RuntimeError("Skyfield is not installed.")
         return self._load
@@ -1059,16 +1043,16 @@ class SkyfieldWrapper:
     @property
     def path(self):
         """The path to the Skyfield data."""
-
         return self.load.directory
 
     _timescale = None
 
     @property
     def timescale(self):
-        """A :class:`skyfield.timelib.Timescale` object. Loaded at first call,
-        and then cached."""
+        """A :class:`skyfield.timelib.Timescale` object.
 
+        Loaded at first call and then cached.
+        """
         if self._timescale:
             return self._timescale
 
@@ -1102,8 +1086,9 @@ class SkyfieldWrapper:
     @property
     def ephemeris(self):
         """A Skyfield ephemeris object (:class:`skyfield.jpllib.SpiceKernel`).
-        Loaded at first call, and then cached."""
 
+        Loaded at first call, and then cached.
+        """
         if self._ephemeris:
             return self._ephemeris
 
@@ -1133,7 +1118,6 @@ class SkyfieldWrapper:
 
         This will only load the data from the official sources.
         """
-
         # Download the timescale file and ephemeris
         self.load.download("finals2000A.all")
         self.load.download(self._ephemeris_name)
@@ -1219,7 +1203,6 @@ def skyfield_star_from_ra_dec(ra, dec, name=""):
     body : skyfield.starlib.Star
         An object representing the body.
     """
-
     body = Star(
         ra=Angle(degrees=ra, preference="hours"), dec=Angle(degrees=dec), names=name
     )

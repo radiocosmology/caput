@@ -7,7 +7,7 @@ import numpy as np
 
 
 def vectorize(**base_kwargs):
-    """An improved vectorization decorator.
+    """Improved vectorization decorator.
 
     Unlike the :class:`np.vectorize` decorator this version works on methods in
     addition to functions. It also gives an actual scalar value back for any
@@ -15,7 +15,7 @@ def vectorize(**base_kwargs):
 
     Parameters
     ----------
-    **kwargs
+    **base_kwargs
         Any keyword arguments accepted by :class:`np.vectorize`
 
     Returns
@@ -256,7 +256,6 @@ class lock_file:
 
     Examples
     --------
-
     >>> from . import memh5
     >>> container = memh5.BasicCont()
     >>> with lock_file('file_to_create.h5') as fname:

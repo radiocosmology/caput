@@ -6,7 +6,7 @@ import yaml
 from caput import config
 
 
-### Test classes
+# Test classes
 class Person(config.Reader):
     name = config.Property(default="Bill", proptype=str)
     age = config.Property(default=26, proptype=float, key="ageinyears")
@@ -27,11 +27,11 @@ class DictTypeTests(config.Reader):
     dict_config = config.Property(proptype=dict)
 
 
-### Test data dict
+# Test data dict
 testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
 
-### Tests
+# Tests
 def test_default_params():
     person1 = Person()
 

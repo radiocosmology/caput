@@ -35,8 +35,7 @@ class FileFormat:
 
     @staticmethod
     def open(*args, **vargs):
-        """
-        Open a file.
+        """Open a file.
 
         Not implemented in base class
         """
@@ -44,8 +43,7 @@ class FileFormat:
 
     @staticmethod
     def compression_kwargs(compression=None, compression_opts=None, compressor=None):
-        """
-        Sort compression arguments in a format expected by file format module.
+        """Sort compression arguments in a format expected by file format module.
 
         Parameters
         ----------
@@ -75,7 +73,7 @@ class HDF5(FileFormat):
 
     @staticmethod
     def compression_enabled():
-        """Disable compression and chunking due to bug: https://github.com/chime-experiment/Pipeline/issues/33"""
+        """Disable compression and chunking due to bug: https://github.com/chime-experiment/Pipeline/issues/33."""
         return False
 
     @staticmethod
@@ -165,8 +163,7 @@ class Zarr(FileFormat):
 
 
 class ZarrProcessSynchronizer:
-    """
-    A context manager for Zarr's ProcessSynchronizer that removes the lock files when done.
+    """A context manager for Zarr's ProcessSynchronizer that removes the lock files when done.
 
     If an MPI communicator is supplied, only rank 0 will attempt to remove files.
 
@@ -195,8 +192,7 @@ class ZarrProcessSynchronizer:
 
 
 def remove_file_or_dir(name: str):
-    """
-    Remove the file or directory with the given name.
+    """Remove the file or directory with the given name.
 
     Parameters
     ----------
@@ -216,8 +212,7 @@ def remove_file_or_dir(name: str):
 
 
 def guess_file_format(name, default=HDF5):
-    """
-    Guess the file format from the file name.
+    """Guess the file format from the file name.
 
     Parameters
     ----------
@@ -246,8 +241,7 @@ def guess_file_format(name, default=HDF5):
 
 
 def check_file_format(filename, file_format, data):
-    """
-    Compare file format with guess from filename and data. Return concluded format.
+    """Compare file format with guess from filename and data. Return concluded format.
 
     Parameters
     ----------
@@ -263,7 +257,6 @@ def check_file_format(filename, file_format, data):
     file_format : HDF5 or Zarr
         File format.
     """
-
     # check <file_format> value
     if file_format not in (None, HDF5, Zarr):
         raise ValueError(
