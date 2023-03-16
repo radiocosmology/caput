@@ -478,8 +478,7 @@ class MPIArray(np.ndarray):
 
     @property
     def global_slice(self) -> _global_resolver:
-        """Return an objects that presents a view of the
-        array with global slicing.
+        """Return an object that presents a view of the array with global slicing.
 
         Returns
         -------
@@ -532,8 +531,7 @@ class MPIArray(np.ndarray):
 
     @property
     def local_bounds(self) -> slice:
-        """Global bounds of the local array along the
-        distributed axis.
+        """Global bounds of the local array along the distributed axis.
 
         Returns
         -------
@@ -567,7 +565,8 @@ class MPIArray(np.ndarray):
         """
         return self._comm
 
-    def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
+    def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs) -> MPIArray:
+        """Create a new array."""
         if comm is None:
             comm = mpiutil.world
 
@@ -614,6 +613,8 @@ class MPIArray(np.ndarray):
             global length of the distributed axis
         local_start
             index in the distributed axis where this slice exists
+        comm
+            MPI communicator to use with this array
 
         Returns
         -------
@@ -947,7 +948,6 @@ class MPIArray(np.ndarray):
         array
             Reshaped MPIArray as a view of the original data.
         """
-
         if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
             shape = tuple(shape[0])
 
@@ -1561,12 +1561,17 @@ class MPIArray(np.ndarray):
             File to write dataset into.
         dataset : string
             Name of dataset to write into. Should not exist.
+        create : bool, optional
+            True if a new file should be created
         chunks
+            chunking argument
         compression : str or int
             Name or identifier of HDF5 compression filter.
         compression_opts
             See HDF5 documentation for compression filters.
             Compression options for the dataset.
+        file_format
+            save file as either HDF5 or Zarr
         """
         if chunks is None and hasattr(self, "chunks"):
             logger.error(f"getting chunking opts from mpiarray: {self.chunks}")
@@ -1606,7 +1611,10 @@ class MPIArray(np.ndarray):
             File to write dataset into.
         dataset : string
             Name of dataset to write into. Should not exist.
+        create : bool, optional
+            True if a new file should be created
         chunks
+            chunking argument
         compression : str or int
             Name or identifier of HDF5 compression filter.
         compression_opts
@@ -1697,7 +1705,10 @@ class MPIArray(np.ndarray):
             File to write dataset into.
         dataset : string
             Name of dataset to write into. Should not exist.
+        create : bool, optional
+            True if a new file should be created
         chunks
+            chunking argument
         compression : str or int
             Name or identifier of HDF5 compression filter.
         compression_opts
@@ -1785,8 +1796,9 @@ class MPIArray(np.ndarray):
             File to write dataset into.
         dataset : string
             Name of dataset to write into.
+        create : bool, optional
+            True if a new file should be created
         """
-
         import h5py
 
         if h5py.get_config().mpi:
@@ -1930,7 +1942,7 @@ def _partition_sel(sel, split_axis, n, slice_):
     Parameters
     ----------
     sel : Tuple[slice]
-        Selection
+        Initial selection
     split_axis : int
         New split axis
     n : int
