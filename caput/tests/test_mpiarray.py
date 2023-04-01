@@ -292,26 +292,40 @@ def test_copy():
 def test_reshape():
     gshape = (1, 11, 2, 14)
 
+    # Redistribute with the axis in the middle
+    arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
+    arr2 = arr.reshape((None, 28))
     l0, s0, _ = mpiutil.split_local(11)
 
-    arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
-
-    arr2 = arr.reshape((None, 28))
-
-    # Check type
+    # Check the type, global_shape, local_shape, local_offset and axis as are expected
     assert isinstance(arr2, mpiarray.MPIArray)
-
-    # Check global shape
     assert arr2.global_shape == (11, 28)
-
-    # Check local shape
     assert arr2.local_shape == (l0, 28)
-
-    # Check local offset
     assert arr2.local_offset == (s0, 0)
-
-    # Check axis
     assert arr2.axis == 0
+
+    # Another test but now with the axis far at the end, this catches a bug where if the
+    # number of axes shrunk enough the distributed axis would index off the end
+    arr = mpiarray.MPIArray(gshape, axis=3, dtype=np.int64)
+    arr2 = arr.reshape((22, None))
+    l0, s0, _ = mpiutil.split_local(14)
+
+    # Check the type, global_shape, local_shape, local_offset and axis as are expected
+    assert isinstance(arr2, mpiarray.MPIArray)
+    assert arr2.global_shape == (22, 14)
+    assert arr2.local_shape == (22, l0)
+    assert arr2.local_offset == (0, s0)
+    assert arr2.axis == 1
+
+    # Check a reshape with a wildcard works
+    arr2 = arr.reshape(-1, None)
+
+    # Check the type, global_shape, local_shape, local_offset and axis as are expected
+    assert isinstance(arr2, mpiarray.MPIArray)
+    assert arr2.global_shape == (22, 14)
+    assert arr2.local_shape == (22, l0)
+    assert arr2.local_offset == (0, s0)
+    assert arr2.axis == 1
 
 
 # pylint: disable=too-many-statements
