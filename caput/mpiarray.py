@@ -1879,11 +1879,11 @@ class MPIArray(np.ndarray):
 
         Parameters
         ----------
+        self : MPIArray or ndarray
+            The array which will be created
         obj : MPIArray, ndarray or None
             The original array being viewed or broadcast.
             When in the middle of a constructor, obj is set to None.
-        self : MPIArray or ndarray
-            The array which will be created
         """
         if obj is None:
             # we are in the middle of a constructor, and the attributes
