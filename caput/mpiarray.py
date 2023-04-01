@@ -1331,32 +1331,84 @@ class MPIArray(np.ndarray):
         array : MPIArray
             Reshaped MPIArray as a view of the original data.
         """
+
+        def _check_shapes(
+            current_shape: Tuple[int], new_shape: Tuple[int]
+        ) -> Tuple[int]:
+            """Check that we can reshape one array into another.
+
+            Returns the fully fleshed out shape, or raises a ValueError.
+            """
+            actual_size = 1
+            for s in current_shape:
+                actual_size *= s
+
+            wildcard_pos = -1
+
+            new_size = 1
+            for ii, s in enumerate(new_shape):
+                if s == -1 and wildcard_pos < 0:
+                    wildcard_pos = ii
+                elif s == -1 and wildcard_pos >= 0:
+                    raise ValueError(
+                        f"Found two wildcards (-1) in new array shape {new_shape}"
+                    )
+                else:
+                    new_size *= s
+
+            if wildcard_pos >= 0 and actual_size % new_size == 0:
+                # If there was a wildcard then it then we need to check that it would be
+                # a sane value and calculate what it is
+                new_shape = list(new_shape)
+                new_shape[wildcard_pos] = actual_size // new_size
+                return tuple(new_shape)
+
+            elif wildcard_pos < 0 and actual_size == new_size:
+                # If not, the total sizes must be exactly equal
+                return tuple(new_shape)
+            else:
+                # Throw an error. Note that this exception gives the full array shapes
+                # not just the parts being tested to make more sense for the user.
+                raise ValueError(
+                    f"Cannot reshape MPIArray of shape={self.shape} into new shape="
+                    f"{shape}."
+                )
+
         if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
             shape = tuple(shape[0])
 
-        # Find which axis is distributed
-        list_shape = list(shape)
-        new_axis = list_shape.index(None)
-
         # Fill in the missing value
-        local_shape = list_shape[:]
-        global_shape = list_shape[:]
-        local_offset = [0] * len(list_shape)
+        local_shape = list(shape)
+        new_axis = local_shape.index(None)
         local_shape[new_axis] = self.local_shape[self.axis]
-        global_shape[new_axis] = self.global_shape[self.axis]
-        local_offset[new_axis] = self.local_offset[self.axis]
 
-        # Check that the array sizes are compatible
-        if np.prod(local_shape) != np.prod(self.local_shape):
-            raise Exception("Dataset shapes incompatible.")
+        # We will check the reshaping in two steps so we can be sure that we are not
+        # messing up the axis distribution. In both cases we will *include* the
+        # distributed axis in the test as this takes care of cases where we are adding
+        # length-1 axes where there are currently no axes.
+        # First, we test any axes after the distributed axis...
+        post_shape = self.local_shape[self.axis :]
+        new_post_shape = local_shape[new_axis:]
+        new_post_shape = _check_shapes(post_shape, new_post_shape)
+        # Then, we test any axes before the distributed axis...
+        pre_shape = self.local_shape[: (self.axis + 1)]
+        new_pre_shape = local_shape[: (new_axis + 1)]
+        new_pre_shape = _check_shapes(pre_shape, new_pre_shape)
 
-        rdata = np.ndarray.reshape(self, local_shape)
+        # Construct the new fleshed out local array shape
+        local_shape = new_pre_shape[:new_axis] + new_post_shape
 
-        rdata.axis = new_axis
-        rdata.comm = self._comm
-        rdata.local_shape = tuple(local_shape)
-        rdata.global_shape = tuple(global_shape)
-        rdata.local_offset = tuple(local_offset)
+        # Now we actually try the resize...
+        new_data = self.local_array.reshape(local_shape)
+
+        # ...and then construct the final MPIArray object
+        rdata = self.__class__._view_from_data_and_params(
+            new_data,
+            new_axis,
+            self.global_shape[self.axis],
+            self._local_offset[self.axis],
+            self.comm,
+        )
 
         return rdata
 
