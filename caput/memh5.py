@@ -2546,6 +2546,8 @@ def deep_group_copy(
     >>> list(g2["foo"]["bar"])
     [0, 1]
 
+    Axis downselections cannot be applied to shared datasets.
+
     Parameters
     ----------
     g1 : h5py.Group or zarr.Group
@@ -2555,7 +2557,7 @@ def deep_group_copy(
     selections : dict
         If this is not None, it should have a subset of the same hierarchical structure
         as g1, but ultimately describe axis selections for group entries as valid
-        numpy indexes.
+        numpy indexes. Selections cannot be applied to shared datasets.
     convert_attribute_strings : bool, optional
         Convert string attributes (or lists/arrays of them) to ensure that they are
         unicode.
@@ -2572,12 +2574,11 @@ def deep_group_copy(
         entries, and can modify either.
     deep_copy_dsets : bool, optional
         Explicitly deep copy all datasets. This will only alter behaviour when copying
-        from memory to memory. XXX: enabling this in places where it is not currently
-        enabled could break legacy code, so be very careful
+        from memory to memory.
     shared : list, optional
         List of datasets to share, if `deep_copy_dsets` is True. Otherwise, no effect.
-        Shared datasets just point to the existing object in g1 storage, and override
-        any other behaviour
+        Shared datasets just point to the existing object in g1 storage. Axis selections
+        cannot be applied to shared datasets.
 
     Returns
     -------
@@ -2593,10 +2594,9 @@ def deep_group_copy(
 
     to_file = isinstance(g2, file_format.module.Group)
 
-    # Prepare a dataset for writing out, applying selections and transforming any
-    # datatypes
-    # Returns: dict(dtype, shape, data_to_write)
-    def _prepare_dataset(dset):
+    # Get the selection associated with this dataset
+    # Returns: slice
+    def _get_selection(dset):
         # Look for a selection for this dataset (also try without the leading "/")
         try:
             selection = selections.get(
@@ -2604,6 +2604,14 @@ def deep_group_copy(
             )
         except AttributeError:
             selection = slice(None)
+
+        return selection
+
+    # Prepare a dataset for writing out, applying selections and transforming any
+    # datatypes
+    # Returns: dict(dtype, shape, data_to_write)
+    def _prepare_dataset(dset):
+        selection = _get_selection(dset)
 
         # Check if this is a distributed dataset and figure out if we can make this work
         # out
@@ -2711,6 +2719,11 @@ def deep_group_copy(
             stack += [entry[k] for k in sorted(entry, reverse=True)]
 
         elif key in shared:
+            # Make sure that we aren't trying to apply a selection to this dataset
+            if _get_selection(entry) != slice(None):
+                raise ValueError(
+                    f"Cannot apply a selection to a shared dataset ({entry.name})"
+                )
             # Just point to the existing dataset
             parent_name, name = posixpath.split(posixpath.join(g2.name, key))
             parent_name = format_abs_path(parent_name)
