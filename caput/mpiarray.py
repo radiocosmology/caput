@@ -236,6 +236,8 @@ please use the uppercase variant of the function. The lower-case variants involv
 intermediate pickling process, which can lead to malformed arrays.
 
 """
+from __future__ import annotations
+
 import os
 import time
 import logging
@@ -2100,6 +2102,15 @@ def _expand_sel(sel, naxis):
     if len(sel) < naxis:
         sel = list(sel) + [slice(None)] * (naxis - len(sel))
     return list(sel)
+
+
+def _apply_sel(arr: np.ndarray, sel: slice | tuple | list, ax: int) -> np.ndarray:
+    """Apply a selection to a single axis of an array."""
+    if type(sel) is slice:
+        sel = (slice(None),) * ax + (sel,)
+        return arr[sel]
+    elif type(sel) in {list, tuple}:
+        return np.take(arr, sel, axis=ax)
 
 
 def _check_dist_axis(
