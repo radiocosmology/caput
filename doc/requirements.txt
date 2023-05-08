@@ -1,4 +1,4 @@
-Sphinx >= 4.0, < 5.0
+Sphinx >= 5.0, <7.0
 sphinx_rtd_theme
 # funcsigs required by mock, which apparently does not have its dependencies
 # setup correctly.
