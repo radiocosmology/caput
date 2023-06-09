@@ -117,8 +117,8 @@ and a complete cycle of ERA.
 
 .. _`IERS constants`: http://hpiers.obspm.fr/eop-pc/models/constants.html
 """
-from datetime import datetime
 import warnings
+from datetime import datetime
 
 import numpy as np
 from scipy.optimize import brentq
@@ -127,8 +127,7 @@ from skyfield.starlib import Star
 from skyfield.units import Angle
 
 from . import config
-from .misc import vectorize, scalarize, listize
-
+from .misc import listize, scalarize, vectorize
 
 # The approximate length of a UT1 second in SI seconds (i.e. LOD / 86400). This was
 # calculated from the IERS EOP C01 IAU2000 data, by calculating the derivative of UT1 -
@@ -268,9 +267,7 @@ class Observer:
         """
         era = unix_to_era(time)
 
-        lsa = (era + self.longitude) % 360.0
-
-        return lsa
+        return (era + self.longitude) % 360.0
 
     lsa = unix_to_lsa
 
@@ -428,9 +425,7 @@ class Observer:
         pos = obs.at(st).from_altaz(az_degrees=az, alt_degrees=el)
         ra, _, _ = pos.radec()  # Fetch ICRS position (effectively J2000)
 
-        ra = np.degrees(ra.radians)
-
-        return ra
+        return np.degrees(ra.radians)
 
     def transit_times(
         self, source, t0, t1=None, step=None, lower=False, return_dec=False
@@ -497,8 +492,8 @@ class Observer:
                 dec = np.array([], dtype=np.float64)
 
             return t_unix, dec
-        else:
-            return t_unix
+
+        return t_unix
 
     def rise_set_times(self, source, t0, t1=None, step=None, diameter=0.0):
         """Find all times a sources rises or sets in an interval.
@@ -647,9 +642,7 @@ class Observer:
         # this we need to use a private Skyfield method. This isn't a great idea given
         # how unstable skyfields internal API seems to be, but it saves reinventing the
         # wheel. We'll see how it goes for now.
-        alt = _to_altaz(pos, None, None)[0].degrees
-
-        return alt
+        return _to_altaz(pos, None, None)[0].degrees
 
 
 @scalarize()
@@ -674,9 +667,7 @@ def unix_to_skyfield_time(unix_time):
 
     # Construct Skyfield time. Cheat slightly by putting all of the time of day
     # in the `second` argument.
-    t = ts.utc(year, month, day, second=seconds)
-
-    return t
+    return ts.utc(year, month, day, second=seconds)
 
 
 @scalarize()
@@ -918,14 +909,17 @@ def ensure_unix(time):
     """
     if isinstance(time[0], datetime):
         return datetime_to_unix(time)
-    elif isinstance(time[0], str):
+
+    if isinstance(time[0], str):
         return datetime_to_unix(timestr_to_datetime(time))
-    elif isinstance(time[0], timelib.Time):
+
+    if isinstance(time[0], timelib.Time):
         return datetime_to_unix(time.utc_datetime())
-    elif isinstance(time, np.ndarray) and np.issubdtype(time.dtype, np.number):
+
+    if isinstance(time, np.ndarray) and np.issubdtype(time.dtype, np.number):
         return time.astype(np.float64)
-    else:
-        raise TypeError("Could not convert %s into a UNIX time" % repr(type(time)))
+
+    raise TypeError(f"Could not convert {type(time)!r} into a UNIX time")
 
 
 _warned_utc_datetime = False
@@ -1059,7 +1053,7 @@ class SkyfieldWrapper:
 
         try:
             self._timescale = self.load.timescale(builtin=False)
-        except IOError:
+        except OSError:
             warnings.warn(
                 "Could not get timescale data from an official source. Trying the "
                 "CHIME mirror, but the products are likely out of date."
@@ -1070,8 +1064,8 @@ class SkyfieldWrapper:
                     self.load.download(self.mirror_url + file)
 
                 self._timescale = self.load.timescale(builtin=False)
-            except IOError as e:
-                raise IOError(
+            except OSError as e:
+                raise OSError(
                     "Could not get ephemeris either from an existing installation at "
                     f"{self.load.directory}, an official download source or the CHIME "
                     f"mirror. If you can find a working mirror of "
@@ -1096,7 +1090,7 @@ class SkyfieldWrapper:
         try:
             self._ephemeris = self.load(self._ephemeris_name)
             return self._ephemeris
-        except IOError:
+        except OSError:
             warnings.warn(
                 "Could not get ephemeris data from an official source. Trying the "
                 "CHIME mirror, but the products are likely out of date."
@@ -1104,8 +1098,8 @@ class SkyfieldWrapper:
             try:
                 self.load.download(self.mirror_url + self._ephemeris_name)
                 self._ephemeris = self.load(self._ephemeris_name)
-            except IOError as e:
-                raise IOError(
+            except OSError as e:
+                raise OSError(
                     "Could not get ephemeris either from an existing installation at "
                     f"{self.load.directory}, an official download source or the CHIME "
                     f"mirror. If you can find a working mirror of "
@@ -1204,7 +1198,6 @@ def skyfield_star_from_ra_dec(ra, dec, name=""):
     body : skyfield.starlib.Star
         An object representing the body.
     """
-    body = Star(
+    return Star(
         ra=Angle(degrees=ra, preference="hours"), dec=Angle(degrees=dec), names=name
     )
-    return body

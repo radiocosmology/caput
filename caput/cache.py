@@ -2,7 +2,6 @@
 import weakref
 
 import numpy as np
-
 from cachetools import LRUCache
 
 

@@ -10,12 +10,10 @@ import glob
 import inspect
 from typing import Any, Tuple
 
-import numpy as np
 import h5py
+import numpy as np
 
-from . import memh5
-from . import mpiarray
-from . import fileformats
+from . import fileformats, memh5, mpiarray
 
 
 class TOData(memh5.BasicCont):
@@ -642,8 +640,7 @@ def _copy_non_time_data(
                 entry.attrs, target.attrs, convert_strings=convert_attribute_strings
             )
 
-    to_dataset_names = [n[1:] if n[0] == "/" else n for n in to_dataset_names]
-    return to_dataset_names
+    return [n[1:] if n[0] == "/" else n for n in to_dataset_names]
 
 
 def _dset_has_axis(entry: Any, axes: Tuple[str]) -> bool:

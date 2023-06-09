@@ -16,8 +16,8 @@ else:
     zarr_available = True
 
 try:
-    from bitshuffle.h5 import H5FILTER, H5_COMPRESS_LZ4
     import numcodecs
+    from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER
 except ModuleNotFoundError as e:
     logger.debug(
         f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters.: {e}"
@@ -154,12 +154,9 @@ class Zarr(FileFormat):
                         blocksize=int(blocksize) if blocksize is not None else None,
                     )
                 }
-            else:
-                raise ValueError(
-                    f"Compression filter not supported in zarr: {compression}"
-                )
-        else:
-            return {"compressor": compressor}
+            raise ValueError(f"Compression filter not supported in zarr: {compression}")
+
+        return {"compressor": compressor}
 
 
 class ZarrProcessSynchronizer:

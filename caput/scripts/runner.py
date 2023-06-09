@@ -1,13 +1,13 @@
 """CLI interface to run caput pipelines."""
 
 import functools
-import operator
 import itertools
+import operator
 import os
 import subprocess
 import sys
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 import click
 
@@ -56,8 +56,8 @@ def lint_config(configfile):
             Manager.from_yaml_file(f, lint=True)
         except CaputConfigError as e:
             click.echo(
-                "Found at least one error in '{}'.\n"
-                "Fix and run again to find more problems.".format(f)
+                f"Found at least one error in '{f}'.\n"
+                "Fix and run again to find more problems."
             )
             click.echo(e)
             sys.exit(1)
@@ -66,9 +66,10 @@ def lint_config(configfile):
 def load_venv(configfile):
     """Load the venv specified under cluster/venv in the given configfile."""
     import site
+
     import yaml
 
-    with open(configfile, mode="r") as f:
+    with open(configfile) as f:
         conf = yaml.safe_load(f)
     try:
         venv_path = conf["cluster"]["venv"]
@@ -76,14 +77,14 @@ def load_venv(configfile):
         # no 'cluster/venv' entry... nothing to do here
         return
 
-    click.echo("Activating '{}'...".format(venv_path))
+    click.echo(f"Activating '{venv_path}'...")
 
     base = Path(venv_path).resolve()
     if not base.exists():
-        click.echo("Path defined in 'cluster'/'venv' doesn't exist ({})".format(base))
+        click.echo(f"Path defined in 'cluster'/'venv' doesn't exist ({base})")
         sys.exit(1)
 
-    site_packages = base / "lib" / "python{}".format(sys.version[:3]) / "site-packages"
+    site_packages = base / "lib" / f"python{sys.version[:3]}" / "site-packages"
     prev_sys_path = list(sys.path)
 
     site.addsitedir(site_packages)
@@ -146,9 +147,9 @@ def load_venv(configfile):
 )
 def run(configfile, loglevel, profile, profiler, mpi_abort, psutil):
     """Run a pipeline immediately from the given CONFIGFILE."""
-    from caput.pipeline import Manager
-
     import warnings
+
+    from caput.pipeline import Manager
 
     if loglevel != "CONFIG":
         warnings.warn(
@@ -165,8 +166,8 @@ def run(configfile, loglevel, profile, profiler, mpi_abort, psutil):
             P = Manager.from_yaml_file(configfile, psutil_profiling=psutil)
         except CaputConfigError as e:
             click.echo(
-                "Found at least one error in '{}'.\n"
-                "Fix and run again to find more problems.".format(configfile)
+                f"Found at least one error in '{configfile}'.\n"
+                "Fix and run again to find more problems."
             )
             click.echo(e)
             sys.exit(1)
@@ -387,6 +388,7 @@ def queue(
         same filesystem.
     """
     import shutil
+
     import yaml
 
     if lint:
@@ -398,13 +400,13 @@ def queue(
             Manager.from_yaml_file(configfile, lint=True)
         except CaputConfigError as e:
             click.echo(
-                "Found at least one error in '{}'.\n"
-                "Fix and run again to find more problems.".format(configfile)
+                f"Found at least one error in '{configfile}'.\n"
+                "Fix and run again to find more problems."
             )
             click.echo(e)
             sys.exit(1)
 
-    with open(configfile, "r") as f:
+    with open(configfile) as f:
         yconf = yaml.safe_load(f)
 
     # Global configuration
@@ -466,8 +468,9 @@ def queue(
         if overwrite == "never":
             click.echo(f"Job already exists at {workdir}. Skipping.")
             return
-        elif overwrite == "failed" and statusfile.exists():
-            with open(statusfile, "r") as fh:
+
+        if overwrite == "failed" and statusfile.exists():
+            with open(statusfile) as fh:
                 contents = fh.read()
                 if "FINISHED" in contents:
                     click.echo(f"Successful job already exists at {workdir}. Skipping.")
@@ -603,7 +606,7 @@ fi
         else:
             if mailtype is None:
                 raise ValueError("Must specify PBS mailtype for email notifications")
-            elif mailtype not in _PBS_MAIL_TYPES:
+            if mailtype not in _PBS_MAIL_TYPES:
                 raise ValueError(f"Invalid PBS mailtype specified ({mailtype})")
 
             job_options = [f"-M {email}", f"-m {mailtype}"]
@@ -617,7 +620,7 @@ fi
         else:
             if mailtype is None:
                 raise ValueError("Must specify slurm mailtype for email notifications")
-            elif mailtype not in _SLURM_MAIL_TYPES:
+            if mailtype not in _SLURM_MAIL_TYPES:
                 raise ValueError(f"Invalid slurm mailtype specified ({mailtype})")
 
             job_options = [f"--mail-user={email}", f"--mail-type={mailtype}"]
@@ -636,7 +639,7 @@ fi
         # be. This is because mpi4py will incorrectly modify the environment
         # using lowlevel calls which Python cannot detect.
         subprocess.run(
-            [job_command] + job_options + ["jobscript.sh"], cwd=jobdir, env=os.environ
+            [job_command, *job_options, "jobscript.sh"], cwd=jobdir, env=os.environ
         )
 
 

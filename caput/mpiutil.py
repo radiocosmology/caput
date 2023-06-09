@@ -16,17 +16,16 @@ instead of::
 """
 
 import logging
-import sys
 import os
 import re
-import psutil
+import sys
 import time
 import warnings
 from types import ModuleType
 from typing import Optional
 
 import numpy as np
-
+import psutil
 
 rank = 0
 size = 1
@@ -80,8 +79,8 @@ def enable_mpi_exception_handler():
         MPI.COMM_WORLD.Abort(1)
 
     # Enable the faulthandler tracebacks as they are useful.
-    import io
     import faulthandler
+    import io
 
     try:
         faulthandler.enable()
@@ -104,33 +103,32 @@ def active_comm(aprocs):
     """Return a communicator consists of a list of processes in `aprocs`."""
     if _comm is None:
         return None
-    else:
-        # create a new communicator from active processes
-        comm = _comm.Create(_comm.Get_group().Incl(aprocs))
-        return comm
+
+    # create a new communicator from active processes
+    return _comm.Create(_comm.Get_group().Incl(aprocs))
 
 
 def active(aprocs):
     """Make a list of processes in `aprocs` active, while others wait."""
     if _comm is None:
         return None
-    else:
-        # create a new communicator from active processes
-        comm = _comm.Create(_comm.Get_group().Incl(aprocs))
-        if rank not in aprocs:
-            while True:
-                # Event loop.
-                # Sit here and await instructions.
 
-                # Blocking receive to wait for instructions.
-                task = _comm.recv(source=0, tag=MPI.ANY_TAG)
+    # create a new communicator from active processes
+    comm = _comm.Create(_comm.Get_group().Incl(aprocs))
+    if rank not in aprocs:
+        while True:
+            # Event loop.
+            # Sit here and await instructions.
 
-                # Check if message is special sentinel signaling end.
-                # If so, stop.
-                if isinstance(task, _close_message):
-                    break
+            # Blocking receive to wait for instructions.
+            task = _comm.recv(source=0, tag=MPI.ANY_TAG)
 
-        return comm
+            # Check if message is special sentinel signaling end.
+            # If so, stop.
+            if isinstance(task, _close_message):
+                break
+
+    return comm
 
 
 def close(aprocs):
@@ -180,10 +178,10 @@ def can_allocate(
 
     try:
         available_memory_node = available_memory_shared()
-    except Exception as e:
+    except OSError as e:
         # We probably don't want this to fail if it can't get the available
         # memory, but it should definitey warn about it
-        warnings.warn(f"Unable to check available memory: {repr(e)}", RuntimeWarning)
+        warnings.warn(f"Unable to check available memory: {e!r}", RuntimeWarning)
         return True
 
     if scope == "shared":
@@ -274,7 +272,7 @@ def partition_list(full_list, i, n, method="con"):
         base = N // n
         rem = N % n
         num_lst = rem * [base + 1] + (n - rem) * [base]
-        cum_num_lst = np.cumsum([0] + num_lst)
+        cum_num_lst = np.cumsum([0, *num_lst])
 
         return cum_num_lst[i], cum_num_lst[i + 1]
 
@@ -283,13 +281,15 @@ def partition_list(full_list, i, n, method="con"):
 
     if method == "con":
         return full_list[start:stop]
-    elif method == "alt":
+
+    if method == "alt":
         return full_list[i::n]
-    elif method == "rand":
+
+    if method == "rand":
         choices = np.random.permutation(N)[start:stop]
         return [full_list[i] for i in choices]
-    else:
-        raise ValueError("Unknown partition method %s" % method)
+
+    raise ValueError(f"Unknown partition method {method}")
 
 
 def partition_list_mpi(full_list, method="con", comm=_comm):
@@ -325,16 +325,16 @@ def bcast(data, root=0, comm=_comm):
     """Call comm.bcast if MPI is enabled."""
     if comm is not None and comm.size > 1:
         return comm.bcast(data, root=root)
-    else:
-        return data
+
+    return data
 
 
 def allreduce(sendobj, op=None, comm=_comm):
     """Call comm.allreduce if MPI is enabled."""
     if comm is not None and comm.size > 1:
         return comm.allreduce(sendobj, op=(op or MPI.SUM))
-    else:
-        return sendobj
+
+    return sendobj
 
 
 # def Gatherv(sendbuf, recvbuf, root=0, comm=_comm):
@@ -417,8 +417,8 @@ def parallel_map(func, glist, root=None, method="con", comm=_comm):
 
         # Extract the return values into a list
         return [item for ind, item in sortlist]
-    else:
-        return None
+
+    return None
 
 
 def typemap(dtype):
@@ -624,11 +624,10 @@ def transpose_blocks(row_array, shape, comm=_comm):
             # Note that to mimic the mpi behaviour we have to allow the
             # last index to be trimmed.
             return row_array[..., : shape[-1]].copy()
-        else:
-            raise ValueError(
-                "Shape %s is incompatible with `row_array`s shape %s"
-                % (shape, row_array.shape)
-            )
+
+        raise ValueError(
+            f"Shape {shape} is incompatible with `row_array`s shape {row_array.shape}"
+        )
 
     nr = shape[0]
     nc = shape[-1]
@@ -763,9 +762,7 @@ def allocate_hdf5_dataset(fname, dsetname, shape, dtype, comm=_comm):
         f.close()
 
     # state = comm.bcast(state, root=0)
-    state = bcast(state, root=0, comm=comm)
-
-    return state
+    return bcast(state, root=0, comm=comm)
 
 
 def lock_and_write_buffer(obj, fname, offset, size):
@@ -785,8 +782,8 @@ def lock_and_write_buffer(obj, fname, offset, size):
     size : integer
         Size of the region to write to (and lock).
     """
-    import os
     import fcntl
+    import os
 
     buf = memoryview(obj)
 
@@ -892,10 +889,11 @@ class SelfWrapper(ModuleType):
     def __getattr__(self, name):
         if name in globals():
             return globals()[name]
-        elif _comm is not None and name in MPI.__dict__:
+
+        if _comm is not None and name in MPI.__dict__:
             return MPI.__dict__[name]
-        else:
-            raise AttributeError("module 'mpiutil' has no attribute '%s'" % name)
+
+        raise AttributeError("module 'mpiutil' has no attribute '%s'" % name)
 
     def __call__(self, **kwargs):
         """Call self with set module."""

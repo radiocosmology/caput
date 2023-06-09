@@ -1,9 +1,9 @@
 """Helper routines for profiling the CPU and IO usage of code."""
 
-import math
-import time
 import logging
+import math
 import os
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -138,12 +138,11 @@ class IOUsage:
 
         if suffix == "count":
             return ""
-        elif suffix == "time":
+        if suffix == "time":
             return "ms"
-        elif suffix == "bytes":
+        if suffix == "bytes":
             return "bytes"
-        else:
-            return ""
+        return ""
 
     def __enter__(self):
         self._start = self._get_io()
@@ -363,12 +362,10 @@ class PSUtilProfiler(psutil.Process):
         cpu_times_arr = np.subtract(cpu_times, self._start_cpu_times)
         disk_io_arr = np.subtract(disk_io, self._start_disk_io)
 
-        cpu_times = {
-            k: v for (k, v) in zip(cpu_times._fields, cpu_times_arr)
-        }  # contain results in dictionary
-        disk_io = {
-            k: v for (k, v) in zip(disk_io._fields, disk_io_arr)
-        }  # contain results in dictionary
+        cpu_times = dict(zip(cpu_times._fields, cpu_times_arr))
+        # contain results in dictionary
+        disk_io = dict(zip(disk_io._fields, disk_io_arr))
+        # contain results in dictionary
 
         memory = memory - self._start_memory
 
