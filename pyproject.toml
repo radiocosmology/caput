@@ -2,8 +2,18 @@
 requires = ["setuptools", "wheel", "Cython", "oldest-supported-numpy"]
 
 [tool.ruff]
-# Enable pycodestyle ('E'), pydocstyle ('D'), pyflakes ('F')
-select = ["E", "D", "F"]
+# Enable:
+# pycodestyle ('E')
+# pydocstyle ('D')
+# pyflakes ('F')
+# isort ('I')
+# pyupgrade ('UP')
+# numpy-specific ('NPY')
+# ruff-specific ('RUF')
+# flake8-blind-except ('BLE')
+# flake8-comprehensions ('C4')
+# flake8-return ('RET')
+select = ["E", "D", "F", "I", "UP", "NPY", "RUF", "BLE", "C4", "RET"]
 
 # E203, W503
 ignore = [
@@ -18,6 +28,8 @@ ignore = [
     "D402", # D402: First line should not be the function’s “signature”
     "D413", # D413: Missing blank line after last section
     "D416", # D416: Section name should end with a colon
+    "NPY002", # NPY002: replace legacy numpy.random calls with np.random.Generator
+    "RUF012", # RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 ]
 
 # Ignore the following directories
@@ -29,6 +41,8 @@ exclude = [
     "tests",
     "setup.py",
     "versioneer.py",
+    "*/_version.py",
+    "*/__init__.py",
 ]
 
-target-version = "py311"
+target-version = "py38"
