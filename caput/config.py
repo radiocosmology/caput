@@ -50,6 +50,7 @@ Richard 40.0 Sooty
 
 """
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -58,7 +59,6 @@ if TYPE_CHECKING:
 import logging
 
 from yaml.loader import SafeLoader
-
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ class Property:
                 val = self.proptype(config[self.key])
             except TypeError as e:
                 raise CaputConfigError(
-                    "Can't read value of '%s' as %s: %s" % (self.key, self.proptype, e),
+                    f"Can't read value of '{self.key}' as {self.proptype}: {e}",
                     location=config,
                 ) from e
             obj.__dict__[self.propname] = val
@@ -259,9 +259,7 @@ def utc_time(default=None):
 
         return ensure_unix(val)
 
-    prop = Property(proptype=_prop, default=default)
-
-    return prop
+    return Property(proptype=_prop, default=default)
 
 
 def float_in_range(start, end, default=None):
@@ -292,13 +290,11 @@ def float_in_range(start, end, default=None):
         val = float(val)
 
         if val < start or val > end:
-            raise CaputConfigError("Input %f not in range [%f, %f]" % (val, start, end))
+            raise CaputConfigError(f"Input {val:f} not in range [{start:f}, {end:f}]")
 
         return val
 
-    prop = Property(proptype=_prop, default=default)
-
-    return prop
+    return Property(proptype=_prop, default=default)
 
 
 def enum(options, default=None):
@@ -339,9 +335,7 @@ def enum(options, default=None):
     if default is not None and default not in options:
         raise ValueError(f"Default value {default} must be in {options} (or None)")
 
-    prop = Property(proptype=_prop, default=default)
-
-    return prop
+    return Property(proptype=_prop, default=default)
 
 
 def list_type(type_=None, length=None, maxlength=None, default=None):
@@ -411,13 +405,10 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
             _prop(default)
         except CaputConfigError as e:
             raise ValueError(
-                "Default value %s does not satisfy property requirements: %s"
-                % (default, repr(e))
+                f"Default value {default} does not satisfy property requirements: {e!r}"
             ) from e
 
-    prop = Property(proptype=_prop, default=default)
-
-    return prop
+    return Property(proptype=_prop, default=default)
 
 
 def logging_config(default=None):
@@ -476,9 +467,7 @@ def logging_config(default=None):
             checked_config[key] = level
         return checked_config
 
-    prop = Property(proptype=_prop, default=default)
-
-    return prop
+    return Property(proptype=_prop, default=default)
 
 
 def file_format(default: str | fileformats.FileFormat | None = None) -> Property:
@@ -522,7 +511,7 @@ def file_format(default: str | fileformats.FileFormat | None = None) -> Property
 
         if not isinstance(val, str):
             raise CaputConfigError(
-                f"Input {repr(val)} is of type {type(val).__name__} (expected str or None)."
+                f"Input {val!r} is of type {type(val).__name__} (expected str or None)."
             )
 
         val = val.lower()
@@ -532,12 +521,12 @@ def file_format(default: str | fileformats.FileFormat | None = None) -> Property
         if val == "zarr":
             return fileformats.Zarr
 
-        raise CaputConfigError(f"Input {repr(val)} needs to be one of {options})")
+        raise CaputConfigError(f"Input {val!r} needs to be one of {options})")
 
     if default is not None and (
         (not isinstance(default, str)) or (default.lower() not in options)
     ):
-        raise CaputConfigError(f"Default value {repr(default)} must be in {options}")
+        raise CaputConfigError(f"Default value {default!r} must be in {options}")
 
     return Property(proptype=_prop, default=default)
 
@@ -591,10 +580,10 @@ class CaputConfigError(Exception):
     def __str__(self):
         location = ""
         if self.line is not None:
-            location = "\nError in block starting at L{}".format(self.line)
+            location = f"\nError in block starting at L{self.line}"
             if self.file is not None:
-                location = "{} ({})".format(location, self.file)
-        return "{}{}".format(self.message, location)
+                location = f"{location} ({self.file})"
+        return f"{self.message}{location}"
 
 
 if __name__ == "__main__":

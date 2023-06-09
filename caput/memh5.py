@@ -49,26 +49,21 @@ Utility Functions
 """
 
 from __future__ import annotations
-from typing import Any
 
-from collections.abc import Mapping
 import datetime
-import warnings
-import posixpath
-from ast import literal_eval
 import json
 import logging
-
-import numpy as np
-import h5py
+import posixpath
+import warnings
+from ast import literal_eval
+from collections.abc import Mapping
 from copy import deepcopy
+from typing import Any
 
-from . import fileformats
-from . import mpiutil
-from . import mpiarray
-from . import misc
-from . import tools
+import h5py
+import numpy as np
 
+from . import fileformats, misc, mpiarray, mpiutil, tools
 
 logger = logging.getLogger(__name__)
 
@@ -285,7 +280,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
 
     @classmethod
     def _from_storage_root(cls, storage_root, name):
-        self = super(_BaseGroup, cls).__new__(cls)
+        self = super().__new__(cls)
         super(_BaseGroup, self).__init__(storage_root, name)
         return self
 
@@ -304,14 +299,15 @@ class _BaseGroup(_MemObjMixin, Mapping):
         if is_group(out) or isinstance(out, _Storage):
             # Group like.
             return self._group_class._from_storage_root(self._storage_root, path)
-        elif isinstance(out, MemDataset):
+
+        if isinstance(out, MemDataset):
             # Create back references for user facing mem datasets.
             out = out.view()
             out._storage_root = self._storage_root
             return out
-        else:
-            # H5py dataset.
-            return out
+
+        # H5py dataset.
+        return out
 
     def __delitem__(self, name):
         """Delete item from group."""
@@ -327,8 +323,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
 
     def __iter__(self):
         keys = list(self._get_storage().keys())
-        for key in keys:
-            yield key
+        yield from keys
 
     def require_dataset(self, name, shape, dtype, **kwargs):
         """Require a dataset to exist, create if it doesn't.
@@ -343,8 +338,8 @@ class _BaseGroup(_MemObjMixin, Mapping):
         if is_group(d):
             msg = "Entry '%s' exists and is not a Dataset." % name
             raise TypeError(msg)
-        else:
-            return d
+
+        return d
 
     def require_group(self, name):
         """Require a group to exist, create if it doesn't."""
@@ -355,8 +350,8 @@ class _BaseGroup(_MemObjMixin, Mapping):
         if not is_group(g):
             msg = "Entry '%s' exists and is not a Group." % name
             raise TypeError(msg)
-        else:
-            return g
+
+        return g
 
 
 class MemGroup(_BaseGroup):
@@ -399,14 +394,15 @@ class MemGroup(_BaseGroup):
             self = cls()
             deep_group_copy(group, self)
             return self
-        elif isinstance(group, (str, bytes)):
+
+        if isinstance(group, (str, bytes)):
             file_format = fileformats.guess_file_format(group)
             return cls.from_file(group, file_format=file_format)
-        else:
-            raise RuntimeError(
-                f"Can't create an instance from type {type(group).__name__} "
-                f"(expected MemGroup, str or bytes)."
-            )
+
+        raise RuntimeError(
+            f"Can't create an instance from type {type(group).__name__} "
+            f"(expected MemGroup, str or bytes)."
+        )
 
     @classmethod
     def from_hdf5(
@@ -1181,7 +1177,7 @@ class MemDatasetCommon(MemDataset):
     @property
     def comm(self):
         """Reference to the MPI communicator."""
-        return None
+        return
 
     @property
     def common(self):
@@ -1270,7 +1266,7 @@ class MemDatasetCommon(MemDataset):
         return self._data.__iter__()
 
     def __repr__(self):
-        return '<memh5 common dataset %s: shape %s, type "%s">' % (
+        return '<memh5 common dataset {}: shape {}, type "{}">'.format(
             repr(self._name),
             repr(self.shape),
             repr(self.dtype),
@@ -1499,13 +1495,10 @@ class MemDatasetDistributed(MemDataset):
 
     def __repr__(self):
         return (
-            '<memh5 distributed dataset %s: global_shape %s, dist_axis %s, type "%s">'
-            % (
-                repr(self._name),
-                repr(self.global_shape),
-                repr(self.distributed_axis),
-                repr(self.dtype),
-            )
+            f"<memh5 distributed dataset {self._name!r}: "
+            f"global_shape {self.global_shape!r}, "
+            f"dist_axis {self.distributed_axis!r}, "
+            f"type '{self.dtype!r}'>"
         )
 
     def __eq__(self, other):
@@ -1744,7 +1737,7 @@ class MemDiskGroup(_BaseGroup):
             Mapping of dataset names to numpy indexes for downselection of the data.
             May include multiple layers of dicts to map the dataset tree
         """
-        return None
+        return
 
     # For creating new instances. #
 
@@ -1943,9 +1936,8 @@ class MemDiskGroup(_BaseGroup):
         if not self.dataset_name_allowed(path):
             msg = "Dataset name %s not allowed." % path
             raise ValueError(msg)
-        new_dataset = self._data.create_dataset(path, *args, **kwargs)
 
-        return new_dataset
+        return self._data.create_dataset(path, *args, **kwargs)
 
     def dataset_common_to_distributed(self, name, distributed_axis=0):
         """Convert a common dataset to a distributed one.
@@ -1963,10 +1955,10 @@ class MemDiskGroup(_BaseGroup):
         """
         if isinstance(self._data, MemGroup):
             return self._data.dataset_common_to_distributed(name, distributed_axis)
-        else:
-            raise RuntimeError(
-                "Can not convert a h5py or zarr dataset %s to distributed" % name
-            )
+
+        raise RuntimeError(
+            f"Can not convert a h5py or zarr dataset {name} to distributed"
+        )
 
     def dataset_distributed_to_common(self, name):
         """Convert a distributed dataset to a common one.
@@ -1983,10 +1975,10 @@ class MemDiskGroup(_BaseGroup):
         """
         if isinstance(self._data, MemGroup):
             return self._data.dataset_distributed_to_common(name)
-        else:
-            raise RuntimeError(
-                "Can not convert a h5py or zarr dataset %s to distributed" % name
-            )
+
+        raise RuntimeError(
+            f"Can not convert a h5py or zarr dataset {name} to distributed"
+        )
 
     def create_group(self, name):
         """Create and return a new group."""
@@ -2001,8 +1993,8 @@ class MemDiskGroup(_BaseGroup):
         """Return a version of this data that lives in memory."""
         if isinstance(self._data, MemGroup):
             return self
-        else:
-            return self.__class__.from_file(self._data)
+
+        return self.__class__.from_file(self._data)
 
     def to_disk(self, filename, file_format=fileformats.HDF5, **kwargs):
         """Return a version of this data that lives on disk.
@@ -2292,7 +2284,7 @@ class BasicCont(MemDiskGroup):
         if history is None:
             history = {}
         order = self.history["order"]
-        order = order + [name]
+        order = [*order, name]
 
         history_group = self._data["history"]
         history_group.attrs["order"] = str(order)
@@ -2409,17 +2401,19 @@ def get_file(f, file_format=None, **kwargs):
     # closed.
     if is_group(f):
         return f, False
-    else:
-        if file_format is None:
-            file_format = fileformats.guess_file_format(f)
-        if file_format == fileformats.Zarr and not zarr_available:
-            raise RuntimeError("Unable to open zarr file. Please install zarr.")
-        try:
-            f = file_format.open(f, **kwargs)
-        except IOError as e:
-            msg = "Opening file %s caused an error: " % str(f)
-            raise IOError(msg + str(e)) from e
-        return f, True
+
+    if file_format is None:
+        file_format = fileformats.guess_file_format(f)
+
+    if file_format == fileformats.Zarr and not zarr_available:
+        raise RuntimeError("Unable to open zarr file. Please install zarr.")
+    try:
+        f = file_format.open(f, **kwargs)
+    except OSError as e:
+        msg = "Opening file %s caused an error: " % str(f)
+        raise OSError(msg + str(e)) from e
+
+    return f, True
 
 
 def copyattrs(a1, a2, convert_strings=False):
@@ -2476,13 +2470,13 @@ def copyattrs(a1, a2, convert_strings=False):
             def default(self, o):
                 if isinstance(o, datetime.datetime):
                     return o.isoformat()
-                elif isinstance(o, np.number):
+                if isinstance(o, np.number):
                     return o.data
-                elif isinstance(o, np.ndarray):
+                if isinstance(o, np.ndarray):
                     if len(o) == 1:
                         return o.tolist()[0]
                     return o.tolist()
-                elif isinstance(o, bytes):  # pragma: py3
+                if isinstance(o, bytes):  # pragma: py3
                     return o.decode()
 
                 # Let the default method raise the TypeError
@@ -2602,15 +2596,15 @@ def deep_group_copy(
                     f"Cannot write out a distributed dataset ({dset.name}) "
                     "via this method."
                 )
-            elif selection != slice(None):
+            if selection != slice(None):
                 raise ValueError(
                     "Cannot apply a slice when writing out a distributed dataset "
                     f"({dset.name}) via this method."
                 )
-            else:
-                # If we get here, we should create the dataset, but not write out any data into it (i.e. return None)
-                distributed_dset_names.append(dset.name)
-                return {"dtype": dset.dtype, "shape": dset.shape, "data": None}
+
+            # If we get here, we should create the dataset, but not write out any data into it (i.e. return None)
+            distributed_dset_names.append(dset.name)
+            return {"dtype": dset.dtype, "shape": dset.shape, "data": None}
 
         # Extract the data for the selection
         data = dset[selection]
@@ -3105,8 +3099,7 @@ def _convert_dtype(dt, type_from, type_to):
     if not dt.names:
         return np.dtype(_conv(dt.str))
     # For compound types we need to iterate through
-    else:
-        return np.dtype(_iter_conv(dt.descr))
+    return np.dtype(_iter_conv(dt.descr))
 
 
 def check_byteorder(arr_byteorder):
@@ -3125,7 +3118,7 @@ def check_byteorder(arr_byteorder):
     if arr_byteorder == "=":
         return False
 
-    elif has_matching_byteorder(arr_byteorder):
+    if has_matching_byteorder(arr_byteorder):
         return True
 
     return False
@@ -3178,9 +3171,9 @@ def has_kind(dt, kind):
             # Recursively convert the type
             if isinstance(type_, list) and _iter_conv(type_):
                 return True
-            elif isinstance(type_, tuple) and type_[0][1] == kind:
+            if isinstance(type_, tuple) and type_[0][1] == kind:
                 return True
-            elif type_[1] == kind:
+            if type_[1] == kind:
                 return True
 
         return False
@@ -3223,8 +3216,8 @@ def ensure_native_byteorder(arr):
     """
     if check_byteorder(arr.dtype.byteorder):
         return arr.newbyteorder("=")
-    else:
-        return arr
+
+    return arr
 
 
 def ensure_bytestring(arr):
@@ -3242,8 +3235,8 @@ def ensure_bytestring(arr):
     """
     if has_unicode(arr.dtype):
         return arr.astype(dtype_to_bytestring(arr.dtype))
-    else:
-        return arr
+
+    return arr
 
 
 def ensure_unicode(arr):
@@ -3261,8 +3254,8 @@ def ensure_unicode(arr):
     """
     if has_bytestring(arr.dtype):
         return arr.astype(dtype_to_unicode(arr.dtype))
-    else:
-        return arr
+
+    return arr
 
 
 def check_unicode(dset):

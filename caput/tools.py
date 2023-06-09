@@ -3,6 +3,7 @@
 from typing import Iterable
 
 import numpy as np
+
 from caput._fast_tools import _invert_no_zero
 
 

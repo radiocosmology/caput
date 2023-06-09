@@ -236,13 +236,11 @@ please use the uppercase variant of the function. The lower-case variants involv
 intermediate pickling process, which can lead to malformed arrays.
 
 """
-from __future__ import annotations
-
+import logging
 import os
 import time
-import logging
-from typing import Sequence, Tuple, Union, Any, TYPE_CHECKING
 import warnings
+from typing import TYPE_CHECKING, Any, Sequence, Tuple, Union
 
 if TYPE_CHECKING:
     from mpi4py import MPI
@@ -250,8 +248,7 @@ if TYPE_CHECKING:
 import numpy as np
 import numpy.typing as npt
 
-from caput import fileformats, mpiutil, misc
-
+from caput import fileformats, misc, mpiutil
 
 logger = logging.getLogger(__name__)
 
@@ -281,7 +278,7 @@ class _global_resolver:
 
         # Add an ellipsis if length of slice object is too short
         if isinstance(slobj, tuple) and len(slobj) < ndim and Ellipsis not in slobj:
-            slobj = slobj + (Ellipsis,)
+            slobj = (*slobj, Ellipsis)
 
         # Expand an ellipsis
         slice_list = []
@@ -358,14 +355,13 @@ class _global_resolver:
             # index on this rank
             if slobj[self.axis] is None:
                 return None
-            else:
-                return self.array.local_array[slobj]
 
-        else:
-            # Fix up slobj for axes where there is no data
-            slobj = tuple(slice(None, None, None) if sl is None else sl for sl in slobj)
+            return self.array.local_array[slobj]
 
-            return self.array[slobj]
+        # Fix up slobj for axes where there is no data
+        slobj = tuple(slice(None, None, None) if sl is None else sl for sl in slobj)
+
+        return self.array[slobj]
 
     def __setitem__(self, slobj, value):
         slobj, _ = self._resolve_slice(slobj)
@@ -450,14 +446,13 @@ class MPIArray(np.ndarray):
             return arr_sliced
 
         # Create a view of the numpy sliced array as an MPIArray.
-        arr_mpi = self._view_from_data_and_params(
+        return self._view_from_data_and_params(
             arr_sliced,
             final_dist_axis,
             self.global_shape[self.axis],
             self.local_offset[self.axis],
             self.comm,
         )
-        return arr_mpi
 
     def __setitem__(self, slobj, value):
         self.local_array.__setitem__(slobj, value)
@@ -1063,10 +1058,10 @@ class MPIArray(np.ndarray):
             if isinstance(f, str):
                 self._to_hdf5_serial(f, dataset, create)
                 return
-            else:
-                raise ValueError(
-                    "Argument must be a filename if h5py does not have MPI support"
-                )
+
+            raise ValueError(
+                "Argument must be a filename if h5py does not have MPI support"
+            )
 
         mode = "a" if create else "r+"
         fh = misc.open_h5py_mpi(f, mode, self.comm)
@@ -1157,8 +1152,8 @@ class MPIArray(np.ndarray):
             Compression options for the dataset.
         """
         try:
-            import zarr
             import numcodecs  # noqa: F401
+            import zarr
         except ImportError as err:
             raise RuntimeError(
                 f"Can't write to zarr file. Please install zarr and numcodecs: {err}"
@@ -1291,8 +1286,8 @@ class MPIArray(np.ndarray):
         ----------
         axes : None, tuple of ints, or n ints
             - None or no argument: reverses the order of the axes.
-            - tuple of ints: i in the j-th place in the tuple means a’s i-th axis
-              becomes a.transpose()’s j-th axis.
+            - tuple of ints: i in the j-th place in the tuple means a`s i-th axis
+              becomes a.transpose()`s j-th axis.
             - n ints: same as an n-tuple of the same ints (this form is intended simply
               as a “convenience” alternative to the tuple form)
 
@@ -1365,16 +1360,14 @@ class MPIArray(np.ndarray):
                 new_shape[wildcard_pos] = actual_size // new_size
                 return tuple(new_shape)
 
-            elif wildcard_pos < 0 and actual_size == new_size:
+            if wildcard_pos < 0 and actual_size == new_size:
                 # If not, the total sizes must be exactly equal
                 return tuple(new_shape)
-            else:
-                # Throw an error. Note that this exception gives the full array shapes
-                # not just the parts being tested to make more sense for the user.
-                raise ValueError(
-                    f"Cannot reshape MPIArray of shape={self.shape} into new shape="
-                    f"{shape}."
-                )
+            # Throw an error. Note that this exception gives the full array shapes
+            # not just the parts being tested to make more sense for the user.
+            raise ValueError(
+                f"Cannot reshape MPIArray of shape={self.shape} into new shape={shape}."
+            )
 
         if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
             shape = tuple(shape[0])
@@ -1404,15 +1397,13 @@ class MPIArray(np.ndarray):
         new_data = self.local_array.reshape(local_shape)
 
         # ...and then construct the final MPIArray object
-        rdata = self.__class__._view_from_data_and_params(
+        return self.__class__._view_from_data_and_params(
             new_data,
             new_axis,
             self.global_shape[self.axis],
             self._local_offset[self.axis],
             self.comm,
         )
-
-        return rdata
 
     def _prep_buf(self, x: np.ndarray) -> Tuple[np.ndarray, "MPI.Datatype"]:
         """Prepare a buffer for sending/recv by mpi4py.
@@ -1426,7 +1417,7 @@ class MPIArray(np.ndarray):
             return (x, mpi_dtype)
         except KeyError:
             return (
-                x.view(np.byte).reshape(x.shape + (self.itemsize,)),
+                x.view(np.byte).reshape((*x.shape, self.itemsize)),
                 mpiutil.MPI.BYTE,
             )
 
@@ -1784,7 +1775,7 @@ class MPIArray(np.ndarray):
             for ii, array in enumerate(out_args):
                 try:
                     _check_dist_axis(array, new_dist_axis, global_length, offset, comm)
-                except Exception as e:
+                except (ValueError, AxisException) as e:
                     raise ValueError(
                         f"Output argument at position {ii} does not match expectation."
                     ) from e
@@ -1849,7 +1840,7 @@ class MPIArray(np.ndarray):
             if isinstance(inp, MPIArray):
                 try:
                     _check_dist_axis(inp, cur_dist_axis, length, offset)
-                except Exception as e:
+                except (ValueError, AxisException) as e:
                     raise AxisException(
                         f"Input argument {ii} has an incompatible distributed axis."
                     ) from e
@@ -1859,7 +1850,8 @@ class MPIArray(np.ndarray):
                 if cur_axis_length == 1:
                     # Can broadcast. Great!
                     continue
-                elif cur_axis_length == local_length:
+
+                if cur_axis_length == local_length:
                     warnings.warn(
                         "A ufunc is combining an MPIArray with a numpy array that "
                         "matches exactly the local part of the distributed axis. This "
@@ -1899,7 +1891,7 @@ class MPIArray(np.ndarray):
             return (0, input_.comm.size, input_.comm.rank)
 
         # Get the normalised set of axes to reduce over
-        axis = set(ax if ax >= 0 else input_.ndim + ax for ax in _ensure_list(axis))
+        axis = {ax if ax >= 0 else input_.ndim + ax for ax in _ensure_list(axis)}
 
         if input_.axis in axis:
             raise AxisException(
@@ -2062,8 +2054,8 @@ def _len_slice(slice_, n):
     if isinstance(slice_, slice):
         start, stop, step = slice_.indices(n)
         return 1 + (stop - start - 1) // step
-    else:
-        return len(slice_)
+
+    return len(slice_)
 
 
 def _ensure_list(x: Any) -> list:
@@ -2071,8 +2063,8 @@ def _ensure_list(x: Any) -> list:
     # and turning sets or tuples into a list
     if isinstance(x, (list, tuple, set)):
         return list(x)
-    else:
-        return [x]
+
+    return [x]
 
 
 def _reslice(slice_, n, subslice):
@@ -2091,8 +2083,8 @@ def _reslice(slice_, n, subslice):
             min(dstart + subslice.stop * dstep, dstop),
             dstep,
         )
-    else:
-        return slice_[subslice]
+
+    return slice_[subslice]
 
 
 def _expand_sel(sel, naxis):
@@ -2104,13 +2096,19 @@ def _expand_sel(sel, naxis):
     return list(sel)
 
 
-def _apply_sel(arr: np.ndarray, sel: slice | tuple | list, ax: int) -> np.ndarray:
+def _apply_sel(arr: np.ndarray, sel: Union[slice, tuple, list], ax: int) -> np.ndarray:
     """Apply a selection to a single axis of an array."""
     if type(sel) is slice:
         sel = (slice(None),) * ax + (sel,)
         return arr[sel]
-    elif type(sel) in {list, tuple}:
+
+    if type(sel) in {list, tuple}:
         return np.take(arr, sel, axis=ax)
+
+    raise ValueError(
+        "Invalid selection type. Selection must be one of (slice, tuple, list). "
+        f"Got {type(sel)}."
+    )
 
 
 def _check_dist_axis(
@@ -2149,7 +2147,7 @@ def _check_dist_axis(
 
 
 def _get_common_comm(
-    inputs: Sequence[Union[MPIArray, npt.ArrayLike, None]]
+    inputs: Sequence[Union[MPIArray, npt.ArrayLike, None]],
 ) -> "MPI.IntraComm":
     """Get a common MPI communicator from a set of arguments.
 
@@ -2282,7 +2280,8 @@ def sanitize_slice(
     num_ellipsis = sum([s is Ellipsis for s in sl])
     if num_ellipsis > 1:
         raise IndexError(f"Found more than one Ellipsis in slice {sl}")
-    elif num_ellipsis == 0:
+
+    if num_ellipsis == 0:
         sl += (Ellipsis,)
 
     # Convert all np.int types (which are valid arguments) to ints

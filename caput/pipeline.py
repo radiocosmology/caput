@@ -355,7 +355,6 @@ import yaml
 
 from . import config, fileformats, misc
 
-
 # Set the module logger.
 logger = logging.getLogger(__name__)
 
@@ -451,9 +450,7 @@ def _get_versions(modules):
             versions[module] = importlib.import_module(module).__version__
         except ModuleNotFoundError as err:
             raise config.CaputConfigError(
-                "Failure getting versions requested with config parameter 'save_versions': {}".format(
-                    err
-                )
+                f"Failure getting versions requested with config parameter 'save_versions': {err}"
             )
     return versions
 
@@ -529,7 +526,7 @@ class Manager(config.Reader):
                 yaml_doc = f.read()
         except TypeError as e:
             raise config.CaputConfigError(
-                "Unable to open yaml file ({}): {}".format(file_name, e),
+                f"Unable to open yaml file ({file_name}): {e}",
                 file_=file_name,
             )
         return cls.from_yaml_str(yaml_doc, lint, psutil_profiling)
@@ -668,22 +665,26 @@ class Manager(config.Reader):
         """
         if out is None:  # This iteration supplied no output
             return None
-        elif len(task._out_keys) == 0:  # Output not handled by pipeline.
+
+        if len(task._out_keys) == 0:  # Output not handled by pipeline.
             return None
-        elif len(task._out_keys) == 1:
+
+        if len(task._out_keys) == 1:
             if isinstance(task._out_keys, tuple):
                 # in config file, written as `out: out_key`, No
                 # unpacking if `out` is a length 1 sequence.
                 return (out,)
-            else:  # `out_keys` is a list.
-                # In config file, written as `out: [out_key,]`.
-                # `out` must be a length 1 sequence.
-                return out
-        elif len(task._out_keys) != len(out):
+            # `out_keys` is a list.
+            # In config file, written as `out: [out_key,]`.
+            # `out` must be a length 1 sequence.
+            return out
+
+        if len(task._out_keys) != len(out):
             raise PipelineRuntimeError(
                 f"Found unexpected number of outputs in {task.__class__.__name__}"
                 f"(got {len(out)} expected {len(task._out_keys)})"
             )
+
         return out
 
     def _setup_tasks(self):
@@ -705,7 +706,7 @@ class Manager(config.Reader):
                     out=out,
                 )
             except config.CaputConfigError as e:
-                msg = "Setting up task {} caused an error:\n\t{}".format(ii, str(e))
+                msg = f"Setting up task {ii} caused an error:\n\t{e!s}"
                 raise config.CaputConfigError(
                     msg, location=task_spec if e.line is None else e.line
                 ) from e
@@ -732,7 +733,7 @@ class Manager(config.Reader):
         for key in task_spec.keys():
             if key not in ["type", "params", "requires", "in", "out"]:
                 raise config.CaputConfigError(
-                    "Task got an unexpected key '{}' in 'tasks' list.".format(key)
+                    f"Task got an unexpected key '{key}' in 'tasks' list."
                 )
 
         # 'type' is a required key.
@@ -749,7 +750,7 @@ class Manager(config.Reader):
             try:
                 task_cls = misc.import_class(task_path)
             except (config.CaputConfigError, AttributeError, ModuleNotFoundError) as e:
-                msg = "Loading task '%s' caused error %s:\n\t%s" % (
+                msg = "Loading task '{}' caused error {}:\n\t{}".format(
                     task_path,
                     e.__class__.__name__,
                     str(e),
@@ -793,7 +794,7 @@ class Manager(config.Reader):
             task = task_cls._from_config(task_params)
         except config.CaputConfigError as e:
             raise config.CaputConfigError(
-                "Failed instantiating %s from config:\n\t%s" % (task_cls, e),
+                f"Failed instantiating {task_cls} from config:\n\t{e}",
                 location=task_spec.get("params", task_spec),
             ) from e
 
@@ -816,7 +817,7 @@ class Manager(config.Reader):
         """
         try:
             task._setup_keys(requires=requires, in_=in_, out=out)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             msg = "Setting up keys for task {} caused an error:\n\t{}".format(
                 task.__class__.__name__, str(e)
             )
@@ -1016,8 +1017,8 @@ class TaskBase(config.Reader):
             for in_, in_key in zip(self._in, self._in_keys):
                 if not in_.empty():
                     msg = (
-                        "Task finished %s iterating `next()` but input queue '%s' isn't empty."
-                        % (self.__class__.__name__, in_key)
+                        f"Task finished {self.__class__.__name__} iterating `next()` "
+                        f"but input queue '{in_key}' isn't empty."
                     )
                     warnings.warn(msg)
 
@@ -1047,7 +1048,8 @@ class TaskBase(config.Reader):
             out = self.setup(*tuple(self._requires))
             self._pipeline_advance_state()
             return out
-        elif self._pipeline_state == "next":
+
+        if self._pipeline_state == "next":
             # Check if we have all the required input data.
             for in_ in self._in:
                 if in_.empty():
@@ -1059,12 +1061,12 @@ class TaskBase(config.Reader):
             try:
                 msg = "Task %s calling 'next()'." % self.__class__.__name__
                 logger.debug(msg)
-                out = self.next(*args)
-                return out
+                return self.next(*args)
             except PipelineStopIteration:
                 # Finished iterating `next()`.
                 self._pipeline_advance_state()
                 return None
+
         elif self._pipeline_state == "finish":
             msg = "Task %s calling 'finish()'." % self.__class__.__name__
             logger.debug(msg)
@@ -1104,9 +1106,8 @@ class TaskBase(config.Reader):
                     if self._requires[jj] is not None:
                         msg = "'requires' data product set more than once."
                         raise PipelineRuntimeError(msg)
-                    else:
-                        # Accept the data product and store for later use.
-                        self._requires[jj] = product
+                    # Accept the data product and store for later use.
+                    self._requires[jj] = product
             for jj, in_key in enumerate(self._in_keys):
                 if in_key == key:
                     msg = "%s queue data product with key %s for 'in'."
@@ -1119,9 +1120,8 @@ class TaskBase(config.Reader):
                             "`next()` iteration already completed."
                         )
                         raise PipelineRuntimeError(msg)
-                    else:
-                        # Accept the data product and store for later use.
-                        self._in[jj].put(product)
+                    # Accept the data product and store for later use.
+                    self._in[jj].put(product)
 
 
 class _OneAndOne(TaskBase):
@@ -1148,7 +1148,7 @@ class _OneAndOne(TaskBase):
         """Override this method with your data processing task."""
         output = input
 
-        return output
+        return output  # noqa: RET504
 
     def validate(self):
         """Validate the task after instantiation.
@@ -1378,11 +1378,10 @@ class IterBase(_OneAndOne):
             if not self.input_root == "None":
                 # We are iterating over input files and have run out.
                 raise PipelineStopIteration()
-            else:
-                # Not iterating over input files, and unable to assign
-                # filenames.
-                input_filename = None
-                output_filename = None
+            # Not iterating over input files, and unable to assign
+            # filenames.
+            input_filename = None
+            output_filename = None
         else:
             # May or may not be iterating over input files, but able to assign
             # filenames.
@@ -1394,6 +1393,7 @@ class IterBase(_OneAndOne):
             input = self.cast_input(input)
         output = self.read_process_write(input, input_filename, output_filename)
         self.iteration += 1
+
         return output
 
 
@@ -1442,8 +1442,9 @@ class H5IOMixin:
         **kwargs : dict
             Arbitrary keyword arguments.
         """
-        from caput import memh5
         import h5py
+
+        from caput import memh5
 
         file_format = fileformats.check_file_format(filename, file_format, output)
 
