@@ -1,6 +1,6 @@
-"""Routines for truncating data to a specified precision."""
-
 # cython: language_level=3
+
+"""Routines for truncating data to a specified precision."""
 
 cimport cython
 from cython.parallel import prange
