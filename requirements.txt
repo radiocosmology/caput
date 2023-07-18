@@ -2,7 +2,7 @@ cachetools
 click
 cython
 h5py
-numpy>=1.20
+numpy>=1.20,<1.25
 psutil
 PyYAML
 scipy
