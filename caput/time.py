@@ -344,6 +344,7 @@ class Observer:
         ----------
         lsd : float or array of
             Local Stellar Day to convert to unix
+
         Returns
         -------
         time :  float or array of
