@@ -2,6 +2,7 @@
 
 import itertools
 import os
+import subprocess
 import sys
 from pathlib import Path
 import tempfile
@@ -565,7 +566,10 @@ fi
     with open(jobdir / "jobscript.sh", "w") as f:
         f.write(script)
     if submit:
-        os.system("cd %s; %s jobscript.sh" % (jobdir, job_command))
+        # NOTE: explicitly set the environment to what Python thinks it should
+        # be. This is because mpi4py will incorrectly modify the environment
+        # using lowlevel calls which Python cannot detect.
+        subprocess.run([job_command, "jobscript.sh"], cwd=jobdir, env=os.environ)
 
 
 def expandpath(path):
