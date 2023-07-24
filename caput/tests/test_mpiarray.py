@@ -5,6 +5,7 @@ Designed to be run as an MPI job with four processes like::
     $ mpirun -np 4 python test_mpiarray.py
 """
 from typing import Union
+from packaging import version
 import pytest
 from pytest_lazyfixture import lazy_fixture
 import h5py
@@ -906,13 +907,27 @@ def test_call_ravel():
 def test_call_median():
     size = mpiutil.size
 
-    arr_ones = mpiarray.ones((4, size, 17), axis=1)
+    arr = mpiarray.ones((4, size, 17), axis=1)
+    arr[..., 0] = 1700.0
+
     # Check that this will fail correctly when trying to
     # take median across the distributed axis
     with pytest.raises(mpiarray.AxisException):
-        np.median(arr_ones, axis=1)
-    # Check that the median fails due to .ravel() call
-    with pytest.raises(NotImplementedError):
-        np.median(arr_ones, axis=0)
+        np.median(arr, axis=1)
+
+    if version.parse(np.__version__) >= version.parse("1.25.0"):
+        # Check that the median is correct along the last axis
+        assert np.all(np.median(arr, axis=-1) == 1)
+
+        # Check that the median is correct along the first axis
+        res = np.ones(17)
+        res[0] = 1700.0
+        assert np.all(np.median(arr, axis=0) == res)
+    else:
+        # Median does not work on earlier numpy versions because of an internal use of
+        # .ravel()
+        with pytest.raises(NotImplementedError):
+            np.median(arr, axis=0)
+
     # Check that median call with local array works
-    assert (np.median(arr_ones.local_array, axis=0) == np.ones(arr_ones.shape)).all()
+    assert (np.median(arr.local_array, axis=-1) == 1).all()
