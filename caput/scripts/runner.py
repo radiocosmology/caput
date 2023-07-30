@@ -1,5 +1,7 @@
 """CLI interface to run caput pipelines."""
 
+import functools
+import operator
 import itertools
 import os
 import subprocess
@@ -13,6 +15,14 @@ from caput.config import CaputConfigError
 from caput.profile import Profiler
 
 products = None
+
+# Email notification options for slurm and PBS
+_SLURM_MAIL_TYPES = ["BEGIN", "END", "FAIL", "REQUEUE", "ALL"]
+_PBS_MAIL_TYPES = functools.reduce(
+    operator.concat,
+    [["".join(p) for p in itertools.permutations("abe", n)] for n in [1, 2, 3]],
+)
+_MAIL_TYPES = _SLURM_MAIL_TYPES + _PBS_MAIL_TYPES
 
 
 @click.group()
@@ -188,8 +198,21 @@ def run(configfile, loglevel, profile, profiler, mpi_abort, psutil):
         "(if there is no STATUS file with the FINISHED status in it)"
     ),
 )
+@click.option(
+    "--email",
+    type=str,
+    help=("Email address for notifications specified by mailtype option."),
+)
+@click.option(
+    "--mailtype",
+    type=click.Choice(_MAIL_TYPES),
+    help=(
+        "Email notification option, following --mail-type syntax for slurm "
+        "or -m syntax for PBS"
+    ),
+)
 @click.pass_context
-def template_run(ctx, templatefile, submit, var, overwrite):
+def template_run(ctx, templatefile, submit, var, overwrite, email=None, mailtype=None):
     """Run a pipeline from the given TEMPLATEFILE.
 
     This is either run immediately (default), or can be placed in the batch
@@ -229,7 +252,13 @@ def template_run(ctx, templatefile, submit, var, overwrite):
 
             # Run or queue the pipeline
             if submit:
-                ctx.invoke(queue, configfile=tfh.name, overwrite=overwrite)
+                ctx.invoke(
+                    queue,
+                    configfile=tfh.name,
+                    overwrite=overwrite,
+                    email=email,
+                    mailtype=mailtype,
+                )
             else:
                 Manager.from_yaml_file(tfh.name).run()
 
@@ -280,6 +309,19 @@ def template_run(ctx, templatefile, submit, var, overwrite):
         "(if there is no STATUS file with the FINISHED status in it)"
     ),
 )
+@click.option(
+    "--email",
+    type=str,
+    help=("Email address for notifications specified by mailtype option."),
+)
+@click.option(
+    "--mailtype",
+    type=click.Choice(_MAIL_TYPES),
+    help=(
+        "Email notification option, following --mail-type syntax for slurm "
+        "or -m syntax for PBS"
+    ),
+)
 def queue(
     configfile,
     submit=False,
@@ -288,6 +330,8 @@ def queue(
     profiler="cProfiler",
     psutil=False,
     overwrite="never",
+    email=None,
+    mailtype=None,
 ):
     r"""Queue a pipeline on a cluster from the given CONFIGFILE.
 
@@ -553,9 +597,31 @@ fi
     if rconf["queue_sys"] == "pbs":
         script = pbs_script
         job_command = "qsub"
+
+        if email is None:
+            job_options = []
+        else:
+            if mailtype is None:
+                raise ValueError("Must specify PBS mailtype for email notifications")
+            elif mailtype not in _PBS_MAIL_TYPES:
+                raise ValueError(f"Invalid PBS mailtype specified ({mailtype})")
+
+            job_options = [f"-M {email}", f"-m {mailtype}"]
+
     elif rconf["queue_sys"] == "slurm":
         script = slurm_script
         job_command = "sbatch"
+
+        if email is None:
+            job_options = []
+        else:
+            if mailtype is None:
+                raise ValueError("Must specify slurm mailtype for email notifications")
+            elif mailtype not in _SLURM_MAIL_TYPES:
+                raise ValueError(f"Invalid slurm mailtype specified ({mailtype})")
+
+            job_options = [f"--mail-user={email}", f"--mail-type={mailtype}"]
+
     else:
         raise ValueError("Specified queueing system not recognized")
 
@@ -569,7 +635,9 @@ fi
         # NOTE: explicitly set the environment to what Python thinks it should
         # be. This is because mpi4py will incorrectly modify the environment
         # using lowlevel calls which Python cannot detect.
-        subprocess.run([job_command, "jobscript.sh"], cwd=jobdir, env=os.environ)
+        subprocess.run(
+            [job_command] + job_options + ["jobscript.sh"], cwd=jobdir, env=os.environ
+        )
 
 
 def expandpath(path):
