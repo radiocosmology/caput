@@ -64,7 +64,7 @@ def lint_config(configfile):
 
 
 def load_venv(configfile):
-    """Load the venv specified under cluster/venv in the give configfile."""
+    """Load the venv specified under cluster/venv in the given configfile."""
     import site
     import yaml
 
@@ -356,7 +356,7 @@ def queue(
         A name of the cluster that we are running on, if this is supported
         (currently ``gpc`` and ``cedar``), this uses more relevant default
         values.
-    ``queue_system``
+    ``queue_sys``
         The queue system to run on. Either ``pbs`` or ``slurm``.
     ``queue``
         The queue to submit to. Only used for *PBS*
