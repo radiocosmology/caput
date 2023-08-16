@@ -2,8 +2,14 @@
 
 import importlib
 import os
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional, Union, overload
 
+import h5py
 import numpy as np
+
+if TYPE_CHECKING:
+    from mpi4py import MPI
 
 
 def vectorize(**base_kwargs):
@@ -180,6 +186,23 @@ def listize(**_):
             return self.__class__(new_func)
 
     return _listize_desc
+
+
+@overload
+def open_h5py_mpi(
+    f: Union[str, Path, h5py.File],
+    mode: str,
+    use_mpi: bool = True,
+    comm: Optional["MPI.Comm"] = None,
+) -> h5py.File:
+    ...
+
+
+@overload
+def open_h5py_mpi(
+    f: h5py.Group, mode: str, use_mpi: bool = True, comm: Optional["MPI.Comm"] = None
+) -> h5py.Group:
+    ...
 
 
 def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
