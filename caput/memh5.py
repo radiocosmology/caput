@@ -49,6 +49,8 @@ Utility Functions
 """
 
 from __future__ import annotations
+from pathlib import Path
+from typing import Any, Union, TYPE_CHECKING
 
 import datetime
 import json
@@ -64,6 +66,10 @@ import h5py
 import numpy as np
 
 from . import fileformats, misc, mpiarray, mpiutil, tools
+
+if TYPE_CHECKING:
+    from mpi4py import MPI
+
 
 logger = logging.getLogger(__name__)
 
@@ -2863,24 +2869,34 @@ def _distributed_group_to_file(
 
 
 def _distributed_group_from_file(
-    fname,
-    comm=None,
-    _=True,  # usually `hints`, but hints do not do anything in this method
-    convert_dataset_strings=False,
-    convert_attribute_strings=True,
-    file_format=fileformats.HDF5,
+    fname: Union[str, Path],
+    comm: "MPI.Comm" = None,
+    hints: Union[bool, dict] = True,
+    convert_dataset_strings: bool = False,
+    convert_attribute_strings: bool = True,
+    file_format: type[fileformats.FileFormat] = fileformats.HDF5,
     **kwargs,
 ):
-    """Restore full tree from an HDF5 file or Zarr group into a distributed memh5 object.
+    """Restore full tree from an HDF5 or Zarr into a distributed memh5 object.
 
     A `selections=` parameter may be supplied as parts of 'kwargs'. See
     `_deep_group_copy' for a description.
+
+    Hints may be a dictionary that can override the settings in the file itself. The
+    keys should be the path to the dataset and the value a dictionary with keys
+    `distributed` (boolean, required) and `axis` (integer, optional).
     """
     # Create root group
     group = MemGroup(distributed=True, comm=comm)
     comm = group.comm
 
     selections = kwargs.pop("selections", None)
+
+    # Fill the hints dict if set
+    hints_dict = {}
+    if isinstance(hints, dict):
+        hints_dict = hints
+        hints = True
 
     # == Create some internal functions for doing the read ==
     # Copy over attributes with a broadcast from rank = 0
@@ -2912,11 +2928,20 @@ def _distributed_group_from_file(
 
             # If dataset, create dataset
             else:
+
+                dset_hints = hints_dict.get(key, {})
+
+                distributed = hints and (
+                    dset_hints.get("distributed", False)
+                    or item.attrs.get("__memh5_distributed_dset", False)
+                )
                 # Check if we are in a distributed dataset
-                if ("__memh5_distributed_dset" in item.attrs) and item.attrs[
-                    "__memh5_distributed_dset"
-                ]:
-                    distributed_axis = item.attrs.get("__memh5_distributed_axis", 0)
+                if distributed:
+                    distributed_axis = (
+                        dset_hints["axis"]
+                        if "axis" in dset_hints
+                        else item.attrs.get("__memh5_distributed_axis", 0)
+                    )
 
                     # Read from file into MPIArray
                     pdata = mpiarray.MPIArray.from_file(
