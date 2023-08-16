@@ -50,7 +50,7 @@ Utility Functions
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Any, Union, TYPE_CHECKING
+from typing import Any, Optional, Type, Union, TYPE_CHECKING
 
 import datetime
 import json
@@ -2870,11 +2870,11 @@ def _distributed_group_to_file(
 
 def _distributed_group_from_file(
     fname: Union[str, Path],
-    comm: "MPI.Comm" = None,
+    comm: Optional["MPI.Comm"] = None,
     hints: Union[bool, dict] = True,
     convert_dataset_strings: bool = False,
     convert_attribute_strings: bool = True,
-    file_format: type[fileformats.FileFormat] = fileformats.HDF5,
+    file_format: Type[fileformats.FileFormat] = fileformats.HDF5,
     **kwargs,
 ):
     """Restore full tree from an HDF5 or Zarr into a distributed memh5 object.
@@ -2928,8 +2928,7 @@ def _distributed_group_from_file(
 
             # If dataset, create dataset
             else:
-
-                dset_hints = hints_dict.get(key, {})
+                dset_hints = hints_dict.get(item.name, {})
 
                 distributed = hints and (
                     dset_hints.get("distributed", False)
@@ -2945,8 +2944,8 @@ def _distributed_group_from_file(
 
                     # Read from file into MPIArray
                     pdata = mpiarray.MPIArray.from_file(
-                        h5group,
-                        key,
+                        fname,
+                        item.name,
                         axis=distributed_axis,
                         comm=comm,
                         sel=selection,
