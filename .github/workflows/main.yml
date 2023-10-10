@@ -57,12 +57,17 @@ jobs:
     - name: Install brew dependencies
       if: matrix.os == 'macos-latest'
       run: |
-        brew install open-mpi
+        brew install llvm libomp open-mpi hdf5
+        export CC=/usr/local/opt/llvm/bin/clang
+        export CPP=/usr/local/opt/llvm/bin/clang
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
+
+    - name: Update pip
+      run: pip install --upgrade pip
 
     - name: Install pip dependencies
       run: |
