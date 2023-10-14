@@ -551,9 +551,24 @@ class Manager(config.Reader):
         -------
         self: Pipeline object
         """
+        import re
         from .config import SafeLineLoader
 
         yaml_params = yaml.load(yaml_doc, Loader=SafeLineLoader)
+
+        # Check for unquoted cluster time specifications with colons in the YAML
+        if "cluster" in yaml_params and "time" in yaml_params["cluster"]:
+            matches = re.search(r"(?<=time:)\s+(\d+:(\d+:)*\d+)", yaml_doc)
+            if matches and matches.group(1):
+                raw_time_value = matches.group(1)
+                raise config.CaputConfigError(
+                    f"Value 'cluster.time: {raw_time_value}' in YAML configuration"
+                    f" parsed as sexagesimal: '{yaml_params['cluster']['time']}'\n"
+                    "This number will be interpreted as *minutes* by Slurm.\n"
+                    "Please enclose value in quotation marks.",
+                    location=yaml_params,
+                )
+
         try:
             if not isinstance(yaml_params["pipeline"], dict):
                 raise config.CaputConfigError(
