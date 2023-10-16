@@ -66,10 +66,13 @@ def lint_config(configfile):
 def load_venv(configfile):
     """Load the venv specified under cluster/venv in the given configfile."""
     import site
-    import yaml
+    from ruamel.yaml import YAML
+
+    # Set up ruamel YAML loader and dumper
+    yaml = YAML(typ="safe", pure=True)
 
     with open(configfile, mode="r") as f:
-        conf = yaml.safe_load(f)
+        conf = yaml.load(f)
     try:
         venv_path = conf["cluster"]["venv"]
     except KeyError:
@@ -387,7 +390,10 @@ def queue(
         same filesystem.
     """
     import shutil
-    import yaml
+    from ruamel.yaml import YAML
+
+    # Set up ruamel YAML loader and dumper
+    yaml = YAML(typ="safe", pure=True)
 
     if lint:
         from caput.pipeline import Manager
@@ -405,7 +411,7 @@ def queue(
             sys.exit(1)
 
     with open(configfile, "r") as f:
-        yconf = yaml.safe_load(f)
+        yconf = yaml.load(f)
 
     # Global configuration
     # Create output directory and copy over params file.

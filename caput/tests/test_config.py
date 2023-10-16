@@ -1,9 +1,13 @@
 import pickle
 
 import pytest
-import yaml
+from ruamel.yaml import YAML
 
 from caput import config
+
+
+# Set up ruamel YAML loader and dumper
+yaml = YAML(typ="safe", pure=True)
 
 
 # Test classes

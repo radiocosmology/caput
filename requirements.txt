@@ -4,6 +4,6 @@ cython
 h5py
 numpy>=1.20
 psutil
-PyYAML
+ruamel-yaml
 scipy
 skyfield>=1.31

@@ -1,8 +1,12 @@
 import unittest
-import yaml
+from ruamel.yaml import YAML, SafeLoader
 
 import numpy
 import caput
+
+
+# Set up ruamel YAML loader and dumper
+yaml = YAML(typ="safe", pure=True)
 
 
 class TestConfig(unittest.TestCase):
@@ -22,7 +26,7 @@ class TestConfig(unittest.TestCase):
         pipeline_config = man.all_tasks_params["pipeline_config"]
         self.assertDictEqual(
             pipeline_config,
-            yaml.load(testconfig, Loader=yaml.SafeLoader),
+            yaml.load(testconfig, Loader=SafeLoader),
         )
 
     def test_metadata_params(self):
@@ -49,7 +53,7 @@ class TestConfig(unittest.TestCase):
         pipeline_config = man.all_tasks_params["pipeline_config"]
         self.assertDictEqual(
             pipeline_config,
-            yaml.load(testconfig, Loader=yaml.SafeLoader),
+            yaml.load(testconfig, Loader=SafeLoader),
         )
 
     def test_metadata_params_no_config(self):

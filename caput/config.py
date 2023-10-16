@@ -57,7 +57,7 @@ if TYPE_CHECKING:
 
 import logging
 
-from yaml.loader import SafeLoader
+from ruamel.yaml import SafeLoader
 
 
 logger = logging.getLogger(__name__)

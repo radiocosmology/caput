@@ -351,13 +351,17 @@ import queue
 import warnings
 from copy import deepcopy
 
-import yaml
+from ruamel.yaml import YAML
 
 from . import config, fileformats, misc
 
 
 # Set the module logger.
 logger = logging.getLogger(__name__)
+
+
+# Set up ruamel YAML loader and dumper
+yaml = YAML(typ="safe", pure=True)
 
 
 # Search this dictionary for tasks.

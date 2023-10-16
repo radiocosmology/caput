@@ -1,12 +1,16 @@
 import tempfile
 import pytest
-import yaml
+from ruamel.yaml import YAML
 
 from click.testing import CliRunner
 
 from caput.config import Property
 from caput.pipeline import TaskBase
 from caput.scripts import runner as caput_script
+
+
+# Set up ruamel YAML loader and dumper
+yaml = YAML(typ="safe", pure=True)
 
 
 class DoNothing(TaskBase):
@@ -47,7 +51,7 @@ def simple_config():
 
 def write_to_file(config_json):
     with tempfile.NamedTemporaryFile(mode="w+t", delete=False) as temp:
-        yaml.safe_dump(config_json, temp, encoding="utf-8")
+        yaml.dump(config_json, temp, encoding="utf-8")
         temp.flush()
         return temp.name
 

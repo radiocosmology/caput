@@ -2467,7 +2467,7 @@ def copyattrs(a1, a2, convert_strings=False):
         class Memh5JSONEncoder(json.JSONEncoder):
             """Properly handle some odd formats.
 
-            - Datetimes often appear in the configs (as they are parsed by PyYAML),
+            - Datetimes often appear in the configs (as they are parsed by ruamel.yaml),
               so we need to serialise them back to strings.
             - Some old data format may have numpy arrays in `history["acq"]`. We have to convert
               those to lists and decode byte objects.
