@@ -374,13 +374,16 @@ def queue(
         *processors* on a node.
     ``venv``
         Path to a virtual environment to load before running.
-    ``modules``
+    ``module_list``
         Only used for slurm.
         A list of modules environments to load before running a job.
         If set, a module purge will occur before loading the specified modules.
         Sticky modules like StdEnv/* on Cedar will not get purged, and
         should not be specified.
         If not set, the current environment is used.
+    ``module_path``
+        Only used for slurm.
+        A list of modules paths to use. May be required to load modules.
     ``temp_directory``
         If set, save the output to a temporary location while running and
         then move to a final location if the job successfully finishes. This
@@ -484,13 +487,23 @@ def queue(
     if sfile != dfile:
         shutil.copyfile(sfile, dfile)
 
-    if rconf.get("modules"):
-        modules = rconf["modules"]
-        modules = (modules,) if isinstance(modules, str) else modules
-        modstr = "module purge\nmodule load "
-        modstr += "\nmodule load ".join(modules)
-    else:
-        modstr = ""
+    # Get any modules that should be loaded
+    modlist = rconf.get("module_list")
+    modpath = rconf.get("module_path")
+    modstr = ""
+
+    if modpath:
+        if isinstance(modpath, str):
+            modpath = (modpath,)
+        modstr += "module use " + "\nmodule use ".join(modpath)
+
+    if modlist:
+        if isinstance(modlist, str):
+            modlist = (modlist,)
+        modstr += "\nmodule load " + "\nmodule load ".join(modlist)
+
+    if modstr:
+        modstr = "module --force purge\n" + modstr
 
     rconf["modules"] = modstr
 
