@@ -28,8 +28,7 @@ jobs:
         run: |
           pip install ruff pytest black mpi4py pyinstrument psutil pytest-lazy-fixture
           pip install -r requirements.txt
-          python setup.py develop
-          pip install .[compression]
+          pip install -e .[compression]
 
       - name: Run ruff (flake8 and pydocstyle)
         run: ruff check .
@@ -64,7 +63,7 @@ jobs:
         pip install zarr==2.11.3
         pip install mpi4py numcodecs>=0.7.3 bitshuffle
         pip install pytest pytest-lazy-fixture
-        python setup.py develop
+        pip install -e .
 
     - name: Run serial tests
       run: pytest --doctest-modules caput/
@@ -97,7 +96,7 @@ jobs:
       run: |
         pip install -r requirements.txt
         pip install -r doc/requirements.txt
-        python setup.py develop
+        pip install -e .
 
     - name: Build sphinx docs
       run: sphinx-build -W -b html doc/ doc/_build/html
