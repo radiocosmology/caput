@@ -1,5 +1,11 @@
 [build-system]
-requires = ["setuptools", "wheel", "Cython", "oldest-supported-numpy"]
+requires = [
+    "setuptools",
+    "wheel",
+    "Cython",
+    "oldest-supported-numpy",
+    "versioneer[toml]",
+]
 
 [tool.ruff]
 # Enable:
@@ -46,3 +52,11 @@ exclude = [
 ]
 
 target-version = "py38"
+
+[tool.versioneer]
+VCS = "git"
+style = "pep440"
+versionfile_source = "caput/_version.py"
+versionfile_build = "caput/_version.py"
+tag_prefix = "v"
+parentdir_prefix = "caput-"
