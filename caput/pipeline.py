@@ -368,19 +368,6 @@ local_tasks = {}
 # ----------
 
 
-class PipelineConfigError(config.CaputConfigError):
-    """Deprecated. Raised when there is an error setting up a pipeline."""
-
-    def __init__(self, message):
-        warnings.warn(
-            "caput.pipeline.PipelineConfigError is deprecated. It will get removed in December 2021. "
-            "Use caput.config.CaputConfigError instead.",
-            DeprecationWarning,
-            2,
-        )
-        super().__init__(message)
-
-
 class PipelineRuntimeError(Exception):
     """Raised when there is a pipeline related error at runtime."""
 
