@@ -3,6 +3,7 @@
 import logging
 import math
 import os
+import threading
 import time
 from pathlib import Path
 from typing import ClassVar, Optional
@@ -263,6 +264,7 @@ class PSUtilProfiler(psutil.Process):
                     "memory_change_uss",
                     "current_available_memory_bytes",
                     "current_total_used_memory_bytes",
+                    "peak_used_memory_bytes",
                 ]
                 cw = csv.writer(fp)
                 cw.writerow(colnames)
@@ -309,6 +311,13 @@ class PSUtilProfiler(psutil.Process):
             else:
                 self._start_disk_io = self.io_counters()
 
+        self._thread_flag = threading.Event()
+        self._thread_flag.set()
+
+        self._peak_memory = self._start_memory
+        self._monitor_thread = threading.Thread(target=self.monitor)
+        self._monitor_thread.start()
+
     def stop(self):
         """Stop profiler. Dump results to csv file and/or log and/or set results on self.usage.
 
@@ -339,6 +348,13 @@ class PSUtilProfiler(psutil.Process):
         RuntimeError
             If stop was called before start.
         """
+        if self._start_cpu_times is None:
+            raise RuntimeError("PSUtilProfiler.stop was called before start.")
+
+        # Stop the monitoring process
+        self._thread_flag.clear()
+        self._monitor_thread.join()
+
         stop_time = time.time()
 
         # Get all stats at the same time
@@ -352,9 +368,6 @@ class PSUtilProfiler(psutil.Process):
                 disk_io = psutil.disk_io_counters()
             else:
                 disk_io = self.io_counters()
-
-        if self._start_cpu_times is None:
-            raise RuntimeError("PSUtilProfiler.stop was called before start.")
 
         # Construct results
         self._usage = {"task_name": self._label}
@@ -383,6 +396,7 @@ class PSUtilProfiler(psutil.Process):
         self._usage["memory"] = memory
         self._usage["used_memory"] = used_memory
         self._usage["available_memory"] = available_memory
+        self._usage["peak_memory"] = self._peak_memory
 
         time_s = stop_time - self._start_time
 
@@ -403,6 +417,7 @@ class PSUtilProfiler(psutil.Process):
                 f"current available memory: {bytes2human(available_memory)}"
             )
             self._logger.info(f"current total used memory: {bytes2human(used_memory)}")
+            self._logger.info(f"peak used memory: {bytes2human(self._peak_memory)}")
 
         with open(self.path, mode="a", newline="") as fp:
             import csv
@@ -427,8 +442,16 @@ class PSUtilProfiler(psutil.Process):
                     memory,
                     available_memory,
                     used_memory,
+                    self._peak_memory,
                 ]
             )
+
+    def monitor(self):
+        """Track peak memory."""
+        while self._thread_flag.is_set():
+            current_mem = psutil.virtual_memory().used
+            self._peak_memory = max(self._peak_memory, current_mem)
+            time.sleep(0.5)
 
     @property
     def cpu_count(self):
