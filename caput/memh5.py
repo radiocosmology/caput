@@ -1271,11 +1271,7 @@ class MemDatasetCommon(MemDataset):
         return self._data.__iter__()
 
     def __repr__(self):
-        return '<memh5 common dataset {}: shape {}, type "{}">'.format(
-            repr(self._name),
-            repr(self.shape),
-            repr(self.dtype),
-        )
+        return f'<memh5 common dataset {self._name!r}: shape {self.shape!r}, type "{self.dtype!r}">'
 
     def __eq__(self, other):
         if not isinstance(other, MemDatasetCommon):
@@ -2172,9 +2168,9 @@ class BasicCont(MemDiskGroup):
         out = {}
         for name, value in self._data["history"].items():
             warnings.warn(
-                "memh5 dataset {} is using a deprecated history format. Read support of "
+                f"memh5 dataset {self.name} is using a deprecated history format. Read support of "
                 "files using this format will be continued for now, but you should "
-                "update the instance of caput that wrote this file.".format(self.name),
+                "update the instance of caput that wrote this file.",
                 DeprecationWarning,
             )
             out[name] = value.attrs
