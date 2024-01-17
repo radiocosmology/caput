@@ -35,7 +35,6 @@ lint.ignore = [
     "D413", # D413: Missing blank line after last section
     "D416", # D416: Section name should end with a colon
     "NPY002", # NPY002: replace legacy numpy.random calls with np.random.Generator
-    "RUF012", # RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 ]
 
 # Ignore the following directories
