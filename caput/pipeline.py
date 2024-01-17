@@ -434,17 +434,13 @@ def _get_versions(modules):
         modules = [modules]
     if not isinstance(modules, list):
         raise config.CaputConfigError(
-            "Value of 'save_versions' is of type '{}' (expected 'str' or 'list(str)').".format(
-                type(modules).__name__
-            )
+            f"Value of 'save_versions' is of type '{type(modules).__name__}' (expected 'str' or 'list(str)')."
         )
     versions = {}
     for module in modules:
         if not isinstance(module, str):
             raise config.CaputConfigError(
-                "Found value of type '{}' in list 'save_versions' (expected 'str').".format(
-                    type(module).__name__
-                )
+                f"Found value of type '{type(module).__name__}' in list 'save_versions' (expected 'str')."
             )
         try:
             versions[module] = importlib.import_module(module).__version__
@@ -721,10 +717,8 @@ class Manager(config.Reader):
                 for v in value:
                     if v not in all_out_values:
                         raise config.CaputConfigError(
-                            "Value '{}' for task {} has no corresponding 'out' from another task "
-                            "(Value {} is not in {}).".format(
-                                key, type(task), v, all_out_values
-                            )
+                            f"Value '{key}' for task {type(task)} has no corresponding 'out' from another task "
+                            f"(Value {v} is not in {all_out_values})."
                         )
 
     def _setup_task(self, task_spec):
@@ -750,11 +744,7 @@ class Manager(config.Reader):
             try:
                 task_cls = misc.import_class(task_path)
             except (config.CaputConfigError, AttributeError, ModuleNotFoundError) as e:
-                msg = "Loading task '{}' caused error {}:\n\t{}".format(
-                    task_path,
-                    e.__class__.__name__,
-                    str(e),
-                )
+                msg = f"Loading task '{task_path}' caused error {e.__class__.__name__}:\n\t{e!s}"
                 raise config.CaputConfigError(msg) from e
 
         # Get the parameters and initialize the class.
@@ -817,10 +807,8 @@ class Manager(config.Reader):
         """
         try:
             task._setup_keys(requires=requires, in_=in_, out=out)
-        except Exception as e:  # noqa: BLE001
-            msg = "Setting up keys for task {} caused an error:\n\t{}".format(
-                task.__class__.__name__, str(e)
-            )
+        except Exception as e:
+            msg = f"Setting up keys for task {task.__class__.__name__} caused an error:\n\t{e!s}"
             raise config.CaputConfigError(msg) from e
 
         # The tasks own custom validation method
