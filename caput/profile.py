@@ -5,7 +5,7 @@ import math
 import os
 import time
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar, Optional
 
 import numpy as np
 import psutil
@@ -29,7 +29,7 @@ class Profiler:
         current directory.
     """
 
-    profilers = ["cprofile", "pyinstrument"]
+    profilers: ClassVar = ["cprofile", "pyinstrument"]
 
     def __init__(
         self,
