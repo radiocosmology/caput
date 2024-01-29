@@ -7,3 +7,5 @@ psutil
 PyYAML
 scipy
 skyfield>=1.31
+versioneer
+
