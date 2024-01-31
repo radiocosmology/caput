@@ -194,15 +194,13 @@ def open_h5py_mpi(
     mode: str,
     use_mpi: bool = True,
     comm: Optional["MPI.Comm"] = None,
-) -> h5py.File:
-    ...
+) -> h5py.File: ...
 
 
 @overload
 def open_h5py_mpi(
     f: h5py.Group, mode: str, use_mpi: bool = True, comm: Optional["MPI.Comm"] = None
-) -> h5py.Group:
-    ...
+) -> h5py.Group: ...
 
 
 def open_h5py_mpi(f, mode, use_mpi=True, comm=None):

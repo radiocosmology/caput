@@ -1,4 +1,5 @@
 """Tools for caching expensive calculations."""
+
 import weakref
 
 import numpy as np

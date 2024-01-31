@@ -1,4 +1,5 @@
 """Test running the caput.pipeline."""
+
 from caput.tests import conftest
 
 

@@ -1,4 +1,5 @@
 """Interface for file formats supported by caput: HDF5 and Zarr."""
+
 import logging
 import os
 import shutil

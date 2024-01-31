@@ -49,6 +49,7 @@ Richard 40.0
 Richard 40.0 Sooty
 
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

@@ -390,9 +390,11 @@ def concatenate(
             # Just copy it.
             out.create_index_map(
                 axis,
-                memh5.ensure_unicode(index_map)
-                if convert_dataset_strings
-                else index_map,
+                (
+                    memh5.ensure_unicode(index_map)
+                    if convert_dataset_strings
+                    else index_map
+                ),
             )
         memh5.copyattrs(first_data.index_attrs[axis], out.index_attrs[axis])
 

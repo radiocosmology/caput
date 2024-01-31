@@ -4,6 +4,7 @@ Designed to be run as an MPI job with four processes like::
 
     $ mpirun -np 4 python test_mpiarray.py
 """
+
 from typing import Union
 from packaging import version
 import pytest

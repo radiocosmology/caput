@@ -11,7 +11,6 @@ Interferometry
 - :py:meth:`fringestop_phase`
 """
 
-
 import numpy as np
 
 
