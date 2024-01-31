@@ -49,8 +49,6 @@ Utility Functions
 """
 
 from __future__ import annotations
-from pathlib import Path
-from typing import Any, Optional, Type, Union, TYPE_CHECKING
 
 import datetime
 import json
@@ -60,7 +58,8 @@ import warnings
 from ast import literal_eval
 from collections.abc import Mapping
 from copy import deepcopy
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import h5py
 import numpy as np
@@ -1862,6 +1861,10 @@ class MemDiskGroup(_BaseGroup):
                 if distributed and file_format == fileformats.Zarr:
                     lockfile = f"{file_}.sync"
                     kwargs["synchronizer"] = zarr.ProcessSynchronizer(lockfile)
+
+                # NOTE: hints is not supported for ondisk files, remove the argument in
+                # case it's been passed indirectly
+                kwargs.pop("hints", None)
                 data = file_format.open(file_, **kwargs)
                 toclose = file_format == fileformats.HDF5
 
@@ -2869,12 +2872,12 @@ def _distributed_group_to_file(
 
 
 def _distributed_group_from_file(
-    fname: Union[str, Path],
-    comm: Optional["MPI.Comm"] = None,
-    hints: Union[bool, dict] = True,
+    fname: str | Path,
+    comm: MPI.Comm | None = None,
+    hints: bool | dict = True,
     convert_dataset_strings: bool = False,
     convert_attribute_strings: bool = True,
-    file_format: Type[fileformats.FileFormat] = fileformats.HDF5,
+    file_format: type[fileformats.FileFormat] = fileformats.HDF5,
     **kwargs,
 ):
     """Restore full tree from an HDF5 or Zarr into a distributed memh5 object.
