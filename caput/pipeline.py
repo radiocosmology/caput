@@ -871,7 +871,7 @@ class Manager(config.Reader):
         # Validate that all inputs have a corresponding output key.
         self._validate_task_inputs()
 
-        # Setup all tasks in the task listk
+        # Setup all tasks in the task list
         for ii, task_spec in enumerate(self.task_specs):
             try:
                 # Load the task instance and add it to the pipeline
