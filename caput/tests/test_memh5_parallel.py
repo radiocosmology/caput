@@ -1,7 +1,7 @@
 """Unit tests for the parallel features of the memh5 module."""
 
 import pytest
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 import numpy as np
 import h5py
 import zarr
@@ -62,9 +62,9 @@ def test_create_dataset():
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
-        (lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (lf("h5_file_distributed"), h5py.File, fileformats.HDF5),
         (
-            lazy_fixture("zarr_file_distributed"),
+            lf("zarr_file_distributed"),
             zarr.open_group,
             fileformats.Zarr,
         ),
@@ -173,9 +173,9 @@ def test_io(
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
-        (lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (lf("h5_file_distributed"), h5py.File, fileformats.HDF5),
         (
-            lazy_fixture("zarr_file_distributed"),
+            lf("zarr_file_distributed"),
             zarr.open_group,
             fileformats.Zarr,
         ),

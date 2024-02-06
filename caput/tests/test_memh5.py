@@ -10,7 +10,7 @@ from zipfile import ZipFile
 import h5py
 import numpy as np
 import pytest
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 import zarr
 import copy
 
@@ -183,8 +183,8 @@ def assertAttrsEqual(a, b):
 @pytest.mark.parametrize(
     "test_file,file_open_function",
     [
-        (lazy_fixture("filled_h5_file"), h5py.File),
-        (lazy_fixture("filled_zarr_file"), zarr.open_group),
+        (lf("filled_h5_file"), h5py.File),
+        (lf("filled_zarr_file"), zarr.open_group),
     ],
 )
 def test_file_sanity(test_file, file_open_function):
@@ -196,12 +196,12 @@ def test_file_sanity(test_file, file_open_function):
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
-        (lazy_fixture("filled_h5_file"), h5py.File, None),
-        (lazy_fixture("filled_zarr_file"), zarr.open_group, None),
-        (lazy_fixture("filled_zarrzip_file"), zarr.open_group, None),
-        (lazy_fixture("filled_h5_file"), h5py.File, fileformats.HDF5),
-        (lazy_fixture("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
-        (lazy_fixture("filled_zarrzip_file"), zarr.open_group, fileformats.Zarr),
+        (lf("filled_h5_file"), h5py.File, None),
+        (lf("filled_zarr_file"), zarr.open_group, None),
+        (lf("filled_zarrzip_file"), zarr.open_group, None),
+        (lf("filled_h5_file"), h5py.File, fileformats.HDF5),
+        (lf("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
+        (lf("filled_zarrzip_file"), zarr.open_group, fileformats.Zarr),
     ],
 )
 def test_to_from_file(test_file, file_open_function, file_format):
@@ -223,8 +223,8 @@ def test_to_from_file(test_file, file_open_function, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("filled_h5_file"), fileformats.HDF5),
-        (lazy_fixture("filled_zarr_file"), fileformats.Zarr),
+        (lf("filled_h5_file"), fileformats.HDF5),
+        (lf("filled_zarr_file"), fileformats.Zarr),
     ],
 )
 def test_memdisk(test_file, file_format):
@@ -253,8 +253,8 @@ def test_memdisk(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("filled_h5_file"), fileformats.HDF5),
-        (lazy_fixture("filled_zarr_file"), fileformats.Zarr),
+        (lf("filled_h5_file"), fileformats.HDF5),
+        (lf("filled_zarr_file"), fileformats.Zarr),
     ],
 )
 def test_compression(test_file, file_format, compression, compression_opts, chunks):
@@ -302,10 +302,10 @@ class TempSubClass(memh5.MemDiskGroup):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("h5_file"), fileformats.HDF5),
-        (lazy_fixture("zarr_file"), fileformats.Zarr),
-        (lazy_fixture("h5_file"), None),
-        (lazy_fixture("zarr_file"), None),
+        (lf("h5_file"), fileformats.HDF5),
+        (lf("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), None),
+        (lf("zarr_file"), None),
     ],
 )
 def test_io(test_file, file_format):
@@ -395,9 +395,9 @@ def zarrzip_basiccont_file(zarr_basiccont_file):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
-        (lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
-        (lazy_fixture("zarrzip_basiccont_file"), fileformats.Zarr),
+        (lf("h5_basiccont_file"), fileformats.HDF5),
+        (lf("zarr_basiccont_file"), fileformats.Zarr),
+        (lf("zarrzip_basiccont_file"), fileformats.Zarr),
     ],
 )
 def test_access(test_file, file_format):
@@ -420,8 +420,8 @@ def test_access(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("h5_basiccont_file"), fileformats.HDF5),
-        (lazy_fixture("zarr_basiccont_file"), fileformats.Zarr),
+        (lf("h5_basiccont_file"), fileformats.HDF5),
+        (lf("zarr_basiccont_file"), fileformats.Zarr),
     ],
 )
 def test_history(test_file, file_format):
@@ -459,8 +459,8 @@ def test_history(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("h5_file"), fileformats.HDF5),
-        (lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), fileformats.HDF5),
+        (lf("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_to_from__file_unicode(test_file, file_format):
@@ -519,8 +519,8 @@ def test_to_from__file_unicode(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("h5_file"), fileformats.HDF5),
-        (lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), fileformats.HDF5),
+        (lf("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_failure(test_file, file_format):
@@ -537,8 +537,8 @@ def test_failure(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("h5_file"), fileformats.HDF5),
-        (lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), fileformats.HDF5),
+        (lf("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_to_from_hdf5(test_file, file_format):
@@ -567,8 +567,8 @@ def test_to_from_hdf5(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lazy_fixture("h5_file"), fileformats.HDF5),
-        (lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), fileformats.HDF5),
+        (lf("zarr_file"), fileformats.Zarr),
     ],
 )
 def test_json_failure(test_file, file_format):

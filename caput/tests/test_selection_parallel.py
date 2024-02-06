@@ -6,7 +6,7 @@ Needs to be run on 1, 2 or 4 MPI processes.
 from mpi4py import MPI
 import numpy as np
 import pytest
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 
 from caput import mpiutil, mpiarray, fileformats
 from caput.memh5 import MemGroup
@@ -51,8 +51,8 @@ def xfail_zarr_listsel(request):
 @pytest.mark.parametrize(
     "file_name, file_format",
     [
-        (lazy_fixture("h5_file"), fileformats.HDF5),
-        (lazy_fixture("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), fileformats.HDF5),
+        (lf("zarr_file"), fileformats.Zarr),
     ],
 )
 @pytest.mark.parametrize("fsel", [slice(1, 8, 2), slice(5, 8, 2)])

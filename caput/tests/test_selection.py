@@ -1,7 +1,7 @@
 """Serial version of the selection tests."""
 
 import pytest
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 import numpy as np
 
 from caput.memh5 import MemGroup
@@ -40,8 +40,8 @@ def zarr_file_select(datasets, zarr_file):
 @pytest.mark.parametrize(
     "container_on_disk, file_format",
     [
-        (lazy_fixture("h5_file_select"), fileformats.HDF5),
-        (lazy_fixture("zarr_file_select"), fileformats.Zarr),
+        (lf("h5_file_select"), fileformats.HDF5),
+        (lf("zarr_file_select"), fileformats.Zarr),
     ],
 )
 def test_file_select(container_on_disk, file_format):
@@ -57,9 +57,9 @@ def test_file_select(container_on_disk, file_format):
 @pytest.mark.parametrize(
     "container_on_disk, file_format",
     [
-        (lazy_fixture("h5_file_select"), fileformats.HDF5),
+        (lf("h5_file_select"), fileformats.HDF5),
         pytest.param(
-            lazy_fixture("zarr_file_select"),
+            lf("zarr_file_select"),
             fileformats.Zarr,
             marks=pytest.mark.xfail(reason="Zarr doesn't support index selections."),
         ),
