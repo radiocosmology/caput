@@ -26,7 +26,7 @@ jobs:
 
       - name: Install pip dependencies
         run: |
-          pip install ruff pytest black mpi4py pyinstrument psutil pytest-lazy-fixture
+          pip install ruff pytest black mpi4py pyinstrument psutil pytest-lazy-fixtures
           pip install -r requirements.txt
           pip install -e .[compression]
 
@@ -62,7 +62,7 @@ jobs:
         pip install -r requirements.txt
         pip install zarr==2.11.3
         pip install mpi4py numcodecs>=0.7.3 bitshuffle
-        pip install pytest pytest-lazy-fixture
+        pip install pytest pytest-lazy-fixtures
         pip install -e .
 
     - name: Run serial tests

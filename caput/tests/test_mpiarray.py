@@ -8,7 +8,7 @@ Designed to be run as an MPI job with four processes like::
 from typing import Union
 from packaging import version
 import pytest
-from pytest_lazyfixture import lazy_fixture
+from pytest_lazy_fixtures import lf
 import h5py
 import numpy as np
 import zarr
@@ -126,9 +126,9 @@ def test_wrap():
 @pytest.mark.parametrize(
     "filename, file_open_function, file_format",
     [
-        (lazy_fixture("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (lf("h5_file_distributed"), h5py.File, fileformats.HDF5),
         (
-            lazy_fixture("zarr_file_distributed"),
+            lf("zarr_file_distributed"),
             zarr.open_group,
             fileformats.Zarr,
         ),
