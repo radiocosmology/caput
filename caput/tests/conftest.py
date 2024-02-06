@@ -87,7 +87,7 @@ class CookEggs(IterBase):
 
     def process(self, _input):
         """Run process."""
-        print("Cooking %s %s eggs." % (self.style, input))
+        print("Cooking %s %s eggs." % (self.style, _input))
 
     def finish(self):
         """Run finish."""
@@ -120,6 +120,25 @@ pipeline:
       in: egg
 eggs_params:
   eggs: ['green', 'duck', 'ostrich']
+cook_params:
+  style: 'fried'
+"""
+
+multi_eggs_pipeline_conf = """
+---
+pipeline:
+  tasks:
+    - type: caput.tests.conftest.GetEggs
+      params: eggs_params
+      out: [color, egg]
+    - type: caput.tests.conftest.CookEggs
+      params: cook_params
+      in: egg
+    - type: caput.tests.conftest.CookEggs
+      params: cook_params
+      in: color
+eggs_params:
+  eggs: [['green', 'duck'], ['blue', 'ostrich']]
 cook_params:
   style: 'fried'
 """
