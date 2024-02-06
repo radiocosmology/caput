@@ -689,9 +689,17 @@ class Manager(config.Reader):
 
     def _setup_tasks(self):
         """Create and setup all tasks from the task list."""
-        all_out_values = {t.get("out", None) for t in self.task_specs}
+        # Get the names of all outputs such that we can validate the inputs into each
+        # task
+        all_out_values = set()
+        for t in self.task_specs:
+            if "out" in t:
+                if isinstance(t["out"], (list, tuple)):
+                    all_out_values.update(t["out"])
+                else:
+                    all_out_values.add(t["out"])
 
-        # Setup all tasks in the task listk
+        # Setup all tasks in the task list
         for ii, task_spec in enumerate(self.task_specs):
             try:
                 task, key_spec = self._setup_task(task_spec)
