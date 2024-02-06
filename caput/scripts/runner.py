@@ -484,7 +484,7 @@ def queue(
     if sfile != dfile:
         shutil.copyfile(sfile, dfile)
 
-    if "modules" in rconf and rconf["modules"]:
+    if rconf.get("modules"):
         modules = rconf["modules"]
         modules = (modules,) if isinstance(modules, str) else modules
         modstr = "module purge\nmodule load "

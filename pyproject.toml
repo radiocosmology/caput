@@ -19,10 +19,10 @@ requires = [
 # flake8-blind-except ('BLE')
 # flake8-comprehensions ('C4')
 # flake8-return ('RET')
-select = ["E", "D", "F", "I", "UP", "NPY", "RUF", "BLE", "C4", "RET"]
+lint.select = ["E", "D", "F", "I", "UP", "NPY", "RUF", "BLE", "C4", "RET"]
 
 # E203, W503
-ignore = [
+lint.ignore = [
     "E501", # E501: line length violations. Enforce these with `black`
     "E741", # E741: Ambiguous variable name
     "D105", # D105: Missing docstring in magic method
