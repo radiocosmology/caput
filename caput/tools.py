@@ -1,5 +1,11 @@
 """Collection of assorted tools."""
 
+from collections import deque
+from collections.abc import Mapping
+from itertools import chain
+from numbers import Number
+from sys import getsizeof
+from types import ModuleType
 from typing import Iterable
 
 import numpy as np
@@ -142,3 +148,59 @@ def _assert_equal(obj1, obj2):
 
     # Check all other built-in types and numpy types are equal
     np.testing.assert_equal(obj1, obj2)
+
+
+def total_size(obj: object):
+    """Return the approximate memory used by an object and anything it references.
+
+    Parameters
+    ----------
+    obj
+        Any object
+    """
+    # types not to iterate - these can handle their own internal
+    # recursion/iteration when calling `sys.getsizeof`
+    exclude_types = (str, bytes, Number, range, bytearray)
+
+    seen = set()
+    default = getsizeof(0)
+
+    def sum_(x):
+        try:
+            return sum(x)
+        except TypeError:
+            return 0
+
+    def sizeof(x):
+        if isinstance(x, ModuleType):
+            raise TypeError(
+                f"function `total_size` is not implemented for type {ModuleType}"
+            )
+        # Don't check the same item twice
+        if id(x) in seen:
+            return 0
+
+        seen.add(id(x))
+        # Get the base size of this object
+        size = getsizeof(x, default)
+        # Exclude certain types
+        if isinstance(x, exclude_types):
+            pass
+        # Check basic types and iterate accordingly
+        elif isinstance(x, (tuple, list, set, deque)):
+            size += sum_(map(sizeof, iter(x)))
+        elif isinstance(x, Mapping):
+            size += sum_(map(sizeof, chain.from_iterable(x.items())))
+
+        # Check custom objects
+        if hasattr(x, "__dict__"):
+            size += sizeof(vars(x))
+
+        if hasattr(x, "__slots__"):
+            size += sum_(
+                sizeof(getattr(x, attr)) for attr in x.__slots__ if hasattr(x, attr)
+            )
+
+        return size
+
+    return sizeof(obj)
