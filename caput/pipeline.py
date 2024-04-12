@@ -550,9 +550,7 @@ class Manager(config.Reader):
         try:
             if not isinstance(yaml_params["pipeline"], dict):
                 raise config.CaputConfigError(
-                    "Value 'pipeline' in YAML configuration is of type '{}' (expected a YAML block here).".format(
-                        type(yaml_params["pipeline"]).__name__
-                    ),
+                    f"Value 'pipeline' in YAML configuration is of type '{type(yaml_params['pipeline']).__name__}' (expected a YAML block here).",
                     location=yaml_params,
                 )
         except TypeError as e:
