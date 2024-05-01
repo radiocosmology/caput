@@ -893,7 +893,7 @@ class SelfWrapper(ModuleType):
         if _comm is not None and name in MPI.__dict__:
             return MPI.__dict__[name]
 
-        raise AttributeError("module 'mpiutil' has no attribute '%s'" % name)
+        raise AttributeError(f"module 'mpiutil' has no attribute '{name}'")
 
     def __call__(self, **kwargs):
         """Call self with set module."""

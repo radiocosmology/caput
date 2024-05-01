@@ -317,7 +317,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
     def __delitem__(self, name):
         """Delete item from group."""
         if name not in self:
-            raise KeyError("Key %s not present." % name)
+            raise KeyError(f"Key {name} not present.")
         path = posixpath.join(self.name, name)
         parent_path, name = posixpath.split(path)
         parent = self._storage_root[parent_path]
@@ -341,7 +341,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
         except KeyError:
             return self.create_dataset(name, shape=shape, dtype=dtype, **kwargs)
         if is_group(d):
-            msg = "Entry '%s' exists and is not a Dataset." % name
+            msg = f"Entry '{name}' exists and is not a Dataset."
             raise TypeError(msg)
 
         return d
@@ -353,7 +353,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
         except KeyError:
             return self.create_group(name)
         if not is_group(g):
-            msg = "Entry '%s' exists and is not a Group." % name
+            msg = f"Entry '{name}' exists and is not a Group."
             raise TypeError(msg)
 
         return g
@@ -653,7 +653,7 @@ class MemGroup(_BaseGroup):
         except KeyError:
             pass
         else:
-            raise ValueError("Entry %s exists." % name)
+            raise ValueError(f"Entry {name} exists.")
 
         # If distributed, synchronise to ensure that we create group collectively
         if self.distributed:
@@ -672,7 +672,7 @@ class MemGroup(_BaseGroup):
                 parent_name = posixpath.join(parent_name, part)
                 parent_storage = parent_storage[part]
             if not isinstance(parent_storage, _Storage):
-                raise ValueError("Entry %s exists and is not a Group." % parent_name)
+                raise ValueError(f"Entry {parent_name} exists and is not a Group.")
 
         # Underlying storage has been created. Return the group object.
         return self[name]
@@ -930,7 +930,7 @@ class MemGroup(_BaseGroup):
         dset = self[name]
 
         if dset.common:
-            warnings.warn("%s is already a common dataset, no need to convert" % name)
+            warnings.warn(f"{name} is already a common dataset, no need to convert")
             return dset
 
         dset_shape = dset.shape
@@ -1624,13 +1624,12 @@ class MemDiskGroup(_BaseGroup):
         try:
             new_cls = misc.import_class(clspath)
         except (ImportError, KeyError):
-            warnings.warn("Could not import memh5 subclass %s" % clspath)
+            warnings.warn(f"Could not import memh5 subclass {clspath}")
 
         # Check that it is a subclass of MemDiskGroup
         if not issubclass(new_cls, MemDiskGroup):
             raise RuntimeError(
-                "Requested type (%s) is not an subclass of memh5.MemDiskGroup."
-                % clspath
+                f"Requested type ({clspath}) is not an subclass of memh5.MemDiskGroup."
             )
         return new_cls
 
@@ -1690,11 +1689,11 @@ class MemDiskGroup(_BaseGroup):
         path = value.name
         if is_group(value):
             if not self.group_name_allowed(path):
-                msg = "Access to group %s not allowed." % path
+                msg = f"Access to group {path} not allowed."
                 raise KeyError(msg)
         else:
             if not self.dataset_name_allowed(path):
-                msg = "Access to dataset %s not allowed." % path
+                msg = f"Access to dataset {path} not allowed."
                 raise KeyError(msg)
         return value
 
@@ -1939,7 +1938,7 @@ class MemDiskGroup(_BaseGroup):
         """
         path = posixpath.join(self.name, name)
         if not self.dataset_name_allowed(path):
-            msg = "Dataset name %s not allowed." % path
+            msg = f"Dataset name {path} not allowed."
             raise ValueError(msg)
 
         return self._data.create_dataset(path, *args, **kwargs)
@@ -1989,7 +1988,7 @@ class MemDiskGroup(_BaseGroup):
         """Create and return a new group."""
         path = posixpath.join(self.name, name)
         if not self.group_name_allowed(path):
-            msg = "Group name %s not allowed." % path
+            msg = f"Group name {path} not allowed."
             raise ValueError(msg)
         self._data.create_group(path)
         return self._group_class._from_storage_root(self._data, path)
@@ -2415,7 +2414,7 @@ def get_file(f, file_format=None, **kwargs):
     try:
         f = file_format.open(f, **kwargs)
     except OSError as e:
-        msg = "Opening file %s caused an error: " % str(f)
+        msg = f"Opening file {f!s} caused an error: "
         raise OSError(msg + str(e)) from e
 
     return f, True
@@ -2858,7 +2857,7 @@ def _distributed_group_to_file(
             # Open file on all ranks
             with misc.open_h5py_mpi(fname, "r+", comm=group.comm) as f:
                 if not f.is_mpi:
-                    raise RuntimeError("Could not create file %s in MPI mode" % fname)
+                    raise RuntimeError(f"Could not create file {fname!s} in MPI mode")
                 _write_distributed_datasets(f)
         else:
             _write_distributed_datasets(fname)
@@ -3298,7 +3297,7 @@ def check_unicode(dset):
     """
     if has_unicode(dset.dtype):
         raise TypeError(
-            'Can not write dataset "%s" of unicode type into HDF5.' % dset.name
+            f'Can not write dataset "{dset.name!s}" of unicode type into HDF5.'
         )
 
     return dset.data
