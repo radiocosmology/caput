@@ -217,13 +217,13 @@ class Reader:
                 excluded_keys = set(prop_keys)
             if set(config_keys) - excluded_keys:
                 raise CaputConfigError(
-                    "Unused configuration keys: [%s]"
+                    "Unused configuration keys: [%s]"  # noqa: UP031
                     % ", ".join(set(config_keys) - excluded_keys),
                 )
         if not use_defaults:
             if set(prop_keys) - set(config_keys):
                 raise CaputConfigError(
-                    "Missing configuration keys: [%s]"
+                    "Missing configuration keys: [%s]"  # noqa: UP031
                     % ", ".join(set(prop_keys) - set(config_keys)),
                 )
 
@@ -374,9 +374,7 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
 
     def _prop(val):
         if not isinstance(val, (list, tuple)):
-            raise CaputConfigError(
-                "Expected to receive a list, but got '%s.'" % repr(val)
-            )
+            raise CaputConfigError(f"Expected to receive a list, but got '{val!r}.'")
 
         if type_:
             for ii, item in enumerate(val):

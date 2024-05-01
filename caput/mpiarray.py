@@ -2075,7 +2075,7 @@ def _reslice(slice_, n, subslice):
     # In other words find a single slice that has the same affect as application of two
     # successive slices
     if subslice.step is not None and subslice.step > 1:
-        raise ValueError("stride > 1 not supported. subslice: %s" % subslice)
+        raise ValueError(f"stride > 1 not supported. subslice: {subslice}")
 
     if isinstance(slice_, slice):
         dstart, dstop, dstep = slice_.indices(n)

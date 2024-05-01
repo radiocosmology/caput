@@ -625,8 +625,8 @@ class Manager(config.Reader):
                     except _PipelineMissingData:
                         if self.tasks.index(task) == 0:
                             msg = (
-                                "%s missing input data and is at beginning of"
-                                " task list. Advancing state." % task.__class__.__name__
+                                f"{task.__class__.__name__} missing input data and is at beginning of"
+                                " task list. Advancing state."
                             )
                             logger.debug(msg)
                             task._pipeline_advance_state()
@@ -767,7 +767,7 @@ class Manager(config.Reader):
                     try:
                         params.update(self.all_params[param_key])
                     except KeyError as e:
-                        msg = "Parameter group %s not found in config." % param_key
+                        msg = f"Parameter group {param_key} not found in config."
                         raise config.CaputConfigError(msg) from e
 
         # add global params to params
@@ -1031,7 +1031,7 @@ class TaskBase(config.Reader):
             for req in self._requires:
                 if req is None:
                     raise _PipelineMissingData()
-            msg = "Task %s calling 'setup()'." % self.__class__.__name__
+            msg = f"Task {self.__class__.__name__} calling 'setup()'."
             logger.debug(msg)
             out = self.setup(*tuple(self._requires))
             self._pipeline_advance_state()
@@ -1047,7 +1047,7 @@ class TaskBase(config.Reader):
             for in_ in self._in:
                 args += (in_.get(),)
             try:
-                msg = "Task %s calling 'next()'." % self.__class__.__name__
+                msg = f"Task {self.__class__.__name__} calling 'next()'."
                 logger.debug(msg)
                 return self.next(*args)
             except PipelineStopIteration:
@@ -1056,7 +1056,7 @@ class TaskBase(config.Reader):
                 return None
 
         elif self._pipeline_state == "finish":
-            msg = "Task %s calling 'finish()'." % self.__class__.__name__
+            msg = f"Task {self.__class__.__name__} calling 'finish()'."
             logger.debug(msg)
             out = self.finish()
             self._pipeline_advance_state()

@@ -434,7 +434,7 @@ def queue(
         system = conf["system"]
 
         if system not in system_defaults:
-            raise ValueError('Specified system "%s": is not known.' % system)
+            raise ValueError(f'Specified system "{system}": is not known.')
 
         rconf.update(**system_defaults[system])
 
@@ -445,7 +445,7 @@ def queue(
     required_keys = {"nodes", "time", "directory", "ppn", "queue", "ompnum", "pernode"}
     missing_keys = required_keys - set(rconf.keys())
     if missing_keys:
-        raise ValueError("Missing required keys: %s" % missing_keys)
+        raise ValueError(f"Missing required keys: {missing_keys}")
 
     # If no temporary directory set, just use the final directory
     if "temp_directory" not in rconf:
@@ -454,12 +454,12 @@ def queue(
     # Construct the working directory
     workdir = expandpath(rconf["temp_directory"])
     if not workdir.is_absolute():
-        raise ValueError("Working directory path %s must be absolute" % workdir)
+        raise ValueError(f"Working directory path {workdir} must be absolute")
 
     # Construct the output directory
     finaldir = expandpath(rconf["directory"])
     if not finaldir.is_absolute():
-        raise ValueError("Final output directory path %s must be absolute" % finaldir)
+        raise ValueError(f"Final output directory path {finaldir} must be absolute")
 
     # Create temporary directory if required
     jobdir = workdir / "job/"
@@ -498,7 +498,7 @@ def queue(
     if "venv" in rconf:
         venvpath = expandpath(rconf["venv"] + "/bin/activate")
         if not venvpath.exists():
-            raise ValueError("Could not find virtualenv at path %s" % rconf["venv"])
+            raise ValueError(f"Could not find virtualenv at path {rconf['venv']}")
         rconf["venv"] = venvpath
     else:
         rconf["venv"] = "/dev/null"

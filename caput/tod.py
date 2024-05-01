@@ -57,7 +57,7 @@ class TOData(memh5.BasicCont):
         stop=None,
         datasets=None,
         dataset_filter=None,
-        **kwargs
+        **kwargs,
     ):
         """Create new data object by concatenating a series of objects.
 
@@ -221,7 +221,7 @@ class Reader:
     def dataset_sel(self, value):
         for dataset_name in value:
             if dataset_name not in self.datasets:
-                msg = "Dataset %s not in data files." % dataset_name
+                msg = f"Dataset {dataset_name} not in data files."
                 raise ValueError(msg)
         self._dataset_sel = tuple(value)
 
