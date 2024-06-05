@@ -25,6 +25,8 @@ ctypedef fused weight_t:
     float
     double
 
+# Define a type to use in place of numpy booleans
+# ctypedef np.uint_8_t uint8
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
@@ -117,6 +119,50 @@ cdef data_t _quickselect_weight(data_t[::1] A, weight_t[::1] W, double qs, char 
             return A[i]
 
 
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef int _partition(data_t[::1] A, int left, int right):
+    cdef int pix = (left + right) // 2
+    pivot = A[pix]
+
+    A[right], A[pix] = A[pix], A[right]
+
+    cdef int i = left - 1
+
+    for j in range(left, right):
+        if A[j] < pivot:
+            i += 1
+            A[i], A[j] = A[j], A[i]
+    A[i+1], A[right] = A[right], A[i+1]
+
+    return i + 1
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef data_t _quickselect_noweight(data_t[::1] A, int q, int left, int right, char method):
+    # A: data, modified in place
+    # q: quantile to select
+    # wt: number of valid entries in A. Must be less than len(A)
+    # method: one of l, h, or s to indicate whether to take the lower,
+    #   higher, or split value if there is a tie
+
+    cdef int i
+
+    if left == right:
+        # TODO: use `method` here
+        return A[left]
+
+    k = _partition(A, left, right)
+    i = k - left + 1
+
+    if q == i:
+        return A[q]
+    
+    if q < i:
+        return _quickselect_noweight(A, q, left, <int> (k - 1), method)
+    else:
+        return _quickselect_noweight(A, <int> (q - i), <int> (k + i), right, method)
 
 
 @cython.wraparound(False)
@@ -193,6 +239,35 @@ cpdef void _quickselect(
         quantile[i] = _quickselect_weight(At, Wt, qs, method)
 
 
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef void _quickselect_bool(
+    data_t[:, ::1] A,
+    weight_t[:, ::1] W,
+    double q,
+    char method,
+    data_t[::1] quantile,
+    data_t[::1] At,
+):
+    # Quickselect with boolean weights
+
+    cdef int wt
+    cdef int i, j
+
+    # with nogil, parallel():
+    # Fill `At` *only* to the number of valid entries
+    for i in range(A.shape[0]):
+
+        wt = 0
+
+        for j in range(A.shape[1]):
+            if W[i, j] == 1:
+                At[wt] = A[i, j]
+                wt += 1
+        # TODO: all threads are trying to use At, which is not allowed
+        quantile[i] = _quickselect_noweight(At, <int> (q * wt), 0, wt, method)
+
+
 def quantile(A, W, q, method="split"):
     """Calculate the weighted quantile of a set of data.
 
@@ -264,9 +339,12 @@ def quantile(A, W, q, method="split"):
     Ar = A.reshape(-1, A.shape[-1])
     Wr = W.reshape(-1, W.shape[-1])
 
+    if Wr.dtype == bool:
+        Wr = Wr.astype(np.intc)
+
     # Allocate the temporaries and output arrays
-    At = np.ndarray(Ar.shape[-1], dtype=A.dtype)
-    Wt = np.ndarray(Wr.shape[-1], dtype=W.dtype)
+    At = np.ndarray(Ar.shape[-1], dtype=Ar.dtype)
+    Wt = np.ndarray(Wr.shape[-1], dtype=Wr.dtype)
     res = np.ndarray(Ar.shape[0], dtype=Ar.dtype)
 
     # NOTE: this is super annoying. In theory this is what Cython fused types are meant
@@ -283,6 +361,8 @@ def quantile(A, W, q, method="split"):
             _quickselect[int, float](Ar, Wr, q, methodc, res, At, Wt)
         elif W.dtype == np.double:
             _quickselect[int, double](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == bool:
+            _quickselect_bool[int, int](Ar, Wr, q, methodc, res, At)
         else:
             raise TypeError("Type of weight array is not supported.")
     elif A.dtype == int:
@@ -294,6 +374,8 @@ def quantile(A, W, q, method="split"):
             _quickselect[long, float](Ar, Wr, q, methodc, res, At, Wt)
         elif W.dtype == np.double:
             _quickselect[long, double](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == bool:
+            _quickselect_bool[long, int](Ar, Wr, q, methodc, res, At)
         else:
             raise TypeError("Type of weight array is not supported.")
     elif A.dtype == np.single:
@@ -305,6 +387,8 @@ def quantile(A, W, q, method="split"):
             _quickselect[float, float](Ar, Wr, q, methodc, res, At, Wt)
         elif W.dtype == np.double:
             _quickselect[float, double](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == bool:
+            _quickselect_bool[float, int](Ar, Wr, q, methodc, res, At)
         else:
             raise TypeError("Type of weight array is not supported.")
     elif A.dtype == np.double:
@@ -316,6 +400,8 @@ def quantile(A, W, q, method="split"):
             _quickselect[double, float](Ar, Wr, q, methodc, res, At, Wt)
         elif W.dtype == np.double:
             _quickselect[double, double](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == bool:
+            _quickselect_bool[double, int](Ar, Wr, q, methodc, res, At)
         else:
             raise TypeError("Type of weight array is not supported.")
     else:
