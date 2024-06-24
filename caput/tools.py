@@ -1,12 +1,11 @@
 """Collection of assorted tools."""
 
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from itertools import chain
 from numbers import Number
 from sys import getsizeof
 from types import ModuleType
-from typing import Iterable
 
 import numpy as np
 
