@@ -8,7 +8,7 @@ sensible operation.
 
 import glob
 import inspect
-from typing import Any, Tuple
+from typing import Any
 
 import h5py
 import numpy as np
@@ -645,7 +645,7 @@ def _copy_non_time_data(
     return [n[1:] if n[0] == "/" else n for n in to_dataset_names]
 
 
-def _dset_has_axis(entry: Any, axes: Tuple[str]) -> bool:
+def _dset_has_axis(entry: Any, axes: tuple[str]) -> bool:
     """Check if `entry` is a dataset with an axis named in `axes`."""
     if memh5.is_group(entry):
         return False

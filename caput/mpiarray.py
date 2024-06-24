@@ -241,7 +241,8 @@ import logging
 import os
 import time
 import warnings
-from typing import TYPE_CHECKING, Any, Sequence, Tuple, Union
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
     from mpi4py import MPI
@@ -1325,8 +1326,8 @@ class MPIArray(np.ndarray):
         """
 
         def _check_shapes(
-            current_shape: Tuple[int], new_shape: Tuple[int]
-        ) -> Tuple[int]:
+            current_shape: tuple[int], new_shape: tuple[int]
+        ) -> tuple[int]:
             """Check that we can reshape one array into another.
 
             Returns the fully fleshed out shape, or raises a ValueError.
@@ -1400,7 +1401,7 @@ class MPIArray(np.ndarray):
             self.comm,
         )
 
-    def _prep_buf(self, x: np.ndarray) -> Tuple[np.ndarray, "MPI.Datatype"]:
+    def _prep_buf(self, x: np.ndarray) -> tuple[np.ndarray, "MPI.Datatype"]:
         """Prepare a buffer for sending/recv by mpi4py.
 
         If this is array is a supported datatype it just returns a simple buffer spec,
@@ -2173,7 +2174,7 @@ def _get_common_comm(
 def _mpi_to_ndarray(
     inputs: Sequence[Union[MPIArray, npt.ArrayLike, None]],
     only_mpiarray: bool = False,
-) -> Tuple[Union[npt.ArrayLike, None], ...]:
+) -> tuple[Union[npt.ArrayLike, None], ...]:
     # ) -> Tuple[List[Union[np.ndarray, None]], int, "MPI.IntraComm"]:
     """Ensure a list with mixed MPIArrays and ndarrays are all ndarrays.
 
@@ -2241,8 +2242,8 @@ def _create_or_get_dset(group, name, shape, dtype, **kwargs):
 
 
 def sanitize_slice(
-    sl: Tuple[Any], naxis: int
-) -> Tuple[Tuple[Any], Tuple[int], Tuple[int]]:
+    sl: tuple[Any], naxis: int
+) -> tuple[tuple[Any], tuple[int], tuple[int]]:
     """Sanitize and extract information from the arguments to an array indexing.
 
     Parameters
