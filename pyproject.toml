@@ -50,7 +50,7 @@ exclude = [
     "*/__init__.py",
 ]
 
-target-version = "py38"
+target-version = "py39"
 
 [tool.versioneer]
 VCS = "git"
