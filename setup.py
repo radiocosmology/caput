@@ -66,7 +66,7 @@ setup(
         [console_scripts]
         caput-pipeline=caput.scripts.runner:cli
     """,
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     install_requires=requires,
     extras_require={
         "mpi": ["mpi4py>=1.3"],
