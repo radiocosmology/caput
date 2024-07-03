@@ -236,20 +236,17 @@ please use the uppercase variant of the function. The lower-case variants involv
 intermediate pickling process, which can lead to malformed arrays.
 
 """
-from __future__ import annotations
 
+import logging
 import os
 import time
-import logging
-from typing import Sequence, Tuple, Union, Any
 import warnings
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Union
-
-from mpi4py import MPI
+from typing import Any, Union
 
 import numpy as np
 import numpy.typing as npt
+from mpi4py import MPI
 
 from caput import fileformats, misc, mpiutil
 
@@ -565,7 +562,7 @@ class MPIArray(np.ndarray):
         """
         return self._comm
 
-    def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs) -> MPIArray:
+    def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs) -> "MPIArray":
         """Create a new array."""
         if comm is None:
             comm = mpiutil.world
@@ -600,7 +597,7 @@ class MPIArray(np.ndarray):
         global_length: int,
         local_start: int,
         comm: MPI.Intracomm,
-    ) -> MPIArray:
+    ) -> "MPIArray":
         """Create an MPIArray view of a numpy array.
 
         Parameters
@@ -640,7 +637,9 @@ class MPIArray(np.ndarray):
         return dist_arr
 
     @classmethod
-    def wrap(cls, array: np.ndarray, axis: int, comm: MPI.Intracomm = None) -> MPIArray:
+    def wrap(
+        cls, array: np.ndarray, axis: int, comm: MPI.Intracomm = None
+    ) -> "MPIArray":
         """Turn a set of numpy arrays into a distributed MPIArray object.
 
         This is needed for functions such as `np.fft.fft` which always return
@@ -687,7 +686,7 @@ class MPIArray(np.ndarray):
 
         return cls._view_from_data_and_params(array, axis, totallen, local_start, comm)
 
-    def redistribute(self, axis: int) -> MPIArray:
+    def redistribute(self, axis: int) -> "MPIArray":
         """Change the axis that the array is distributed over.
 
         Guarantees that the result is c-contiguous.
@@ -928,11 +927,11 @@ class MPIArray(np.ndarray):
             return (x, mpi_dtype)
         except KeyError:
             return (
-                x.view(np.byte).reshape(x.shape + (self.itemsize,)),
+                x.view(np.byte).reshape((*x.shape, self.itemsize)),
                 mpiutil.MPI.BYTE,
             )
 
-    def reshape(self, *shape: tuple) -> MPIArray:
+    def reshape(self, *shape: tuple) -> "MPIArray":
         """Reshape the array.
 
         Must not attempt to reshape the distributed axis. That axis must be
@@ -978,15 +977,15 @@ class MPIArray(np.ndarray):
 
         return rdata
 
-    def transpose(self, *axes) -> MPIArray:
+    def transpose(self, *axes) -> "MPIArray":
         """Transpose the array axes.
 
         Parameters
         ----------
         axes : None, tuple of ints, or n ints
             - None or no argument: reverses the order of the axes.
-            - tuple of ints: i in the j-th place in the tuple means a’s i-th axis
-              becomes a.transpose()’s j-th axis.
+            - tuple of ints: i in the j-th place in the tuple means a's i-th axis
+              becomes a.transpose()'s j-th axis.
             - n ints: same as an n-tuple of the same ints (this form is intended simply
               as a “convenience” alternative to the tuple form)
 
@@ -1011,7 +1010,7 @@ class MPIArray(np.ndarray):
 
         return tdata
 
-    def copy(self, *args, **kwargs) -> MPIArray:
+    def copy(self, *args, **kwargs) -> "MPIArray":
         """Return a copy of the MPIArray.
 
         Returns
@@ -1368,7 +1367,7 @@ class MPIArray(np.ndarray):
         self._comm = comm
 
     @classmethod
-    def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None) -> MPIArray:
+    def from_hdf5(cls, f, dataset, comm=None, axis=0, sel=None) -> "MPIArray":
         """Read MPIArray from an HDF5 dataset in parallel.
 
         Parameters
@@ -1395,7 +1394,7 @@ class MPIArray(np.ndarray):
         return cls.from_file(f, dataset, comm, axis, sel, file_format=fileformats.HDF5)
 
     @classmethod
-    def from_zarr(cls, f, dataset, comm=None, axis=0, sel=None) -> MPIArray:
+    def from_zarr(cls, f, dataset, comm=None, axis=0, sel=None) -> "MPIArray":
         """Read MPIArray from a zarr dataset in parallel.
 
         Parameters
@@ -1424,7 +1423,7 @@ class MPIArray(np.ndarray):
     @classmethod
     def from_file(
         cls, f, dataset, comm=None, axis=0, sel=None, file_format=fileformats.HDF5
-    ) -> MPIArray:
+    ) -> "MPIArray":
         """Read MPIArray from an HDF5 dataset or Zarr array on disk in parallel.
 
         Parameters
@@ -1627,10 +1626,10 @@ class MPIArray(np.ndarray):
             if isinstance(f, str):
                 self._to_hdf5_serial(f, dataset, create)
                 return
-            else:
-                raise ValueError(
-                    "Argument must be a filename if h5py does not have MPI support"
-                )
+
+            raise ValueError(
+                "Argument must be a filename if h5py does not have MPI support"
+            )
 
         mode = "a" if create else "r+"
         fh = misc.open_h5py_mpi(f, mode, use_mpi=True, comm=self.comm)
@@ -1716,8 +1715,8 @@ class MPIArray(np.ndarray):
             Compression options for the dataset.
         """
         try:
-            import zarr
             import numcodecs  # noqa: F401
+            import zarr
         except ImportError as err:
             raise RuntimeError(
                 f"Can't write to zarr file. Please install zarr and numcodecs: {err}"
