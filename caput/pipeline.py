@@ -1472,6 +1472,8 @@ class TaskBase(config.Reader):
         Add a product to either a `requires` slot or an input queue based
         on the associated key.
         """
+        result = False
+
         # First, check requires keys
         if key in self._requires_keys:
             ii = self._requires_keys.index(key)
@@ -1488,7 +1490,7 @@ class TaskBase(config.Reader):
                 )
             self._requires[ii] = product
 
-            return True
+            result = True
 
         if key in self._in_keys:
             ii = self._in_keys.index(key)
@@ -1500,9 +1502,9 @@ class TaskBase(config.Reader):
 
             self._in[ii].put(product)
 
-            return True
+            result = True
 
-        return False
+        return result
 
 
 class _OneAndOne(TaskBase):
