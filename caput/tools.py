@@ -140,7 +140,7 @@ def _assert_equal(obj1, obj2):
     # If both objects are np.ndarray subclasses, check that they
     # have the same type
     if isinstance(obj1, np.ndarray) and isinstance(obj2, np.ndarray):
-        assert type(obj1) == type(obj2)
+        assert type(obj1) is type(obj2)
 
         obj1 = obj1.view(np.ndarray)
         obj2 = obj2.view(np.ndarray)
