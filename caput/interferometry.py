@@ -2,9 +2,11 @@
 
 Coordinates
 -----------
+- :py:meth:`sphdist`
 - :py:meth:`sph_to_ground`
 - :py:meth:`ground_to_sph`
 - :py:meth:`project_distance`
+- :py:meth:`rotate_ypr`
 
 Interferometry
 --------------
@@ -12,6 +14,40 @@ Interferometry
 """
 
 import numpy as np
+
+
+def sphdist(long1, lat1, long2, lat2):
+    """Return the angular distance between two coordinates on the sphere.
+
+    Parameters
+    ----------
+    long1, lat1 : Skyfield Angle objects
+        longitude and latitude of the first coordinate. Each should be the
+        same length; can be one or longer.
+
+    long2, lat2 : Skyfield Angle objects
+        longitude and latitude of the second coordinate. Each should be the
+        same length. If long1, lat1 have length longer than 1, long2 and
+        lat2 should either have the same length as coordinate 1 or length 1.
+
+    Returns
+    -------
+    dist : Skyfield Angle object
+        angle between the two coordinates
+    """
+    from skyfield.units import Angle
+
+    dsinb = np.sin((lat1.radians - lat2.radians) / 2.0) ** 2
+
+    dsinl = (
+        np.cos(lat1.radians)
+        * np.cos(lat2.radians)
+        * (np.sin((long1.radians - long2.radians) / 2.0)) ** 2
+    )
+
+    dist = np.arcsin(np.sqrt(dsinl + dsinb))
+
+    return Angle(radians=2 * dist)
 
 
 def sph_to_ground(ha, lat, dec):
@@ -101,6 +137,45 @@ def projected_distance(ha, lat, dec, x, y, z=0.0):
     dist += z * (np.sin(lat) * np.sin(dec) + np.cos(lat) * np.cos(dec) * np.cos(ha))
 
     return dist
+
+
+def rotate_ypr(rot, xhat, yhat, zhat):
+    """Rotate a basis by a yaw, pitch and roll.
+
+    Parameters
+    ----------
+    rot : [yaw, pitch, roll]
+        Angles of rotation, in radians.
+    xhat: np.ndarray
+        X-component of the basis.  X is the axis of rotation for pitch.
+    yhat: np.ndarray
+        Y-component of the basis.  Y is the axis of rotation for roll.
+    zhat: np.ndarray
+        Z-component of the basis.  Z is the axis of rotation for yaw.
+
+    Returns
+    -------
+    xhat, yhat, zhat : np.ndarray[3]
+        New basis vectors.
+    """
+    yaw, pitch, roll = rot
+
+    # Yaw rotation
+    xhat1 = np.cos(yaw) * xhat - np.sin(yaw) * yhat
+    yhat1 = np.sin(yaw) * xhat + np.cos(yaw) * yhat
+    zhat1 = zhat
+
+    # Pitch rotation
+    xhat2 = xhat1
+    yhat2 = np.cos(pitch) * yhat1 + np.sin(pitch) * zhat1
+    zhat2 = -np.sin(pitch) * yhat1 + np.cos(pitch) * zhat1
+
+    # Roll rotation
+    xhat3 = np.cos(roll) * xhat2 - np.sin(roll) * zhat2
+    yhat3 = yhat2
+    zhat3 = np.sin(roll) * xhat2 + np.cos(roll) * zhat2
+
+    return xhat3, yhat3, zhat3
 
 
 def fringestop_phase(ha, lat, dec, u, v, w=0.0):
