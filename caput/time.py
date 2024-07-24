@@ -64,6 +64,10 @@ determined by the following (in order):
 - By setting the environment variable ``CAPUT_SKYFIELD_PATH``
 - If neither of the above is set, the data is place in ``<path to caput>/caput/data/``
 
+Other skyfield helper functions:
+
+- :py:meth:`skyfield_star_from_ra_dec`
+
 Constants
 =========
 
@@ -1184,21 +1188,24 @@ def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kw
     return (np.array(roots, dtype=np.float64), np.array(increasing, dtype=bool))
 
 
-def skyfield_star_from_ra_dec(ra, dec, name=""):
+def skyfield_star_from_ra_dec(ra, dec, name=()):
     """Create a Skyfield star object from an ICRS position.
 
     Parameters
     ----------
     ra, dec : float
         The ICRS position in degrees.
-    name : str, optional
-        The name of the body.
+    name : str or tuple/list of str, optional
+        The name(s) of the body.
 
     Returns
     -------
     body : skyfield.starlib.Star
         An object representing the body.
     """
+    if isinstance(name, str):
+        name = (name,)
+
     return Star(
         ra=Angle(degrees=ra, preference="hours"), dec=Angle(degrees=dec), names=name
     )
