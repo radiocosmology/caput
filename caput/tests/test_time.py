@@ -443,3 +443,57 @@ def test_rise_set_times(chime, eph):
 
     assert risings == approx(precalc_times[precalc_risings], abs=2)
     assert settings == approx(precalc_times[~precalc_risings], abs=2)
+
+
+def test_solar_ephemerides(chime):
+    """Test solar ephemerides"""
+
+    dts = datetime(2020, 11, 5)
+    dte = datetime(2020, 11, 7)
+
+    times = chime.solar_transit(dts, dte)
+
+    # Calculated via the old version of `ch_util.ephemeris.solar_transit(dts, dte)``
+    precalc_times = [1604605326.0967, 1604691728.9071]
+    assert times == approx(precalc_times, abs=2)
+
+    # From old version of `ch_util.ephemeris`
+    #
+    # NB: these times are different than the ones used in test_rise_set_times
+    #     above, because there both the sun's diameter and atmospheric refraction
+    #     are taken to be zero.
+    precalc_risings = np.array([1604588047, 1604674544], dtype=np.float64)
+
+    risings = chime.solar_rising(dts, dte)
+    assert risings == approx(precalc_risings, abs=2)
+
+    # From old version of `ch_util.ephemeris`
+    precalc_settings = np.array([1604536261, 1604622568], dtype=np.float64)
+
+    settings = chime.solar_setting(dts, dte)
+    assert settings == approx(precalc_settings, abs=2)
+
+
+def test_lunar_ephemerides(chime):
+    """Test lunar ephemerides"""
+
+    dts = datetime(2020, 11, 5)
+    dte = datetime(2020, 11, 7)
+
+    times = chime.lunar_transit(dts, dte)
+
+    # Calculated via the old version of `ch_util.ephemeris.lunar_transit(dts, dte)``
+    precalc_times = [1604575728, 1604665306]
+    assert times == approx(precalc_times, abs=2)
+
+    # From old version of `ch_util.ephemeris`, with adjusted diameter
+    precalc_risings = np.array([1604545414, 1604634887], dtype=np.float64)
+
+    risings = chime.lunar_rising(dts, dte)
+    assert risings == approx(precalc_risings, abs=2)
+
+    # From old version of `ch_util.ephemeris`, with adjusted diameter
+    precalc_settings = np.array([1604606169, 1604695470], dtype=np.float64)
+
+    settings = chime.lunar_setting(dts, dte)
+    assert settings == approx(precalc_settings, abs=2)
