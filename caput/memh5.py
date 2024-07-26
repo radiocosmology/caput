@@ -2655,12 +2655,6 @@ def deep_group_copy(
             # Unicode characters before writing
             data = check_unicode(entry)
 
-        if not to_file:
-            # reading from h5py can result in arrays with explicit endian set
-            # which mpi4py cannot handle when Bcasting memh5.Group
-            # needed until fixed: https://github.com/mpi4py/mpi4py/issues/177
-            data = ensure_native_byteorder(data)
-
         dset_args = {"dtype": data.dtype, "shape": data.shape, "data": data}
         # If we're copying memory to memory we can allow distributed datasets
         if not to_file and isinstance(dset, MemDatasetDistributed):
