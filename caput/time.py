@@ -67,6 +67,7 @@ determined by the following (in order):
 Other skyfield helper functions:
 
 - :py:meth:`skyfield_star_from_ra_dec`
+- :py:meth:`skyfield_time_to_unix`
 
 Constants
 =========
@@ -503,6 +504,9 @@ class Observer:
     def rise_set_times(self, source, t0, t1=None, step=None, diameter=0.0):
         """Find all times a sources rises or sets in an interval.
 
+        Typical atmospheric refraction at the horizon is 34 arcminutes, but
+        this method does _not_ take that into account.
+
         Parameters
         ----------
         source : skyfield source
@@ -522,7 +526,9 @@ class Observer:
         diameter : float
             The size of the source in degrees. Use this to ensure the whole source is
             below the horizon. Also, if the local horizon is higher (i.e. mountains),
-            this can be set to a negative value to account for this.
+            this can be set to a negative value to account for this.  You may also
+            use this parameter to account for atmospheric refraction, if desired,
+            by adding 68 arcminutes to the nominal diameter.
 
         Returns
         -------
@@ -538,6 +544,9 @@ class Observer:
 
     def rise_times(self, source, t0, t1=None, step=None, diameter=0.0):
         """Find all times a sources rises in an interval.
+
+        Typical atmospheric refraction at the horizon is 34 arcminutes, but
+        this method does _not_ take that into account.
 
         Parameters
         ----------
@@ -557,7 +566,9 @@ class Observer:
         diameter : float
             The size of the source in degrees. Use this to ensure the whole source is
             below the horizon. Also, if the local horizon is higher (i.e. mountains),
-            this can be set to a negative value to account for this.
+            this can be set to a negative value to account for this.  You may also
+            use this parameter to account for atmospheric refraction, if desired,
+            by adding 68 arcminutes to the nominal diameter.
 
         Returns
         -------
@@ -570,6 +581,9 @@ class Observer:
 
     def set_times(self, source, t0, t1=None, step=None, diameter=0.0):
         """Find all times a sources sets in an interval.
+
+        Typical atmospheric refraction at the horizon is 34 arcminutes, but
+        this method does _not_ take that into account.
 
         Parameters
         ----------
@@ -589,7 +603,9 @@ class Observer:
         diameter : float
             The size of the source in degrees. Use this to ensure the whole source is
             below the horizon. Also, if the local horizon is higher (i.e. mountains),
-            this can be set to a negative value to account for this.
+            this can be set to a negative value to account for this.  You may also
+            use this parameter to account for atmospheric refraction, if desired,
+            by adding 68 arcminutes to the nominal diameter.
 
         Returns
         -------
@@ -599,6 +615,208 @@ class Observer:
         return self._sr_work(
             source, t0, t1, step, diameter, skip_rise=True, skip_set=False
         )[0]
+
+    def solar_transit(self, t0, t1=None, step=None, lower=False, return_dec=False):
+        """Find the Solar transits between two times.
+
+        Parameters
+        ----------
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of transit, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+        lower : bool, optional
+            By default this only returns the upper (regular) transit. This will cause
+            lower transits to be returned instead.
+        return_dec : bool, optional
+            If set, also return the declination of the source at transit.
+
+        Returns
+        -------
+        times : np.ndarray
+            Solar transit times as UNIX epoch times.
+        """
+        return self.transit_times(
+            skyfield_wrapper.ephemeris["sun"], t0, t1, step, lower, return_dec
+        )
+
+    def lunar_transit(self, t0, t1=None, step=None, lower=False, return_dec=False):
+        """Find the Lunar transits between two times.
+
+        Parameters
+        ----------
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of transit, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+        lower : bool, optional
+            By default this only returns the upper (regular) transit. This will cause
+            lower transits to be returned instead.
+        return_dec : bool, optional
+            If set, also return the declination of the source at transit.
+
+        Returns
+        -------
+        times : np.ndarray
+            Lunar transit times as UNIX epoch times.
+        """
+        return self.transit_times(
+            skyfield_wrapper.ephemeris["moon"], t0, t1, step, lower, return_dec
+        )
+
+    def solar_setting(self, t0, t1=None, step=None):
+        """Find the Solar settings between two times.
+
+        This method calculates the conventional astronomical sunset, which
+        occurs when the centre of the sun is 50 arcminutes below the horizon.
+        This accounts for a solar diameter of 32 arcminutes, plus 34 arcminutes
+        of atmospheric refraction at the horizon.
+
+        Parameters
+        ----------
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of setting, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+
+        Returns
+        -------
+        times : np.ndarray
+            Solar setting times as UNIX epoch times.
+        """
+        return self.set_times(
+            skyfield_wrapper.ephemeris["sun"],
+            t0,
+            t1,
+            step,
+            diameter=100.0 / 60,
+        )
+
+    def lunar_setting(self, t0, t1=None, step=None):
+        """Find the Lunar settings between two times.
+
+        This method calculates the conventional astronomical moonset, which
+        occurs when the centre of the moon is 50 arcminutes below the horizon.
+        This accounts for a lunar diameter of 32 arcminutes, plus 34 arcminutes
+        of atmospheric refraction at the horizon.
+
+        Parameters
+        ----------
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of setting, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+
+        Returns
+        -------
+        times : np.ndarray
+            Lunar setting times as UNIX epoch times.
+        """
+        return self.set_times(
+            skyfield_wrapper.ephemeris["moon"],
+            t0,
+            t1,
+            step,
+            diameter=100.0 / 60,
+        )
+
+    def solar_rising(self, t0, t1=None, step=None):
+        """Find the Solar risings between two times.
+
+        This method calculates the conventional astronomical sunrise, which
+        occurs when the centre of the sun is 50 arcminutes below the horizon.
+        This accounts for a solar diameter of 32 arcminutes, plus 34 arcminutes
+        of atmospheric refraction at the horizon.
+
+        Parameters
+        ----------
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of rising, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+
+        Returns
+        -------
+        times : np.ndarray
+            Solar rising times as UNIX epoch times.
+        """
+        return self.rise_times(
+            skyfield_wrapper.ephemeris["sun"],
+            t0,
+            t1,
+            step,
+            diameter=100.0 / 60,
+        )
+
+    def lunar_rising(self, t0, t1=None, step=None):
+        """Find the Lunar risings between two times.
+
+        This method calculates the conventional astronomical moonrise, which
+        occurs when the centre of the moon is 50 arcminutes below the horizon.
+        This accounts for a lunar diameter of 32 arcminutes, plus 34 arcminutes
+        of atmospheric refraction at the horizon.
+
+        Parameters
+        ----------
+        t0 : float unix time, or datetime
+            The start time to search for. Any type that be converted to a UNIX time
+            by caput.
+        t1 : float unix time, or datetime, optional
+            The end time of the search interval. If not set, this is 1 day after the
+            start time `t0`.
+        step : float or None, optional
+            The initial search step in days. This is used to find the approximate
+            times of rising, and should be set to something less than the spacing
+            between events.  If None is passed, an initial search step of 0.2 days,
+            or else one fifth of the specified interval, is used, whichever is smaller.
+
+        Returns
+        -------
+        times : np.ndarray
+            Lunar rising times as UNIX epoch times.
+        """
+        return self.rise_times(
+            skyfield_wrapper.ephemeris["moon"],
+            t0,
+            t1,
+            step,
+            diameter=100.0 / 60,
+        )
 
     def _sr_work(self, source, t0, t1, step, diameter, skip_rise=False, skip_set=False):
         # A work routine factoring out common functionality
