@@ -2701,8 +2701,20 @@ def deep_group_copy(
     # If copying to file, datasets are not shared, so ensure that these
     # datasets are properly processed
     if to_file:
-        shared = {}
-        shallow = False
+        if shared:
+            warnings.warn(
+                f"Attempted to share datasets {(*shared,)}, but target group "
+                f"{g2} is on disk. Datasets cannot be shared."
+            )
+            shared = {}
+
+        if shallow:
+            warnings.warn(
+                f"Attempted to make a shallow copy of group {g1}, but target "
+                f"group {g2} is on disk. Datasets cannot be shared."
+            )
+            shallow = False
+
     elif not shallow:
         # Make sure shared dataset names are properly formatted
         shared = {"/" + k if k[0] != "/" else k for k in shared}
