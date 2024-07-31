@@ -2901,11 +2901,12 @@ def _distributed_group_to_file(
     # available)
     # NOTE: need to use mode r+ as the file should already exist
     if file_format == fileformats.Zarr:
-        with fileformats.ZarrProcessSynchronizer(
-            f".{fname}.sync", group.comm
-        ) as synchronizer, zarr.open_group(
-            store=fname, mode="r+", synchronizer=synchronizer
-        ) as f:
+        with (
+            fileformats.ZarrProcessSynchronizer(
+                f".{fname}.sync", group.comm
+            ) as synchronizer,
+            zarr.open_group(store=fname, mode="r+", synchronizer=synchronizer) as f,
+        ):
             _write_distributed_datasets(f)
 
     elif file_format == fileformats.HDF5:
