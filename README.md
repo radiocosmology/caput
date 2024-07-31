@@ -1,5 +1,4 @@
-caput
-=====
+# caput
 
 Cluster Astronomical Python Utilities
 
