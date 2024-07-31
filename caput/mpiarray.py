@@ -1017,7 +1017,7 @@ class MPIArray(np.ndarray):
                 fh.close()
         else:
             # If using zarr we can directly read the full dataset into the final array
-            dset.get_basic_selection(sel, out=dist_arr)
+            dset.get_basic_selection(sel, out=dist_arr.local_array)
 
         return dist_arr
 
@@ -1308,7 +1308,7 @@ class MPIArray(np.ndarray):
 
         return tdata
 
-    def reshape(self, *shape):
+    def reshape(self, *shape, order="C"):
         """Reshape the array.
 
         Must not attempt to reshape the distributed axis. That axis must be
@@ -1318,6 +1318,11 @@ class MPIArray(np.ndarray):
         ----------
         shape : tuple
             Tuple of axis lengths. The distributed must be given `None`.
+        order : str
+            Read/write index order, ignoring memory layout of underlying array.
+            'C' means C-like order, 'F' means Fortran-like order. 'A' uses Fortran
+            order _if_ array is Fortran-contiguous in memory, and C order otherwise.
+
 
         Returns
         -------
@@ -1390,7 +1395,7 @@ class MPIArray(np.ndarray):
         local_shape = new_pre_shape[:new_axis] + new_post_shape
 
         # Now we actually try the resize...
-        new_data = self.local_array.reshape(local_shape)
+        new_data = self.local_array.reshape(local_shape, order=order)
 
         # ...and then construct the final MPIArray object
         return self.__class__._view_from_data_and_params(
