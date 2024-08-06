@@ -6,7 +6,7 @@ import tempfile
 import numpy as np
 import pytest
 
-from caput.pipeline import PipelineStopIteration, TaskBase, IterBase
+from caput.pipeline import PipelineStopIteration, TaskBase, IterBase, Manager
 from caput.scripts.runner import cli
 from caput import config, fileformats, mpiutil
 
@@ -154,6 +154,46 @@ cook_params:
                 return runner.invoke(cli, ["run", *parameters, configfile.name])
 
     return _run_pipeline
+
+
+@pytest.fixture
+def get_pipeline():
+    """Provides the `get_pipeline` function which returns an initialized pipeline manager."""
+    eggs_pipeline_conf = """
+---
+pipeline:
+  tasks:
+    - type: tests.conftest.PrintEggs
+      params: eggs_params
+    - type: tests.conftest.GetEggs
+      params: eggs_params
+      out: egg
+    - type: tests.conftest.CookEggs
+      params: cook_params
+      in: egg
+eggs_params:
+  eggs: ['green', 'duck', 'ostrich']
+cook_params:
+  style: 'fried'
+"""
+
+    def _get_pipeline(configstr=eggs_pipeline_conf):
+        """Initialize a pipeline manager object.
+
+        Parameters
+        ----------
+        configstr : str
+            YAML string to use as a config.
+
+        Returns
+        -------
+        manager : Manager
+            Initialized pipeline manager.
+        """
+
+        return Manager.from_yaml_str(configstr)
+
+    return _get_pipeline
 
 
 @pytest.fixture
