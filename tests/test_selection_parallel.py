@@ -10,14 +10,13 @@ from pytest_lazy_fixtures import lf
 
 from caput import mpiutil, mpiarray, fileformats
 from caput.memh5 import MemGroup
-from caput.tests.conftest import rm_all_files
 
 
 comm = MPI.COMM_WORLD
 
 
 @pytest.fixture
-def container_on_disk(datasets, file_name, file_format):
+def container_on_disk(datasets, file_name, file_format, rm_all_files):
     """Prepare a file for the select_parallel tests."""
     if comm.rank == 0:
         m1 = mpiarray.MPIArray.wrap(datasets[0], axis=0, comm=MPI.COMM_SELF)

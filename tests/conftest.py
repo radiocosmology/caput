@@ -6,9 +6,9 @@ import tempfile
 import numpy as np
 import pytest
 
-from ..pipeline import PipelineStopIteration, TaskBase, IterBase
-from ..scripts.runner import cli
-from .. import config, fileformats, mpiutil
+from caput.pipeline import PipelineStopIteration, TaskBase, IterBase
+from caput.scripts.runner import cli
+from caput import config, fileformats, mpiutil
 
 
 @pytest.fixture(scope="session")
@@ -106,16 +106,19 @@ class CookEggs(IterBase):
         raise NotImplementedError()
 
 
-eggs_pipeline_conf = """
+@pytest.fixture
+def run_pipeline():
+    """Provides the `run_pipeline` function which will run the pipeline."""
+    eggs_pipeline_conf = """
 ---
 pipeline:
   tasks:
-    - type: caput.tests.conftest.PrintEggs
+    - type: tests.conftest.PrintEggs
       params: eggs_params
-    - type: caput.tests.conftest.GetEggs
+    - type: tests.conftest.GetEggs
       params: eggs_params
       out: egg
-    - type: caput.tests.conftest.CookEggs
+    - type: tests.conftest.CookEggs
       params: cook_params
       in: egg
 eggs_params:
@@ -124,55 +127,37 @@ cook_params:
   style: 'fried'
 """
 
-multi_eggs_pipeline_conf = """
----
-pipeline:
-  tasks:
-    - type: caput.tests.conftest.GetEggs
-      params: eggs_params
-      out: [color, egg]
-    - type: caput.tests.conftest.CookEggs
-      params: cook_params
-      in: egg
-    - type: caput.tests.conftest.CookEggs
-      params: cook_params
-      in: color
-eggs_params:
-  eggs: [['green', 'duck'], ['blue', 'ostrich']]
-cook_params:
-  style: 'fried'
-"""
+    def _run_pipeline(parameters=None, configstr=eggs_pipeline_conf):
+        """Run `caput.scripts.runner run` with given parameters and config.
 
+        Parameters
+        ----------
+        parameters : List[str]
+            Parameters to pass to the cli, for example `["--profile"]` (see `--help`).
+        configstr : str
+            YAML string to use as a config. This function will write it to a file that is then passed to the cli.
 
-def run_pipeline(parameters=None, configstr=eggs_pipeline_conf):
-    """Run `caput.scripts.runner run` with given parameters and config.
+        Returns
+        -------
+        result : `click.testing.Result`
+            Holds the captured result. Try accessing e.g. `result.exit_code`, `result.output`.
+        """
+        with tempfile.NamedTemporaryFile("w+") as configfile:
+            configfile.write(configstr)
+            configfile.flush()
+            from click.testing import CliRunner
 
-    Parameters
-    ----------
-    parameters : List[str]
-        Parameters to pass to the cli, for example `["--profile"]` (see `--help`).
-    configstr : str
-        YAML string to use as a config. This function will write it to a file that is then passed to the cli.
+            runner = CliRunner()
+            if parameters is None:
+                return runner.invoke(cli, ["run", configfile.name])
+            else:
+                return runner.invoke(cli, ["run", *parameters, configfile.name])
 
-    Returns
-    -------
-    result : `click.testing.Result`
-        Holds the captured result. Try accessing e.g. `result.exit_code`, `result.output`.
-    """
-    with tempfile.NamedTemporaryFile("w+") as configfile:
-        configfile.write(configstr)
-        configfile.flush()
-        from click.testing import CliRunner
-
-        runner = CliRunner()
-        if parameters is None:
-            return runner.invoke(cli, ["run", configfile.name])
-        else:
-            return runner.invoke(cli, ["run", *parameters, configfile.name])
+    return _run_pipeline
 
 
 @pytest.fixture
-def h5_file():
+def h5_file(rm_all_files):
     """Provides a file name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5.h5"
     yield fname
@@ -180,7 +165,7 @@ def h5_file():
 
 
 @pytest.fixture
-def zarr_file():
+def zarr_file(rm_all_files):
     """Provides a directory name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5.zarr"
     yield fname
@@ -188,7 +173,7 @@ def zarr_file():
 
 
 @pytest.fixture
-def h5_file_distributed():
+def h5_file_distributed(rm_all_files):
     """Provides a file name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5_distributed.h5"
     yield fname
@@ -197,7 +182,7 @@ def h5_file_distributed():
 
 
 @pytest.fixture
-def zarr_file_distributed():
+def zarr_file_distributed(rm_all_files):
     """Provides a directory name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5.zarr"
     yield fname
@@ -205,8 +190,14 @@ def zarr_file_distributed():
         rm_all_files(fname)
 
 
-def rm_all_files(file_name):
-    """Remove all files and directories starting with `file_name`."""
-    file_names = glob.glob(file_name + "*")
-    for fname in file_names:
-        fileformats.remove_file_or_dir(fname)
+@pytest.fixture
+def rm_all_files():
+    """Provides the `rm_all_files` function."""
+
+    def _rm_all_files(file_name):
+        """Remove all files and directories starting with `file_name`."""
+        file_names = glob.glob(file_name + "*")
+        for fname in file_names:
+            fileformats.remove_file_or_dir(fname)
+
+    return _rm_all_files

@@ -6,7 +6,6 @@ import numpy as np
 
 from caput.memh5 import MemGroup
 from caput import fileformats
-from caput.tests.conftest import rm_all_files
 
 fsel = slice(1, 8, 2)
 isel = slice(1, 4)
@@ -16,7 +15,7 @@ index_sel = {"dset1": (fsel, ind, slice(None)), "dset2": (ind, slice(None))}
 
 
 @pytest.fixture
-def h5_file_select(datasets, h5_file):
+def h5_file_select(datasets, h5_file, rm_all_files):
     """Provides an HDF5 file with some content for testing."""
     container = MemGroup()
     container.create_dataset("dset1", data=datasets[0].view())
@@ -27,7 +26,7 @@ def h5_file_select(datasets, h5_file):
 
 
 @pytest.fixture
-def zarr_file_select(datasets, zarr_file):
+def zarr_file_select(datasets, zarr_file, rm_all_files):
     """Provides a Zarr file with some content for testing."""
     container = MemGroup()
     container.create_dataset("dset1", data=datasets[0].view())

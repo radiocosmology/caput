@@ -21,7 +21,7 @@ import sys
 import caput
 
 # Mock up modules missing on readthedocs.
-from mock import Mock as MagicMock
+from unittest.mock import Mock as MagicMock
 
 
 class Mock(MagicMock):
