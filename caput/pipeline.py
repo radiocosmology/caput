@@ -396,6 +396,7 @@ import queue
 import re
 import traceback
 import warnings
+from collections.abc import Generator
 from copy import deepcopy
 
 import yaml
@@ -511,6 +512,20 @@ class Manager(config.Reader):
         through all tasks based on the config order, and tries to clear out finished
         tasks as soon as possible. `standard` uses a priority and availability system
         to select the next task to run, and falls back to `legacy` if nothing is available.
+    interactive: bool, optional
+        If True, the `.run()` method becomes a generator and stops on each iteration after
+        selecting the next task to run. This allows a user to interact with the pipeline
+        at each step and to probe the internal state of each task. This feature should be
+        used as follows:
+        - p = Manager()
+        - p.interactive = True
+        - runner = p.runner()
+        - next(runner)
+        Default is False.
+    enable_breakpoints : bool, optional
+        If True, task breakpoints are enabled. If a task requests a breakpoint, a call to
+        `breakpoint()` is made every time the task is selected to be run. If `interactive`
+        is True, this does nothing. Default is False.
     key_pattern : str, optional
         Regex pattern to match on in order to pass a key to subsequent tasks. This is
         useful for controlling which keys are passed in tasks which produce multiple
@@ -531,6 +546,8 @@ class Manager(config.Reader):
     cluster = config.Property(default={}, proptype=dict)
     task_specs = config.Property(default=[], proptype=list, key="tasks")
     execution_order = config.enum(["standard", "legacy"], default="standard")
+    interactive = config.Property(proptype=bool, default=False)
+    enable_breakpoints = config.Property(proptype=bool, default=False)
     key_pattern = config.Property(proptype=str, default=r"[^\W_]")
 
     # Options to be stored in self.all_tasks_params
@@ -647,15 +664,40 @@ class Manager(config.Reader):
                 logging.getLogger(module).setLevel(getattr(logging, level))
 
     def run(self):
+        """Run the pipeline through to completion.
+
+        Interactive mode will be ignored, but breakpoints are
+        still respected.
+        """
+        runner = self.runner()
+
+        while True:
+            try:
+                next(runner)
+            except StopIteration:
+                break
+
+        # Pipeline is done
+        logger.info("FIN")
+
+    def runner(self) -> Generator:
         """Main driver for the pipeline.
 
-        This function initializes all pipeline tasks and runs the pipeline
-        through to completion.
+        This function creates a generator object to initialize and run
+        the pipeline. If `self.interactive` is True, or if breakpoint are
+        set and enabled, the generator object will yield at the relevant
+        pipeline stages. Otherwise, a single generator `next` call will run
+        the pipeline to completion.
 
         Raises
         ------
         PipelineRuntimeError
             If a task stage returns the wrong number of outputs.
+
+        Returns
+        -------
+        runner : Generator
+            Generator object to run the pipeline.
 
         """
         from .profile import PSUtilProfiler
@@ -688,6 +730,13 @@ class Manager(config.Reader):
             except StopIteration:
                 # No tasks remaining
                 break
+
+            if self.interactive:
+                # Freezes the pipeline runner object in its current state
+                yield
+            elif self.enable_breakpoints and task.breakpoint:
+                # Drop into PDB for this specific task
+                breakpoint()
 
             with PSUtilProfiler(
                 self._psutil_profiling, str(task), logger=getattr(task, "log", logging)
@@ -750,9 +799,6 @@ class Manager(config.Reader):
                         f"Task {task!s} tried to pass key {key} "
                         "but no task was found to accept it."
                     )
-
-        # Pipeline is done
-        logger.info("FIN")
 
     def _next_task(self):
         """Get the next task to run from the task list.
@@ -1075,12 +1121,17 @@ class TaskBase(config.Reader):
         forcing a task to have highest/lowest priority relative to other tasks.
         `base_priority` should be used sparingly when a user wants to enforce a
         specific non-standard pipeline behaviour. See method `priority` for details
-        about dynamic priority.
+        about dynamic priority. Default is 0.
+    breakpoint: bool
+        If true, signals to the pipeline runner to make a call to `breakpoint` each
+        time this task is run. This will drop the interpreter into pdb, allowing for
+        interactive debugging of the current pipeline and task state. Default is False.
     """
 
     broadcast_inputs = config.Property(proptype=bool, default=False)
     limit_outputs = config.Property(proptype=int, default=None)
     base_priority = config.Property(proptype=int, default=0)
+    breakpoint = config.Property(proptype=bool, default=False)
 
     # Overridable Attributes
     # -----------------------
