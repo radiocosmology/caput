@@ -23,16 +23,16 @@ def simple_config():
         "pipeline": {
             "tasks": [
                 {
-                    "type": "caput.tests.test_lint.DoNothing",
+                    "type": "tests.test_lint.DoNothing",
                     "out": "out1",
                 },
                 {
-                    "type": "caput.tests.test_lint.DoNothing",
+                    "type": "tests.test_lint.DoNothing",
                     "out": "out2",
                     "in": "out1",
                 },
                 {
-                    "type": "caput.tests.test_lint.DoNothing2",
+                    "type": "tests.test_lint.DoNothing2",
                     "in": "out2",
                     "out": "out3",
                     "requires": "out1",

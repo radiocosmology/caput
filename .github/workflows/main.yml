@@ -57,21 +57,18 @@ jobs:
 
     - name: Install pip dependencies
       run: |
-        pip install -e .
-        pip install -e .[mpi]
-        pip install -e .[compression]
-        pip install -e .[test]
+        pip install -e .[compression,mpi,test]
 
     - name: Run serial tests
-      run: pytest --doctest-modules caput/
+      run: pytest --doctest-modules .
 
     - name: Run parallel tests
       run: |
-        mpirun --oversubscribe -np 4 pytest caput/tests/test_memh5_parallel.py
-        mpirun --oversubscribe -np 4 pytest caput/tests/test_mpiarray.py
-        mpirun -np 1 pytest caput/tests/test_selection_parallel.py
-        mpirun --oversubscribe -np 2 pytest caput/tests/test_selection_parallel.py
-        mpirun --oversubscribe -np 4 pytest caput/tests/test_selection_parallel.py
+        mpirun --oversubscribe -np 4 pytest tests/test_memh5_parallel.py
+        mpirun --oversubscribe -np 4 pytest tests/test_mpiarray.py
+        mpirun -np 1 pytest tests/test_selection_parallel.py
+        mpirun --oversubscribe -np 2 pytest tests/test_selection_parallel.py
+        mpirun --oversubscribe -np 4 pytest tests/test_selection_parallel.py
 
   build-docs:
 
