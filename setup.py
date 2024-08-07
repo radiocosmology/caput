@@ -6,6 +6,7 @@ required to build cython extensions.
 
 import os
 import re
+import sys
 import sysconfig
 
 import numpy
@@ -14,8 +15,10 @@ from setuptools import setup
 from setuptools.extension import Extension
 
 # Decide whether to use OpenMP or not
-if ("CAPUT_NO_OPENMP" in os.environ) or (
-    re.search("gcc", sysconfig.get_config_var("CC")) is None
+if (
+    ("CAPUT_NO_OPENMP" in os.environ)
+    or (re.search("gcc", sysconfig.get_config_var("CC")) is None)
+    or (sys.platform == "darwin")
 ):
     print("Not using OpenMP")
     omp_args = []
