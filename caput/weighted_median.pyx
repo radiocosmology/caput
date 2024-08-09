@@ -12,6 +12,9 @@ from MedianTree cimport Tree, Data
 cimport numpy as np
 cimport cython
 
+# Required for numpy 2.0 compatibility
+np.import_array()
+
 # Define the fused types that can be used for the data or weights in the median routine
 ctypedef fused data_t:
     int
