@@ -1821,7 +1821,15 @@ class MPIArray(np.ndarray):
 
         # Find the first MPIArray in the argument list and use this to determine the
         # distributed axis location
-        first_mpi_array = next(inp for inp in inputs if isinstance(inp, MPIArray))
+        try:
+            first_mpi_array = next(inp for inp in inputs if isinstance(inp, MPIArray))
+        except StopIteration as exc:
+            raise TypeError(
+                "MPIArray ufunc didn't get any MPIArray inputs. This probably "
+                "means that the ufunc was called with the `out` argument assigned "
+                " to a MPIArray."
+            ) from exc
+
         axis = max_dim + first_mpi_array.axis - first_mpi_array.ndim
         length = first_mpi_array.global_shape[first_mpi_array.axis]
         offset = first_mpi_array.local_offset[first_mpi_array.axis]
