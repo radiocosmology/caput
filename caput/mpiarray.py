@@ -600,9 +600,6 @@ class MPIArray(np.ndarray):
 
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
         """Make a new MPIArray."""
-        # if mpiutil.world is None:
-        #     raise RuntimeError('There is no mpi4py installation. Aborting.')
-
         if comm is None:
             comm = mpiutil.world
 
@@ -1619,10 +1616,8 @@ class MPIArray(np.ndarray):
         partitions : list of slice objects
             List of slices.
         """
-        from mpi4py import MPI
-
         threshold_bytes = threshold * 2**30
-        largest_size = self.comm.allreduce(self.nbytes, op=MPI.MAX)
+        largest_size = self.comm.allreduce(self.nbytes, op=mpiutil.MAX)
         min_axis_size = int(np.ceil(largest_size / threshold_bytes))
 
         # Return early if we can
