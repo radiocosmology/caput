@@ -124,7 +124,7 @@ and a complete cycle of ERA.
 """
 
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 from scipy.optimize import brentq
@@ -982,7 +982,7 @@ def era_to_unix(era, time0):
 def unix_to_datetime(unix_time):
     """Converts unix time to a :class:`~datetime.datetime` object.
 
-    Equivalent to :meth:`datetime.datetime.utcfromtimestamp`.
+    Equivalent to timezone-aware :meth:`datetime.datetime.fromtimestamp`.
 
     Parameters
     ----------
@@ -998,7 +998,7 @@ def unix_to_datetime(unix_time):
     --------
     :func:`datetime_to_unix`
     """
-    dt = datetime.utcfromtimestamp(unix_time)
+    dt = datetime.fromtimestamp(unix_time, timezone.utc)
 
     return naive_datetime_to_utc(dt)
 
@@ -1026,7 +1026,7 @@ def datetime_to_unix(dt):
     """
     # Noting that this operation is ignorant of leap seconds.
     dt = naive_datetime_to_utc(dt)
-    epoch_start = naive_datetime_to_utc(datetime.utcfromtimestamp(0))
+    epoch_start = naive_datetime_to_utc(datetime.fromtimestamp(0, timezone.utc))
     since_epoch = dt - epoch_start
     return since_epoch.total_seconds()
 
@@ -1195,7 +1195,7 @@ def time_of_day(time):
     time : float
         Time since start of UTC day in seconds.
     """
-    dt = datetime.utcfromtimestamp(ensure_unix(time))
+    dt = datetime.fromtimestamp(ensure_unix(time), timezone.utc)
     d = dt.replace(hour=0, minute=0, second=0, microsecond=0)
     return (dt - d).total_seconds()
 

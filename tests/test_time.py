@@ -1,7 +1,7 @@
 import os
 import random
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 import pytest
@@ -254,7 +254,7 @@ def test_from_unix_time():
     """
 
     unix_time = random.random() * 2e6
-    dt = datetime.utcfromtimestamp(unix_time)
+    dt = datetime.fromtimestamp(unix_time, timezone.utc)
     st = ctime.unix_to_skyfield_time(unix_time)
     new_dt = st.utc_datetime()
     assert dt.year == new_dt.year
@@ -287,7 +287,7 @@ def test_time_precision():
 
 def test_datetime_to_unix():
     unix_time = time.time()
-    dt = datetime.utcfromtimestamp(unix_time)
+    dt = datetime.fromtimestamp(unix_time, timezone.utc)
     new_unix_time = ctime.datetime_to_unix(dt)
     assert new_unix_time == approx(unix_time, abs=1e-5)
 
