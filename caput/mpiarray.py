@@ -19,7 +19,7 @@ Fourier transforming each of these two axes of the distributed array::
 
     # Load in data into parallel array
     for lfi, fi in darr1.enumerate(axis=0):
-        darr1[lfi] = load_freq_data(gfi)
+        darr1.local_array[lfi] = load_freq_data(gfi)
 
     # Perform m-transform (i.e. FFT)
     darr2 = MPIArray.wrap(np.fft.fft(darr1, axis=1), axis=0)
