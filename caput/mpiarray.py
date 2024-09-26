@@ -254,6 +254,12 @@ from caput import fileformats, misc, mpiutil
 
 logger = logging.getLogger(__name__)
 
+# This needs to be set for doctests to pass on numpy 2.0. In numpy 2.0+,
+# the repr of a numpy scalar include the type information - i.e. a numpy
+# scalar is printed as 'np.float64(3.0)' rather than just '3.0'.
+# https://numpy.org/doc/stable/release/2.0.0-notes.html#representation-of-numpy-scalars-changed
+np.set_printoptions(legacy="1.25")
+
 
 class _global_resolver:
     # Private class implementing the global sampling for MPIArray
