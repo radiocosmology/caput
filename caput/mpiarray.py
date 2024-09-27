@@ -19,7 +19,7 @@ Fourier transforming each of these two axes of the distributed array::
 
     # Load in data into parallel array
     for lfi, fi in darr1.enumerate(axis=0):
-        darr1.local_array[lfi] = load_freq_data(gfi)
+        darr1[lfi] = load_freq_data(gfi)
 
     # Perform m-transform (i.e. FFT)
     darr2 = MPIArray.wrap(np.fft.fft(darr1, axis=1), axis=0)
@@ -127,7 +127,7 @@ Direct Slicing Examples
 
 >>> darr = mpiarray.MPIArray((mpiutil.size,), axis=0)
 >>> (darr[0] == darr.local_array[0]).all()
-True
+np.True_
 >>> not hasattr(darr[0], "axis")
 True
 
@@ -135,7 +135,7 @@ If you wish to index into local portion of a distributed array along its paralle
 axis, you need to index into the :py:attr:`MPIArray.local_array`.
 
 >>> darr[:] = 1.0
->>> darr.local_array[0]
+>>> float(darr.local_array[0])
 1.0
 
 indexing into non-parallel axes returns an MPIArray with appropriate attributes
@@ -253,12 +253,6 @@ import numpy.typing as npt
 from caput import fileformats, misc, mpiutil
 
 logger = logging.getLogger(__name__)
-
-# This needs to be set for doctests to pass on numpy 2.0. In numpy 2.0+,
-# the repr of a numpy scalar include the type information - i.e. a numpy
-# scalar is printed as 'np.float64(3.0)' rather than just '3.0'.
-# https://numpy.org/doc/stable/release/2.0.0-notes.html#representation-of-numpy-scalars-changed
-np.set_printoptions(legacy="1.25")
 
 
 class _global_resolver:
