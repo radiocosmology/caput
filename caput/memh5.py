@@ -3301,7 +3301,7 @@ def ensure_native_byteorder(arr):
         The converted array. If no conversion was required, just returns `arr`.
     """
     if check_byteorder(arr.dtype.byteorder):
-        return arr.newbyteorder("=")
+        return arr.view(arr.dtype.newbyteorder("="))
 
     return arr
 
