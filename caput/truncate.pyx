@@ -64,7 +64,14 @@ def bit_truncate_float(float val, float err):
     -------
     val
         The truncated value.
+
+    Raises
+    ------
+    ValueError
+        If `err` is a NaN.
     """
+    if err != err:
+        raise ValueError(f"Error {err} is invalid.")
 
     return _bit_truncate_float(val, err)
 
@@ -83,7 +90,14 @@ def bit_truncate_double(double val, double err):
     -------
     val
         The truncated value.
+
+    Raises
+    ------
+    ValueError
+        If `err` is a NaN.
     """
+    if err != err:
+        raise ValueError(f"Error {err} is invalid.")
 
     return _bit_truncate_double(val, err)
 

@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from caput import truncate
 
@@ -58,20 +59,22 @@ def test_truncate_float():
     assert truncate.bit_truncate_double(32.121, -1) == 0
     assert truncate.bit_truncate_float(32.121, np.inf) == 0
     assert truncate.bit_truncate_double(32.121, np.inf) == 0
-    assert truncate.bit_truncate_float(32.121, np.nan) == 0
-    assert truncate.bit_truncate_double(32.121, np.nan) == 0
     assert truncate.bit_truncate_float(np.inf, 1) == np.inf
     assert truncate.bit_truncate_double(np.inf, 1) == np.inf
     assert np.isnan(truncate.bit_truncate_float(np.nan, 1))
     assert np.isnan(truncate.bit_truncate_double(np.nan, 1))
+
     assert truncate.bit_truncate_float(np.inf, np.inf) == 0
     assert truncate.bit_truncate_double(np.inf, np.inf) == 0
-    assert truncate.bit_truncate_float(np.inf, np.nan) == 0
-    assert truncate.bit_truncate_double(np.inf, np.nan) == 0
-    assert truncate.bit_truncate_float(np.nan, np.nan) == 0
-    assert truncate.bit_truncate_double(np.nan, np.nan) == 0
     assert truncate.bit_truncate_float(np.nan, np.inf) == 0
     assert truncate.bit_truncate_double(np.nan, np.inf) == 0
+
+    # Test that an error is raised when `err` is `NaN`
+    with pytest.raises(ValueError):
+        truncate.bit_truncate_float(32.121, np.nan)
+
+    with pytest.raises(ValueError):
+        truncate.bit_truncate_double(32.121, np.nan)
 
 
 def test_truncate_array():
