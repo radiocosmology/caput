@@ -67,7 +67,7 @@ jobs:
     - name: Install pip dependencies
       run: |
         pip install -e .
-        pip install -e .[compression,mpi,test]
+        pip install -e .[compression,mpi,test,fftw]
 
     - name: Run serial tests
       run: pytest --doctest-modules .
