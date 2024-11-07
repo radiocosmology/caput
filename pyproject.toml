@@ -50,6 +50,7 @@ profiling = ["pyinstrument"]
 docs = ["Sphinx>=5.0", "sphinx_rtd_theme", "funcsigs", "mock"]
 lint = ["ruff", "black"]
 test = ["pytest", "pytest-lazy-fixtures"]
+fftw = ["pyfftw"]
 
 [project.urls]
 Documentation = "https://caput.readthedocs.io/"
