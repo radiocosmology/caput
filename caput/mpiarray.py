@@ -968,7 +968,7 @@ class MPIArray(np.ndarray):
         # Check that the axis is valid and wrap to an actual position
         if axis < -naxis or axis >= naxis:
             raise AxisException(
-                "Distributed axis %i not in range (%i, %i)" % (axis, -naxis, naxis - 1)
+                f"Distributed axis {axis} not in range ({-naxis}, {naxis - 1})"
             )
         axis = naxis + axis if axis < 0 else axis
 
@@ -1642,9 +1642,8 @@ class MPIArray(np.ndarray):
                 break
         else:
             raise RuntimeError(
-                "Can't identify an IO partition less than %.2f GB in size: "
-                "shape=%s, distributed axis=%i"
-                % (threshold, self.global_shape, self.axis)
+                f"Can't identify an IO partition less than {threshold:.2f} GB in size: "
+                f"shape={self.global_shape!s}, distributed axis={self.axis}"
             )
 
         axis_length = self.global_shape[split_axis]

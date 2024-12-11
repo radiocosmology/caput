@@ -881,8 +881,7 @@ class MemGroup(_BaseGroup):
 
         if dset.distributed:
             warnings.warn(
-                "%s is already a distributed dataset, redistribute it along the required axis %d"
-                % (name, distributed_axis)
+                f"{name!s} is already a distributed dataset, redistribute it along the required axis {distributed_axis}"
             )
             dset.redistribute(distributed_axis)
             return dset
