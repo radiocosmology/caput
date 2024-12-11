@@ -279,8 +279,14 @@ class _global_resolver:
             slobj = (slobj, Ellipsis)
 
         # Add an ellipsis if length of slice object is too short
-        if isinstance(slobj, tuple) and len(slobj) < ndim and Ellipsis not in slobj:
-            slobj = (*slobj, Ellipsis)
+        if isinstance(slobj, tuple) and len(slobj) < ndim:
+            # This is a workaround for the more straightforward
+            # `Ellipsis not in slobj`. If one of the axes is indexed
+            # by a numpy array, the simpler logic will check each element
+            # of the array and will fail. Comparing each object directly
+            # gets around this.
+            if not any(obj is Ellipsis for obj in slobj):
+                slobj = (*slobj, Ellipsis)
 
         # Expand an ellipsis
         slice_list = []
