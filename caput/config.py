@@ -380,21 +380,18 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
             for ii, item in enumerate(val):
                 if not isinstance(item, type_):
                     raise CaputConfigError(
-                        "Expected to receive a list with items of type %s, but got "
-                        "'%s' of type '%s' at position %i"
-                        % (type_, item, type(item), ii)
+                        f"Expected to receive a list with items of type {type_!s}, but got "
+                        f"'{item!s}' of type '{type(item)!s}' at position {ii}"
                     )
 
         if length and len(val) != length:
             raise CaputConfigError(
-                "List expected to be of length %i, but was actually length %i"
-                % (length, len(val))
+                f"List expected to be of length {length}, but was actually length {len(val)}"
             )
 
         if maxlength and len(val) > maxlength:
             raise CaputConfigError(
-                "Maximum length of list is %i is, but list was actually length %i"
-                % (maxlength, len(val))
+                f"Maximum length of list is {maxlength} is, but list was actually length {len(val)}"
             )
 
         return val
