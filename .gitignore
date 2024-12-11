@@ -35,6 +35,10 @@ pip-log.txt
 .tox
 nosetests.xml
 
+# Unit test files
+*.tmp_test*
+*/perf*
+
 # Translations
 *.mo
 
