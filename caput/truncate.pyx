@@ -8,6 +8,8 @@ from cython.parallel import prange
 import numpy as np
 cimport numpy as cnp
 
+from libc.math cimport fabs
+
 cdef extern from "truncate.hpp":
     inline int bit_truncate(int val, int err) nogil
 
@@ -229,7 +231,7 @@ def bit_truncate_relative_float(float[:] val, float prec):
     cdef Py_ssize_t i = 0
 
     for i in prange(n, nogil=True):
-        val[i] = _bit_truncate_float(val[i], prec * val[i])
+        val[i] = _bit_truncate_float(val[i], fabs(prec * val[i]))
 
     return np.asarray(val)
 
@@ -258,7 +260,7 @@ def bit_truncate_relative_double(cnp.float64_t[:] val, cnp.float64_t prec):
     cdef Py_ssize_t i = 0
 
     for i in prange(n, nogil=True):
-        val[i] = _bit_truncate_double(val[i], prec * val[i])
+        val[i] = _bit_truncate_double(val[i], fabs(prec * val[i]))
 
     return np.asarray(val, dtype=np.float64)
 
