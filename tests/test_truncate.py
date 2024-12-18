@@ -126,3 +126,19 @@ def test_truncate_relative():
         )
         == np.asarray([32, 32], dtype=np.float64)
     ).all()
+
+    # Check the case where values are negative
+    assert (
+        truncate.bit_truncate_relative(
+            np.asarray([-32.121, 32.5], dtype=np.float32),
+            0.1,
+        )
+        == np.asarray([-32, 32], dtype=np.float32)
+    ).all()
+    assert (
+        truncate.bit_truncate_relative(
+            np.asarray([-32.121, 32.5], dtype=np.float64),
+            0.1,
+        )
+        == np.asarray([-32, 32], dtype=np.float64)
+    ).all()
