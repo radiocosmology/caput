@@ -1527,33 +1527,38 @@ class TaskBase(config.Reader):
 
         # First, check requires keys
         if key in self._requires_keys:
-            ii = self._requires_keys.index(key)
-            logger.debug(
-                f"{self!s} stowing data product with key {key} for `requires`."
-            )
-            if self._requires is None:
-                raise PipelineRuntimeError(
-                    "Tried to set 'requires' data product, but `setup()` already run."
-                )
-            if self._requires[ii] is not None:
-                raise PipelineRuntimeError(
-                    "'requires' data product set more than once."
-                )
-            self._requires[ii] = product
+            # It's possible that the same key could be passed multiple times
+            indices = (ii for ii, k in enumerate(self._requires_keys) if k == key)
 
-            result = True
+            for ii in indices:
+                logger.debug(
+                    f"{self!s} stowing data product with key {key} for `requires`."
+                )
+                if self._requires is None:
+                    raise PipelineRuntimeError(
+                        "Tried to set 'requires' data product, but `setup()` already run."
+                    )
+                if self._requires[ii] is not None:
+                    raise PipelineRuntimeError(
+                        "'requires' data product set more than once."
+                    )
+                self._requires[ii] = product
+
+                result = True
 
         if key in self._in_keys:
-            ii = self._in_keys.index(key)
-            logger.debug(f"{self!s} stowing data product with key {key} for `in`.")
-            if self._in is None:
-                raise PipelineRuntimeError(
-                    "Tried to queue 'in' data product, but `next()` already run."
-                )
+            indices = (ii for ii, k in enumerate(self._in_keys) if k == key)
 
-            self._in[ii].put(product)
+            for ii in indices:
+                logger.debug(f"{self!s} stowing data product with key {key} for `in`.")
+                if self._in is None:
+                    raise PipelineRuntimeError(
+                        "Tried to queue 'in' data product, but `next()` already run."
+                    )
 
-            result = True
+                self._in[ii].put(product)
+
+                result = True
 
         return result
 
