@@ -79,7 +79,14 @@ except ImportError as err:
     zarr_available = False
 else:
     zarr_available = True
-
+    # Zarr version 3 changed the location of the `Attributes`
+    # class. As long as both zarr < 3 and zarr > 3 are supported,
+    # this check should be in place. Once zarr < 3 support is
+    # dropped, this can be removed
+    if int(zarr.__version__.split(".")[0]) < 3:
+        __zarr_attr_fmt = zarr.attrs.Attributes
+    else:
+        __zarr_attr_fmt = zarr.core.attributes.Attributes
 
 # Basic Classes
 # -------------
@@ -2487,7 +2494,7 @@ def copyattrs(a1, a2, convert_strings=False):
         if (
             isinstance(value, (dict, np.ndarray, datetime.datetime))
             and zarr_available
-            and isinstance(a2, zarr.attrs.Attributes)
+            and isinstance(a2, __zarr_attr_fmt)
         ) or (
             isinstance(value, (dict, datetime.datetime))
             and isinstance(a2, h5py.AttributeManager)
