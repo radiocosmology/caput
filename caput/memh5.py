@@ -88,6 +88,7 @@ else:
     else:
         __zarr_attr_fmt = zarr.core.attributes.Attributes
 
+
 # Basic Classes
 # -------------
 
@@ -112,6 +113,15 @@ class ro_dict(dict):
         raise TypeError(
             f"{self.__class__.__name__!r} object does not support item assignment"
         )
+
+
+class MemAttrs(dict):
+    """In memory implementation of the :class:`h5py.AttributeManager`.
+
+    Currently just a normal dictionary.
+    """
+
+    pass
 
 
 class _Storage(dict):
@@ -187,15 +197,6 @@ class _StorageRoot(_Storage):
             and self._comm == other._comm
             and self._distributed == other._distributed
         )
-
-
-class MemAttrs(dict):
-    """In memory implementation of the :class:`h5py.AttributeManager`.
-
-    Currently just a normal dictionary.
-    """
-
-    pass
 
 
 class _MemObjMixin:
