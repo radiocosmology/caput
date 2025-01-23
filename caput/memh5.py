@@ -92,7 +92,7 @@ else:
 # -------------
 
 
-class ro_dict(Mapping):
+class ro_dict(dict):
     """A dict that is read-only to the user.
 
     This class isn't strictly read-only but it cannot be modified through the
@@ -108,26 +108,10 @@ class ro_dict(Mapping):
         Initial data for the new dictionary.
     """
 
-    def __init__(self, d=None):
-        if not d:
-            d = {}
-        else:
-            d = dict(d)
-        self._dict = d
-
-    def __getitem__(self, key):
-        return self._dict[key]
-
-    def __len__(self):
-        return self._dict.__len__()
-
-    def __iter__(self):
-        return self._dict.__iter__()
-
-    def __eq__(self, other):
-        if not isinstance(other, ro_dict):
-            return False
-        return Mapping.__eq__(self, other) and tools.allequal(self._dict, other._dict)
+    def __setitem__(self, key, value):
+        raise TypeError(
+            f"{self.__class__.__name__!r} object does not support item assignment"
+        )
 
 
 class _Storage(dict):
