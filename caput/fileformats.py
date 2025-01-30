@@ -88,13 +88,17 @@ class HDF5(FileFormat):
         super(HDF5, HDF5).compression_kwargs(compression, compression_opts, compressor)
         if compressor:
             raise NotImplementedError
-        if (compression == "bitshuffle") or (
-            (H5FILTER is not None) and compression in (H5FILTER, str(H5FILTER))
+
+        if compression == "bitshuffle" and not compression_enabled:
+            raise ValueError(
+                "Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
+            )
+
+        if compression_enabled and compression in (
+            "bitshuffle",
+            H5FILTER,
+            str(H5FILTER),
         ):
-            if not compression_enabled:
-                raise ValueError(
-                    "Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
-                )
             compression = H5FILTER
             try:
                 blocksize, c = compression_opts
