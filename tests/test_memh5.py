@@ -525,7 +525,7 @@ def test_to_from__file_unicode(test_file, file_format):
 )
 def test_failure(test_file, file_format):
     """Test that we fail when trying to write a non ASCII character."""
-    udata = np.array(["\u03B2"])
+    udata = np.array(["\u03b2"])
 
     m = memh5.MemGroup()
     m.create_dataset("udata", data=udata)
