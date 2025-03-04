@@ -818,6 +818,52 @@ class Observer:
             diameter=100.0 / 60,
         )
 
+    def object_coords(self, source, date=None, deg=False):
+        """Calculates the RA and DEC of the source.
+
+        Gives the ICRS coordinates if no date is given (=J2000), or if a date is
+        specified gives the CIRS coordinates at that epoch.
+
+        This also returns the *apparent* position, including abberation and
+        deflection by gravitational lensing. This shifts the positions by up to
+        20 arcseconds.
+
+        Parameters
+        ----------
+        source : skyfield source
+            skyfield.starlib.Star or skyfield.vectorlib.VectorSum or
+            skyfield.jpllib.ChebyshevPosition body representing the source.
+        date : float
+            Determine coordinates at this unix time.  If None, use Jan 01 2000.
+        deg : bool
+            Return coordinates in degrees if True, radians if False (default).
+
+        Returns
+        -------
+        ra, dec: float
+            Position of the source.
+        """
+        if date is None:  # No date, get ICRS coords
+            if isinstance(body, Star):
+                ra, dec = body.ra.radians, body.dec.radians
+            else:
+                raise ValueError(
+                    "Source is not fixed, cannot calculate coordinates without a date."
+                )
+
+        else:  # Calculate CIRS position with all corrections
+            t = unix_to_skyfield_time(date)
+            radec = self.skyfield_obs().at(t).observe(source).apparent().cirs_radec(t)
+
+            ra, dec = radec[0].radians, radec[1].radians
+
+        # If requested, convert to degrees
+        if deg:
+            ra = np.degrees(ra)
+            dec = np.degrees(dec)
+
+        return ra, dec
+
     def _sr_work(self, source, t0, t1, step, diameter, skip_rise=False, skip_set=False):
         # A work routine factoring out common functionality
 
