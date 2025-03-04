@@ -818,19 +818,17 @@ class Observer:
             diameter=100.0 / 60,
         )
 
-    def cirs_radec(self, body):
+    def cirs_radec(self, source):
         """Converts a Skyfield body in CIRS coordinates at a given epoch to ICRS.
 
         Parameters
         ----------
-        body : skyfield.starlib.Star
+        source : skyfield.starlib.Star
             Skyfield Star object with positions in CIRS coordinates.
-        obs : `caput.time.Observer` or None
-            The observer instance to use. If not supplied use `chime`.
 
         Returns
         -------
-        new_body : skyfield.starlib.Star
+        new_source : skyfield.starlib.Star
             Skyfield Star object with positions in ICRS coordinates
         """
 
@@ -838,9 +836,9 @@ class Observer:
 
         ts = skyfield_wrapper.timescale
 
-        epoch = ts.tt_jd(np.median(body.epoch))
+        epoch = ts.tt_jd(np.median(source.epoch))
 
-        pos = obs.skyfield_obs().at(epoch).observe(body)
+        pos = obs.skyfield_obs().at(epoch).observe(source)
 
         # Matrix CT transforms from CIRS to ICRF (https://rhodesmill.org/skyfield/time.html)
         r_au, dec, ra = to_polar(
