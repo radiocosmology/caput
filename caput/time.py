@@ -831,14 +831,13 @@ class Observer:
         new_source : skyfield.starlib.Star
             Skyfield Star object with positions in ICRS coordinates
         """
-
         from skyfield.functions import to_polar
 
         ts = skyfield_wrapper.timescale
 
         epoch = ts.tt_jd(np.median(source.epoch))
 
-        pos = obs.skyfield_obs().at(epoch).observe(source)
+        pos = self.skyfield_obs().at(epoch).observe(source)
 
         # Matrix CT transforms from CIRS to ICRF (https://rhodesmill.org/skyfield/time.html)
         r_au, dec, ra = to_polar(
@@ -877,8 +876,8 @@ class Observer:
             Position of the source.
         """
         if date is None:  # No date, get ICRS coords
-            if isinstance(body, Star):
-                ra, dec = body.ra.radians, body.dec.radians
+            if isinstance(source, Star):
+                ra, dec = source.ra.radians, source.dec.radians
             else:
                 raise ValueError(
                     "Source is not fixed, cannot calculate coordinates without a date."
