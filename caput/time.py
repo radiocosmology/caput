@@ -850,6 +850,23 @@ class Observer:
             epoch=epoch,
         )
 
+    def star_cirs(self, ra, dec, epoch):
+        """Create a `skyfield.starlib.Star` given the CIRS coordinates of a source.
+
+        Parameters
+        ----------
+        ra, dec : skyfield.api.Angle
+            RA and dec of the source in CIRS coordinates
+        epoch : skyfield.api.Time
+            Time of the observation
+
+        Returns
+        -------
+        body : skyfield.starlib.Star
+            Star object in ICRS coordinates
+        """
+        return self.cirs_radec(Star(ra=ra, dec=dec, epoch=epoch))
+
     def object_coords(self, source, date=None, deg=False):
         """Calculates the RA and DEC of the source.
 
