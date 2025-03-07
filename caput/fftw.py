@@ -47,18 +47,16 @@ Functions
 - :py:meth:`fftwindow`
 """
 
-from __future__ import annotations
-
-import numpy as np
-
-from caput import mpiutil
-
 try:
     import pyfftw
 except ImportError as exc:
     raise ImportError(
         "`pyfftw` is not installed. Install `pyfftw` via `caput[fftw]`."
     ) from exc
+
+import numpy as np
+
+from caput import mpiutil
 
 
 class FFT:
