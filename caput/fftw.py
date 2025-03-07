@@ -49,16 +49,21 @@ Functions
 
 from __future__ import annotations
 
-import numpy as np
-
-from caput import mpiutil
-
+# NOTE: Due to a bug in pyfftw, it needs to be imported before
+# numpy in order to avoid some sort of namespace collision.
+# If you run into a RuntimeError when trying to use the `FFT`
+# class, make sure that your environment imports `pyfftw`
+# before `numpy`. Hopefully this will be fixed soon.
 try:
     import pyfftw
 except ImportError as exc:
     raise ImportError(
         "`pyfftw` is not installed. Install `pyfftw` via `caput[fftw]`."
     ) from exc
+
+import numpy as np
+
+from caput import mpiutil
 
 
 class FFT:
