@@ -242,6 +242,7 @@ import os
 import time
 import warnings
 from collections.abc import Sequence
+from itertools import pairwise
 from typing import TYPE_CHECKING, Any, Union
 
 if TYPE_CHECKING:
@@ -275,7 +276,7 @@ class _global_resolver:
         local_length = self.array.shape[self.axis]
 
         # Expand a single integer or slice index
-        if isinstance(slobj, (int, slice)):
+        if isinstance(slobj, int | slice):
             slobj = (slobj, Ellipsis)
 
         # Add an ellipsis if length of slice object is too short
@@ -1297,7 +1298,7 @@ class MPIArray(np.ndarray):
         """
         tdata = np.ndarray.transpose(self, *axes)
 
-        if len(axes) == 1 and isinstance(axes[0], (tuple, list)):
+        if len(axes) == 1 and isinstance(axes[0], tuple | list):
             axes = axes[0]
         elif axes is None or axes == ():
             axes = list(range(self.ndim - 1, -1, -1))
@@ -1373,7 +1374,7 @@ class MPIArray(np.ndarray):
                 f"Cannot reshape MPIArray of shape={self.shape} into new shape={shape}."
             )
 
-        if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
+        if len(shape) == 1 and isinstance(shape[0], tuple | list):
             shape = tuple(shape[0])
 
         # Fill in the missing value
@@ -1656,7 +1657,7 @@ class MPIArray(np.ndarray):
             boundaries.append(axis_length)
 
         # Construct the set of slices to apply
-        slices = [slice(s, e) for s, e in zip(boundaries[:-1], boundaries[1:])]
+        slices = [slice(s, e) for s, e in pairwise(boundaries)]
 
         logger.debug("Splitting along axis %i, %i ways", split_axis, len(slices))
 
@@ -2070,7 +2071,7 @@ def _len_slice(slice_, n):
 def _ensure_list(x: Any) -> list:
     # Guarantee the output is a list, by turning any scalars into a single-element list,
     # and turning sets or tuples into a list
-    if isinstance(x, (list, tuple, set)):
+    if isinstance(x, list | tuple | set):
         return list(x)
 
     return [x]
@@ -2105,7 +2106,7 @@ def _expand_sel(sel, naxis):
     return list(sel)
 
 
-def _apply_sel(arr: np.ndarray, sel: Union[slice, tuple, list], ax: int) -> np.ndarray:
+def _apply_sel(arr: np.ndarray, sel: slice | tuple | list, ax: int) -> np.ndarray:
     """Apply a selection to a single axis of an array."""
     if type(sel) is slice:
         sel = (slice(None),) * ax + (sel,)
@@ -2156,7 +2157,7 @@ def _check_dist_axis(
 
 
 def _get_common_comm(
-    inputs: Sequence[Union[MPIArray, npt.ArrayLike, None]],
+    inputs: Sequence[MPIArray | npt.ArrayLike | None],
 ) -> "MPI.IntraComm":
     """Get a common MPI communicator from a set of arguments.
 
@@ -2185,9 +2186,9 @@ def _get_common_comm(
 
 
 def _mpi_to_ndarray(
-    inputs: Sequence[Union[MPIArray, npt.ArrayLike, None]],
+    inputs: Sequence[MPIArray | npt.ArrayLike | None],
     only_mpiarray: bool = False,
-) -> tuple[Union[npt.ArrayLike, None], ...]:
+) -> tuple[npt.ArrayLike | None, ...]:
     # ) -> Tuple[List[Union[np.ndarray, None]], int, "MPI.IntraComm"]:
     """Ensure a list with mixed MPIArrays and ndarrays are all ndarrays.
 

@@ -401,7 +401,7 @@ class MemGroup(_BaseGroup):
             deep_group_copy(group, self)
             return self
 
-        if isinstance(group, (str, bytes)):
+        if isinstance(group, str | bytes):
             file_format = fileformats.guess_file_format(group)
             return cls.from_file(group, file_format=file_format)
 
@@ -2304,7 +2304,7 @@ class BasicCont(MemDiskGroup):
             entry is tried in turn, which allows different datasets to be
             redistributed along differently labelled axes.
         """
-        if not isinstance(dist_axis, (list, tuple)):
+        if not isinstance(dist_axis, list | tuple):
             dist_axis = [dist_axis]
 
         stack = list(self._data._storage_root.items())
@@ -2446,7 +2446,7 @@ def copyattrs(a1, a2, convert_strings=False):
         if isinstance(a2, h5py.AttributeManager):
             # As h5py will coerce the value to an array anyway, do it now such
             # that the following test works
-            if isinstance(value, (tuple, list)):
+            if isinstance(value, tuple | list):
                 value = np.array(value)
 
             if isinstance(value, np.ndarray) and value.dtype.kind == "U":
@@ -2485,11 +2485,11 @@ def copyattrs(a1, a2, convert_strings=False):
                 return json.JSONEncoder.default(self, o)
 
         if (
-            isinstance(value, (dict, np.ndarray, datetime.datetime))
+            isinstance(value, dict | np.ndarray | datetime.datetime)
             and zarr_available
             and isinstance(a2, zarr.attrs.Attributes)
         ) or (
-            isinstance(value, (dict, datetime.datetime))
+            isinstance(value, dict | datetime.datetime)
             and isinstance(a2, h5py.AttributeManager)
         ):
             # Save to JSON converting datetimes.
@@ -3081,7 +3081,7 @@ def bytes_to_unicode(s):
     if isinstance(s, np.ndarray) and s.dtype.kind == "S":
         return s.astype(str)
 
-    if isinstance(s, (list, tuple, set)):
+    if isinstance(s, list | tuple | set):
         return s.__class__(bytes_to_unicode(t) for t in s)
 
     if isinstance(s, dict):

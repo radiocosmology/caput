@@ -37,7 +37,7 @@ class Profiler:
         profile: bool = True,
         profiler: str = "cprofile",
         comm: Optional["mpiutil.MPI.IntraComm"] = None,
-        path: Optional[os.PathLike] = None,
+        path: os.PathLike | None = None,
     ):
         self.profile = profile
 
@@ -114,7 +114,7 @@ class IOUsage:
 
     _start = None
 
-    def __init__(self, logger: Optional[logging.Logger] = None):
+    def __init__(self, logger: logging.Logger | None = None):
         self._logger = logger
         self._usage = {}
 
@@ -209,9 +209,9 @@ class PSUtilProfiler(psutil.Process):
         self,
         use_profiler: bool = True,
         label: str = "",
-        logger: Optional[logging.Logger] = None,
+        logger: logging.Logger | None = None,
         comm: Optional["mpiutil.MPI.IntraComm"] = None,
-        path: Optional[os.PathLike] = None,
+        path: os.PathLike | None = None,
     ):
         self._use_profiler = use_profiler
         self._label = label

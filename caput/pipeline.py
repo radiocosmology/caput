@@ -935,7 +935,7 @@ class Manager(config.Reader):
         all_out_values = []
         for t in self.task_specs:
             if "out" in t:
-                if isinstance(t["out"], (list, tuple)):
+                if isinstance(t["out"], list | tuple):
                     all_out_values.extend(t["out"])
                 else:
                     all_out_values.append(t["out"])

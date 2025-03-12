@@ -31,9 +31,7 @@ def invert_no_zero(x, out=None):
         Return the reciprocal of x. Where possible the output has the same memory layout
         as the input, if this cannot be preserved the output is C-contiguous.
     """
-    if not isinstance(x, (np.generic, np.ndarray)) or np.issubdtype(
-        x.dtype, np.integer
-    ):
+    if not isinstance(x, np.generic | np.ndarray) or np.issubdtype(x.dtype, np.integer):
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
             return np.where(x == 0, 0.0, 1.0 / x)
 
@@ -128,7 +126,7 @@ def _assert_equal(obj1, obj2):
 
         return
 
-    if isinstance(obj1, (list, tuple)) and isinstance(obj2, (list, tuple)):
+    if isinstance(obj1, list | tuple) and isinstance(obj2, list | tuple):
         # Check that the sequence-type objects are equivalent
         _assert_equal(len(obj1), len(obj2))
         # Check that each item is the same
@@ -186,7 +184,7 @@ def total_size(obj: object):
         if isinstance(x, exclude_types):
             pass
         # Check basic types and iterate accordingly
-        elif isinstance(x, (tuple, list, set, deque)):
+        elif isinstance(x, tuple | list | set | deque):
             size += sum_(map(sizeof, iter(x)))
         elif isinstance(x, Mapping):
             size += sum_(map(sizeof, chain.from_iterable(x.items())))

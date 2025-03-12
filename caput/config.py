@@ -373,7 +373,7 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
     """
 
     def _prop(val):
-        if not isinstance(val, (list, tuple)):
+        if not isinstance(val, list | tuple):
             raise CaputConfigError(f"Expected to receive a list, but got '{val!r}.'")
 
         if type_:
