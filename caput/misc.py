@@ -3,7 +3,7 @@
 import importlib
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Union, overload
+from typing import TYPE_CHECKING, Optional, overload
 
 import h5py
 import numpy as np
@@ -122,7 +122,7 @@ def scalarize(dtype=np.float64):
             elif isinstance(x, np.ndarray):
                 scalar = False
 
-            elif isinstance(x, (list, tuple)):
+            elif isinstance(x, list | tuple):
                 x = np.array(x)
                 scalar = False
 
@@ -169,7 +169,7 @@ def listize(**_):
 
             new_args = []
             for arg in args:
-                if isinstance(arg, (list, tuple)):
+                if isinstance(arg, list | tuple):
                     arg = np.array(arg)
                 new_args.append(arg)
 
@@ -190,7 +190,7 @@ def listize(**_):
 
 @overload
 def open_h5py_mpi(
-    f: Union[str, Path, h5py.File],
+    f: str | Path | h5py.File,
     mode: str,
     use_mpi: bool = True,
     comm: Optional["MPI.Comm"] = None,
@@ -244,7 +244,7 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
         else:
             fh = h5py.File(f, mode)
         fh.opened = True
-    elif isinstance(f, (h5py.File, h5py.Group)):
+    elif isinstance(f, h5py.File | h5py.Group):
         fh = f
         fh.opened = False
     else:
