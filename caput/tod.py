@@ -346,12 +346,12 @@ def concatenate(
 
     # Ensure *start* and *stop* are mappings.
     if not hasattr(start, "__getitem__"):
-        start = {axis: start for axis in concatenation_axes}
+        start = dict.fromkeys(concatenation_axes, start)
     if not hasattr(stop, "__getitem__"):
-        stop = {axis: stop for axis in concatenation_axes}
+        stop = dict.fromkeys(concatenation_axes, stop)
 
     # Get the length of all axes for which we are concatenating.
-    concat_index_lengths = {axis: 0 for axis in concatenation_axes}
+    concat_index_lengths = dict.fromkeys(concatenation_axes, 0)
     for data in data_list:
         for index_name in concatenation_axes:
             if index_name not in data.index_map:
@@ -413,7 +413,7 @@ def concatenate(
     else:
         dataset_names = datasets
 
-    current_concat_index_start = {axis: 0 for axis in concatenation_axes}
+    current_concat_index_start = dict.fromkeys(concatenation_axes, 0)
     # Now loop over the list and copy the data.
     for data in data_list:
         # Get the concatenation axis lengths for this BaseData.
