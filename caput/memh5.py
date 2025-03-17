@@ -1816,8 +1816,7 @@ class MemDiskGroup(_BaseGroup):
             ):
                 file_ = file_.filename
 
-            if "mode" in kwargs:
-                del kwargs["mode"]
+            kwargs.pop("mode", None)
 
             # Look for *_sel parameters in kwargs, collect and remove them from kwargs
             sel_args = {}
