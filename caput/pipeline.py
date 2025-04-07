@@ -1490,6 +1490,16 @@ class TaskBase(config.Reader):
 
             if out is not None:
                 self._num_iters += 1
+                # Let the user know if there's a chance that data has been
+                # modified in-place
+                for opt in out if isinstance(out, tuple | list) else (out,):
+                    if opt in args:
+                        logger.debug(
+                            f"Task {self!s} may have modified dataset {opt!r} in-place. "
+                            "If you encounter unexpected results, check that this is "
+                            "the intended behaviour."
+                        )
+
                 # If this task has a restricted number of outputs, it should advance
                 # if enough output iterations have been executed
                 if (
