@@ -58,6 +58,7 @@ if TYPE_CHECKING:
     from . import fileformats
 
 import logging
+import warnings
 
 from yaml.loader import SafeLoader
 
@@ -67,7 +68,7 @@ logger = logging.getLogger(__name__)
 class Property:
     """Custom property descriptor that can load values from a given dict."""
 
-    def __init__(self, default=None, proptype=None, key=None):
+    def __init__(self, default=None, proptype=None, key=None, deprecated=False):
         """Make a new property type.
 
         Parameters
@@ -82,7 +83,17 @@ class Property:
             The name of the dictionary key that we can fetch this value from.
             If None (default), attempt to use the attribute name from the
             class.
+        deprecated : bool
+            An easy way to flag a property as deprecated. This will raise a deprecation
+            warning, but will not change the behaviour of this `Property` instance.
         """
+        if deprecated:
+            warnings.warn(
+                f"Property {self!r} is deprecated and may behave unpredictably. "
+                "Check the documentation of the class/function where this is being "
+                "initialised to see the recommended solution."
+            )
+
         self.proptype = (lambda x: x) if proptype is None else proptype
         self.default = default
         self.key = key
