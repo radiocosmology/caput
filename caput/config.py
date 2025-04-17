@@ -87,17 +87,13 @@ class Property:
             An easy way to flag a property as deprecated. This will raise a deprecation
             warning, but will not change the behaviour of this `Property` instance.
         """
-        if deprecated:
-            warnings.warn(
-                f"Property {self!r} is deprecated and may behave unpredictably. "
-                "Check the documentation of the class/function where this is being "
-                "initialised to see the recommended solution."
-            )
-
         self.proptype = (lambda x: x) if proptype is None else proptype
         self.default = default
         self.key = key
         self.propname = None
+        # If this property is deprecated, we'll emit a warning
+        # when it's used
+        self._deprecated = deprecated
 
     def __get__(self, obj, objtype):
         # Object getter.
@@ -168,6 +164,22 @@ class Property:
                 for propname, clsprop in basecls.__dict__.items():
                     if clsprop is self:
                         self.propname = propname
+
+        if self._deprecated:
+            # Warn the user that they shouldn't be using this. Set the
+            # stacklevel to refer to the class where this property
+            # is being used.
+            # `FutureWarning` is used based on the description:
+            # Base category for warnings about deprecated features when
+            # those warnings are intended for end users of applications
+            # that are written in Python.
+            warnings.warn(
+                f"Property `{self.propname}` is deprecated and may behave unpredictably. "
+                "Check the documentation of the class where this is being used "
+                "to see the recommended solution.",
+                category=FutureWarning,
+                stacklevel=3,
+            )
 
 
 class Reader:
