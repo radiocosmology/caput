@@ -91,8 +91,6 @@ class Property:
         self.default = default
         self.key = key
         self.propname = None
-        # If this property is deprecated, we'll emit a warning
-        # when it's used
         self._deprecated = deprecated
 
     def __get__(self, obj, objtype):
@@ -100,8 +98,9 @@ class Property:
         if obj is None:
             return None
 
-        # Ensure the property name has been found and set
-        self._set_propname(obj)
+        # Ensure the property name has been found and set,
+        # and warn if it's been deprecated
+        self._set_propname_warn_deprecated(obj)
 
         # If the value has not been set, return the default, otherwise return the
         # actual value.
@@ -114,8 +113,9 @@ class Property:
         if obj is None:
             return
 
-        # Ensure the property name has been found and set
-        self._set_propname(obj)
+        # Ensure the property name has been found and set,
+        # and warn if it's been deprecated
+        self._set_propname_warn_deprecated(obj)
 
         # Save the value of this property onto the instance it's a descriptor
         # for.
@@ -136,6 +136,9 @@ class Property:
         CaputConfigError
             If there was an error in the config dict.
         """
+        # We don't want to emit a deprecation warning here,
+        # since it will get raised regardless of whether or
+        # not the user is using the deprecated property
         self._set_propname(obj)
 
         if self.key is None:
@@ -150,6 +153,9 @@ class Property:
                     location=config,
                 ) from e
             obj.__dict__[self.propname] = val
+            # Only warn about deprecation if the property is
+            # actually being set by the config.
+            self._set_propname_warn_deprecated(obj)
 
     def _set_propname(self, obj):
         # As this config.Property instance lives on the class it's in, it
@@ -164,6 +170,11 @@ class Property:
                 for propname, clsprop in basecls.__dict__.items():
                     if clsprop is self:
                         self.propname = propname
+
+    def _set_propname_warn_deprecated(self, obj):
+        # Set the property name and emit a warning
+        # if this property is deprecated
+        self._set_propname(obj)
 
         if self._deprecated:
             # Warn the user that they shouldn't be using this. Set the
@@ -233,6 +244,7 @@ class Reader:
                 if isinstance(clsprop, Property):
                     clsprop._from_config(self, config)
                     prop_keys.append(clsprop.key)
+
         if compare_keys:
             if isinstance(compare_keys, list):
                 excluded_keys = set(prop_keys + compare_keys)
@@ -243,6 +255,7 @@ class Reader:
                     "Unused configuration keys: [%s]"  # noqa: UP031
                     % ", ".join(set(config_keys) - excluded_keys),
                 )
+
         if not use_defaults:
             if set(prop_keys) - set(config_keys):
                 raise CaputConfigError(
