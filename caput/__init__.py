@@ -6,7 +6,6 @@ Submodules
     :toctree: _autosummary
 
     config
-    interferometry
     memh5
     misc
     mpiarray
