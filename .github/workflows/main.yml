@@ -99,7 +99,7 @@ jobs:
     - name: Install pip dependencies
       run: |
         pip install .
-        pip install .[docs]
+        pip install .[docs,fftw]
 
     - name: Build sphinx docs
       run: sphinx-build -W -b html doc/ doc/_build/html
