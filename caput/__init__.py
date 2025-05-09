@@ -5,15 +5,23 @@ Submodules
 .. autosummary::
     :toctree: _autosummary
 
+    cache
     config
+    fftw
+    fileformats
     memh5
     misc
     mpiarray
     mpiutil
     pfb
     pipeline
+    profile
+    random
     time
     tod
+    tools
+    truncate
+    units
     weighted_median
 """
 
