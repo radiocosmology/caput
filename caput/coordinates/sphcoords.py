@@ -1,4 +1,8 @@
-"""Useful functions for radio interferometry.
+"""Useful functions for dealing with spherical coordinates.
+
+NOTE: This module was ported from `caput` and has a lot of
+redundancy with other `cora` utils. At some point, this will
+be cleaned up and merged with other modules in `cora`.
 
 Coordinates
 -----------
@@ -7,10 +11,6 @@ Coordinates
 - :py:meth:`ground_to_sph`
 - :py:meth:`project_distance`
 - :py:meth:`rotate_ypr`
-
-Interferometry
---------------
-- :py:meth:`fringestop_phase`
 """
 
 import numpy as np
@@ -176,35 +176,3 @@ def rotate_ypr(rot, xhat, yhat, zhat):
     zhat3 = np.sin(roll) * xhat2 + np.cos(roll) * zhat2
 
     return xhat3, yhat3, zhat3
-
-
-def fringestop_phase(ha, lat, dec, u, v, w=0.0):
-    """Return the phase required to fringestop. All angle inputs are radians.
-
-    Note that for a visibility V_{ij} = < E_i E_j^*>, this expects the u, v,
-    w coordinates are the components of (d_i - d_j) / lambda.
-
-    Parameters
-    ----------
-    ha : array_like
-        The Hour Angle of the source to fringestop too.
-    lat : array_like
-        The latitude of the observatory.
-    dec : array_like
-        The declination of the source.
-    u : array_like
-        The EW separation in wavelengths (increases to the E)
-    v : array_like
-        The NS separation in wavelengths (increases to the N)
-    w : array_like, optional
-        The vertical separation on wavelengths (increases to the sky!)
-
-    Returns
-    -------
-    phase : np.ndarray
-        The phase required to *correct* the fringeing. Shape is
-        given by the broadcast of the arguments together.
-    """
-    phase = -2.0j * np.pi * projected_distance(ha, lat, dec, u, v, w)
-
-    return np.exp(phase, out=phase)

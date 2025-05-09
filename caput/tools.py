@@ -54,6 +54,64 @@ def invert_no_zero(x, out=None):
     return out
 
 
+def window_generalised(x, window="nuttall"):
+    """A generalised high-order window at arbitrary locations.
+
+    Parameters
+    ----------
+    x : np.ndarray[n]
+        Location to evaluate at. Values outside the range 0 to 1 are zero.
+    window : str
+        Type of window function to return.  Must be one of the following strings:
+        'uniform', 'hann', 'hanning', 'hamming', 'blackman', 'nuttall',
+        'blackman_nuttall', 'blackman_harris', 'triangular', or 'tukey-0.X'.
+        If "tukey-0.X", then 0.X is the fraction of the full window that
+        will be tapered.
+
+    Returns
+    -------
+    w : np.ndarray[n]
+        Window function.
+    """
+    if window == "triangular":
+        w = 1.0 - 2.0 * np.abs(x - 0.5)
+
+    elif window.startswith("tukey"):
+
+        r = float(window.split("-")[1])
+        alpha = 0.5 * r
+
+        w = np.ones_like(x)
+
+        begin = np.flatnonzero(x < alpha)
+        if begin.size > 0:
+            w[begin] = 0.5 * (1.0 + np.cos(np.pi * (x[begin] - alpha) / alpha))
+
+        end = np.flatnonzero(x >= (1.0 - alpha))
+        if end.size > 0:
+            w[end] = 0.5 * (1.0 + np.cos(np.pi * (x[end] - (1.0 - alpha)) / alpha))
+
+    else:
+        a_table = {
+            "uniform": np.array([1, 0, 0, 0]),
+            "hann": np.array([0.5, -0.5, 0, 0]),
+            "hanning": np.array([0.5, -0.5, 0, 0]),
+            "hamming": np.array([0.53836, -0.46164, 0, 0]),
+            "blackman": np.array([0.42, -0.5, 0.08, 0]),
+            "nuttall": np.array([0.355768, -0.487396, 0.144232, -0.012604]),
+            "blackman_nuttall": np.array(
+                [0.3635819, -0.4891775, 0.1365995, -0.0106411]
+            ),
+            "blackman_harris": np.array([0.35875, -0.48829, 0.14128, -0.01168]),
+        }
+
+        a = a_table[window]
+        t = 2 * np.pi * np.arange(4)[:, np.newaxis] * x[np.newaxis, :]
+        w = (a[:, np.newaxis] * np.cos(t)).sum(axis=0)
+
+    return np.where((x >= 0) & (x <= 1), w, 0)
+
+
 def unique_ordered(x: Iterable) -> list:
     """Take unique values from an iterable with order preserved.
 
