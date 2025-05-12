@@ -101,5 +101,6 @@ exclude = [
     "build",
     "doc",
     "tests",
+    "*/__init__.py",
 ]
 target-version = "py310"

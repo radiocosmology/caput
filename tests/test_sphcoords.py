@@ -3,25 +3,25 @@
 import pytest
 from math import pi, sqrt
 
-from caput import interferometry
+from caput.coordinates import sphcoords
 
 
 def test_sphdist():
     from skyfield.units import Angle
 
     # 90 degrees
-    assert interferometry.sphdist(
+    assert sphcoords.sphdist(
         Angle(radians=0), Angle(radians=0), Angle(radians=pi / 2), Angle(radians=0)
     ).radians == pytest.approx(pi / 2)
-    assert interferometry.sphdist(
+    assert sphcoords.sphdist(
         Angle(radians=0), Angle(radians=0), Angle(radians=0), Angle(radians=pi / 2)
     ).radians == pytest.approx(pi / 2)
 
     # 60 degrees
-    assert interferometry.sphdist(
+    assert sphcoords.sphdist(
         Angle(radians=0), Angle(radians=0), Angle(radians=pi / 4), Angle(radians=pi / 4)
     ).radians == pytest.approx(pi / 3)
-    assert interferometry.sphdist(
+    assert sphcoords.sphdist(
         Angle(radians=pi / 4), Angle(radians=pi / 4), Angle(radians=0), Angle(radians=0)
     ).radians == pytest.approx(pi / 3)
 
@@ -29,21 +29,21 @@ def test_sphdist():
 def test_rotate_ypr():
 
     # No rotation
-    basis = interferometry.rotate_ypr([0, 0, 0], 1, 2, 3)
+    basis = sphcoords.rotate_ypr([0, 0, 0], 1, 2, 3)
     assert basis == pytest.approx([1, 2, 3])
 
     # Rotate into +Y two ways
-    basis = interferometry.rotate_ypr([pi / 2, 0, 0], 1, 0, 0)
+    basis = sphcoords.rotate_ypr([pi / 2, 0, 0], 1, 0, 0)
     assert basis == pytest.approx([0, 1, 0])
 
-    basis = interferometry.rotate_ypr([0, pi / 2, 0], 0, 0, 1)
+    basis = sphcoords.rotate_ypr([0, pi / 2, 0], 0, 0, 1)
     assert basis == pytest.approx([0, 1, 0])
 
     # General rotation
     x0 = sqrt(2) / 2
     y0 = 0.5
     z0 = 0.5
-    basis = interferometry.rotate_ypr([pi / 2, pi / 3, pi / 4], x0, y0, z0)
+    basis = sphcoords.rotate_ypr([pi / 2, pi / 3, pi / 4], x0, y0, z0)
 
     # The calculation goes like this ("v" denotes a square root):
 
