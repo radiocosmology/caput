@@ -586,7 +586,7 @@ class SafeLineLoader(SafeLoader):
         return mapping
 
 
-class CaputConfigError(Exception):
+class CaputConfigError(RuntimeError):
     """There was an error in the configuration.
 
     Parameters
