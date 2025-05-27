@@ -63,7 +63,7 @@ except ImportError as exc:
 
 import numpy as np
 
-from caput import mpiutil
+from .. import mpiutil
 
 
 class FFT:
