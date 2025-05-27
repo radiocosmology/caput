@@ -3,8 +3,7 @@
 import numpy as np
 import pytest
 
-from caput import fftw
-from scipy import fft as sfft
+from caput import fft, mpiutil
 
 
 ARRAY_SIZE = (100, 111)
@@ -20,19 +19,24 @@ random_complex_array = rng.standard_normal(
 ) + 1.0j * rng.standard_normal(size=ARRAY_SIZE)
 
 
+def test_fft_workers():
+    """Check that the global number of workers is set."""
+    assert fft.get_workers() == mpiutil.cpu_count()
+
+
 @pytest.mark.parametrize("x", [random_double_array])
 def test_invalid_type(x):
     """Test that an error is raised with a non-complex type."""
     with pytest.raises(TypeError):
-        fftw.FFT(x.shape, x.dtype)
+        fft.fftw.FFT(x.shape, x.dtype)
 
 
 @pytest.mark.parametrize("x", [random_complex_array])
 @pytest.mark.parametrize("ax", [(0,), (1,), None])
-def test_forward_backward(x, ax):
+def test_forward_backward_fftw(x, ax):
     """Test that ifft(fft(x)) returns the original array."""
     # Test the direct class implementation
-    fftobj = fftw.FFT(x.shape, x.dtype, ax)
+    fftobj = fft.fftw.FFT(x.shape, x.dtype, ax)
 
     if np.isrealobj(x):
         # pyfftw will destroy the input array for
@@ -47,27 +51,31 @@ def test_forward_backward(x, ax):
 
     # Test the api
     if np.isrealobj(x):
-        xi = fftw.ifft(fftw.fft(x.copy()))
+        xi = fft.fftw.ifft(fft.fftw.fft(x.copy()))
     else:
-        xi = fftw.ifft(fftw.fft(x))
+        xi = fft.fftw.ifft(fft.fftw.fft(x))
+
+    assert np.allclose(x, xi, atol=ATOL)
+
+
+@pytest.mark.parametrize("x", [random_complex_array, random_double_array])
+@pytest.mark.parametrize("ax", [(0,), (1,), None])
+def test_forward_backward_scipy(x, ax):
+    """Test that ifft(fft(x)) returns the original array."""
+    xi = fft.ifftn(fft.fftn(x, axes=ax), axes=ax)
 
     assert np.allclose(x, xi, atol=ATOL)
 
 
 @pytest.mark.parametrize("x", [random_complex_array])
 @pytest.mark.parametrize("ax", [(0,), (1,), None])
-def test_scipy(x, ax):
+def test_scipy_fftw_result(x, ax):
     """Test that this produces the same results as `scipy.fft`."""
-    Xc = fftw.fft(x, ax)
-    ixc = fftw.ifft(Xc, ax)
+    Xc = fft.fftw.fft(x, ax)
+    ixc = fft.fftw.ifft(Xc, ax)
 
-    # Scipy requires different calls for 1D, 2D, real, and complex cases
-    if ax is not None and len(ax) == 1:
-        Xs = sfft.fft(x, axis=ax[0])
-        ixs = sfft.ifft(Xs, axis=ax[0])
-    else:
-        Xs = sfft.fft2(x)
-        ixs = sfft.ifft2(Xs)
+    Xs = fft.fftn(x, axes=ax)
+    ixs = fft.ifftn(Xs, axes=ax)
 
     assert np.allclose(Xc, Xs, atol=ATOL)
     assert np.allclose(ixc, ixs, atol=ATOL)

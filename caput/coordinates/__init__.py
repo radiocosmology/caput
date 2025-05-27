@@ -5,6 +5,6 @@
 
 from . import (
     coord as coord,
-    sphcoords as sphcoords,
+    spherical as spherical,
     sphfunc as sphfunc,
 )
