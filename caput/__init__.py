@@ -7,7 +7,6 @@ Submodules
 
     cache
     config
-    fftw
     fileformats
     memh5
     misc
