@@ -21,7 +21,6 @@ Submodules
     tools
     truncate
     units
-    weighted_median
 """
 
 from importlib.metadata import PackageNotFoundError, version
