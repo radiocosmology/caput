@@ -28,8 +28,8 @@ else:
 # Set up project extensions
 extensions = [
     Extension(
-        name="caput.weighted_median",
-        sources=["caput/weighted_median.pyx"],
+        name="caput.median.weighted",
+        sources=["caput/median/weighted.pyx"],
         include_dirs=[numpy.get_include()],
         language="c++",
         extra_compile_args=[*omp_args, "-std=c++11", "-g0", "-O3"],
