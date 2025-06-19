@@ -11,7 +11,7 @@ from typing import ClassVar
 
 import numpy as np
 
-from .. import memh5
+from ..memdata import memh5
 
 
 class ContainerBase(memh5.BasicCont):
