@@ -251,7 +251,8 @@ if TYPE_CHECKING:
 import numpy as np
 import numpy.typing as npt
 
-from caput import fileformats, misc, mpiutil
+from .. import misc, mpiutil
+from . import fileformats
 
 logger = logging.getLogger(__name__)
 
