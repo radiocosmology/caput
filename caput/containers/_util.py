@@ -2,7 +2,8 @@
 
 import numpy as np
 
-from .. import memh5, mpiarray
+from .. import mpiarray
+from ..memdata import memh5
 from ._core import ContainerBase
 
 
