@@ -1,6 +1,6 @@
 """Basic caput containers."""
 
-from .. import memh5
+from ..memdata import memh5
 from ._core import ContainerBase
 
 
