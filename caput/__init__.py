@@ -7,8 +7,6 @@ Submodules
 
     cache
     config
-    fileformats
-    memh5
     misc
     mpiarray
     mpiutil
@@ -17,9 +15,7 @@ Submodules
     profile
     random
     time
-    tod
     tools
-    truncate
     units
 """
 
