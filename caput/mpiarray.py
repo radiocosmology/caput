@@ -251,7 +251,9 @@ if TYPE_CHECKING:
 import numpy as np
 import numpy.typing as npt
 
-from caput import fileformats, misc, mpiutil
+from . import mpiutil
+from .memdata import fileformats
+from .memdata.io import open_h5py_mpi
 
 logger = logging.getLogger(__name__)
 
@@ -938,7 +940,7 @@ class MPIArray(np.ndarray):
             use_mpi = axis > 0
 
             # Read the file. Opening with MPI if requested, and we can
-            fh = misc.open_h5py_mpi(f, "r", use_mpi=use_mpi, comm=comm)
+            fh = open_h5py_mpi(f, "r", use_mpi=use_mpi, comm=comm)
         elif file_format == fileformats.Zarr:
             try:
                 import numcodecs  # noqa: F401
@@ -1064,7 +1066,7 @@ class MPIArray(np.ndarray):
             )
 
         mode = "a" if create else "r+"
-        fh = misc.open_h5py_mpi(f, mode, self.comm)
+        fh = open_h5py_mpi(f, mode, self.comm)
 
         # Check that there are no null slices, otherwise we need to turn off
         # collective IO to work around an h5py issue (#965)

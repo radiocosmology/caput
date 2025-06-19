@@ -6,7 +6,8 @@ from inspect import getfullargspec
 
 import numpy as np
 
-from .. import config, fileformats, memh5, pipeline
+from .. import config, pipeline
+from ..memdata import fileformats, memh5
 
 
 class MPILogFilter(logging.Filter):
