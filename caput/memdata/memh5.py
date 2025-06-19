@@ -64,7 +64,9 @@ from typing import TYPE_CHECKING, Any
 import h5py
 import numpy as np
 
-from . import fileformats, misc, mpiarray, mpiutil, tools
+from .. import misc, mpiarray, mpiutil, tools
+from . import fileformats
+from .io import open_h5py_mpi
 
 if TYPE_CHECKING:
     from mpi4py import MPI
@@ -2902,7 +2904,7 @@ def _distributed_group_to_file(
         # Use MPI IO if possible, else revert to serialising
         if h5py.get_config().mpi:
             # Open file on all ranks
-            with misc.open_h5py_mpi(fname, "r+", comm=group.comm) as f:
+            with open_h5py_mpi(fname, "r+", comm=group.comm) as f:
                 if not f.is_mpi:
                     raise RuntimeError(f"Could not create file {fname!s} in MPI mode")
                 _write_distributed_datasets(f)
@@ -3027,7 +3029,7 @@ def _distributed_group_from_file(
 
     if file_format == fileformats.HDF5:
         # Open file on all ranks
-        with misc.open_h5py_mpi(fname, "r", comm=comm) as f:
+        with open_h5py_mpi(fname, "r", comm=comm) as f:
             # Start recursive file read
             _copy_from_file(f, group, selections)
     else:
