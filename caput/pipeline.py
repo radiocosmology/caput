@@ -401,7 +401,8 @@ from copy import deepcopy
 
 import yaml
 
-from . import config, fileformats, misc, mpiutil, tools
+from . import config, misc, mpiutil, tools
+from .memdata import fileformats, lock_file
 
 # Set the module logger.
 logger = logging.getLogger(__name__)
@@ -1917,7 +1918,7 @@ class H5IOMixin:
             # Already in memory.
 
             # Lock file
-            with misc.lock_file(filename, comm=output.comm) as fn:
+            with lock_file(filename, comm=output.comm) as fn:
                 output.to_file(fn, mode="w", file_format=file_format, **kwargs)
             return
 
@@ -1934,7 +1935,7 @@ class H5IOMixin:
                 out_copy = memh5.MemGroup.from_hdf5(output)
 
                 # Lock file as we write
-                with misc.lock_file(filename, comm=out_copy.comm) as fn:
+                with lock_file(filename, comm=out_copy.comm) as fn:
                     out_copy.to_hdf5(fn, mode="w")
         elif isinstance(output, zarr.Group):
             if os.path.isdir(filename) and os.path.samefile(
