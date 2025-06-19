@@ -55,7 +55,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from . import fileformats
+    from .memdata import fileformats
 
 import logging
 import warnings
@@ -533,7 +533,7 @@ def file_format(default: str | fileformats.FileFormat | None = None) -> Property
     options = ("hdf5", "zarr")
 
     def _prop(val):
-        from . import fileformats
+        from .memdata import fileformats
 
         if val is None:
             return None

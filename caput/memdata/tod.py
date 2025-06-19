@@ -13,7 +13,8 @@ from typing import Any
 import h5py
 import numpy as np
 
-from . import fileformats, memh5, mpiarray
+from .. import mpiarray
+from . import fileformats, memh5
 
 
 class TOData(memh5.BasicCont):
