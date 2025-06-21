@@ -64,7 +64,8 @@ from typing import TYPE_CHECKING, Any
 import h5py
 import numpy as np
 
-from . import fileformats, misc, mpiarray, mpiutil, tools
+from .. import misc, mpiutil, tools
+from . import fileformats, mpiarray
 
 if TYPE_CHECKING:
     from mpi4py import MPI

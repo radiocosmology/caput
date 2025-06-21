@@ -735,7 +735,7 @@ def transpose_blocks(row_array, shape, comm=_comm):
                 "**** ERROR in MPI RECV (r: %i c: %i rank: %i) *****", ir, ir, comm.rank
             )
 
-    return recv_buffer.reshape(shape[:-1] + (pc,))
+    return recv_buffer.reshape((*shape[:-1], pc))
 
 
 def allocate_hdf5_dataset(fname, dsetname, shape, dtype, comm=_comm):
