@@ -96,7 +96,7 @@ def complex_normal(loc=0.0, scale=1.0, size=None, dtype=None, rng=None, out=None
 
     # Fill the complex array by creating a real type view of it
     rtype = _type_map[dtype]
-    rsize = size[:-1] + (size[-1] * 2,)
+    rsize = (*size[:-1], size[-1] * 2)
     rng.standard_normal(rsize, dtype=rtype, out=out.view(rtype))
 
     # Use inplace ops for scaling and adding to avoid intermediate arrays
