@@ -106,3 +106,4 @@ target-version = "py310"
 
 [tool.ruff.lint.per-file-ignores]
 "*/__init__.py" = ["I", "F401"]
+"caput/astro/constants.py" = ["F403", "F405"]
