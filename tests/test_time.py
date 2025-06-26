@@ -8,7 +8,7 @@ import pytest
 from skyfield import earthlib, api
 from pytest import approx, raises
 
-from caput import time as ctime
+from caput.astro import time as ctime
 
 
 # Download the required Skyfield files from a mirror on a CHIME server.
