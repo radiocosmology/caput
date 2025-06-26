@@ -8,8 +8,8 @@ import numpy as np
 import pytest
 from pytest_lazy_fixtures import lf
 
-from caput import mpiutil, mpiarray, fileformats
-from caput.memh5 import MemGroup
+from caput import mpiutil, mpiarray
+from caput.memdata import fileformats, MemGroup
 
 
 comm = MPI.COMM_WORLD
