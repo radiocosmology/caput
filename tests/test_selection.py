@@ -4,8 +4,7 @@ import pytest
 from pytest_lazy_fixtures import lf
 import numpy as np
 
-from caput.memh5 import MemGroup
-from caput import fileformats
+from caput.memdata import fileformats, MemGroup
 
 fsel = slice(1, 8, 2)
 isel = slice(1, 4)
