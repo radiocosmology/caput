@@ -292,7 +292,7 @@ def utc_time(default=None):
     def _prop(val):
         # Include import here to get around circular import issues
         # pylint: disable=R0401
-        from .time import ensure_unix
+        from .astro.time import ensure_unix
 
         return ensure_unix(val)
 
