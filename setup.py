@@ -43,8 +43,8 @@ extensions = [
         extra_link_args=omp_args,
     ),
     Extension(
-        name="caput.coordinates.coord",
-        sources=["caput/coordinates/coord.pyx"],
+        name="caput.astro.coordinates.coord",
+        sources=["caput/astro/coordinates/coord.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=[*omp_args, "-g0", "-O3"],
         extra_link_args=omp_args,
