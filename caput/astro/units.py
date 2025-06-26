@@ -1,108 +1,50 @@
 """A set of useful constants and conversions in Astronomy and Cosmology.
 
-# NOTE: this module should probably be replaced with `astropy`.
+Most constants are just imported directly from `scipy.constants`.
+A few other units are defined here, as well as some aliases.
 """
 
-import math
+from scipy.constants import *
 
-# Astrophysical units (in SI)
-
+## Include a handful of useful units which are not
+## included in `scipy.constants`.
 #: Solar masses in kg
 solar_mass = 1.98892e30
-
-#: Nano prefix
-nano = 1e-9
-
-#: Micro prefix
-micro = 1e-6
-
-#: Milli prefix
-milli = 1e-3
-
-#: Kilo prefix
-kilo = 1e3
-
-#: Mega prefix
-mega = 1e6
-
-#: Giga prefix
-giga = 1e9
-
-#: Parsecs in m
-parsec = 3.08568025e16
-
-#: Kilo Parsecs in m
-kilo_parsec = kilo * parsec
-
-#: Mega Parsecs in m
-mega_parsec = mega * parsec
-
-#: Giga Parsecs in m
-giga_parsec = giga * parsec
-
-# Time lengths in seconds.
-
 #: One second in seconds
 second = 1.0
-
-#: One minute in seconds
-minute = 60.0
-
-#: One hour in seconds
-hour = 60.0 * minute
-
-#: One day in seconds
-day = 24.0 * hour
-
-#: One year in seconds
-year = 365.25 * day
-
-#: One kilo year in seconds
-kilo_year = kilo * year
-
-#: One mega year in seconds
-mega_year = mega * year
-
-#: One giga year in seconds
-giga_year = giga * year
-
 #: One sidereal day in seconds
 t_sidereal = 23.9344696 * hour
-
-# Physical constants (in SI)
-
-#: Gravitational constant :math:`G kg^-1 m^3 s^-2`.
-G = 6.6742e-11
-
-#: Gravitational constant :math:`G kg^-1 m^3 s^-2`. (In case of clashes)
-G_n = G
-
-#: Speed of light in m/s
-c = 2.99792458e8
-
-#: Speed of light in m/s (In case of clashes.)
-c_sl = c
-
-#: Stefan-Boltzmann (in W m^{-2} K^{-4})
-stefan_boltzmann = 5.6705e-8
-
 #: Radiation constant (in J m^{-3} K^{-4})
-a_rad = 4 * stefan_boltzmann / c
-
+a_rad = 4 * Stefan_Boltzmann / c
 #: 21cm transition frequency (in MHz)
 nu21 = 1420.40575177
 
-#: Boltzmann constant
-k_B = 1.3806503e-23
+
+__aliases = {
+    "stefan_boltzmann": Stefan_Boltzmann,
+    "k_B": Boltzmann,
+    "arc_minute": arcminute,
+    "arc_second": arcsecond,
+}
 
 
-# Angular units (in radians)
+def __split_prefix(name):
+    names = [value for value in name.split("_") if value]
 
-#: One degree in radians
-degree = 2 * math.pi / 360
+    if len(names) > 2:
+        raise AttributeError(f"Only single-prefix values are allowed. Got `{name}`.")
 
-#: One arc minute in radians
-arc_minute = 2 * math.pi / (60 * 360)
+    return names
 
-#: One arc second in radians
-arc_second = 2 * math.pi / (60 * 60 * 360)
+
+def __getattr__(name):
+    if name in globals():
+        return globals()[name]
+    if name in __aliases:
+        return __aliases[name]
+    # If this value hasn't been defined, see if it's
+    # a combination of a prefix and a unit
+    if len(names := __split_prefix(name)) == 2:
+        return __getattr__(names[0]) * __getattr__(names[1])
+
+    raise AttributeError(f"Cannot find constant `{name}`.")
