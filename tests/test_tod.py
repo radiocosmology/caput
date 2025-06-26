@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from caput import tod
+from caput.memdata import tod
 
 
 class TestConcatenation(unittest.TestCase):
