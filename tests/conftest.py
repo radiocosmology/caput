@@ -6,9 +6,10 @@ import tempfile
 import numpy as np
 import pytest
 
+from caput.memdata import fileformats
 from caput.pipeline import PipelineStopIteration, TaskBase, IterBase, Manager
 from caput.scripts.runner import cli
-from caput import config, fileformats, mpiutil
+from caput import config, mpiutil
 
 
 @pytest.fixture(scope="session")

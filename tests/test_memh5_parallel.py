@@ -7,7 +7,8 @@ import h5py
 import zarr
 import copy
 
-from caput import fileformats, memh5, mpiarray, mpiutil
+from caput.memdata import fileformats, memh5
+from caput import mpiarray, mpiutil
 
 
 comm = mpiutil.world

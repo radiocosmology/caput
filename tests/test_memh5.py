@@ -14,7 +14,7 @@ from pytest_lazy_fixtures import lf
 import zarr
 import copy
 
-from caput import memh5, fileformats
+from caput.memdata import memh5, fileformats
 
 
 def test_ro_dict():

@@ -1,4 +1,4 @@
-"""Test the miscellaneous tools."""
+"""Test lock file functionality."""
 
 import unittest
 import tempfile
@@ -6,7 +6,7 @@ import os
 import pytest
 import shutil
 
-from caput import misc
+from caput.memdata import lock_file
 
 
 class TestLock(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestLock(unittest.TestCase):
         newfile_name = os.path.join(self.dir, base)
         lockfile_name = os.path.join(self.dir, "." + base + ".lock")
 
-        with misc.lock_file(newfile_name) as fname:
+        with lock_file(newfile_name) as fname:
             # Check lock file has been created
             self.assertTrue(os.path.exists(lockfile_name))
 
@@ -44,7 +44,7 @@ class TestLock(unittest.TestCase):
         lockfile_name = os.path.join(self.dir, "." + base + ".lock")
 
         with pytest.raises(RuntimeError):
-            with misc.lock_file(newfile_name) as fname:
+            with lock_file(newfile_name) as fname:
                 # Create a stub file
                 with open(fname, "w+") as fh:
                     fh.write("hello")
@@ -64,7 +64,7 @@ class TestLock(unittest.TestCase):
         tmpfile_name = os.path.join(self.dir, "." + base)
 
         with pytest.raises(RuntimeError):
-            with misc.lock_file(newfile_name, preserve=True) as fname:
+            with lock_file(newfile_name, preserve=True) as fname:
                 # Create a stub file
                 with open(fname, "w+") as fh:
                     fh.write("hello")
