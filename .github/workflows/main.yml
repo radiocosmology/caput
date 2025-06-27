@@ -3,6 +3,7 @@ on:
   pull_request:
     branches:
     - master
+    - refactor-dev
   push:
     branches:
     - master
