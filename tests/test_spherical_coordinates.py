@@ -3,7 +3,7 @@
 import pytest
 from math import pi, sqrt
 
-from caput.coordinates import spherical
+from caput.astro.coordinates import spherical
 
 
 def test_sphdist():
