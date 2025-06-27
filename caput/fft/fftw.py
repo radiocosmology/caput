@@ -13,7 +13,7 @@ The core of this module is the :class:`FFT`, which essentially just
 abstracts the :class:`pyfftw:FFTW` in the simplest way.
 
 >>> import numpy as np
->>> from caput import fftw
+>>> from caput.fft import fftw
 >>>
 >>> shape = (24, 50)
 >>> x = np.random.rand(*shape) + 1j * np.random.rand(*shape)
