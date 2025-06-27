@@ -1,6 +1,6 @@
 """Simple pipeline task used for things like data flow."""
 
-from .. import config
+from ... import config
 from ._core import MPILoggedTask, SingleTask
 
 

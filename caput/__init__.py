@@ -11,7 +11,6 @@ Submodules
     mpiarray
     mpiutil
     pfb
-    pipeline
     profile
     random
     tools

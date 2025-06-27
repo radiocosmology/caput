@@ -3,7 +3,8 @@
 import numpy as np
 from yaml import dump as yamldump
 
-from .. import config, pipeline
+from ... import config
+from .._core import TaskBase
 from ._core import MPILoggedTask, SetMPILogging, SingleTask
 
 
@@ -117,7 +118,7 @@ class DebugInfo(MPILoggedTask, SetMPILogging):
         return package_list
 
 
-class Print(pipeline.TaskBase):
+class Print(TaskBase):
     """Stupid module which just prints whatever it gets. Good for debugging."""
 
     def next(self, input_):

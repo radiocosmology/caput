@@ -32,8 +32,9 @@ from typing import ClassVar
 
 import numpy as np
 
-from .. import config, pipeline, truncate
-from ..memdata import fileformats, memh5
+from ... import config, truncate
+from ...memdata import fileformats, memh5
+from .._core import PipelineStopIteration
 from ._core import MPILoggedTask, SingleTask
 
 
@@ -391,7 +392,7 @@ class LoadFilesFromParams(BaseLoadFiles):
         gc.collect()
 
         if self._file_ind == len(self.files):
-            raise pipeline.PipelineStopIteration
+            raise PipelineStopIteration
 
         # Fetch and remove the first item in the list
         file_ = self.files[self._file_ind]
@@ -893,7 +894,7 @@ class ZipZarrContainers(SingleTask):
 
         self.comm.Barrier()
 
-        raise pipeline.PipelineStopIteration
+        raise PipelineStopIteration
 
 
 class ZarrZipHandle:
