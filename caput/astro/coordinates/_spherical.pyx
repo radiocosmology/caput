@@ -23,6 +23,18 @@ Miscellaneous
 =============
 - :py:meth:`great_circle_points`
 """
+
+__all__ = [
+    "sph_to_cart",
+    "cart_to_sph",
+    "sph_dot",
+    "thetaphi_plane",
+    "thetaphi_plane_cart",
+    "norm_vec2",
+    "great_circle_points",
+    "cosine_rule",
+]
+
 cimport cython
 from cython.parallel cimport prange, parallel
 
