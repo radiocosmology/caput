@@ -5,7 +5,9 @@ time conversions, and constants.
 """
 
 from . import (
-    coordinates as coordinates,
-    time as time,
     constants as constants,
+    coordinates as coordinates,
+    observer as observer,
+    skyfield as skyfield,
+    time as time,
 )

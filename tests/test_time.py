@@ -8,7 +8,7 @@ import pytest
 from skyfield import earthlib, api
 from pytest import approx, raises
 
-from caput.astro import time as ctime
+from caput.astro import time as ctime, skyfield as csf, observer, constants
 
 
 # Download the required Skyfield files from a mirror on a CHIME server.
@@ -23,7 +23,7 @@ mirror_url = "https://bao.chimenet.ca/skyfield/"
 
 files = ["Leap_Second.dat", "finals2000A.all", "de421.bsp"]
 
-loader = ctime.skyfield_wrapper.load
+loader = csf.skyfield_wrapper.load
 for file in files:
     if not os.path.exists(loader.path_to(file)):
         loader.download(mirror_url + file)
@@ -34,7 +34,7 @@ def test_epoch():
     epoch = datetime(2000, 1, 1, 11, 58, 56)
 
     # Create an observer at an arbitrary location
-    obs = ctime.Observer(118.3, 36.1)
+    obs = observer.Observer(118.3, 36.1)
 
     # Calculate the transit_RA
     unix_epoch = ctime.datetime_to_unix(epoch)
@@ -56,7 +56,7 @@ def test_transit_array():
     epoch = datetime(2000, 1, 1, 11, 58, 56)
 
     # Create an observer at an arbitrary location
-    obs = ctime.Observer(118.3, 36.1)
+    obs = observer.Observer(118.3, 36.1)
 
     # Calculate LST
     lst = obs.lst(ctime.datetime_to_unix(epoch))
@@ -68,7 +68,7 @@ def test_transit_array():
 
     # Calculate RA using transit_RA
     unix_epoch = ctime.datetime_to_unix(epoch)
-    unix_times = unix_epoch + (delta_deg * 60 * 4 * ctime.STELLAR_S)
+    unix_times = unix_epoch + (delta_deg * 60 * 4 * constants.stellar_second)
     TRA = obs.transit_RA(unix_times)
     LSA = obs.lsa(unix_times)
 
@@ -82,7 +82,7 @@ def test_delta():
     # time.time() when I wrote this.  No leap seconds for the next few
     # days.
 
-    obs = ctime.Observer(118.3, 36.1)
+    obs = observer.Observer(118.3, 36.1)
 
     start = 1383679008.816173
     times = start + delta
@@ -91,7 +91,7 @@ def test_delta():
     start_ra = obs.transit_RA(start)
     ra = obs.transit_RA(times)
     delta_ra = ra - start_ra
-    expected = delta / 3600.0 * 15.0 / ctime.SIDEREAL_S
+    expected = delta / 3600.0 * 15.0 / constants.sidereal_second
     error = ((expected - delta_ra + 180.0) % 360) - 180
     # Tolerance limited by stellar aberation (40" peak to peak).
     assert error == approx(0, abs=0.02)
@@ -100,7 +100,7 @@ def test_delta():
     start_lsa = obs.lsa(start)
     lsa = obs.lsa(times)
     delta_lsa = lsa - start_lsa
-    expected = delta / 3600.0 * 15.0 / ctime.STELLAR_S
+    expected = delta / 3600.0 * 15.0 / constants.stellar_second
     error = ((expected - delta_lsa + 180.0) % 360) - 180
     # Tolerance limited by stellar aberation (40" peak to peak).
     assert error == approx(0, abs=0.02)
@@ -113,10 +113,10 @@ def test_lsa_skyfield():
     dt_utc = dt.replace(tzinfo=api.utc)
 
     t1 = ctime.datetime_to_unix(dt)
-    obs = ctime.Observer(42.8, 4.7)
+    obs = observer.Observer(42.8, 4.7)
     lsa1 = obs.unix_to_lsa(t1)
 
-    t = ctime.skyfield_wrapper.timescale.utc(dt_utc)
+    t = csf.skyfield_wrapper.timescale.utc(dt_utc)
     lsa2 = (earthlib.earth_rotation_angle(t.ut1) * 360.0 + obs.longitude) % 360.0
 
     assert lsa1 == approx(lsa2, abs=1e-4)
@@ -128,7 +128,7 @@ def test_lsa_tra():
     dt = datetime(2001, 2, 3, 4, 5, 6)
 
     t1 = ctime.datetime_to_unix(dt)
-    obs = ctime.Observer(118.0, 31.0)
+    obs = observer.Observer(118.0, 31.0)
     lsa = obs.unix_to_lsa(t1)
     tra = obs.transit_RA(t1)
 
@@ -145,7 +145,7 @@ def test_reverse_lsa():
     dt0 = datetime(2018, 3, 12)
     t0 = ctime.datetime_to_unix(dt0)
 
-    obs = ctime.Observer(42.8, 4.7)
+    obs = observer.Observer(42.8, 4.7)
     lsa = obs.unix_to_lsa(t1)
 
     t2 = obs.lsa_to_unix(lsa, t0)
@@ -158,7 +158,7 @@ def test_lsa_array():
 
     t1 = ctime.datetime_to_unix(dt)
 
-    obs = ctime.Observer(0.0, 0.0)
+    obs = observer.Observer(0.0, 0.0)
     times = t1 + np.linspace(0, 24 * 3600.0, 25)
     lsas = obs.unix_to_lsa(times)
 
@@ -171,7 +171,9 @@ def test_lsa_array():
     # was not in the correct sidereal day)
     itimes = obs.lsa_to_unix(lsas, times[0])
     assert times[:-1] == approx(itimes[:-1], rel=1e-5, abs=1e-5)
-    assert (times[-1] - itimes[-1]) == approx(24 * 3600.0 * ctime.SIDEREAL_S, abs=0.1)
+    assert (times[-1] - itimes[-1]) == approx(
+        24 * 3600.0 * constants.sidereal_second, abs=0.1
+    )
 
     # Check that it works with zero length arrays
     assert obs.lsa_to_unix(np.array([]), np.array([])).size == 0
@@ -180,7 +182,7 @@ def test_lsa_array():
 def test_lsd():
     """Test Local Earth Rotation Day (LSD) definition."""
 
-    obs = ctime.Observer(113.2, 62.4)
+    obs = observer.Observer(113.2, 62.4)
     obs.lsd_start_day = ctime.datetime_to_unix(datetime(2014, 1, 2))
 
     # Check the zero point is correct
@@ -203,7 +205,7 @@ def test_lsd_array():
 
     t1 = ctime.datetime_to_unix(dt)
 
-    obs = ctime.Observer(0.0, 0.0)
+    obs = observer.Observer(0.0, 0.0)
     times = t1 + np.linspace(0, 48 * 3600.0, 25)
     lsds = obs.unix_to_lsd(times)
 
@@ -255,7 +257,7 @@ def test_from_unix_time():
 
     unix_time = random.random() * 2e6
     dt = datetime.fromtimestamp(unix_time, timezone.utc)
-    st = ctime.unix_to_skyfield_time(unix_time)
+    st = csf.unix_to_skyfield_time(unix_time)
     new_dt = st.utc_datetime()
     assert dt.year == new_dt.year
     assert dt.month == new_dt.month
@@ -278,8 +280,8 @@ def test_time_precision():
     delta = 0.001  # Try a 1 ms shift
     unix_time = time.time()
     unix_time2 = unix_time + delta
-    tt1 = ctime.unix_to_skyfield_time(unix_time).tt_calendar()
-    tt2 = ctime.unix_to_skyfield_time(unix_time2).tt_calendar()
+    tt1 = csf.unix_to_skyfield_time(unix_time).tt_calendar()
+    tt2 = csf.unix_to_skyfield_time(unix_time2).tt_calendar()
     err = abs(tt2[-1] - tt1[-1] - delta)
 
     assert err < 4e-5  # Check that it is accurate at the 0.03 ms level.
@@ -363,8 +365,8 @@ def test_ensure_unix():
     ut = ctime.datetime_to_unix(dt)
     ut_array = ctime.datetime_to_unix(dt_list)
 
-    sf = ctime.unix_to_skyfield_time(ut)
-    sf_array = ctime.unix_to_skyfield_time(ut_array)
+    sf = csf.unix_to_skyfield_time(ut)
+    sf_array = csf.unix_to_skyfield_time(ut_array)
 
     assert ctime.ensure_unix(dt) == ut
     assert ctime.ensure_unix(ut) == ut
@@ -382,12 +384,12 @@ def test_ensure_unix():
 @pytest.fixture
 def chime():
     # Position from ch_util.ephemeris on 2020/11/09
-    return ctime.Observer(lon=-119.62, lat=49.32, alt=545.0)
+    return observer.Observer(lon=-119.62, lat=49.32, alt=545.0)
 
 
 @pytest.fixture(scope="module")
 def eph():
-    return ctime.skyfield_wrapper.ephemeris
+    return csf.skyfield_wrapper.ephemeris
 
 
 def test_transit_times(chime, eph):
