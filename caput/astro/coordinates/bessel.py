@@ -1,8 +1,10 @@
-"""Special functions for calculations on the sphere.
+"""Fast spherical Bessel function and derivatives.
 
 Although these functions are available in `scipy`,
 they tend to be inaccurate at large values of `l`.
 """
+
+__all__ = ["jl", "jl_d", "jl_d2"]
 
 import numpy as np
 import scipy.special as ss

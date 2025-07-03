@@ -11,6 +11,18 @@ Coordinates
 
 import numpy as np
 
+from . import _spherical
+from ._spherical import *  # noqa: F403
+
+__all__ = [
+    "ground_to_sph",
+    "projected_distance",
+    "rotate_ypr",
+    "sph_to_ground",
+    "sphdist",
+    *_spherical.__all__,
+]
+
 
 def sphdist(long1, lat1, long2, lat2):
     """Return the angular distance between two coordinates on the sphere.
