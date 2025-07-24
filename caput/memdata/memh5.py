@@ -64,7 +64,8 @@ from typing import TYPE_CHECKING, Any
 import h5py
 import numpy as np
 
-from .. import misc, mpiarray, mpiutil, tools
+from .. import mpiarray, mpiutil
+from ..lib import misc
 from . import fileformats
 from .io import open_h5py_mpi
 
@@ -122,7 +123,7 @@ class ro_dict(Mapping):
     def __eq__(self, other):
         if not isinstance(other, ro_dict):
             return False
-        return Mapping.__eq__(self, other) and tools.allequal(self._dict, other._dict)
+        return Mapping.__eq__(self, other) and misc.allequal(self._dict, other._dict)
 
 
 class _Storage(dict):
@@ -145,7 +146,7 @@ class _Storage(dict):
     def __eq__(self, other):
         if not isinstance(other, _Storage):
             return False
-        return dict.__eq__(self, other) and tools.allequal(self._attrs, other._attrs)
+        return dict.__eq__(self, other) and misc.allequal(self._attrs, other._attrs)
 
 
 class _StorageRoot(_Storage):
@@ -1106,7 +1107,7 @@ class MemDataset(_MemObjMixin):
     def __eq__(self, other):
         if not isinstance(other, MemDataset):
             return False
-        return _MemObjMixin.__eq__(self, other) and tools.allequal(
+        return _MemObjMixin.__eq__(self, other) and misc.allequal(
             self._attrs, other._attrs
         )
 
@@ -1280,10 +1281,10 @@ class MemDatasetCommon(MemDataset):
             return False
         return (
             MemDataset.__eq__(self, other)
-            and tools.allequal(self._data, other._data)
-            and tools.allequal(self._chunks, other._chunks)
-            and tools.allequal(self._compression, other._compression)
-            and tools.allequal(self._compression_opts, other._compression_opts)
+            and misc.allequal(self._data, other._data)
+            and misc.allequal(self._chunks, other._chunks)
+            and misc.allequal(self._compression, other._compression)
+            and misc.allequal(self._compression_opts, other._compression_opts)
         )
 
 
@@ -1509,10 +1510,10 @@ class MemDatasetDistributed(MemDataset):
             return False
         return (
             MemDataset.__eq__(self, other)
-            and tools.allequal(self._data, other._data)
-            and tools.allequal(self._chunks, other._chunks)
-            and tools.allequal(self._compression, other._compression)
-            and tools.allequal(self._compression_opts, other._compression_opts)
+            and misc.allequal(self._data, other._data)
+            and misc.allequal(self._chunks, other._chunks)
+            and misc.allequal(self._compression, other._compression)
+            and misc.allequal(self._compression_opts, other._compression_opts)
         )
 
 
