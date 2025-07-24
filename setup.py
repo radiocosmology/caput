@@ -50,8 +50,8 @@ extensions = [
         extra_link_args=omp_args,
     ),
     Extension(
-        name="caput._fast_tools",
-        sources=["caput/_fast_tools.pyx"],
+        name="caput._invert_no_zero",
+        sources=["caput/_invert_no_zero.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=[*omp_args, "-g0", "-O3"],
         extra_link_args=omp_args,
