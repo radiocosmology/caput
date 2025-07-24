@@ -1,6 +1,4 @@
-"""A set of miscellaneous routines that don't really fit anywhere more specific."""
-
-import importlib
+"""Make functions that already work with `np.ndarray` accept different types."""
 
 import numpy as np
 
@@ -179,47 +177,3 @@ def listize(**_):
             return self.__class__(new_func)
 
     return _listize_desc
-
-
-# TODO: remove this. This was to support a patching of this routine to support Python 2
-# that used to exist in here. This will be removed when all other repos are changed to
-# use the version from `inspect`
-def getfullargspec(*args, **kwargs):
-    """See `inspect.getfullargspec`.
-
-    This is a Python 2 patch that will be removed.
-    """
-    import inspect
-    import warnings
-
-    warnings.warn(
-        "This patch to support Python 2 is no longer needed and will be removed.",
-        DeprecationWarning,
-    )
-
-    return inspect.getfullargspec(*args, **kwargs)
-
-
-def import_class(class_path):
-    """Import class dynamically from a string.
-
-    Parameters
-    ----------
-    class_path : str
-        Fully qualified path to the class. If only a single component, look up in the
-        globals.
-
-    Returns
-    -------
-    class : class object
-        The class we want to load.
-    """
-    path_split = class_path.split(".")
-    module_path = ".".join(path_split[:-1])
-    class_name = path_split[-1]
-    if module_path:
-        m = importlib.import_module(module_path)
-        task_cls = getattr(m, class_name)
-    else:
-        task_cls = globals()[class_name]
-    return task_cls
