@@ -4,7 +4,8 @@ import zlib
 
 import numpy as np
 
-from .. import config, random
+from .. import config
+from ..lib import random
 from ._core import MPILoggedTask
 
 
