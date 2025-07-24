@@ -1,5 +1,6 @@
-"""Collection of assorted tools."""
+"""A set of miscellaneous routines that don't really fit anywhere more specific."""
 
+import importlib
 from collections import deque
 from collections.abc import Iterable, Mapping
 from itertools import chain
@@ -8,108 +9,6 @@ from sys import getsizeof
 from types import ModuleType
 
 import numpy as np
-
-from caput._fast_tools import _invert_no_zero
-
-
-def invert_no_zero(x, out=None):
-    """Return the reciprocal, but ignoring zeros.
-
-    Where `x != 0` return 1/x, or just return 0. Importantly this routine does
-    not produce a warning about zero division.
-
-    Parameters
-    ----------
-    x : np.ndarray
-        Array to invert
-    out : np.ndarray, optional
-        Output array to insert results
-
-    Returns
-    -------
-    r : np.ndarray
-        Return the reciprocal of x. Where possible the output has the same memory layout
-        as the input, if this cannot be preserved the output is C-contiguous.
-    """
-    if not isinstance(x, np.generic | np.ndarray) or np.issubdtype(x.dtype, np.integer):
-        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
-            return np.where(x == 0, 0.0, 1.0 / x)
-
-    if out is not None:
-        if x.shape != out.shape:
-            raise ValueError(
-                f"Input and output arrays don't have same shape: {x.shape} != {out.shape}."
-            )
-    else:
-        # This works even for MPIArrays, producing a correctly shaped MPIArray
-        out = np.empty_like(x, order="A")
-
-    # In order to be able to flatten the arrays to do element by element operations, we
-    # need to ensure the inputs are numpy arrays, and so we take a view which will work
-    # even if `x` (and thus `out`) are MPIArray's
-    _invert_no_zero(
-        x.view(np.ndarray).ravel(order="A"), out.view(np.ndarray).ravel(order="A")
-    )
-
-    return out
-
-
-def window_generalised(x, window="nuttall"):
-    """A generalised high-order window at arbitrary locations.
-
-    Parameters
-    ----------
-    x : np.ndarray[n]
-        Location to evaluate at. Values outside the range 0 to 1 are zero.
-    window : str
-        Type of window function to return.  Must be one of the following strings:
-        'uniform', 'hann', 'hanning', 'hamming', 'blackman', 'nuttall',
-        'blackman_nuttall', 'blackman_harris', 'triangular', or 'tukey-0.X'.
-        If "tukey-0.X", then 0.X is the fraction of the full window that
-        will be tapered.
-
-    Returns
-    -------
-    w : np.ndarray[n]
-        Window function.
-    """
-    if window == "triangular":
-        w = 1.0 - 2.0 * np.abs(x - 0.5)
-
-    elif window.startswith("tukey"):
-
-        r = float(window.split("-")[1])
-        alpha = 0.5 * r
-
-        w = np.ones_like(x)
-
-        begin = np.flatnonzero(x < alpha)
-        if begin.size > 0:
-            w[begin] = 0.5 * (1.0 + np.cos(np.pi * (x[begin] - alpha) / alpha))
-
-        end = np.flatnonzero(x >= (1.0 - alpha))
-        if end.size > 0:
-            w[end] = 0.5 * (1.0 + np.cos(np.pi * (x[end] - (1.0 - alpha)) / alpha))
-
-    else:
-        a_table = {
-            "uniform": np.array([1, 0, 0, 0]),
-            "hann": np.array([0.5, -0.5, 0, 0]),
-            "hanning": np.array([0.5, -0.5, 0, 0]),
-            "hamming": np.array([0.53836, -0.46164, 0, 0]),
-            "blackman": np.array([0.42, -0.5, 0.08, 0]),
-            "nuttall": np.array([0.355768, -0.487396, 0.144232, -0.012604]),
-            "blackman_nuttall": np.array(
-                [0.3635819, -0.4891775, 0.1365995, -0.0106411]
-            ),
-            "blackman_harris": np.array([0.35875, -0.48829, 0.14128, -0.01168]),
-        }
-
-        a = a_table[window]
-        t = 2 * np.pi * np.arange(4)[:, np.newaxis] * x[np.newaxis, :]
-        w = (a[:, np.newaxis] * np.cos(t)).sum(axis=0)
-
-    return np.where((x >= 0) & (x <= 1), w, 0)
 
 
 def unique_ordered(x: Iterable) -> list:
@@ -259,3 +158,28 @@ def total_size(obj: object):
         return size
 
     return sizeof(obj)
+
+
+def import_class(class_path):
+    """Import class dynamically from a string.
+
+    Parameters
+    ----------
+    class_path : str
+        Fully qualified path to the class. If only a single component, look up in the
+        globals.
+
+    Returns
+    -------
+    class : class object
+        The class we want to load.
+    """
+    path_split = class_path.split(".")
+    module_path = ".".join(path_split[:-1])
+    class_name = path_split[-1]
+    if module_path:
+        m = importlib.import_module(module_path)
+        task_cls = getattr(m, class_name)
+    else:
+        task_cls = globals()[class_name]
+    return task_cls
