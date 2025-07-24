@@ -401,7 +401,8 @@ from copy import deepcopy
 
 import yaml
 
-from . import config, misc, mpiutil, tools
+from . import config, mpiutil
+from .lib import misc
 from .memdata import fileformats, lock_file
 
 # Set the module logger.
@@ -701,7 +702,7 @@ class Manager(config.Reader):
             Generator object to run the pipeline.
 
         """
-        from .profile import PSUtilProfiler
+        from .lib.profile import PSUtilProfiler
 
         # Log MPI information
         if mpiutil._comm is not None:
@@ -1301,7 +1302,7 @@ class TaskBase(config.Reader):
     @property
     def mem_used(self):
         """Return the approximate total memory referenced by this task."""
-        return tools.total_size(self)
+        return misc.total_size(self)
 
     @classmethod
     def _from_config(cls, config):
@@ -1863,17 +1864,17 @@ class H5IOMixin:
     @staticmethod
     def read_input(filename):
         """Method for reading hdf5 input."""
-        from caput import memh5
+        from caput.memdata import MemGroup
 
-        return memh5.MemGroup.from_hdf5(filename, mode="r")
+        return MemGroup.from_hdf5(filename, mode="r")
 
     @staticmethod
     def read_output(filename):
         """Method for reading hdf5 output (from caches)."""
         # Replicate code from read_input in case read_input is overridden.
-        from caput import memh5
+        from caput.memdata import MemGroup
 
-        return memh5.MemGroup.from_hdf5(filename, mode="r")
+        return MemGroup.from_hdf5(filename, mode="r")
 
     @staticmethod
     def write_output(filename, output, file_format=None, **kwargs):
@@ -1894,7 +1895,7 @@ class H5IOMixin:
         """
         import h5py
 
-        from caput import memh5
+        from caput.memdata import MemGroup
 
         file_format = fileformats.check_file_format(filename, file_format, output)
 
@@ -1914,7 +1915,7 @@ class H5IOMixin:
                 if not os.path.isdir(dirname):
                     raise e
         # Cases for `output` object type.
-        if isinstance(output, memh5.MemGroup):
+        if isinstance(output, MemGroup):
             # Already in memory.
 
             # Lock file
@@ -1932,7 +1933,7 @@ class H5IOMixin:
             else:
                 # Copy to memory then to disk
                 # XXX This can be made much more efficient using a direct copy.
-                out_copy = memh5.MemGroup.from_hdf5(output)
+                out_copy = MemGroup.from_hdf5(output)
 
                 # Lock file as we write
                 with lock_file(filename, comm=out_copy.comm) as fn:
@@ -1976,18 +1977,18 @@ class BasicContMixin:
 
     def read_input(self, filename):
         """Method for reading hdf5 input."""
-        from caput import memh5
+        from caput.memdata import BasicCont
 
-        return memh5.BasicCont.from_file(
+        return BasicCont.from_file(
             filename, distributed=self._distributed, comm=self._comm
         )
 
     def read_output(self, filename):
         """Method for reading hdf5 output (from caches)."""
         # Replicate code from read_input in case read_input is overridden.
-        from caput import memh5
+        from caput.memdata import BasicCont
 
-        return memh5.BasicCont.from_file(
+        return BasicCont.from_file(
             filename, distributed=self._distributed, comm=self._comm
         )
 
@@ -2006,7 +2007,7 @@ class BasicContMixin:
         **kwargs : dict
             Arbitrary keyword arguments.
         """
-        from caput import memh5
+        from caput.memdata import BasicCont
 
         file_format = fileformats.check_file_format(filename, file_format, output)
 
@@ -2020,7 +2021,7 @@ class BasicContMixin:
                 if not os.path.isdir(dirname):
                     raise e
         # Cases for `output` object type.
-        if not isinstance(output, memh5.BasicCont):
+        if not isinstance(output, BasicCont):
             raise RuntimeError(
                 "Object to write out is not an instance of memh5.BasicCont"
             )
