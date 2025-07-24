@@ -5,16 +5,11 @@ Submodules
 .. autosummary::
     :toctree: _autosummary
 
-    cache
     config
-    misc
     mpiarray
     mpiutil
-    pfb
     pipeline
-    profile
-    random
-    tools
+    truncate
 """
 
 from importlib.metadata import PackageNotFoundError, version
