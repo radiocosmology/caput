@@ -1,10 +1,11 @@
-"""Unit tests for the tools module."""
+"""Unit tests for the invert_no_zero module."""
 
 from mpi4py import MPI
 import numpy as np
 import pytest
 
-from caput import mpiarray, tools
+from caput import mpiarray
+from caput._invert_no_zero import invert_no_zero
 
 
 ARRAY_SIZE = (100, 111)
@@ -40,7 +41,7 @@ def test_invert_no_zero(a):
     else:
         a[zero_ind[0][2], zero_ind[1][2]] = -0.5 / np.finfo(a.real.dtype).max
 
-    b = tools.invert_no_zero(a)
+    b = invert_no_zero(a)
     assert np.allclose(b[good_ind], 1.0 / a[good_ind], atol=ATOL)
     assert (b[zero_ind] == 0).all()
 
@@ -52,7 +53,7 @@ def test_invert_no_zero_mpiarray():
     a = mpiarray.MPIArray((20, 30), axis=0, comm=comm)
     a[:] = comm.rank
 
-    b = tools.invert_no_zero(a)
+    b = invert_no_zero(a)
 
     assert b.shape == a.shape
     assert b.comm == a.comm
@@ -70,58 +71,16 @@ def test_invert_no_zero_noncontiguous():
     res[0, 0] = 0.0
 
     # Check the contiguous layout is working
-    b_cont = tools.invert_no_zero(a.T.copy())
+    b_cont = invert_no_zero(a.T.copy())
     assert a.T * b_cont == pytest.approx(res)
 
     # Check that a Fortran contiguous array works
-    b_noncont = tools.invert_no_zero(a.T)
+    b_noncont = invert_no_zero(a.T)
     assert a.T * b_noncont == pytest.approx(res)
 
     # Check a complex sub slicing that is neither C nor F contiguous
     a_noncont = a.T[1::2, 1::2]
-    b_noncont = tools.invert_no_zero(a_noncont)
-    res_cont = tools.invert_no_zero(a_noncont.copy(order="C"))
+    b_noncont = invert_no_zero(a_noncont)
+    res_cont = invert_no_zero(a_noncont.copy(order="C"))
     assert np.all(b_noncont == res_cont)
     assert b_noncont.flags["C_CONTIGUOUS"]
-
-
-def test_allequal():
-    # Test some basic types
-    assert tools.allequal(1, 1)
-    assert tools.allequal("x", "x")
-    assert tools.allequal([1, 2, 3], [1, 2, 3])
-    assert tools.allequal({"a": 1}, {"a": 1})
-    assert tools.allequal({1, 2, 3}, {1, 2, 3})
-    assert tools.allequal((1, 2, 3), (1, 2, 3))
-
-    # Test numpy arrays and mpiarrays
-    assert tools.allequal(np.array([1, 2, 3]), np.array([1, 2, 3]))
-    assert tools.allequal(
-        mpiarray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
-        mpiarray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
-    )
-    assert not tools.allequal(
-        np.array([1, 2, 3]),
-        mpiarray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
-    )
-
-    # Test objects with numpy arrays in them
-    assert tools.allequal(
-        [np.array([1]), np.array([2])], [np.array([1]), np.array([2])]
-    )
-    assert tools.allequal({"a": np.array([1])}, {"a": np.array([1])})
-
-    # Test objects with different types
-    assert tools.allequal([1, 3.4, "a"], [1, 3.4, "a"])
-
-    # Test for items that are not equal
-    assert not tools.allequal(1, 3)
-    assert not tools.allequal(1, 1.1)
-    assert not tools.allequal([np.array([1])], [np.array([2])])
-    assert not tools.allequal(
-        np.array(["x"], dtype="U32"), np.array(["x"], dtype="S32")
-    )
-
-    # Test for lengths that are not equal
-    assert not tools.allequal([1], [1, 2])
-    assert not tools.allequal({"a": 1}, {"a": 1, "b": 2})
