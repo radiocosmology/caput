@@ -401,9 +401,9 @@ from copy import deepcopy
 
 import yaml
 
-from . import config, mpiutil
-from .lib import misc
+from . import config
 from .memdata import fileformats, lock_file
+from .util import importutil, mpiutil, objectutil
 
 # Set the module logger.
 logger = logging.getLogger(__name__)
@@ -702,7 +702,7 @@ class Manager(config.Reader):
             Generator object to run the pipeline.
 
         """
-        from .lib.profile import PSUtilProfiler
+        from .util.profiler import PSUtilProfiler
 
         # Log MPI information
         if mpiutil._comm is not None:
@@ -989,7 +989,7 @@ class Manager(config.Reader):
             task_cls = local_tasks[task_path]
         else:
             try:
-                task_cls = misc.import_class(task_path)
+                task_cls = importutil.import_class(task_path)
             except (config.CaputConfigError, AttributeError, ModuleNotFoundError) as e:
                 raise config.CaputConfigError(
                     f"Loading task `{task_path}` caused an error:\n\t{traceback.format_exc()}"
@@ -1302,7 +1302,7 @@ class TaskBase(config.Reader):
     @property
     def mem_used(self):
         """Return the approximate total memory referenced by this task."""
-        return misc.total_size(self)
+        return objectutil.total_size(self)
 
     @classmethod
     def _from_config(cls, config):
@@ -1864,7 +1864,7 @@ class H5IOMixin:
     @staticmethod
     def read_input(filename):
         """Method for reading hdf5 input."""
-        from caput.memdata import MemGroup
+        from .memdata import MemGroup
 
         return MemGroup.from_hdf5(filename, mode="r")
 
@@ -1872,7 +1872,7 @@ class H5IOMixin:
     def read_output(filename):
         """Method for reading hdf5 output (from caches)."""
         # Replicate code from read_input in case read_input is overridden.
-        from caput.memdata import MemGroup
+        from .memdata import MemGroup
 
         return MemGroup.from_hdf5(filename, mode="r")
 
@@ -1895,7 +1895,7 @@ class H5IOMixin:
         """
         import h5py
 
-        from caput.memdata import MemGroup
+        from .memdata import MemGroup
 
         file_format = fileformats.check_file_format(filename, file_format, output)
 
@@ -1977,7 +1977,7 @@ class BasicContMixin:
 
     def read_input(self, filename):
         """Method for reading hdf5 input."""
-        from caput.memdata import BasicCont
+        from .memdata import BasicCont
 
         return BasicCont.from_file(
             filename, distributed=self._distributed, comm=self._comm
@@ -1986,7 +1986,7 @@ class BasicContMixin:
     def read_output(self, filename):
         """Method for reading hdf5 output (from caches)."""
         # Replicate code from read_input in case read_input is overridden.
-        from caput.memdata import BasicCont
+        from .memdata import BasicCont
 
         return BasicCont.from_file(
             filename, distributed=self._distributed, comm=self._comm
@@ -2007,7 +2007,7 @@ class BasicContMixin:
         **kwargs : dict
             Arbitrary keyword arguments.
         """
-        from caput.memdata import BasicCont
+        from .memdata import BasicCont
 
         file_format = fileformats.check_file_format(filename, file_format, output)
 

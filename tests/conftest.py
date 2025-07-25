@@ -9,7 +9,8 @@ import pytest
 from caput.memdata import fileformats
 from caput.pipeline import PipelineStopIteration, TaskBase, IterBase, Manager
 from caput.scripts.runner import cli
-from caput import config, mpiutil
+from caput.util import mpiutil
+from caput import config
 
 
 @pytest.fixture(scope="session")

@@ -12,7 +12,7 @@ from pathlib import Path
 import click
 
 from caput.config import CaputConfigError
-from caput.lib.profile import Profiler
+from caput.util.profiler import Profiler
 
 products = None
 
