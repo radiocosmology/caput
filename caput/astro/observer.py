@@ -37,7 +37,7 @@ from skyfield.starlib import Star
 from skyfield.units import Angle
 
 from .. import config
-from ..lib import array_utils
+from ..util import array
 from . import constants
 from . import skyfield as csf
 from . import time as ctime
@@ -208,7 +208,7 @@ class Observer:
 
         return self._obs
 
-    @array_utils.listize()
+    @array.listize()
     def unix_to_lsa(self, time):
         """Calculate the Local Stellar Angle.
 
@@ -230,7 +230,7 @@ class Observer:
 
     lsa = unix_to_lsa
 
-    @array_utils.listize()
+    @array.listize()
     def lsa_to_unix(self, lsa, time0):
         """Convert a Local Stellar Angle (LSA) on a given day to a UNIX time.
 
@@ -260,7 +260,7 @@ class Observer:
         """
         return self.lsa_to_unix(0.0, self.lsd_start_day)
 
-    @array_utils.listize()
+    @array.listize()
     def unix_to_lsd(self, time):
         """Calculate the Local Stellar Day (LSD) corresponding to the given time.
 
@@ -294,7 +294,7 @@ class Observer:
 
     lsd = unix_to_lsd
 
-    @array_utils.listize()
+    @array.listize()
     def lsd_to_unix(self, lsd):
         """Calculate the UNIX time corresponding to a given LSD.
 
@@ -320,7 +320,7 @@ class Observer:
         # Solve for the next transit of that RA after start_unix
         return self.lsa_to_unix(lsa, start_unix)
 
-    @array_utils.listize()
+    @array.listize()
     def unix_to_lst(self, unix):
         """Calculate the apparent Local Sidereal Time for the given UNIX time.
 
@@ -340,7 +340,7 @@ class Observer:
 
     lst = unix_to_lst
 
-    @array_utils.scalarize()
+    @array.scalarize()
     def transit_RA(self, time):
         """Transiting RA for the observer at given Unix Time.
 

@@ -1,6 +1,5 @@
-"""A set of miscellaneous routines that don't really fit anywhere more specific."""
+"""Generic object utilities."""
 
-import importlib
 from collections import deque
 from collections.abc import Iterable, Mapping
 from itertools import chain
@@ -9,6 +8,12 @@ from sys import getsizeof
 from types import ModuleType
 
 import numpy as np
+
+__all__ = [
+    "allequal",
+    "total_size",
+    "unique_ordered",
+]
 
 
 def unique_ordered(x: Iterable) -> list:
@@ -158,28 +163,3 @@ def total_size(obj: object):
         return size
 
     return sizeof(obj)
-
-
-def import_class(class_path):
-    """Import class dynamically from a string.
-
-    Parameters
-    ----------
-    class_path : str
-        Fully qualified path to the class. If only a single component, look up in the
-        globals.
-
-    Returns
-    -------
-    class : class object
-        The class we want to load.
-    """
-    path_split = class_path.split(".")
-    module_path = ".".join(path_split[:-1])
-    class_name = path_split[-1]
-    if module_path:
-        m = importlib.import_module(module_path)
-        task_cls = getattr(m, class_name)
-    else:
-        task_cls = globals()[class_name]
-    return task_cls

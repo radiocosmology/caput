@@ -11,7 +11,7 @@ single threaded version from `scipy.fft` directly.
 
 import scipy.fft
 
-from .. import mpiutil
+from ..util import mpiutil
 
 # Overwrite any existing backends on import
 scipy.fft.set_global_backend("scipy", only=True)
