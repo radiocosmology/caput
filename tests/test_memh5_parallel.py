@@ -8,7 +8,8 @@ import zarr
 import copy
 
 from caput.memdata import fileformats, memh5
-from caput import mpiarray, mpiutil
+from caput.util import mpiutil
+from caput import mpiarray
 
 
 comm = mpiutil.world
