@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from caput import mpiarray
-from caput._invert_no_zero import invert_no_zero
+from caput.util.array import invert_no_zero
 
 
 ARRAY_SIZE = (100, 111)

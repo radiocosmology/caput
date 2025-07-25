@@ -14,7 +14,8 @@ import numpy as np
 import zarr
 
 from caput.memdata import fileformats
-from caput import mpiutil, mpiarray
+from caput.util import mpiutil
+from caput import mpiarray
 
 
 def _arange_dtype(N: int, dtype: Union[np.dtype, str]) -> np.ndarray:

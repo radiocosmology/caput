@@ -7,8 +7,8 @@ Submodules
 
     config
     mpiarray
-    mpiutil
     pipeline
+    random
     truncate
 """
 

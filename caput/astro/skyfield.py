@@ -42,7 +42,7 @@ from skyfield import timelib
 from skyfield.starlib import Star
 from skyfield.units import Angle
 
-from ..lib import array_utils
+from ..util import array
 
 
 class SkyfieldWrapper:
@@ -191,7 +191,7 @@ class SkyfieldWrapper:
 skyfield_wrapper = SkyfieldWrapper()
 
 
-@array_utils.scalarize()
+@array.scalarize()
 def skyfield_time_to_unix(skyfield_time):
     """Formats the Skyfield time into UNIX times.
 
@@ -213,7 +213,7 @@ def skyfield_time_to_unix(skyfield_time):
     return ensure_unix(skyfield_time.utc_datetime())
 
 
-@array_utils.scalarize()
+@array.scalarize()
 def unix_to_skyfield_time(unix_time):
     """Formats the Unix time into a time that can be interpreted by Skyfield.
 
