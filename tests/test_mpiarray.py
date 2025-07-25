@@ -15,7 +15,7 @@ import zarr
 
 from caput.memdata import fileformats
 from caput.util import mpiutil
-from caput import mpiarray
+from caput import darray
 
 
 def _arange_dtype(N: int, dtype: Union[np.dtype, str]) -> np.ndarray:
@@ -29,7 +29,7 @@ def _arange_dtype(N: int, dtype: Union[np.dtype, str]) -> np.ndarray:
 
 def test_construction():
     """Test local/global shape construction of MPIArray."""
-    arr = mpiarray.MPIArray((10, 11), axis=1)
+    arr = darray.MPIArray((10, 11), axis=1)
 
     l, s, _ = mpiutil.split_local(11)
 
@@ -57,7 +57,7 @@ def test_redistribution(dtype):
     _, s1, e1 = mpiutil.split_local(14)
     _, s2, e2 = mpiutil.split_local(4)
 
-    arr = mpiarray.MPIArray(gshape, axis=1, dtype=dtype)
+    arr = darray.MPIArray(gshape, axis=1, dtype=dtype)
     arr[:] = garr[:, s0:e0]
 
     arr2 = arr.redistribute(axis=3)
@@ -85,7 +85,7 @@ def test_gather(dtype):
     global_array = np.zeros(global_shape, dtype=dtype)
     global_array[..., :] = _arange_dtype(size * block, dtype=dtype)
 
-    arr = mpiarray.MPIArray(global_shape, dtype=dtype, axis=2)
+    arr = darray.MPIArray(global_shape, dtype=dtype, axis=2)
     arr[:] = global_array[..., (rank * block) : ((rank + 1) * block)]
 
     assert (arr.allgather() == global_array).all()
@@ -101,15 +101,15 @@ def test_gather(dtype):
 
 def test_wrap():
     """Test MPIArray.wrap()."""
-    ds = mpiarray.MPIArray((10, 17))
+    ds = darray.MPIArray((10, 17))
 
     df = np.fft.rfft(ds, axis=1)
 
     assert isinstance(df, np.ndarray)
 
-    da = mpiarray.MPIArray.wrap(df, axis=0)
+    da = darray.MPIArray.wrap(df, axis=0)
 
-    assert isinstance(da, mpiarray.MPIArray)
+    assert isinstance(da, darray.MPIArray)
     assert da.global_shape == (10, 9)
     assert da.axis == 0
 
@@ -122,7 +122,7 @@ def test_wrap():
 
     if mpiutil.size > 1:
         with pytest.raises(Exception):
-            mpiarray.MPIArray.wrap(df, axis=0)
+            darray.MPIArray.wrap(df, axis=0)
 
 
 @pytest.mark.parametrize(
@@ -140,7 +140,7 @@ def test_io(filename, file_open_function, file_format):
     """Test I/O of MPIArray."""
     gshape = (19, 17)
 
-    ds = mpiarray.MPIArray(gshape, dtype=np.int64)
+    ds = darray.MPIArray(gshape, dtype=np.int64)
 
     ga = np.arange(np.prod(gshape)).reshape(gshape)
 
@@ -157,16 +157,14 @@ def test_io(filename, file_open_function, file_format):
 
             assert (h5ds == ga).all()
 
-    ds2 = mpiarray.MPIArray.from_file(filename, "testds", file_format=file_format)
+    ds2 = darray.MPIArray.from_file(filename, "testds", file_format=file_format)
 
     assert (ds2 == ds).all()
 
     mpiutil.barrier()
 
     # Check that reading over another distributed axis works
-    ds3 = mpiarray.MPIArray.from_file(
-        filename, "testds", axis=1, file_format=file_format
-    )
+    ds3 = darray.MPIArray.from_file(filename, "testds", axis=1, file_format=file_format)
     assert ds3.shape[0] == gshape[0]
     assert ds3.shape[1] == mpiutil.split_local(gshape[1])[0]
     ds3 = ds3.redistribute(axis=0)
@@ -174,7 +172,7 @@ def test_io(filename, file_open_function, file_format):
     mpiutil.barrier()
 
     # Check a read with an arbitrary slice in there. This only checks the shape is correct.
-    ds4 = mpiarray.MPIArray.from_file(
+    ds4 = darray.MPIArray.from_file(
         filename,
         "testds",
         axis=1,
@@ -186,7 +184,7 @@ def test_io(filename, file_open_function, file_format):
     mpiutil.barrier()
 
     # Check the read with a slice along the axis being read
-    ds5 = mpiarray.MPIArray.from_file(
+    ds5 = darray.MPIArray.from_file(
         filename,
         "testds",
         axis=1,
@@ -200,7 +198,7 @@ def test_io(filename, file_open_function, file_format):
     mpiutil.barrier()
 
     # Check the read with a slice along the axis being read
-    ds6 = mpiarray.MPIArray.from_file(
+    ds6 = darray.MPIArray.from_file(
         filename,
         "testds",
         axis=0,
@@ -217,12 +215,12 @@ def test_transpose():
 
     l0, s0, _ = mpiutil.split_local(11)
 
-    arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
+    arr = darray.MPIArray(gshape, axis=1, dtype=np.int64)
 
     arr2 = arr.transpose(1, 3, 0, 2)
 
     # Check type
-    assert isinstance(arr2, mpiarray.MPIArray)
+    assert isinstance(arr2, darray.MPIArray)
 
     # Check global shape
     assert arr2.global_shape == (11, 14, 1, 2)
@@ -240,7 +238,7 @@ def test_transpose():
     arr3 = arr.transpose((1, 3, 0, 2))
 
     # Check type
-    assert isinstance(arr3, mpiarray.MPIArray)
+    assert isinstance(arr3, darray.MPIArray)
 
     # Check global shape
     assert arr3.global_shape == (11, 14, 1, 2)
@@ -258,7 +256,7 @@ def test_transpose():
     arr4 = arr.transpose()
 
     # Check type
-    assert isinstance(arr4, mpiarray.MPIArray)
+    assert isinstance(arr4, darray.MPIArray)
 
     # Check global shape
     assert arr4.global_shape == (14, 2, 11, 1)
@@ -278,13 +276,13 @@ def test_copy():
     # for MPIArrays
     size = mpiutil.size
 
-    arr = mpiarray.ones((3, size, 14), axis=1, dtype=np.float32)
+    arr = darray.ones((3, size, 14), axis=1, dtype=np.float32)
     arr2 = arr.copy()
 
     assert (arr == arr2).all()
 
     # Check type
-    assert isinstance(arr2, mpiarray.MPIArray)
+    assert isinstance(arr2, darray.MPIArray)
 
     # Check global shape
     assert arr.global_shape == arr2.global_shape
@@ -297,12 +295,12 @@ def test_reshape():
     gshape = (1, 11, 2, 14)
 
     # Redistribute with the axis in the middle
-    arr = mpiarray.MPIArray(gshape, axis=1, dtype=np.int64)
+    arr = darray.MPIArray(gshape, axis=1, dtype=np.int64)
     arr2 = arr.reshape((None, 28))
     l0, s0, _ = mpiutil.split_local(11)
 
     # Check the type, global_shape, local_shape, local_offset and axis as are expected
-    assert isinstance(arr2, mpiarray.MPIArray)
+    assert isinstance(arr2, darray.MPIArray)
     assert arr2.global_shape == (11, 28)
     assert arr2.local_shape == (l0, 28)
     assert arr2.local_offset == (s0, 0)
@@ -310,12 +308,12 @@ def test_reshape():
 
     # Another test but now with the axis far at the end, this catches a bug where if the
     # number of axes shrunk enough the distributed axis would index off the end
-    arr = mpiarray.MPIArray(gshape, axis=3, dtype=np.int64)
+    arr = darray.MPIArray(gshape, axis=3, dtype=np.int64)
     arr2 = arr.reshape((22, None))
     l0, s0, _ = mpiutil.split_local(14)
 
     # Check the type, global_shape, local_shape, local_offset and axis as are expected
-    assert isinstance(arr2, mpiarray.MPIArray)
+    assert isinstance(arr2, darray.MPIArray)
     assert arr2.global_shape == (22, 14)
     assert arr2.local_shape == (22, l0)
     assert arr2.local_offset == (0, s0)
@@ -325,7 +323,7 @@ def test_reshape():
     arr2 = arr.reshape(-1, None)
 
     # Check the type, global_shape, local_shape, local_offset and axis as are expected
-    assert isinstance(arr2, mpiarray.MPIArray)
+    assert isinstance(arr2, darray.MPIArray)
     assert arr2.global_shape == (22, 14)
     assert arr2.local_shape == (22, l0)
     assert arr2.local_offset == (0, s0)
@@ -337,7 +335,7 @@ def test_global_getslice():
     rank = mpiutil.rank
     size = mpiutil.size
 
-    darr = mpiarray.MPIArray((size * 5, 20), axis=0)
+    darr = darray.MPIArray((size * 5, 20), axis=0)
 
     # Initialise the distributed array
     for li, _ in darr.enumerate(axis=0):
@@ -365,7 +363,7 @@ def test_global_getslice():
     arr = darr.global_slice[:, 3:5]
     res = local_array[:, 3:5]
 
-    assert isinstance(arr, mpiarray.MPIArray)
+    assert isinstance(arr, darray.MPIArray)
     assert arr.axis == 0
     assert (arr.local_array == res).all()
 
@@ -407,7 +405,7 @@ def test_global_getslice():
         assert arr == res[rank] if arr is None else (arr == res[rank]).all()
 
     # Check a slice that removes an axis
-    darr = mpiarray.MPIArray((10, 20, size * 5), axis=2)
+    darr = darray.MPIArray((10, 20, size * 5), axis=2)
     dslice = darr.global_slice[:, 0, :]
 
     assert dslice.global_shape == (10, size * 5)
@@ -416,12 +414,12 @@ def test_global_getslice():
 
     # Check that directly indexing into distributed axis returns a numpy array equal to
     # local array indexing
-    darr = mpiarray.MPIArray((size,), axis=0)
+    darr = darray.MPIArray((size,), axis=0)
     with pytest.warns(UserWarning):
         assert (darr[0] == darr.local_array[0]).all()
 
     # Check that a single index into a non-parallel axis works
-    darr = mpiarray.MPIArray((4, size), axis=1)
+    darr = darray.MPIArray((4, size), axis=1)
     darr[:] = rank
     assert (darr[0] == rank).all()
     assert darr[0].axis == 0
@@ -429,7 +427,7 @@ def test_global_getslice():
     with pytest.warns(UserWarning):
         assert (darr[2, 0] == darr.local_array[2, 0]).all()
 
-    darr = mpiarray.MPIArray((20, size * 5), axis=1)
+    darr = darray.MPIArray((20, size * 5), axis=1)
     darr[:] = rank
     # But, you can directly index with global_slice
     if size > 1:
@@ -446,7 +444,7 @@ def test_global_getslice():
     # more direct indexing into distributed with global_slice
     # the global slice should return a numpy array on rank=1, and None everywhere else
     if size >= 2:
-        darr = mpiarray.MPIArray((20, 10, size * 5), axis=2)
+        darr = darray.MPIArray((20, 10, size * 5), axis=2)
         darr[:] = rank
         dslice = darr.global_slice[:, :, 6]
         if rank != 1:
@@ -462,14 +460,14 @@ def test_global_getslice():
             assert (darr[:, :, 2:3] == darr.local_array[:, :, 2:3]).all()
 
     # Check ellipsis and slice at the end
-    darr = mpiarray.MPIArray((size * 5, 20, 10), axis=0)
+    darr = darray.MPIArray((size * 5, 20, 10), axis=0)
     dslice = darr.global_slice[..., 4:9]
 
     assert dslice.global_shape == (size * 5, 20, 5)
     assert dslice.local_shape == (5, 20, 5)
 
     # Check slice that goes off the end of the axis
-    darr = mpiarray.MPIArray((size, 136, 2048), axis=0)
+    darr = darray.MPIArray((size, 136, 2048), axis=0)
     dslice = darr.global_slice[..., 2007:2087]
 
     assert dslice.global_shape == (size, 136, 41)
@@ -480,7 +478,7 @@ def test_global_setslice():
     rank = mpiutil.rank
     size = mpiutil.size
 
-    darr = mpiarray.MPIArray((size * 5, 20), axis=0)
+    darr = darray.MPIArray((size * 5, 20), axis=0)
 
     # Initialise the distributed array
     for li, _ in darr.enumerate(axis=0):
@@ -525,7 +523,7 @@ def test_global_setslice():
 
     # test setting complex dtypes
 
-    darr_complex = mpiarray.MPIArray((size * 5, 20), axis=0, dtype=np.complex64)
+    darr_complex = darray.MPIArray((size * 5, 20), axis=0, dtype=np.complex64)
 
     darr_complex[:] = 4
     assert darr_complex.dtype == np.complex64
@@ -536,7 +534,7 @@ def test_global_setslice():
     assert darr_complex.dtype == np.complex64
     assert (darr_complex == 2.0 + 1.345j).all()
 
-    darr_float = mpiarray.MPIArray((size * 5, 20), axis=0, dtype=np.float64)
+    darr_float = darray.MPIArray((size * 5, 20), axis=0, dtype=np.float64)
 
     darr_float[:] = 4.0
     assert darr_float.dtype == np.float64
@@ -547,7 +545,7 @@ def test_ufunc_call():
     rank = mpiutil.rank
     size = mpiutil.size
 
-    dist_arr = mpiarray.MPIArray((size, 4), axis=0)
+    dist_arr = darray.MPIArray((size, 4), axis=0)
     dist_arr[:] = rank
 
     dist_arr_add = dist_arr + dist_arr
@@ -569,26 +567,26 @@ def test_ufunc_call():
     assert dist_arr_add.comm is dist_arr.comm
 
     # add differently shaped MPIArrays, with broadcasting
-    dist_arr_2 = mpiarray.MPIArray((size, 1), axis=0)
+    dist_arr_2 = darray.MPIArray((size, 1), axis=0)
     dist_arr_2[:] = rank - 1
     assert (dist_arr + dist_arr_2 == 2 * rank - 1).all()
     assert (dist_arr + dist_arr_2).axis == 0
 
     # check that subtracting arrays with two different distributed axis fails
     # pylint: disable=expression-not-assigned
-    with pytest.raises(mpiarray.AxisException):
-        mpiarray.MPIArray((size, 4), axis=0) - mpiarray.MPIArray((size, 4), axis=1)
+    with pytest.raises(darray.AxisException):
+        darray.MPIArray((size, 4), axis=0) - darray.MPIArray((size, 4), axis=1)
 
     # check that outer ufunc on arrays that cannot be broadcast fails
     with pytest.raises(ValueError):
         np.multiply(
-            mpiarray.MPIArray((size, 3), axis=0), mpiarray.MPIArray((size, 4), axis=0)
+            darray.MPIArray((size, 3), axis=0), darray.MPIArray((size, 4), axis=0)
         )
     # pylint: enable=expression-not-assigned
 
     # test ufuncs with complex dtypes
 
-    dist_complex = mpiarray.MPIArray((size, 4), axis=0, dtype=np.complex64)
+    dist_complex = darray.MPIArray((size, 4), axis=0, dtype=np.complex64)
     dist_complex_add = dist_complex + dist_complex
 
     assert (dist_complex_add == dist_complex + dist_complex).all()
@@ -602,10 +600,10 @@ def test_ufunc_broadcast():
     rank = mpiutil.rank
     size = mpiutil.size
 
-    dist_arr1 = mpiarray.MPIArray((4, size), axis=1)
+    dist_arr1 = darray.MPIArray((4, size), axis=1)
     dist_arr1.local_array[:] = rank
 
-    dist_arr2 = mpiarray.MPIArray((size,), axis=0)
+    dist_arr2 = darray.MPIArray((size,), axis=0)
     dist_arr2.local_array[:] = rank
 
     dist_arr3 = dist_arr1 + dist_arr2
@@ -628,7 +626,7 @@ def test_ufunc_broadcast():
 
     # Test a broadcast against a numpy array of lower dimensionality, with the
     # distributed axis being one of the axes implicitly added to the numpy array
-    dist_arr3 = mpiarray.MPIArray((size, 4), axis=0)
+    dist_arr3 = darray.MPIArray((size, 4), axis=0)
     dist_arr3.local_array[:] = rank
     nondist_arr = 2 * np.ones((4,))
     assert (dist_arr3 * nondist_arr == 2 * rank).all()
@@ -646,14 +644,14 @@ def test_ufunc_2output():
     rank = mpiutil.rank
     size = mpiutil.size
 
-    dist_arr = mpiarray.MPIArray((size, 4), axis=0)
+    dist_arr = darray.MPIArray((size, 4), axis=0)
     dist_arr[:] = rank
 
     quotient, remainder = np.divmod(dist_arr, 2)
 
     # Check that the arrays come back as MPIArrays with the correct structure
-    assert isinstance(quotient, mpiarray.MPIArray)
-    assert isinstance(remainder, mpiarray.MPIArray)
+    assert isinstance(quotient, darray.MPIArray)
+    assert isinstance(remainder, darray.MPIArray)
 
     assert quotient.shape == dist_arr.shape
     assert remainder.shape == dist_arr.shape
@@ -673,7 +671,7 @@ def test_ufunc_reduce():
     rank = mpiutil.rank
     size = mpiutil.size
 
-    dist_array = mpiarray.MPIArray((size, 4, 3), axis=0)
+    dist_array = darray.MPIArray((size, 4, 3), axis=0)
     dist_array[:] = rank
 
     # sums across non-distributed axes should be permitted, and work as usual
@@ -688,12 +686,12 @@ def test_ufunc_reduce():
     assert sum_all.global_shape == (size,)
 
     # Reductions should fail across the distributed axis
-    with pytest.raises(mpiarray.AxisException):
+    with pytest.raises(darray.AxisException):
         dist_array.sum(axis=0)
 
     # sum across a smaller numbered axes
     # this will result in an axes reduction
-    dist_array = mpiarray.MPIArray((5, size, 3), axis=1)
+    dist_array = darray.MPIArray((5, size, 3), axis=1)
     dist_array[:] = rank
 
     sum_array_0 = dist_array.sum(axis=0)
@@ -712,14 +710,14 @@ def test_ufunc_reduce():
 
     assert sum_all.global_shape == (size,)
 
-    assert mpiarray.MPIArray((size, 4), axis=1).sum(axis=0).axis == 0
+    assert darray.MPIArray((size, 4), axis=1).sum(axis=0).axis == 0
 
     # test AllReduce
     if size > 1:
         from mpi4py import MPI
 
         # Test comm.Allreduce
-        dist_array = mpiarray.MPIArray((size, 4), axis=1)
+        dist_array = darray.MPIArray((size, 4), axis=1)
         dist_array[:] = 1
 
         df_sum = np.sum(dist_array, axis=0)
@@ -751,16 +749,16 @@ def test_ufunc_reduce_multi():
     # Test that reductions over multiple axes don't break things
     size = mpiutil.size
 
-    dist_array = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
+    dist_array = darray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
     dist_array.local_array[:] = 1.0
 
-    with pytest.raises(mpiarray.AxisException):
+    with pytest.raises(darray.AxisException):
         dist_array.sum(axis=(0, 1))
 
     a = dist_array.sum(axis=(1, 2))
     assert np.all(a.local_array == 16.0)
 
-    dist_array = mpiarray.MPIArray((4, 4, size), axis=2, dtype=np.float64)
+    dist_array = darray.MPIArray((4, 4, size), axis=2, dtype=np.float64)
     dist_array.local_array[:] = 1.0
 
     b = dist_array.sum(axis=(0, 1))
@@ -771,7 +769,7 @@ def test_ufunc_accumulate():
     # Test that reductions over multiple axes don't break things
     size = mpiutil.size
 
-    dist_array = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
+    dist_array = darray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
     dist_array.local_array[:] = 1.0
 
     dist_array_cumsum = np.cumsum(dist_array, axis=2)
@@ -787,26 +785,26 @@ def test_ufunc_misc():
 
     size = mpiutil.size
 
-    dist_array1 = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
-    dist_array2 = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
+    dist_array1 = darray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
+    dist_array2 = darray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
     dist_array1.local_array[:] = 1.0
     dist_array2.local_array[:] = 1.0
 
     # Check that unsupported operations types fail
     # Check that an outer call fails
-    with pytest.raises(mpiarray.UnsupportedOperation):
+    with pytest.raises(darray.UnsupportedOperation):
         np.multiply.outer(dist_array1, dist_array2)
 
     # Check that a reduceat call fails
-    with pytest.raises(mpiarray.UnsupportedOperation):
+    with pytest.raises(darray.UnsupportedOperation):
         np.multiply.reduceat(dist_array1, [0, 2], axis=1)
 
     # Check that an at call fails
-    with pytest.raises(mpiarray.UnsupportedOperation):
+    with pytest.raises(darray.UnsupportedOperation):
         np.exp.at(dist_array1, [(0, 2, 1)])
 
     # Check that where arguments are not supported
-    with pytest.raises(mpiarray.UnsupportedOperation):
+    with pytest.raises(darray.UnsupportedOperation):
         np.exp(dist_array1, where=(dist_array2 == 1.0))
 
     # Check that feeding in one positional argument is interpreted as an out argument
@@ -824,7 +822,7 @@ def test_slice_newaxis():
     size = mpiutil.size
 
     # Test inserting an axis before a normal axis
-    dist_array = mpiarray.MPIArray((4, size, 3), axis=1)
+    dist_array = darray.MPIArray((4, size, 3), axis=1)
     dist_array[:] = rank
     new_dist_array = dist_array[np.newaxis, :, :, :]
     assert new_dist_array.shape == (1, 4, 1, 3)
@@ -842,7 +840,7 @@ def test_slice_ellipsis():
     rank = mpiutil.rank
     size = mpiutil.size
 
-    dist_array = mpiarray.MPIArray((4, size, 3), axis=1)
+    dist_array = darray.MPIArray((4, size, 3), axis=1)
     dist_array[:] = rank
 
     # Test selecting an axis at the end via an ellipsis
@@ -870,7 +868,7 @@ def test_slice_npint64():
     size = mpiutil.size
 
     # Test inserting an axis before a normal axis
-    dist_array = mpiarray.MPIArray((4, size, 3), axis=1)
+    dist_array = darray.MPIArray((4, size, 3), axis=1)
     dist_array[:] = rank
     new_dist_array = dist_array[np.int64(2), :, :]
     assert new_dist_array.shape == (1, 3)
@@ -882,7 +880,7 @@ def test_mpi_array_fill():
     rank = mpiutil.rank
     size = mpiutil.size
 
-    arr_zero = mpiarray.zeros((4, size, 17), axis=1, dtype=np.float32)
+    arr_zero = darray.zeros((4, size, 17), axis=1, dtype=np.float32)
     assert (arr_zero == 0).all()
     assert arr_zero.axis == 1
     assert arr_zero.global_shape == (4, size, 17)
@@ -890,7 +888,7 @@ def test_mpi_array_fill():
     assert arr_zero.local_offset == (0, rank, 0)
     assert arr_zero.dtype == np.float32
 
-    arr_ones = mpiarray.ones((4, size, 17), axis=1, dtype=int)
+    arr_ones = darray.ones((4, size, 17), axis=1, dtype=int)
     assert (arr_ones == 1).all()
     assert arr_ones.axis == 1
     assert arr_ones.global_shape == (4, size, 17)
@@ -902,7 +900,7 @@ def test_mpi_array_fill():
 def test_call_ravel():
     size = mpiutil.size
 
-    arr_ones = mpiarray.ones((4, size, 17), axis=1)
+    arr_ones = darray.ones((4, size, 17), axis=1)
     with pytest.raises(NotImplementedError):
         arr_ones.ravel()
 
@@ -910,12 +908,12 @@ def test_call_ravel():
 def test_call_median():
     size = mpiutil.size
 
-    arr = mpiarray.ones((4, size, 17), axis=1)
+    arr = darray.ones((4, size, 17), axis=1)
     arr[..., 0] = 1700.0
 
     # Check that this will fail correctly when trying to
     # take median across the distributed axis
-    with pytest.raises(mpiarray.AxisException):
+    with pytest.raises(darray.AxisException):
         np.median(arr, axis=1)
 
     if version.parse(np.__version__) >= version.parse("1.25.0"):

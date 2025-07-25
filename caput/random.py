@@ -223,7 +223,7 @@ def mpi_random_seed(seed, extra=0, gen=None):
     """
     import warnings
 
-    from . import mpiutil
+    from .util import mpiutil
 
     warnings.warn(
         "This routine has fatal flaws. Try using `RandomTask` instead",
