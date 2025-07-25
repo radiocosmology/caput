@@ -6,7 +6,6 @@ Submodules
     :toctree: _autosummary
 
     config
-    mpiarray
     pipeline
     random
     truncate

@@ -8,7 +8,7 @@ Fourier transforming each of these two axes of the distributed array::
     import numpy as np
     from mpi4py import MPI
 
-    from caput.mpiarray import MPIArray
+    from caput.darray import MPIArray
 
     nfreq = 32
     nprod = 2
@@ -60,9 +60,10 @@ Global Slicing Examples
 Here is an example of this in action. Create and set an MPI array:
 
 >>> import numpy as np
->>> from caput import mpiarray, mpiutil
+>>> from caput.darray import MPIArray
+>>> from caput.util import mpiutil
 >>>
->>> arr = mpiarray.MPIArray((mpiutil.size, 3), dtype=np.float64)
+>>> arr = MPIArray((mpiutil.size, 3), dtype=np.float64)
 >>> arr[:] = 0.0
 
 >>> for ri in range(mpiutil.size):
@@ -125,7 +126,7 @@ Direct Slicing Examples
     array equal to local array indexing, along with a warning. This behaviour will be
     removed in the future.
 
->>> darr = mpiarray.MPIArray((mpiutil.size,), axis=0)
+>>> darr = MPIArray((mpiutil.size,), axis=0)
 >>> (darr[0] == darr.local_array[0]).all()
 np.True_
 >>> not hasattr(darr[0], "axis")
@@ -141,7 +142,7 @@ axis, you need to index into the :py:attr:`MPIArray.local_array`.
 indexing into non-parallel axes returns an MPIArray with appropriate attributes
 Slicing could result in a reduction of axis, and a lower parallel axis number
 
->>> darr = mpiarray.MPIArray((4, mpiutil.size), axis=1)
+>>> darr = MPIArray((4, mpiutil.size), axis=1)
 >>> darr[:] = mpiutil.rank
 >>> (darr[0] == mpiutil.rank).all()
 array([ True])
@@ -177,7 +178,7 @@ ufunc Examples
 
 Create an array
 
->>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4), axis=0)
+>>> dist_arr = MPIArray((mpiutil.size, 4), axis=0)
 >>> dist_arr[:] = mpiutil.rank
 
 Element wise summation and `.all()` reduction
@@ -198,11 +199,11 @@ True
 An operation on multiple arrays with different parallel axes is not possible and will
 result in an exception
 
->>> (mpiarray.MPIArray((mpiutil.size, 4), axis=0) -
-...  mpiarray.MPIArray((mpiutil.size, 4), axis=1))  # doctest: +NORMALIZE_WHITESPACE
+>>> (MPIArray((mpiutil.size, 4), axis=0) -
+...  MPIArray((mpiutil.size, 4), axis=1))  # doctest: +NORMALIZE_WHITESPACE
 Traceback (most recent call last):
     ...
-caput.mpiarray.AxisException: Input argument 1 has an incompatible distributed axis.
+caput.darray._mpiarray.AxisException: Input argument 1 has an incompatible distributed axis.
 
 Summation across a non-parallel axis
 
@@ -221,7 +222,7 @@ True
 
 Reduction methods might result in a decrease in the distributed axis number
 
->>> dist_arr = mpiarray.MPIArray((mpiutil.size, 4, 3), axis=1)
+>>> dist_arr = MPIArray((mpiutil.size, 4, 3), axis=1)
 >>> dist_arr.sum(axis=0).axis == 0
 True
 
@@ -234,7 +235,6 @@ https://mpi4py.readthedocs.io/en/stable/overview.html?highlight=allreduce#collec
 They provide an upper-case and lower-case variant of many functions.  With MPIArrays,
 please use the uppercase variant of the function. The lower-case variants involve an
 intermediate pickling process, which can lead to malformed arrays.
-
 """
 
 import logging
@@ -251,11 +251,14 @@ if TYPE_CHECKING:
 import numpy as np
 import numpy.typing as npt
 
-from .memdata import fileformats
-from .memdata.io import open_h5py_mpi
-from .util import mpiutil
+from ..memdata import fileformats
+from ..memdata.io import open_h5py_mpi
+from ..util import mpiutil
 
 logger = logging.getLogger(__name__)
+
+
+__all__ = ["AxisException", "MPIArray", "UnsupportedOperation", "ones", "zeros"]
 
 
 class _global_resolver:
