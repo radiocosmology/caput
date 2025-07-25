@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from .. import mpiarray
+from ..darray._mpiarray import _apply_sel
 from ..memdata import memh5
 from ._core import ContainerBase
 
@@ -155,7 +155,7 @@ def copy_datasets_filter(
                 ax_ind = item_axes.index(ax)
             except ValueError:
                 continue
-            arr = mpiarray._apply_sel(arr, sel, ax_ind)
+            arr = _apply_sel(arr, sel, ax_ind)
 
         dest_dset[:] = arr[:]
 
