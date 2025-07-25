@@ -251,9 +251,9 @@ if TYPE_CHECKING:
 import numpy as np
 import numpy.typing as npt
 
-from . import mpiutil
 from .memdata import fileformats
 from .memdata.io import open_h5py_mpi
+from .util import mpiutil
 
 logger = logging.getLogger(__name__)
 

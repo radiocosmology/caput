@@ -1,6 +1,15 @@
-"""Make functions that already work with `np.ndarray` accept different types."""
+"""caput.util.array.
+
+Basic array utilities.
+"""
 
 import numpy as np
+
+import _invert_no_zero
+from ._invert_no_zero import *  # noqa: F403
+
+
+__all__ = ["listize", "scalarize", "vectorize", *_invert_no_zero.__all__]
 
 
 def vectorize(**base_kwargs):

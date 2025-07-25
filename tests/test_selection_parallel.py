@@ -8,7 +8,8 @@ import numpy as np
 import pytest
 from pytest_lazy_fixtures import lf
 
-from caput import mpiutil, mpiarray
+from caput import mpiarray
+from caput.util import mpiutil
 from caput.memdata import fileformats, MemGroup
 
 
