@@ -1,15 +1,24 @@
-"""caput.util.array.
+"""Caput distributed arrays.
 
-Basic array utilities.
+An MPI-aware numpy array and array utilities.
 """
 
 import numpy as np
 
-import _invert_no_zero
+from . import _cache, _invert_no_zero, _mpiarray
+from ._cache import *  # noqa: F403
 from ._invert_no_zero import *  # noqa: F403
+from ._mpiarray import *  # noqa: F403
 
 
-__all__ = ["listize", "scalarize", "vectorize", *_invert_no_zero.__all__]
+__all__ = [
+    "listize",
+    "scalarize",
+    "vectorize",
+    *_cache.__all__,
+    *_invert_no_zero.__all__,
+    *_mpiarray.__all__,
+]
 
 
 def vectorize(**base_kwargs):

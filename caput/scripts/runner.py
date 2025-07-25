@@ -157,7 +157,7 @@ def run(configfile, loglevel, profile, profiler, mpi_abort, psutil):
         )
 
     if mpi_abort:
-        from caput import mpiutil
+        from caput.util import mpiutil
 
         mpiutil.enable_mpi_exception_handler()
 

@@ -9,7 +9,7 @@ import copy
 
 from caput.memdata import fileformats, memh5
 from caput.util import mpiutil
-from caput import mpiarray
+from caput.darray import MPIArray
 
 
 comm = mpiutil.world
@@ -20,7 +20,7 @@ def test_create_dataset():
     """Test for creating datasets in MemGroup."""
     global_data = np.arange(size * 5 * 10, dtype=np.float32)
     local_data = global_data.reshape(size, -1, 10)[rank]
-    d_array = mpiarray.MPIArray.wrap(local_data, axis=0)
+    d_array = MPIArray.wrap(local_data, axis=0)
     d_array_T = d_array.redistribute(axis=1)
 
     # Check that we must specify in advance if the dataset is distributed

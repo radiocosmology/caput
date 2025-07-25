@@ -4,8 +4,7 @@ from mpi4py import MPI
 import numpy as np
 import pytest
 
-from caput import mpiarray
-from caput.util.array import invert_no_zero
+from caput.darray import invert_no_zero, MPIArray
 
 
 ARRAY_SIZE = (100, 111)
@@ -50,7 +49,7 @@ def test_invert_no_zero_mpiarray():
     comm = MPI.COMM_WORLD
     comm.Barrier()
 
-    a = mpiarray.MPIArray((20, 30), axis=0, comm=comm)
+    a = MPIArray((20, 30), axis=0, comm=comm)
     a[:] = comm.rank
 
     b = invert_no_zero(a)
