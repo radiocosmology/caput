@@ -11,7 +11,7 @@ from typing import ClassVar, Optional
 import numpy as np
 import psutil
 
-from .. import mpiutil
+from . import mpiutil
 
 
 class Profiler:

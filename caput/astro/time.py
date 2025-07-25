@@ -94,7 +94,7 @@ from datetime import datetime, timezone
 import numpy as np
 from skyfield import timelib
 
-from ..util import array
+from .. import darray
 from . import constants
 from .skyfield import unix_to_skyfield_time
 
@@ -104,7 +104,7 @@ SIDEREAL_S = constants.sidereal_second
 STELLAR_S = constants.stellar_second
 
 
-@array.scalarize()
+@darray.scalarize()
 def unix_to_era(unix_time):
     """Calculate the Earth Rotation Angle for a given time.
 
@@ -131,7 +131,7 @@ def unix_to_era(unix_time):
     return 360.0 * era
 
 
-@array.scalarize()
+@darray.scalarize()
 def era_to_unix(era, time0):
     """Calculate the UNIX time for a given Earth Rotation Angle.
 
@@ -169,7 +169,7 @@ def era_to_unix(era, time0):
     return time0 + diff_time - leap_seconds
 
 
-@array.vectorize(otypes=[object])
+@darray.vectorize(otypes=[object])
 def unix_to_datetime(unix_time):
     """Converts unix time to a :class:`~datetime.datetime` object.
 
@@ -194,7 +194,7 @@ def unix_to_datetime(unix_time):
     return naive_datetime_to_utc(dt)
 
 
-@array.vectorize(otypes=[np.float64])
+@darray.vectorize(otypes=[np.float64])
 def datetime_to_unix(dt):
     """Converts a :class:`~datetime.datetime` object to the unix time.
 
@@ -222,7 +222,7 @@ def datetime_to_unix(dt):
     return since_epoch.total_seconds()
 
 
-@array.vectorize(otypes=[str])
+@darray.vectorize(otypes=[str])
 def datetime_to_timestr(dt):
     """Converts a :class:`~datetime.datetime` to "YYYYMMDDTHHMMSSZ" format.
 
@@ -245,7 +245,7 @@ def datetime_to_timestr(dt):
     return dt.strftime("%Y%m%dT%H%M%SZ")
 
 
-@array.vectorize(otypes=[object])
+@darray.vectorize(otypes=[object])
 def timestr_to_datetime(time_str):
     """Converts date "YYYYMMDDTHHMMSS*" to a :class:`~datetime.datetime`.
 
@@ -266,7 +266,7 @@ def timestr_to_datetime(time_str):
     return datetime.strptime(time_str[:15], "%Y%m%dT%H%M%S")
 
 
-@array.scalarize(dtype=np.int64)
+@darray.scalarize(dtype=np.int64)
 def leap_seconds_between(time_a, time_b):
     """Determine how many leap seconds occurred between two Unix times.
 
@@ -307,7 +307,7 @@ def leap_seconds_between(time_a, time_b):
     return time_shift_int
 
 
-@array.scalarize()
+@darray.scalarize()
 def ensure_unix(time):
     """Convert the input time to Unix time format.
 
@@ -339,7 +339,7 @@ def ensure_unix(time):
 _warned_utc_datetime = False
 
 
-@array.vectorize(otypes=[object])
+@darray.vectorize(otypes=[object])
 def naive_datetime_to_utc(dt):
     """Add UTC timezone info to a naive datetime.
 
@@ -372,7 +372,7 @@ def naive_datetime_to_utc(dt):
     return dt
 
 
-@array.vectorize()
+@darray.vectorize()
 def time_of_day(time):
     """Return the time since the start of the UTC day in seconds.
 

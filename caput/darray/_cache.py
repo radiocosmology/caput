@@ -3,8 +3,10 @@
 import numpy as np
 from cachetools import LRUCache
 
+__all__ = ["ArrayLRUCache"]
 
-class NumpyCache(LRUCache):  # pylint: disable=too-many-ancestors
+
+class ArrayLRUCache(LRUCache):
     """An LRU cache for numpy arrays that will expand to a maximum size in bytes.
 
     This should be used like a dictionary except that the least recently used entries
@@ -19,7 +21,7 @@ class NumpyCache(LRUCache):  # pylint: disable=too-many-ancestors
     def __init__(self, size_bytes: int):
         def _array_size(arr: np.ndarray):
             if not isinstance(arr, np.ndarray):
-                raise ValueError("Item must be a numpy array.")
+                raise ValueError(f"Item must be a numpy array. Got {type(arr)}.")
 
             return arr.nbytes
 
