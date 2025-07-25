@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pytest_lazy_fixtures import lf
 
-from caput import mpiarray
+from caput import darray
 from caput.util import mpiutil
 from caput.memdata import fileformats, MemGroup
 
@@ -20,8 +20,8 @@ comm = MPI.COMM_WORLD
 def container_on_disk(datasets, file_name, file_format, rm_all_files):
     """Prepare a file for the select_parallel tests."""
     if comm.rank == 0:
-        m1 = mpiarray.MPIArray.wrap(datasets[0], axis=0, comm=MPI.COMM_SELF)
-        m2 = mpiarray.MPIArray.wrap(datasets[1], axis=0, comm=MPI.COMM_SELF)
+        m1 = darray.MPIArray.wrap(datasets[0], axis=0, comm=MPI.COMM_SELF)
+        m2 = darray.MPIArray.wrap(datasets[1], axis=0, comm=MPI.COMM_SELF)
         container = MemGroup(distributed=True, comm=MPI.COMM_SELF)
         container.create_dataset("dset1", data=m1, distributed=True)
         container.create_dataset("dset2", data=m2, distributed=True)
