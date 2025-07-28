@@ -1,9 +1,8 @@
-"""caput.task.
+"""caput.pipeline.task.
 
 Base classes for building tasks for `caput.pipeline`.
 """
 
-from . import _core
 from ._core import (
     SingleTask as SingleTask,
     MPILoggedTask as MPILoggedTask,
