@@ -6,8 +6,9 @@ from inspect import getfullargspec
 
 import numpy as np
 
-from .. import config, pipeline
-from ..memdata import fileformats, memh5
+from .._core import TaskBase
+from ... import config
+from ...memdata import fileformats, memh5
 
 
 class MPILogFilter(logging.Filter):
@@ -87,7 +88,7 @@ def _log_level(x):
     raise ValueError(f"Logging level {x!r} not understood")
 
 
-class SetMPILogging(pipeline.TaskBase):
+class SetMPILogging(TaskBase):
     """A task used to configure MPI aware logging.
 
     Attributes
@@ -126,7 +127,7 @@ class SetMPILogging(pipeline.TaskBase):
         ch.setFormatter(formatter)
 
 
-class LoggedTask(pipeline.TaskBase):
+class LoggedTask(TaskBase):
     """A task with logger support."""
 
     log_level = config.Property(proptype=_log_level, default=None)
@@ -145,7 +146,7 @@ class LoggedTask(pipeline.TaskBase):
         return self._log
 
 
-class MPITask(pipeline.TaskBase):
+class MPITask(TaskBase):
     """Base class for MPI using tasks.
 
     Just ensures that the task gets a `comm` attribute.
