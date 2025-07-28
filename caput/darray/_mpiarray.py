@@ -61,15 +61,15 @@ Here is an example of this in action. Create and set an MPI array:
 
 >>> import numpy as np
 >>> from caput.darray import MPIArray
->>> from caput.util import mpiutil
+>>> from caput.util import mpitools
 >>>
->>> arr = MPIArray((mpiutil.size, 3), dtype=np.float64)
+>>> arr = MPIArray((mpitools.size, 3), dtype=np.float64)
 >>> arr[:] = 0.0
 
->>> for ri in range(mpiutil.size):
-...    if ri == mpiutil.rank:
+>>> for ri in range(mpitools.size):
+...    if ri == mpitools.rank:
 ...        print(ri, arr)
-...    mpiutil.barrier()
+...    mpitools.barrier()
 0 [[0. 0. 0.]]
 
 Use a global index to assign to the array
@@ -82,18 +82,18 @@ Fetch a view of the whole array with a full slice
 
 Print the third column of the array on all ranks
 
->>> for ri in range(mpiutil.size):
-...    if ri == mpiutil.rank:
+>>> for ri in range(mpitools.size):
+...    if ri == mpitools.rank:
 ...        print(ri, arr2)
-...    mpiutil.barrier()
+...    mpitools.barrier()
 0 [0.]
 
 Fetch a view of the whole array with a partial slice. The final two ranks should be None
 >>> arr3 = arr.global_slice[:2, 2]
->>> for ri in range(mpiutil.size):
-...    if ri == mpiutil.rank:
+>>> for ri in range(mpitools.size):
+...    if ri == mpitools.rank:
 ...        print(ri, arr3)
-...    mpiutil.barrier()
+...    mpitools.barrier()
 0 [0.]
 
 Direct Slicing
@@ -126,7 +126,7 @@ Direct Slicing Examples
     array equal to local array indexing, along with a warning. This behaviour will be
     removed in the future.
 
->>> darr = MPIArray((mpiutil.size,), axis=0)
+>>> darr = MPIArray((mpitools.size,), axis=0)
 >>> (darr[0] == darr.local_array[0]).all()
 np.True_
 >>> not hasattr(darr[0], "axis")
@@ -142,9 +142,9 @@ axis, you need to index into the :py:attr:`MPIArray.local_array`.
 indexing into non-parallel axes returns an MPIArray with appropriate attributes
 Slicing could result in a reduction of axis, and a lower parallel axis number
 
->>> darr = MPIArray((4, mpiutil.size), axis=1)
->>> darr[:] = mpiutil.rank
->>> (darr[0] == mpiutil.rank).all()
+>>> darr = MPIArray((4, mpitools.size), axis=1)
+>>> darr[:] = mpitools.rank
+>>> (darr[0] == mpitools.rank).all()
 array([ True])
 >>> darr[0].axis == 0
 True
@@ -178,17 +178,17 @@ ufunc Examples
 
 Create an array
 
->>> dist_arr = MPIArray((mpiutil.size, 4), axis=0)
->>> dist_arr[:] = mpiutil.rank
+>>> dist_arr = MPIArray((mpitools.size, 4), axis=0)
+>>> dist_arr[:] = mpitools.rank
 
 Element wise summation and `.all()` reduction
 
->>> (dist_arr + dist_arr == 2 * mpiutil.rank).all()
+>>> (dist_arr + dist_arr == 2 * mpitools.rank).all()
 array([ True])
 
 Element wise multiplication and reduction
 
->>> (dist_arr * 2 == 2 * mpiutil.rank).all()
+>>> (dist_arr * 2 == 2 * mpitools.rank).all()
 array([ True])
 
 The distributed axis is unchanged during an elementwise operation
@@ -199,30 +199,30 @@ True
 An operation on multiple arrays with different parallel axes is not possible and will
 result in an exception
 
->>> (MPIArray((mpiutil.size, 4), axis=0) -
-...  MPIArray((mpiutil.size, 4), axis=1))  # doctest: +NORMALIZE_WHITESPACE
+>>> (MPIArray((mpitools.size, 4), axis=0) -
+...  MPIArray((mpitools.size, 4), axis=1))  # doctest: +NORMALIZE_WHITESPACE
 Traceback (most recent call last):
     ...
 caput.darray._mpiarray.AxisException: Input argument 1 has an incompatible distributed axis.
 
 Summation across a non-parallel axis
 
->>> (dist_arr.sum(axis=1) == 4 * mpiutil.rank).all()
+>>> (dist_arr.sum(axis=1) == 4 * mpitools.rank).all()
 array([ True])
 
 A sum reducing across all axes will reduce across each local array and give a new
 distributed array with a single element on each rank.
 
->>> (dist_arr.sum() == 4 * 3 * mpiutil.rank).all()
+>>> (dist_arr.sum() == 4 * 3 * mpitools.rank).all()
 array([ True])
 >>> (dist_arr.sum().local_shape) == (1,)
 True
->>> (dist_arr.sum().global_shape) == (mpiutil.size,)
+>>> (dist_arr.sum().global_shape) == (mpitools.size,)
 True
 
 Reduction methods might result in a decrease in the distributed axis number
 
->>> dist_arr = MPIArray((mpiutil.size, 4, 3), axis=1)
+>>> dist_arr = MPIArray((mpitools.size, 4, 3), axis=1)
 >>> dist_arr.sum(axis=0).axis == 0
 True
 
@@ -253,7 +253,7 @@ import numpy.typing as npt
 
 from ..memdata import fileformats
 from ..memdata.io import open_h5py_mpi
-from ..util import mpiutil
+from ..util import mpitools
 
 logger = logging.getLogger(__name__)
 
@@ -613,10 +613,10 @@ class MPIArray(np.ndarray):
     def __new__(cls, global_shape, axis=0, comm=None, *args, **kwargs):
         """Make a new MPIArray."""
         if comm is None:
-            comm = mpiutil.world
+            comm = mpitools.world
 
         # Determine local section of distributed axis
-        local_num, local_start, _ = mpiutil.split_local(global_shape[axis], comm=comm)
+        local_num, local_start, _ = mpitools.split_local(global_shape[axis], comm=comm)
 
         # Figure out the local shape and offset
         lshape = list(global_shape)
@@ -701,7 +701,7 @@ class MPIArray(np.ndarray):
         # from mpi4py import MPI
 
         if comm is None:
-            comm = mpiutil.world
+            comm = mpitools.world
 
         # Get axis length, both locally, and globally
         try:
@@ -711,14 +711,16 @@ class MPIArray(np.ndarray):
                 f"Distributed axis {axis} does not exist in global shape {array.shape}"
             ) from e
 
-        totallen = mpiutil.allreduce(axlen, comm=comm)
+        totallen = mpitools.allreduce(axlen, comm=comm)
 
         # Figure out what the distributed layout should be
-        local_num, local_start, _ = mpiutil.split_local(totallen, comm=comm)
+        local_num, local_start, _ = mpitools.split_local(totallen, comm=comm)
 
         # Check the local layout is consistent with what we expect, and send
         # result to all ranks.
-        layout_issue = mpiutil.allreduce(axlen != local_num, op=mpiutil.MAX, comm=comm)
+        layout_issue = mpitools.allreduce(
+            axlen != local_num, op=mpitools.MAX, comm=comm
+        )
 
         if layout_issue:
             raise Exception("Cannot wrap, distributed axis local length is incorrect.")
@@ -757,7 +759,7 @@ class MPIArray(np.ndarray):
         # slightly more space than needed to be safe
         min_req_mem = int((1 + 4 / self.comm.size) * self.local_array.nbytes)
 
-        if not mpiutil.can_allocate(min_req_mem, scope="process", comm=self.comm):
+        if not mpitools.can_allocate(min_req_mem, scope="process", comm=self.comm):
             raise MemoryError(
                 f"Cannot allocate {min_req_mem} bytes required for redistribute."
             )
@@ -772,8 +774,8 @@ class MPIArray(np.ndarray):
         target_arr = dist_arr.local_array
 
         # Get the start and end of each subrange of interest
-        _, sac, eac = mpiutil.split_all(self.global_shape[axis], self.comm)
-        _, sar, ear = mpiutil.split_all(self.global_shape[self.axis], self.comm)
+        _, sac, eac = mpitools.split_all(self.global_shape[axis], self.comm)
+        _, sar, ear = mpitools.split_all(self.global_shape[self.axis], self.comm)
         # Split the soruce array into properly sized blocks for sending
         blocks = np.array_split(arr, np.insert(eac, 0, sac[0]), axis)[1:]
         # Create fixed-size contiguous buffers for sending and receiving
@@ -793,7 +795,7 @@ class MPIArray(np.ndarray):
         sendsl[self.axis] = slice(ear[crank] - sar[crank])
         recvsl[axis] = slice(eac[crank] - sac[crank])
 
-        mpistatus = mpiutil.MPI.Status()
+        mpistatus = mpitools.MPI.Status()
 
         # Cyclically pass and receive array chunks across ranks
         for i in range(csize):
@@ -814,7 +816,7 @@ class MPIArray(np.ndarray):
                 status=mpistatus,
             )
 
-            if mpistatus.error != mpiutil.MPI.SUCCESS:
+            if mpistatus.error != mpitools.MPI.SUCCESS:
                 logger.error(
                     f"**** ERROR in MPI SEND/RECV "
                     f"(rank={crank}, "
@@ -1435,12 +1437,12 @@ class MPIArray(np.ndarray):
         an MPI.BYTE datatype.
         """
         try:
-            mpi_dtype = mpiutil.typemap(self.dtype)
+            mpi_dtype = mpitools.typemap(self.dtype)
             return (x, mpi_dtype)
         except KeyError:
             return (
                 x.view(np.byte).reshape((*x.shape, self.itemsize)),
-                mpiutil.MPI.BYTE,
+                mpitools.MPI.BYTE,
             )
 
     def gather(self, rank=0):
@@ -1461,7 +1463,7 @@ class MPIArray(np.ndarray):
         else:
             arr = None
 
-        splits = mpiutil.split_all(self.global_shape[self.axis], self.comm)
+        splits = mpitools.split_all(self.global_shape[self.axis], self.comm)
 
         for ri, (n, s, e) in enumerate(zip(*splits)):
             if self.comm.rank == rank:
@@ -1478,10 +1480,10 @@ class MPIArray(np.ndarray):
                 request = self.comm.Isend(self._prep_buf(self.local_array), dest=rank)
 
                 # Wait until the data has been sent
-                stat = mpiutil.MPI.Status()
+                stat = mpitools.MPI.Status()
                 request.Wait(status=stat)
 
-                if stat.error != mpiutil.MPI.SUCCESS:
+                if stat.error != mpitools.MPI.SUCCESS:
                     logger.error(
                         "**** ERROR in MPI SEND (source: %i,  dest rank: %i) *****",
                         ri,
@@ -1490,10 +1492,10 @@ class MPIArray(np.ndarray):
 
             if self.comm.rank == rank:
                 # Wait until the data has arrived
-                stat = mpiutil.MPI.Status()
+                stat = mpitools.MPI.Status()
                 request.Wait(status=stat)
 
-                if stat.error != mpiutil.MPI.SUCCESS:
+                if stat.error != mpitools.MPI.SUCCESS:
                     logger.error(
                         "**** ERROR in MPI RECV (source: %i,  dest rank: %i) *****",
                         ri,
@@ -1517,7 +1519,7 @@ class MPIArray(np.ndarray):
         """
         arr = np.empty(self.global_shape, dtype=self.dtype)
 
-        splits = mpiutil.split_all(self.global_shape[self.axis], self.comm)
+        splits = mpitools.split_all(self.global_shape[self.axis], self.comm)
 
         for ri, (n, s, e) in enumerate(zip(*splits)):
             # Construct a temporary array for the data to be received into
@@ -1641,7 +1643,7 @@ class MPIArray(np.ndarray):
             List of slices.
         """
         threshold_bytes = threshold * 2**30
-        largest_size = self.comm.allreduce(self.nbytes, op=mpiutil.MAX)
+        largest_size = self.comm.allreduce(self.nbytes, op=mpitools.MAX)
         min_axis_size = int(np.ceil(largest_size / threshold_bytes))
 
         # Return early if we can
@@ -1969,7 +1971,7 @@ class MPIArray(np.ndarray):
             return
 
         # we are in a slice, rebuild the attributes from the original MPIArray
-        comm = getattr(obj, "comm", mpiutil.world)
+        comm = getattr(obj, "comm", mpitools.world)
 
         axis = obj.axis
 
@@ -1988,7 +1990,7 @@ class MPIArray(np.ndarray):
         global_shape[axis] = axlen
 
         # Get offset
-        _, local_start, _ = mpiutil.split_local(axlen, comm=comm)
+        _, local_start, _ = mpitools.split_local(axlen, comm=comm)
 
         loffset = [0] * len(lshape)
         loffset[axis] = local_start

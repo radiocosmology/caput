@@ -65,7 +65,7 @@ import h5py
 import numpy as np
 
 from .. import darray
-from ..util import importutil, mpiutil, objectutil
+from ..util import importtools, mpitools, objecttools
 from . import fileformats
 from .io import open_h5py_mpi
 
@@ -123,7 +123,7 @@ class ro_dict(Mapping):
     def __eq__(self, other):
         if not isinstance(other, ro_dict):
             return False
-        return Mapping.__eq__(self, other) and objectutil.allequal(
+        return Mapping.__eq__(self, other) and objecttools.allequal(
             self._dict, other._dict
         )
 
@@ -148,7 +148,7 @@ class _Storage(dict):
     def __eq__(self, other):
         if not isinstance(other, _Storage):
             return False
-        return dict.__eq__(self, other) and objectutil.allequal(
+        return dict.__eq__(self, other) and objecttools.allequal(
             self._attrs, other._attrs
         )
 
@@ -163,7 +163,7 @@ class _StorageRoot(_Storage):
             logger.debug(
                 "No communicator set for distributed object, using `MPI.COMM_WORLD`"
             )
-            comm = mpiutil.world
+            comm = mpitools.world
 
         self._comm = comm
         self._distributed = distributed
@@ -520,7 +520,7 @@ class MemGroup(_BaseGroup):
             Root group of loaded file.
         """
         if comm is None:
-            comm = mpiutil.world
+            comm = mpitools.world
 
         if file_format is None:
             file_format = fileformats.guess_file_format(filename)
@@ -899,7 +899,7 @@ class MemGroup(_BaseGroup):
         dset_compression = dset.compression
         dset_compression_opts = dset.compression_opts
         dist_len = dset_shape[distributed_axis]
-        _, sd, ed = mpiutil.split_local(dist_len, comm=self.comm)
+        _, sd, ed = mpitools.split_local(dist_len, comm=self.comm)
         md = darray.MPIArray(
             dset_shape, axis=distributed_axis, comm=self.comm, dtype=dset_type
         )
@@ -950,7 +950,7 @@ class MemGroup(_BaseGroup):
         nproc = 1 if self.comm is None else self.comm.size
         # gather local distributed dataset to a global array for all procs
         for rank in range(nproc):
-            mpiutil.gather_local(
+            mpitools.gather_local(
                 global_array, dset.local_data, local_start, root=rank, comm=self.comm
             )
         attr_dict = {}  # temporarily save attrs of this dataset
@@ -1111,7 +1111,7 @@ class MemDataset(_MemObjMixin):
     def __eq__(self, other):
         if not isinstance(other, MemDataset):
             return False
-        return _MemObjMixin.__eq__(self, other) and objectutil.allequal(
+        return _MemObjMixin.__eq__(self, other) and objecttools.allequal(
             self._attrs, other._attrs
         )
 
@@ -1285,10 +1285,10 @@ class MemDatasetCommon(MemDataset):
             return False
         return (
             MemDataset.__eq__(self, other)
-            and objectutil.allequal(self._data, other._data)
-            and objectutil.allequal(self._chunks, other._chunks)
-            and objectutil.allequal(self._compression, other._compression)
-            and objectutil.allequal(self._compression_opts, other._compression_opts)
+            and objecttools.allequal(self._data, other._data)
+            and objecttools.allequal(self._chunks, other._chunks)
+            and objecttools.allequal(self._compression, other._compression)
+            and objecttools.allequal(self._compression_opts, other._compression_opts)
         )
 
 
@@ -1514,10 +1514,10 @@ class MemDatasetDistributed(MemDataset):
             return False
         return (
             MemDataset.__eq__(self, other)
-            and objectutil.allequal(self._data, other._data)
-            and objectutil.allequal(self._chunks, other._chunks)
-            and objectutil.allequal(self._compression, other._compression)
-            and objectutil.allequal(self._compression_opts, other._compression_opts)
+            and objecttools.allequal(self._data, other._data)
+            and objecttools.allequal(self._chunks, other._chunks)
+            and objecttools.allequal(self._compression, other._compression)
+            and objecttools.allequal(self._compression_opts, other._compression_opts)
         )
 
 
@@ -1565,7 +1565,7 @@ class MemDiskGroup(_BaseGroup):
         toclose = False
 
         if comm is None:
-            comm = mpiutil.world
+            comm = mpitools.world
 
         if distributed and comm is None:
             warnings.warn(
@@ -1629,7 +1629,7 @@ class MemDiskGroup(_BaseGroup):
 
         # Try to get a reference to the requested class (warn if we cannot find it)
         try:
-            new_cls = importutil.import_class(clspath)
+            new_cls = importtools.import_class(clspath)
         except (ImportError, KeyError):
             warnings.warn(f"Could not import memh5 subclass {clspath}")
 
