@@ -63,7 +63,7 @@ except ImportError as exc:
 
 import numpy as np
 
-from ..util import mpiutil
+from ..util import mpitools
 
 
 class FFT:
@@ -108,7 +108,7 @@ class FFT:
             raise TypeError("Only complex->complex transforms are currently supported.")
 
         self._nsimd = pyfftw.simd_alignment
-        ncpu = mpiutil.cpu_count()
+        ncpu = mpitools.cpu_count()
         flags = ("FFTW_MEASURE",)
 
         if axes is None:

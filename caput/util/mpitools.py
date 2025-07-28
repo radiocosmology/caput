@@ -6,7 +6,7 @@ writing code that can be run in either parallel or serial. Also it exposes all
 attributes of the :mod:`mpi4py.MPI` by the :class:`SelfWrapper` class for
 convenience. You can just use::
 
-    mpiutil.attr
+    mpitools.attr
 
 instead of::
 
@@ -923,7 +923,7 @@ class SelfWrapper(ModuleType):
         if _comm is not None and name in MPI.__dict__:
             return MPI.__dict__[name]
 
-        raise AttributeError(f"module 'mpiutil' has no attribute '{name}'")
+        raise AttributeError(f"module 'mpitools' has no attribute '{name}'")
 
     def __call__(self, **kwargs):
         """Call self with set module."""

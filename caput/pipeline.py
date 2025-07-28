@@ -403,7 +403,7 @@ import yaml
 
 from . import config
 from .memdata import fileformats, lock_file
-from .util import importutil, mpiutil, objectutil
+from .util import importtools, mpitools, objecttools
 
 # Set the module logger.
 logger = logging.getLogger(__name__)
@@ -705,8 +705,8 @@ class Manager(config.Reader):
         from .util.profiler import PSUtilProfiler
 
         # Log MPI information
-        if mpiutil._comm is not None:
-            logger.debug(f"Running with {mpiutil.size} MPI process(es)")
+        if mpitools._comm is not None:
+            logger.debug(f"Running with {mpitools.size} MPI process(es)")
         else:
             logger.debug("Running in single process without MPI.")
 
@@ -849,7 +849,7 @@ class Manager(config.Reader):
         # Ensure that all ranks are running the same task.
         # This probably should never be needed with the current
         # priority selection. Effectively a no-op if no MPI
-        self._task_idx = mpiutil.bcast(new_index, root=0)
+        self._task_idx = mpitools.bcast(new_index, root=0)
 
         return self.tasks[self._task_idx]
 
@@ -989,7 +989,7 @@ class Manager(config.Reader):
             task_cls = local_tasks[task_path]
         else:
             try:
-                task_cls = importutil.import_class(task_path)
+                task_cls = importtools.import_class(task_path)
             except (config.CaputConfigError, AttributeError, ModuleNotFoundError) as e:
                 raise config.CaputConfigError(
                     f"Loading task `{task_path}` caused an error:\n\t{traceback.format_exc()}"
@@ -1302,7 +1302,7 @@ class TaskBase(config.Reader):
     @property
     def mem_used(self):
         """Return the approximate total memory referenced by this task."""
-        return objectutil.total_size(self)
+        return objecttools.total_size(self)
 
     @classmethod
     def _from_config(cls, config):
@@ -1945,9 +1945,9 @@ class H5IOMixin:
                 pass
             else:
                 logger.debug(f"Copying {output.store}:{output.path} to {filename}.")
-                from . import mpiutil
+                from . import mpitools
 
-                if mpiutil.rank == 0:
+                if mpitools.rank == 0:
                     n_copied, n_skipped, n_bytes_copied = zarr.copy_store(
                         output.store,
                         zarr.DirectoryStore(filename),

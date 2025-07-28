@@ -11,7 +11,7 @@ single threaded version from `scipy.fft` directly.
 
 import scipy.fft
 
-from ..util import mpiutil
+from ..util import mpitools
 
 # Overwrite any existing backends on import
 scipy.fft.set_global_backend("scipy", only=True)
@@ -20,7 +20,7 @@ scipy.fft.set_global_backend("scipy", only=True)
 __all__ = scipy.fft.__all__
 
 # Only use this lookup once
-_nworkers = mpiutil.cpu_count()
+_nworkers = mpitools.cpu_count()
 
 
 def _set_workers(func):

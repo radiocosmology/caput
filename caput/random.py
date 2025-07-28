@@ -223,7 +223,7 @@ def mpi_random_seed(seed, extra=0, gen=None):
     """
     import warnings
 
-    from .util import mpiutil
+    from .util import mpitools
 
     warnings.warn(
         "This routine has fatal flaws. Try using `RandomTask` instead",
@@ -235,7 +235,7 @@ def mpi_random_seed(seed, extra=0, gen=None):
         seed = np.random.randint(2**30)
 
     # Construct the new process specific seed
-    new_seed = seed + mpiutil.rank + 4096 * extra
+    new_seed = seed + mpitools.rank + 4096 * extra
     np.random.seed(new_seed)
 
     # we will be setting the numpy.random context

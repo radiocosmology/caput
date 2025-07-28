@@ -9,7 +9,7 @@ import pytest
 from pytest_lazy_fixtures import lf
 
 from caput import darray
-from caput.util import mpiutil
+from caput.util import mpitools
 from caput.memdata import fileformats, MemGroup
 
 
@@ -81,10 +81,10 @@ def test_FileSelect_distributed(container_on_disk, fsel, isel, file_format, ind)
     d1 = container_on_disk[1][0][sel["dset1"]]
     d2 = container_on_disk[1][1][sel["dset2"]]
 
-    _, s, e = mpiutil.split_local(d1.shape[0], comm=comm)
+    _, s, e = mpitools.split_local(d1.shape[0], comm=comm)
     d1slice = slice(s, e)
 
-    _, s, e = mpiutil.split_local(d2.shape[0], comm=comm)
+    _, s, e = mpitools.split_local(d2.shape[0], comm=comm)
     d2slice = slice(s, e)
 
     # For debugging...
