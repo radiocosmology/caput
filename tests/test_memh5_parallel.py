@@ -8,12 +8,12 @@ import zarr
 import copy
 
 from caput.memdata import fileformats, memh5
-from caput.util import mpiutil
+from caput.util import mpitools
 from caput.darray import MPIArray
 
 
-comm = mpiutil.world
-rank, size = mpiutil.rank, mpiutil.size
+comm = mpitools.world
+rank, size = mpitools.rank, mpitools.size
 
 
 def test_create_dataset():
@@ -218,7 +218,7 @@ def test_misc(test_file, file_open_function, file_format):
             with pytest.raises(ValueError):
                 # MemDiskGroup will guess the file format
                 memh5.MemDiskGroup(data_group=f, distributed=True)
-    mpiutil.barrier()
+    mpitools.barrier()
 
 
 def test_redistribute():

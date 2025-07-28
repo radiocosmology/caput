@@ -11,7 +11,7 @@ from typing import ClassVar, Optional
 import numpy as np
 import psutil
 
-from . import mpiutil
+from . import mpitools
 
 
 class Profiler:
@@ -36,7 +36,7 @@ class Profiler:
         self,
         profile: bool = True,
         profiler: str = "cprofile",
-        comm: Optional["mpiutil.MPI.IntraComm"] = None,
+        comm: Optional["mpitools.MPI.IntraComm"] = None,
         path: os.PathLike | None = None,
     ):
         self.profile = profile
@@ -74,8 +74,8 @@ class Profiler:
             return
 
         if self.comm is None:
-            rank = mpiutil.rank
-            size = mpiutil.size
+            rank = mpitools.rank
+            size = mpitools.size
         else:
             rank = self.comm.rank
             size = self.comm.size
@@ -210,7 +210,7 @@ class PSUtilProfiler(psutil.Process):
         use_profiler: bool = True,
         label: str = "",
         logger: logging.Logger | None = None,
-        comm: Optional["mpiutil.MPI.IntraComm"] = None,
+        comm: Optional["mpitools.MPI.IntraComm"] = None,
         path: os.PathLike | None = None,
     ):
         self._use_profiler = use_profiler
@@ -220,7 +220,7 @@ class PSUtilProfiler(psutil.Process):
         self.comm = comm
 
         if self.comm is None:
-            rank = mpiutil.rank
+            rank = mpitools.rank
         else:
             rank = self.comm.rank
 
