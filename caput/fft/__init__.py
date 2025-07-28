@@ -8,5 +8,5 @@ Features
 - Helpers to use `pyFFTW`
 """
 
-from ._scipy_fft import *  # noqa: F403
+from ._scipy_fft import *
 from . import fftw as fftw
