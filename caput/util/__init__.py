@@ -4,9 +4,9 @@ Assorted utilities.
 """
 
 from . import (
-    importutil as importutil,
-    mpiutil as mpiutil,
-    objectutil as objectutil,
+    importtools as importtools,
+    mpitools as mpitools,
+    objecttools as objecttools,
     pfb as pfb,
     profiler as profiler,
 )
