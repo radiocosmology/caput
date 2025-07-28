@@ -9,7 +9,7 @@ import pytest
 from caput.memdata import fileformats
 from caput.pipeline import PipelineStopIteration, TaskBase, IterBase, Manager
 from caput.scripts.runner import cli
-from caput.util import mpiutil
+from caput.util import mpitools
 from caput import config
 
 
@@ -219,7 +219,7 @@ def h5_file_distributed(rm_all_files):
     """Provides a file name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5_distributed.h5"
     yield fname
-    if mpiutil.rank == 0:
+    if mpitools.rank == 0:
         rm_all_files(fname)
 
 
@@ -228,7 +228,7 @@ def zarr_file_distributed(rm_all_files):
     """Provides a directory name and removes all files/dirs with the same prefix later."""
     fname = "tmp_test_memh5.zarr"
     yield fname
-    if mpiutil.rank == 0:
+    if mpitools.rank == 0:
         rm_all_files(fname)
 
 
