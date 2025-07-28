@@ -1,397 +1,8 @@
-r"""Data Analysis and Simulation Pipeline.
-
-A data analysis pipeline is completely specified by a YAML file that specifies
-both what tasks are to be run and the parameters that go to those tasks.
-Included in this package are base classes for simplifying the construction of
-data analysis tasks, as well as the pipeline manager which executes them.
-
-Pipelines are most easily executed using the script in `caput_pipeline.py`,
-which ships with :mod:`caput`.
-
-Flow control classes
-====================
-- :py:class:`Manager`
-- :py:class:`PipelineRuntimeError`
-- :py:class:`PipelineStopIteration`
-
-Task base classes
-=================
-- :py:class:`TaskBase`
-- :py:class:`SingleBase`
-- :py:class:`IterBase`
-- :py:class:`H5IOMixin`
-- :py:class:`BasicContMixin`
-- :py:class:`SingleH5Base`
-- :py:class:`IterH5Base`
-
-
-
-Examples
---------
-Basic Tasks
------------
-
-A pipeline task is a subclass of :class:`TaskBase` intended to perform some small,
-modular piece analysis. The developer of the task must specify what input
-parameters the task expects as well as code to perform the actual processing
-for the task.
-
-Input parameters are specified by adding class attributes whose values are
-instances of :class:`config.Property`. For instance a task definition might begin
-with
-
->>> class SpamTask(TaskBase):
-...     eggs = config.Property(proptype=str)
-
-This defines a new task named :class:`SpamTask` with a parameter named *eggs*, whose
-type is a string.  The class attribute :attr:`SpamTask.eggs` will replaced with an
-instance attribute when an instance of the task is initialized, with it's value
-read from the pipeline configuration YAML file (see next section).
-
-The actual work for the task is specified by over-ridding any of the
-:meth:`~TaskBase.setup`, :meth:`~TaskBase.next` or
-:meth:`~TaskBase.finish` methods (:meth:`~TaskBase.__init__` may also be
-implemented`).  These are executed in order, with :meth:`~TaskBask.next`
-possibly being executed many times.  Iteration of :meth:`next` is halted by
-raising a :exc:`PipelineStopIteration`.  Here is a example of a somewhat
-trivial but fully implemented task:
-
->>> class PrintEggs(TaskBase):
-...
-...     eggs = config.Property(proptype=list)
-...
-...     def __init__(self):
-...         super().__init__()
-...         self.i = 0
-...
-...     def setup(self):
-...         print("Setting up PrintEggs.")
-...
-...     def next(self):
-...         if self.i >= len(self.eggs):
-...             raise PipelineStopIteration()
-...         print("Spam and %s eggs." % self.eggs[self.i])
-...         self.i += 1
-...
-...     def finish(self):
-...         print("Finished PrintEggs.")
-
-Any return value of these three pipeline methods can be handled by the pipeline
-and provided to subsequent tasks. The methods :meth:`setup` and :meth:`next`
-may accept (positional only) arguments which will be received as the outputs of
-early tasks in a pipeline chain. The following is an example of a pair of tasks
-that are designed to operate in this manner.
-
->>> class GetEggs(TaskBase):
-...
-...     eggs = config.Property(proptype=list)
-...
-...     def __init__(self):
-...         super().__init__()
-...         self.i = 0
-...
-...     def setup(self):
-...         print("Setting up GetEggs.")
-...
-...     def next(self):
-...         if self.i >= len(self.eggs):
-...             raise PipelineStopIteration()
-...         egg = self.eggs[self.i]
-...         self.i += 1
-...         return egg
-...
-...     def finish(self):
-...         print("Finished GetEggs.")
-
->>> class CookEggs(TaskBase):
-...
-...     style = config.Property(proptype=str)
-...
-...     def setup(self):
-...         print("Setting up CookEggs.")
-...
-...     def next(self, egg):
-...         print("Cooking %s %s eggs." % (self.style, egg))
-...
-...     def finish(self):
-...         print("Finished CookEggs.")
-
-Note that :meth:`CookEggs.next` never raises a :exc:`PipelineStopIteration`.
-This is because there is no way for the task to internally know how long to
-iterate.  :meth:`next` will continue to be called as long as there are inputs
-for :meth:`next` and will stop iterating when there are none.
-
-Pipeline Configuration
-----------------------
-
-To actually run a task or series of tasks, a YAML pipeline configuration is
-required.  The pipeline configuration has two main functions: to specify the
-the pipeline (which tasks are run, in which order and how to handle the inputs and
-outputs of tasks) and to provide parameters to each individual task.  Here is
-an example of a pipeline configuration:
-
->>> spam_config = '''
-... pipeline :
-...     tasks:
-...         -   type:   PrintEggs
-...             params: eggs_params
-...
-...         -   type:   GetEggs
-...             params: eggs_params
-...             out:    egg
-...
-...         -   type:   CookEggs
-...             params: cook_params
-...             in:     egg
-...
-... eggs_params:
-...     eggs: ['green', 'duck', 'ostrich']
-...
-... cook_params:
-...     style: 'fried'
-...
-... '''
-
-Here the 'pipeline' section contains parameters that pertain to the pipeline as
-a whole.  The most important parameter is *tasks*, a list of tasks to be
-executed.  Each entry in this list may contain the following keys:
-
-type
-    (required) The name of the class relative to the global
-    name space. Any required imports will be performed dynamically.  Any
-    classes that are not importable (defined interactively) need to be
-    registered in the dictionary ``pipeline.local_tasks``.
-params
-    (required) Key or list of keys referring to sections of the pipeline
-    configuration holding parameters for the task.
-out
-    A 'pipeline product key' or list of keys that label any return values from
-    :meth:`setup`, :meth:`next` or :meth:`finish`.
-requires
-    A 'pipeline product key' or list of keys representing values to be passed
-    as arguments to :meth:`setup`.
-in\_
-    A 'pipeline product key' or list of keys representing values to be passed
-    as arguments to :meth:`next`.
-
-The sections other than 'pipeline' in the configuration contain the parameter
-for the various tasks, as specified be the 'params' keys.
-
-Execution Order
----------------
-
-There are two options when choosing how to execute a pipeline: standard and legacy.
-When the above pipeline is executed in standard mode, it produces the following output.
-
->>> local_tasks.update(globals())  # Required for interactive sessions.
->>> m = Manager.from_yaml_str(spam_config)
->>> m.run()
-Setting up PrintEggs.
-Setting up GetEggs.
-Setting up CookEggs.
-Spam and green eggs.
-Spam and duck eggs.
-Spam and ostrich eggs.
-Finished PrintEggs.
-Cooking fried green eggs.
-Cooking fried duck eggs.
-Cooking fried ostrich eggs.
-Finished GetEggs.
-Finished CookEggs.
-
-When executed in legacy mode, it produces this output.
-
->>> local_tasks.update(globals())  # Required for interactive sessions.
->>> m = Manager.from_yaml_str(spam_config)
->>> m.execution_order = "legacy"
->>> m.run()
-Setting up PrintEggs.
-Setting up GetEggs.
-Setting up CookEggs.
-Spam and green eggs.
-Cooking fried green eggs.
-Spam and duck eggs.
-Cooking fried duck eggs.
-Spam and ostrich eggs.
-Cooking fried ostrich eggs.
-Finished PrintEggs.
-Finished GetEggs.
-Finished CookEggs.
-
-To understand the differences, compare the rules for each strategy.
-The `standard` method uses a priority system based on the following criteria,
-in decreasing importance:
-
-1. Task must be available to execute some step.
-2. Task priority. This is set by two factors:
-
-   * Dynamic priority: tasks which have a higher net consumption
-     (inputs consumed minus outputs created).
-   * Base priority: user-configurable base priority is added to
-     the dynamic priority.
-
-3. Pipeline configuration order.
-
-If no tasks are available to run, the `legacy` method is used, which uses the
-following execution order rules:
-
-1. One of the methods `setup()`, `next()` or `finish()`, as appropriate, will
-   be executed from each task, in order.
-2. If the task method is missing its input, as specified by the 'requires' or 'in\_'
-   keys, restart at the beginning of the `tasks` list.
-3. If the input to `next()` is missing and the task is at the beginning of the
-   list there will be no opportunity to generate this input. Stop iterating
-   `next()` and proceed to `finish()`.
-4. Once a task has executed `finish()`, remove it from the list.
-5. Once a method from the last member of the `tasks` list is executed, restart
-   at the beginning of the list.
-
-The difference in outputs is because `PrintEggs` will always have higher priority
-than `GetEggs`, so it will run to completion _before_ `GetEggs` starts generating
-anything. Only once `PrintEggs` is done will the other tasks run. Even though
-`CookEggs` has the highest priority, it cannot do anything without `GetEggs` running
-first.
-
-If the above `legacy` rules seem somewhat opaque, consider the following example which
-illustrates these rules in a pipeline with a slightly more non-trivial flow.
-
->>> class DoNothing(TaskBase):
-...
-...     def setup(self):
-...         print("Setting up DoNothing.")
-...
-...     def next(self, input):
-...         print("DoNothing next.")
-...
-...     def finish(self):
-...         print("Finished DoNothing.")
-
->>> local_tasks.update(globals())  # Required for interactive sessions only.
->>> new_spam_config = '''
-... pipeline :
-...     tasks:
-...         -   type:   GetEggs
-...             params: eggs_params
-...             out:    egg
-...
-...         -   type:   CookEggs
-...             params: cook_params
-...             in:     egg
-...
-...         -   type:   DoNothing
-...             params: no_params
-...             in:     non_existent_data_product
-...
-...         -   type:   PrintEggs
-...             params: eggs_params
-...
-... eggs_params:
-...     eggs: ['green', 'duck', 'ostrich']
-...
-... cook_params:
-...     style: 'fried'
-...
-... no_params: {}
-... '''
-
-The following would error, because the pipeline config is checked for errors, like an 'in\_' parameter without a
-corresponding 'out'::
-
-    m = Manager.from_yaml_str(new_spam_config)
-    m.execution_order = "legacy"
-    m.run()
-
-But this is what it would produce otherwise::
-
-    Setting up GetEggs.
-    Setting up CookEggs.
-    Setting up DoNothing.
-    Setting up PrintEggs.
-    Cooking fried green eggs.
-    Cooking fried duck eggs.
-    Cooking fried ostrich eggs.
-    Finished GetEggs.
-    Finished CookEggs.
-    Finished DoNothing.
-    Spam and green eggs.
-    Spam and duck eggs.
-    Spam and ostrich eggs.
-    Finished PrintEggs.
-
-Notice that :meth:`DoNothing.next` is never called, since the pipeline never
-generates its input, 'non_existent_data_product'.  Once everything before
-:class:`DoNothing` has been executed the pipeline notices that there is no
-opertunity for 'non_existent_data_product' to be generated and forces
-`DoNothing` to proceed to :meth:`finish`. This also unblocks :class:`PrintEggs`
-allowing it to proceed normally.
-
-Pure Python Pipelines
----------------------
-
-It is possible to construct and run a pipeline purely within Python, which can be
-useful for quick prototyping and debugging. This gives direct control over task
-construction and configuration, and allows injection and inspection of pipeline
-products.
-
-To add a task to the pipeline you need to: create an instance of it; set any
-configuration attributes directly (or call :meth:`~TaskBase.read_config` on an
-appropriate dictionary); and then added to the pipeline using the
-:meth:`~Manager.add_task` to add the instance and specify the queues it connects to.
-
-To inject products into the pipeline, use the :class:`~Input` and supply it an
-iterator as an argument. Each item will be fed into the pipeline one by one. To take
-outputs from the pipeline, simply use the :class:`~Output` task. By default this
-simply saves everything it receives into a list (which can be accessed via the task's
-`outputs` attribute, e.g. with `save_output.outputs` after running the example below),
-but it can be given a callback function to apply processing to each argument in turn.
-
->>> m = Manager()
->>> m.add_task(Input(["platypus", "dinosaur"]), out="key1")
->>> cook = CookEggs()
->>> cook.style = "coddled"
->>> m.add_task(cook, in_="key1")
->>> save_output = Output()
->>> m.add_task(save_output, in_="key1")
->>> print_output = Output(lambda x: print("I love %s eggs!" % x))
->>> m.add_task(print_output, in_="key1")
->>> m.execution_order = "legacy"
->>> m.run()
-Setting up CookEggs.
-Cooking coddled platypus eggs.
-I love platypus eggs!
-Cooking coddled dinosaur eggs.
-I love dinosaur eggs!
-Finished CookEggs.
-
-Advanced Tasks
---------------
-
-Several subclasses of :class:`TaskBase` provide advanced functionality for tasks that
-conform to the most common patterns. This functionality includes: optionally
-reading inputs from disk, instead of receiving them from the pipeline;
-optionally writing outputs to disk automatically; and caching the results of a
-large computation to disk in an intelligent manner (not yet implemented).
-
-Base classes providing this functionality are :class:`SingleBase` for 'one
-shot' tasks and :class:`IterBase` for task that need to iterate.  There are
-limited to a single input ('in' key) and a single output ('out' key).  Method
-:meth:`~SingleBase.process` should be overwritten instead of :meth:`next`.
-Optionally, :meth:`~SingleBase.read_input` and :meth:`~SingleBase.write_output`
-may be over-ridden for maximum functionality.  :meth:`setup` and :meth:`finish`
-may be overridden as usual.
-
-In addition :class:`SingleH5Base`, :class:`IterH5Base`, provide the
-:meth:`read_input` and :meth:`write_output` methods for the most common
-formats.
-
-See the documentation for these base classes for more details.
-
-"""
+"""Core pipeline task infrastructure."""
 
 import importlib
 import inspect
 import logging
-import os
 import queue
 import re
 import traceback
@@ -401,12 +12,20 @@ from copy import deepcopy
 
 import yaml
 
-from . import config
-from .memdata import fileformats, lock_file
-from .util import importtools, mpitools, objecttools
+from .. import config
+from ..util import importtools, mpitools, objecttools
 
 # Set the module logger.
 logger = logging.getLogger(__name__)
+
+
+__all__ = [
+    "Manager",
+    "PipelineRuntimeError",
+    "PipelineStopIteration",
+    "TaskBase",
+    "local_tasks",
+]
 
 
 # Search this dictionary for tasks.
@@ -418,10 +37,8 @@ local_tasks = {}
 # ----------
 
 
-class PipelineRuntimeError(Exception):
+class PipelineRuntimeError(RuntimeError):
     """Raised when there is a pipeline related error at runtime."""
-
-    pass
 
 
 class PipelineStopIteration(Exception):
@@ -433,22 +50,15 @@ class PipelineStopIteration(Exception):
     Note that if `next()` recieves input data as an argument, it is not
     required to ever raise this exception.  The pipeline will proceed to
     `finish()` once the input data has run out.
-
     """
-
-    pass
 
 
 class _PipelineMissingData(Exception):
     """Used for flow control when input data is yet to be produced."""
 
-    pass
-
 
 class _PipelineFinished(Exception):
     """Raised by tasks that have been completed."""
-
-    pass
 
 
 # Pipeline Manager
@@ -615,7 +225,7 @@ class Manager(config.Reader):
         -------
         self: Pipeline object
         """
-        from .config import SafeLineLoader
+        from ..config import SafeLineLoader
 
         yaml_params = yaml.load(yaml_doc, Loader=SafeLineLoader)
         try:
@@ -702,7 +312,7 @@ class Manager(config.Reader):
             Generator object to run the pipeline.
 
         """
-        from .util.profiler import PSUtilProfiler
+        from ..util.profiler import PSUtilProfiler
 
         # Log MPI information
         if mpitools._comm is not None:
@@ -797,7 +407,7 @@ class Manager(config.Reader):
                 if not any(received):
                     # Just warn. This probably shouldn't happen, but there
                     # could be some edge cases to deal with
-                    logger.info(
+                    logger.debug(
                         f"Task {task!s} tried to pass key {key} "
                         "but no task was found to accept it."
                     )
@@ -842,7 +452,10 @@ class Manager(config.Reader):
         # the task with highest base priority will be selected
         new_index = sorted(
             available,
-            key=lambda i: (self.tasks[i].priority, self.tasks[i].base_priority),
+            key=lambda i: (
+                self.tasks[i]._pipeline_priority,
+                self.tasks[i].base_priority,
+            ),
             reverse=True,
         )[0]
 
@@ -1088,8 +701,34 @@ class Manager(config.Reader):
         logger.debug(f"Added {task!s} to task list.")
 
 
-# Pipeline Task Base Classes
-# --------------------------
+# Pipeline Task Base Class
+# ------------------------
+
+
+def _format_product_keys(keys):
+    """Formats the pipeline task product keys.
+
+    In the pipeline config task list, the values of 'requires', 'in' and 'out'
+    are keys representing data products.  This function gets that key from the
+    task's entry of the task list, defaults to zero, and ensures it's formated
+    as a sequence of strings.
+    """
+    if keys is None:
+        return []
+
+    # Turn into a sequence if only one key was provided.
+    if not isinstance(keys, list):
+        # Making this a tuple instead of a list is significant.  It only
+        # impacts the 'out' product key and affects how return values are
+        # unpacked.
+        keys = (keys,)
+
+    # Check that all the keys provided are strings.
+    for key in keys:
+        if not isinstance(key, str):
+            msg = "Data product keys must be strings."
+            raise config.CaputConfigError(msg)
+    return keys
 
 
 class TaskBase(config.Reader):
@@ -1248,7 +887,7 @@ class TaskBase(config.Reader):
         return True
 
     @property
-    def priority(self):
+    def _pipeline_priority(self):
         """Return the priority associated with this task.
 
         If the task is not yet initialized, dynamic priority is zero.
@@ -1573,560 +1212,6 @@ class TaskBase(config.Reader):
                 result = True
 
         return result
-
-
-class _OneAndOne(TaskBase):
-    """Base class for tasks that have (at most) one input and one output.
-
-    This is not a user base class and simply holds code that is common to
-    `SingleBase` and `IterBase`.
-    """
-
-    input_root = config.Property(default="None", proptype=str)
-    output_root = config.Property(default="None", proptype=str)
-    output_format = config.file_format()
-
-    def __init__(self):
-        # Inspect the `process` method to see how many arguments it takes.
-        pro_argspec = inspect.getfullargspec(self.process)
-        n_args = len(pro_argspec.args) - 1
-        if n_args == 0:
-            self._no_input = True
-        else:
-            self._no_input = False
-
-    def process(self, input):
-        """Override this method with your data processing task."""
-        output = input
-
-        return output  # noqa: RET504
-
-    def validate(self):
-        """Validate the task after instantiation.
-
-        May be overriden to add any special task validation before the task is run.
-        This is called by the :py:class:`Manager` after it's added to the pipeline and has special attributes like
-        `_requires_keys`, `_requires`, `_in_keys`, `_in`, `-_out_keys` set.
-        Call `super().validate()` if you overwrite this.
-
-        Raises
-        ------
-        caput.config.CaputConfigError
-            If there was an error in the task configuration.
-        """
-        # Inspect the `process` method to see how many arguments it takes.
-        pro_argspec = inspect.getfullargspec(self.process)
-        n_args = len(pro_argspec.args) - 1
-
-        if n_args > 1:
-            msg = "`process` method takes more than 1 argument, which is not allowed."
-            raise config.CaputConfigError(msg)
-        if (
-            pro_argspec.varargs
-            or pro_argspec.varkw
-            or pro_argspec.kwonlyargs
-            or pro_argspec.defaults
-        ):
-            msg = (
-                "`process` method may not have variable length or optional"
-                " arguments."
-            )
-            raise config.CaputConfigError(msg)
-
-        # Make sure we know where to get the data from.
-        if self.input_root == "None":
-            if len(self._in) != n_args:
-                msg = (
-                    "No data to iterate over. 'input_root' is 'None' and"
-                    " there are no 'in' keys."
-                )
-                raise config.CaputConfigError(msg)
-        else:
-            if len(self._in) != 0:
-                msg = (
-                    "For data input, supplied both a file path and an 'in'"
-                    " key.  If not reading to disk, set 'input_root' to"
-                    " 'None'."
-                )
-                raise config.CaputConfigError(msg)
-            if n_args != 1:
-                msg = (
-                    "Reading input from disk but `process` method takes no"
-                    " arguments."
-                )
-                raise config.CaputConfigError(msg)
-
-    def read_process_write(self, input, input_filename, output_filename):
-        """Reads input, executes any processing and writes output."""
-        # Read input if needed.
-        if input is None and not self._no_input:
-            if input_filename is None:
-                raise RuntimeError("No file to read from.")
-            input_filename = self.input_root + input_filename
-            input_filename = os.path.expanduser(input_filename)
-            logger.info(
-                "%s reading data from file %s.", self.__class__.__name__, input_filename
-            )
-            input = self.read_input(input_filename)
-        # Analyse.
-        if self._no_input:
-            if input is not None:
-                # This should never happen.  Just here to catch bugs.
-                raise RuntimeError("Somehow `input` was set.")
-            output = self.process()
-        else:
-            output = self.process(input)
-        # Write output if needed.
-        if self.output_root != "None" and output is not None:
-            if output_filename is None:
-                raise RuntimeError("No file to write to.")
-            output_filename = self.output_root + output_filename
-            output_filename = os.path.expanduser(output_filename)
-            logger.info(
-                "%s writing data to file %s.", self.__class__.__name__, output_filename
-            )
-            output_dirname = os.path.dirname(output_filename)
-            if not os.path.isdir(output_dirname):
-                os.makedirs(output_dirname)
-            self.write_output(
-                output_filename,
-                output,
-                file_format=self.output_format,
-            )
-        return output
-
-    def read_input(self, filename):
-        """Override to implement reading inputs from disk."""
-        raise NotImplementedError()
-
-    def cast_input(self, input):
-        """Override to support accepting pipeline inputs of variouse types."""
-        return input
-
-    def read_output(self, filename):
-        """Override to implement reading outputs from disk.
-
-        Used for result cacheing.
-        """
-        raise NotImplementedError()
-
-    @staticmethod
-    def write_output(filename, output, file_format=None, **kwargs):
-        """Override to implement reading inputs from disk."""
-        raise NotImplementedError()
-
-
-class SingleBase(_OneAndOne):
-    """Base class for non-iterating tasks with at most one input and output.
-
-    Inherits from :class:`TaskBase`.
-
-    Tasks inheriting from this class should override `process` and optionally
-    :meth:`setup`, :meth:`finish`, :meth:`read_input`, :meth:`write_output` and
-    :meth:`cast_input`.  They should not override :meth:`next`.
-
-    If the value of :attr:`input_root` is anything other than the string "None"
-    then the input will be read (using :meth:`read_input`) from the file
-    ``self.input_root + self.input_filename``.  If the input is specified both as
-    a filename and as a product key in the pipeline configuration, an error
-    will be raised upon initialization.
-
-
-    If the value of :attr:`output_root` is anything other than the string
-    "None" then the output will be written (using :meth:`write_output`) to the
-    file ``self.output_root + self.output_filename``.
-
-    Attributes
-    ----------
-    input_root : string
-        Pipeline settable parameter giving the first part of the input path.
-        If set to 'None' no input is read. Either it is assumed that no input
-        is required or that input is recieved from the pipeline.
-    input_filename : string
-        Pipeline settable parameter giving the last part of input path. The
-        full input path is ``self.input_root + self.input_filename``.
-    output_root : strig
-        Pipeline settable parameter giving the first part of the output path.
-        If set to 'None' no output is written.
-    output_filename : string
-        Pipeline settable parameter giving the last part of output path. The
-        full output path is ``self.output_root + self.output_filename``.
-    """
-
-    input_filename = config.Property(default="", proptype=str)
-    output_filename = config.Property(default="", proptype=str)
-    output_format = config.file_format()
-    output_compression = config.Property(default=None, proptype=str)
-    output_compression_opts = config.Property(default=None)
-
-    def next(self, input=None):
-        """Should not need to override."""
-        # This should only be called once.
-        try:
-            if self.done:
-                raise PipelineStopIteration()
-        except AttributeError:
-            self.done = True
-
-        if input:
-            input = self.cast_input(input)
-        return self.read_process_write(input, self.input_filename, self.output_filename)
-
-
-class IterBase(_OneAndOne):
-    """Base class for iterating tasks with at most one input and one output.
-
-    Tasks inheriting from this class should override :meth:`process` and
-    optionally :meth:`setup`, :meth:`finish`, :meth:`read_input`,
-    :meth:`write_output` and :meth:`cast_input`. They should not override
-    :meth:`next`.
-
-    If the value of :attr:`input_root` is anything other than the string "None"
-    then the input will be read (using :meth:`read_input`) from the file
-    ``self.input_root + self.file_middles[i] + self.input_ext``.  If the
-    input is specified both as a filename and as a product key in the pipeline
-    configuration, an error will be raised upon initialization.
-
-    If the value of :attr:`output_root` is anything other than the string "None"
-    then the output will be written (using :meth:`write_output`) to the file
-    ``self.output_root + self.file_middles[i] + self.output_ext``.
-
-    Attributes
-    ----------
-    iteration : int
-        The current iteration of `process`/`next`.
-    file_middles : list of strings
-        The unique part of each file path.
-    input_root : string
-        Pipeline settable parameter giving the first part of the input path.
-        If set to 'None' no input is read. Either it is assumed that no input
-        is required or that input is recieved from the pipeline.
-    input_ext : string
-        Pipeline settable parameter giving the last part of input path. The
-        full input path is ``self.input_root +
-        self.file_middles[self.iteration] + self.input_ext``.
-    output_root : strig
-        Pipeline settable parameter giving the first part of the output path.
-        If set to 'None' no output is written.
-    output_ext : string
-        Pipeline settable parameter giving the last part of output path. The
-        full output path is ``self.output_root +
-        self.file_middles[self.iteration] + self.output_ext``.
-    """
-
-    file_middles = config.Property(default=[], proptype=list)
-    input_ext = config.Property(default="", proptype=str)
-    output_ext = config.Property(default="", proptype=str)
-
-    def __init__(self):
-        super().__init__()
-        self.iteration = 0
-
-    def next(self, input=None):
-        """Should not need to override."""
-        # Sort out filenames.
-        if self.iteration >= len(self.file_middles):
-            if not self.input_root == "None":
-                # We are iterating over input files and have run out.
-                raise PipelineStopIteration()
-            # Not iterating over input files, and unable to assign
-            # filenames.
-            input_filename = None
-            output_filename = None
-        else:
-            # May or may not be iterating over input files, but able to assign
-            # filenames.
-            middle = self.file_middles[self.iteration]
-            input_filename = middle + self.input_ext
-            output_filename = middle + self.output_ext
-
-        if input:
-            input = self.cast_input(input)
-        output = self.read_process_write(input, input_filename, output_filename)
-        self.iteration += 1
-
-        return output
-
-
-class H5IOMixin:
-    """Provides hdf5/zarr IO for pipeline tasks.
-
-    As a mixin, this must be combined (using multiple inheritance) with a
-    subclass of `TaskBase`, providing the full task API.
-
-    Provides the methods `read_input`, `read_output` and `write_output` for
-    hdf5 data.
-    """
-
-    # TODO, implement reading on disk (i.e. no copy to memory).
-    # ondisk = config.Property(default=False, proptype=bool)
-
-    @staticmethod
-    def read_input(filename):
-        """Method for reading hdf5 input."""
-        from .memdata import MemGroup
-
-        return MemGroup.from_hdf5(filename, mode="r")
-
-    @staticmethod
-    def read_output(filename):
-        """Method for reading hdf5 output (from caches)."""
-        # Replicate code from read_input in case read_input is overridden.
-        from .memdata import MemGroup
-
-        return MemGroup.from_hdf5(filename, mode="r")
-
-    @staticmethod
-    def write_output(filename, output, file_format=None, **kwargs):
-        """Method for writing hdf5/zarr output.
-
-        Parameters
-        ----------
-        filename : str
-            File name
-        output : memh5.Group, zarr.Group or h5py.Group
-            `output` to be written. If this is a `h5py.Group` (which include `hdf5.File` objects)
-            the buffer is flushed if `filename` points to the same file and a copy is made otherwise.
-        file_format : fileformats.Zarr, fileformats.HDF5 or None
-            File format to use. If this is not specified, the file format is guessed based on the type of
-            `output` or the `filename`. If guessing is not successful, HDF5 is used.
-        **kwargs : dict
-            Arbitrary keyword arguments.
-        """
-        import h5py
-
-        from .memdata import MemGroup
-
-        file_format = fileformats.check_file_format(filename, file_format, output)
-
-        try:
-            import zarr
-        except ImportError:
-            if file_format == fileformats.Zarr:
-                raise RuntimeError("Can't write to zarr file. Please install zarr.")
-
-        # Ensure parent directory is present.
-        dirname = os.path.dirname(filename)
-        if not os.path.isdir(dirname):
-            try:
-                os.makedirs(dirname)
-            except OSError as e:
-                # It's possible the directory was created by another MPI task
-                if not os.path.isdir(dirname):
-                    raise e
-        # Cases for `output` object type.
-        if isinstance(output, MemGroup):
-            # Already in memory.
-
-            # Lock file
-            with lock_file(filename, comm=output.comm) as fn:
-                output.to_file(fn, mode="w", file_format=file_format, **kwargs)
-            return
-
-        if isinstance(output, h5py.Group):
-            if os.path.isfile(filename) and os.path.samefile(
-                output.file.filename, filename
-            ):
-                # `output` already lives in this file.
-                output.flush()
-
-            else:
-                # Copy to memory then to disk
-                # XXX This can be made much more efficient using a direct copy.
-                out_copy = MemGroup.from_hdf5(output)
-
-                # Lock file as we write
-                with lock_file(filename, comm=out_copy.comm) as fn:
-                    out_copy.to_hdf5(fn, mode="w")
-        elif isinstance(output, zarr.Group):
-            if os.path.isdir(filename) and os.path.samefile(
-                output.store.path, filename
-            ):
-                pass
-            else:
-                logger.debug(f"Copying {output.store}:{output.path} to {filename}.")
-                from . import mpitools
-
-                if mpitools.rank == 0:
-                    n_copied, n_skipped, n_bytes_copied = zarr.copy_store(
-                        output.store,
-                        zarr.DirectoryStore(filename),
-                        source_path=output.path,
-                    )
-                logger.debug(
-                    f"Copied {n_copied} items ({n_bytes_copied} bytes), skipped {n_skipped} items."
-                )
-
-
-class BasicContMixin:
-    """Provides IO for BasicCont objects in pipeline tasks.
-
-    As a mixin, this must be combined (using multiple inheritance) with a
-    subclass of `TaskBase`, providing the full task API.
-
-    Provides the methods `read_input`, `read_output` and `write_output` for
-    BasicCont data which gets written to HDF5 files.
-    """
-
-    # TODO, implement reading on disk (i.e. no copy to memory).
-    # ondisk = config.Property(default=False, proptype=bool)
-
-    # Private setting for reading of inputs, should be overriden in sub class.
-    _distributed = False
-    _comm = None
-
-    def read_input(self, filename):
-        """Method for reading hdf5 input."""
-        from .memdata import BasicCont
-
-        return BasicCont.from_file(
-            filename, distributed=self._distributed, comm=self._comm
-        )
-
-    def read_output(self, filename):
-        """Method for reading hdf5 output (from caches)."""
-        # Replicate code from read_input in case read_input is overridden.
-        from .memdata import BasicCont
-
-        return BasicCont.from_file(
-            filename, distributed=self._distributed, comm=self._comm
-        )
-
-    @staticmethod
-    def write_output(filename, output, file_format=None, **kwargs):
-        """Method for writing output to disk.
-
-        Parameters
-        ----------
-        filename : str
-            File name.
-        output : :class:`memh5.BasicCont`
-            Data to be written.
-        file_format : `fileformats.FileFormat`
-            File format to use. Default `fileformats.HDF5`.
-        **kwargs : dict
-            Arbitrary keyword arguments.
-        """
-        from .memdata import BasicCont
-
-        file_format = fileformats.check_file_format(filename, file_format, output)
-
-        # Ensure parent directory is present.
-        dirname = os.path.dirname(filename)
-        if dirname != "" and not os.path.isdir(dirname):
-            try:
-                os.makedirs(dirname)
-            except OSError as e:
-                # It's possible the directory was created by another MPI task
-                if not os.path.isdir(dirname):
-                    raise e
-        # Cases for `output` object type.
-        if not isinstance(output, BasicCont):
-            raise RuntimeError(
-                "Object to write out is not an instance of memh5.BasicCont"
-            )
-
-        # Already in memory.
-        output.save(filename, file_format=file_format, **kwargs)
-
-
-class SingleH5Base(H5IOMixin, SingleBase):
-    """Base class for tasks with hdf5 input and output.
-
-    Inherits from :class:`H5IOMixin` and :class:`SingleBase`.
-    """
-
-    pass
-
-
-class IterH5Base(H5IOMixin, IterBase):
-    """Base class for iterating over hdf5 input and output.
-
-    Inherits from :class:`H5IOMixin` and :class:`IterBase`.
-    """
-
-    pass
-
-
-# Simple tasks for bridging to Python
-# -----------------------------------
-
-
-class Input(TaskBase):
-    """Pass inputs into the pipeline from outside."""
-
-    def __init__(self, inputs=None):
-        super().__init__()
-        self.inputs = inputs or []
-        self._iter = None
-
-    def next(self):
-        """Pop and return the first element of inputs."""
-        if self._iter is None:
-            self._iter = iter(self.inputs)
-
-        try:
-            return next(self._iter)
-        except StopIteration as e:
-            raise PipelineStopIteration() from e
-
-
-class Output(TaskBase):
-    """Take outputs from the pipeline and place them in a list.
-
-    To apply some processing to pipeline output (i.e. this tasks input), use the
-    `callback` argument which will get passed the item. The return value of the
-    callback is placed in the `outputs` attribute. Note that this need not be the
-    input, so if pipeline output should be deleted to save memory you can simply
-    return `None`.
-
-    Parameters
-    ----------
-    callback : function, optional
-        A function which can apply some processing to the pipeline output.
-    """
-
-    def __init__(self, callback=None):
-        super().__init__()
-        self.outputs = []
-        self.callback = callback
-
-    def next(self, in_):
-        """Pop and return the first element of inputs."""
-        if self.callback:
-            in_ = self.callback(in_)
-
-        self.outputs.append(in_)
-
-
-# Internal Functions
-# ------------------
-
-
-def _format_product_keys(keys):
-    """Formats the pipeline task product keys.
-
-    In the pipeline config task list, the values of 'requires', 'in' and 'out'
-    are keys representing data products.  This function gets that key from the
-    task's entry of the task list, defaults to zero, and ensures it's formated
-    as a sequence of strings.
-    """
-    if keys is None:
-        return []
-
-    # Turn into a sequence if only one key was provided.
-    if not isinstance(keys, list):
-        # Making this a tuple instead of a list is significant.  It only
-        # impacts the 'out' product key and affects how return values are
-        # unpacked.
-        keys = (keys,)
-
-    # Check that all the keys provided are strings.
-    for key in keys:
-        if not isinstance(key, str):
-            msg = "Data product keys must be strings."
-            raise config.CaputConfigError(msg)
-    return keys
 
 
 if __name__ == "__main__":
