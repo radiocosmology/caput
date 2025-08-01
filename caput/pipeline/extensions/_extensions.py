@@ -11,6 +11,8 @@ from ... import config
 from ...memdata import fileformats, lock_file
 from .._core import PipelineStopIteration, TaskBase
 
+from ._configtypes import file_format
+
 __all__ = ["BasicContMixin", "H5IOMixin"]
 
 
@@ -27,7 +29,7 @@ class _OneAndOne(TaskBase):
 
     input_root = config.Property(default="None", proptype=str)
     output_root = config.Property(default="None", proptype=str)
-    output_format = config.file_format()
+    output_format = file_format()
 
     def __init__(self):
         # Inspect the `process` method to see how many arguments it takes.
@@ -198,7 +200,7 @@ class SingleBase(_OneAndOne):
 
     input_filename = config.Property(default="", proptype=str)
     output_filename = config.Property(default="", proptype=str)
-    output_format = config.file_format()
+    output_format = file_format()
     output_compression = config.Property(default=None, proptype=str)
     output_compression_opts = config.Property(default=None)
 
