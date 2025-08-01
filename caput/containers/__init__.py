@@ -3,7 +3,6 @@
 A high-level in-memory data container format for `caput.pipeline`.
 """
 
-from . import _basic, _core, _util
 from ._basic import (
     DataWeightContainer as DataWeightContainer,
     FreqContainer as FreqContainer,
@@ -26,3 +25,12 @@ try:
 except ImportError:
     COMPRESSION = None
     COMPRESSION_OPTS = None
+
+__all__ = [
+    "ContainerBase",
+    "DataWeightContainer",
+    "FreqContainer",
+    "TableBase",
+    "copy_datasets_filter",
+    "empty_like",
+]
