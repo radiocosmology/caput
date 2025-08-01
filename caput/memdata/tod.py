@@ -13,7 +13,7 @@ from typing import Any
 import h5py
 import numpy as np
 
-from .. import darray
+from .. import mpiarray
 from . import fileformats, memh5
 
 
@@ -500,7 +500,7 @@ def concatenate(
             # it is distributed).  Need to convert back to the appropriate
             # subclass of MemDataset for the initialization of output dataset.
             if not isinstance(dataset, memh5.MemDataset):
-                if distributed and isinstance(dataset, darray.MPIArray):
+                if distributed and isinstance(dataset, mpiarray.MPIArray):
                     dataset = memh5.MemDatasetDistributed.from_mpi_array(dataset)
                 else:
                     dataset = memh5.MemDatasetCommon.from_numpy_array(dataset)

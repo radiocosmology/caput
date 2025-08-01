@@ -50,8 +50,8 @@ extensions = [
         extra_link_args=omp_args,
     ),
     Extension(
-        name="caput.darray._invert_no_zero._core",
-        sources=["caput/darray/_invert_no_zero/_core.pyx"],
+        name="caput.invert_no_zero._core",
+        sources=["caput/invert_no_zero/_core.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=[*omp_args, "-g0", "-O3"],
         extra_link_args=omp_args,
