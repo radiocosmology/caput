@@ -32,8 +32,8 @@ from typing import ClassVar
 
 import numpy as np
 
-from .. import config, pipeline, truncate
 from ...memdata import fileformats, memh5
+from .. import config, pipeline, truncate
 from ._core import MPILoggedTask, SingleTask
 
 
