@@ -36,8 +36,8 @@ extensions = [
         extra_link_args=[*omp_args, "-std=c++11"],
     ),
     Extension(
-        name="caput.truncate",
-        sources=["caput/truncate.pyx"],
+        name="caput.util.truncate",
+        sources=["caput/util/truncate.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=[*omp_args, "-g0", "-O3"],
         extra_link_args=omp_args,
