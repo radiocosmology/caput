@@ -1,9 +1,11 @@
 """Tools for working with numpy arrays and subclasses."""
 
+from collections.abc import Callable, Iterable
+
 import cachetools
 import numpy as np
 
-__all__ = ["LRUCache", "listize", "scalarize", "vectorize"]
+__all__ = ["LRUCache", "listize", "scalarize", "unique_ordered", "vectorize"]
 
 
 class LRUCache(cachetools.LRUCache):
@@ -28,7 +30,27 @@ class LRUCache(cachetools.LRUCache):
         super().__init__(maxsize=size_bytes, getsizeof=_array_size)
 
 
-def vectorize(**base_kwargs):
+def unique_ordered(x: Iterable) -> list:
+    """Take unique values from an iterable with order preserved.
+
+    Parameters
+    ----------
+    x : Iterable
+        An iterable to get unique values from
+
+    Returns
+    -------
+    unique : list
+        unique items in x with order preserved
+    """
+    seen = set()
+    # So the method is only resolved once
+    seen_add = seen.add
+
+    return [i for i in x if not (i in seen or seen_add(i))]
+
+
+def vectorize(**base_kwargs) -> Callable:
     """Improved vectorization decorator.
 
     Unlike the :class:`np.vectorize` decorator this version works on methods in
@@ -80,7 +102,7 @@ def vectorize(**base_kwargs):
     return _vectorize_desc
 
 
-def scalarize(dtype=np.float64):
+def scalarize(dtype=np.float64) -> Callable:
     """Handle scalars and other iterables being passed to numpy requiring code.
 
     Parameters
@@ -161,7 +183,7 @@ def scalarize(dtype=np.float64):
     return _scalarize_desc
 
 
-def listize(**_):
+def listize(**_) -> Callable:
     """Make functions that already work with `np.ndarray` or scalars accept lists.
 
     Also works with tuples.
