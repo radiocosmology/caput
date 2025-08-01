@@ -10,4 +10,5 @@ from . import (
     objecttools as objecttools,
     pfb as pfb,
     profiler as profiler,
+    truncate as truncate,
 )
