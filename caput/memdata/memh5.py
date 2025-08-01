@@ -14,7 +14,7 @@ disk.
 
 This also allows the creation and use of :mod:`memh5` objects which can hold
 data distributed over a number of MPI processes. These
-:class:`MemDatasetDistributed` datasets hold :class:`caput.darray.MPIArray`
+:class:`MemDatasetDistributed` datasets hold :class:`caput.mpiarray.MPIArray`
 objects and can be written to, and loaded from disk like normal :class:`memh5`
 objects.  Support for this must be explicitly enabled in the root group at
 creation with the `distributed=True` flag.
@@ -64,7 +64,7 @@ from typing import TYPE_CHECKING, Any
 import h5py
 import numpy as np
 
-from .. import darray
+from .. import mpiarray
 from ..util import importtools, mpitools, objecttools
 from . import fileformats
 from .io import open_h5py_mpi
@@ -771,7 +771,7 @@ class MemGroup(_BaseGroup):
         dtype = np.dtype(dtype)
 
         # Create distributed dataset if data is an MPIArray
-        if isinstance(data, darray.MPIArray) and data.comm is not None:
+        if isinstance(data, mpiarray.MPIArray) and data.comm is not None:
             distributed = True
 
         # Enforce that distributed datasets can only exist in distributed memh5 groups.
@@ -794,7 +794,7 @@ class MemGroup(_BaseGroup):
             # Create parallel array if requested
             if distributed:
                 # Ensure we are creating from an MPIArray
-                if not isinstance(data, darray.MPIArray):
+                if not isinstance(data, mpiarray.MPIArray):
                     raise TypeError(
                         "Can only create distributed dataset from MPIArray."
                     )
@@ -900,7 +900,7 @@ class MemGroup(_BaseGroup):
         dset_compression_opts = dset.compression_opts
         dist_len = dset_shape[distributed_axis]
         _, sd, ed = mpitools.split_local(dist_len, comm=self.comm)
-        md = darray.MPIArray(
+        md = mpiarray.MPIArray(
             dset_shape, axis=distributed_axis, comm=self.comm, dtype=dset_type
         )
         md.local_array[:] = dset[sd:ed].copy()
@@ -1326,7 +1326,7 @@ class MemDatasetDistributed(MemDataset):
     ):
         super().__init__(**kwargs)
 
-        self._data = darray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
+        self._data = mpiarray.MPIArray(shape, axis=axis, comm=comm, dtype=dtype)
         self._chunks = chunks
         self._compression = compression
         self._compression_opts = compression_opts
@@ -1339,7 +1339,7 @@ class MemDatasetDistributed(MemDataset):
 
         Parameters
         ----------
-        data : darray.MPIArray
+        data : mpiarray.MPIArray
             Array to initialise from.
         chunks
             Chunking arguments
@@ -1356,7 +1356,7 @@ class MemDatasetDistributed(MemDataset):
         dset : MemDatasetDistributed
             Dataset encapsulating the MPIArray.
         """
-        if not isinstance(data, darray.MPIArray):
+        if not isinstance(data, mpiarray.MPIArray):
             raise TypeError("Object must be a numpy array (or subclass).")
 
         self = cls.__new__(cls)
@@ -2995,7 +2995,7 @@ def _distributed_group_from_file(
                     )
 
                     # Read from file into MPIArray
-                    pdata = darray.MPIArray.from_file(
+                    pdata = mpiarray.MPIArray.from_file(
                         fname,
                         item.name,
                         axis=distributed_axis,
