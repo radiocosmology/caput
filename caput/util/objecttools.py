@@ -1,7 +1,7 @@
 """Generic object utilities."""
 
 from collections import deque
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from itertools import chain
 from numbers import Number
 from sys import getsizeof
@@ -9,31 +9,7 @@ from types import ModuleType
 
 import numpy as np
 
-__all__ = [
-    "allequal",
-    "total_size",
-    "unique_ordered",
-]
-
-
-def unique_ordered(x: Iterable) -> list:
-    """Take unique values from an iterable with order preserved.
-
-    Parameters
-    ----------
-    x : Iterable
-        An iterable to get unique values from
-
-    Returns
-    -------
-    unique : list
-        unique items in x with order preserved
-    """
-    seen = set()
-    # So the method is only resolved once
-    seen_add = seen.add
-
-    return [i for i in x if not (i in seen or seen_add(i))]
+__all__ = ["allequal", "total_size"]
 
 
 def allequal(obj1, obj2):
