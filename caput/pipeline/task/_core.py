@@ -6,9 +6,9 @@ from inspect import getfullargspec
 
 import numpy as np
 
-from .._core import TaskBase
 from ... import config
 from ...memdata import fileformats, memh5
+from .._core import TaskBase
 
 
 class MPILogFilter(logging.Filter):
