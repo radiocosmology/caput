@@ -8,7 +8,7 @@ Fourier transforming each of these two axes of the distributed array::
     import numpy as np
     from mpi4py import MPI
 
-    from caput.darray import MPIArray
+    from caput.mpiarray import MPIArray
 
     nfreq = 32
     nprod = 2
@@ -60,7 +60,7 @@ Global Slicing Examples
 Here is an example of this in action. Create and set an MPI array:
 
 >>> import numpy as np
->>> from caput.darray import MPIArray
+>>> from caput.mpiarray import MPIArray
 >>> from caput.util import mpitools
 >>>
 >>> arr = MPIArray((mpitools.size, 3), dtype=np.float64)
@@ -203,7 +203,7 @@ result in an exception
 ...  MPIArray((mpitools.size, 4), axis=1))  # doctest: +NORMALIZE_WHITESPACE
 Traceback (most recent call last):
     ...
-caput.darray._mpiarray.AxisException: Input argument 1 has an incompatible distributed axis.
+caput.mpiarray.AxisException: Input argument 1 has an incompatible distributed axis.
 
 Summation across a non-parallel axis
 
