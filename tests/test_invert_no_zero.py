@@ -4,7 +4,8 @@ from mpi4py import MPI
 import numpy as np
 import pytest
 
-from caput.darray import invert_no_zero, MPIArray
+from caput.mpiarray import MPIArray
+from caput.algorithms.invert_no_zero import invert_no_zero
 
 
 ARRAY_SIZE = (100, 111)
