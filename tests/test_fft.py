@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from caput import fft
+from caput.algorithms import fft
 
 
 ARRAY_SIZE = (100, 111)
