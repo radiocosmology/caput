@@ -4,7 +4,7 @@ Fast invert which maintins zeros.
 """
 
 import numpy as np
-from ._core import _invert_no_zero
+from ._invert_no_zero import _invert_no_zero
 
 
 __all__ = [
