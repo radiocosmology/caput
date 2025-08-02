@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from caput.median import weighted_median, moving_weighted_median
+from caput.algorithms.median import weighted_median, moving_weighted_median
 
 
 def py_weighted_median(data, weights):
