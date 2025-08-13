@@ -378,7 +378,7 @@ def queue(
         Only used for slurm.
         A list of modules environments to load before running a job.
         If set, a module purge will occur before loading the specified modules.
-        Sticky modules like StdEnv/* on Fir will not get purged, and
+        Sticky modules like StdEnv/* on Cedar and Fir will not get purged, and
         should not be specified.
         If not set, the current environment is used.
     ``module_path``
