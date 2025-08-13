@@ -355,7 +355,7 @@ def queue(
     \b
     ``system``
         A name of the cluster that we are running on, if this is supported
-        (currently ``gpc`` and ``cedar``), this uses more relevant default
+        (currently ``gpc``, ``cedar``, ``fir``), this uses more relevant default
         values.
     ``queue_sys``
         The queue system to run on. Either ``pbs`` or ``slurm``.
@@ -378,7 +378,7 @@ def queue(
         Only used for slurm.
         A list of modules environments to load before running a job.
         If set, a module purge will occur before loading the specified modules.
-        Sticky modules like StdEnv/* on Cedar will not get purged, and
+        Sticky modules like StdEnv/* on Fir will not get purged, and
         should not be specified.
         If not set, the current environment is used.
     ``module_path``
@@ -427,6 +427,7 @@ def queue(
     system_defaults = {
         "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
         "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
+        "fir": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
     }
 
     # Start to generate the full resolved config
