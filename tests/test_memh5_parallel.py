@@ -9,7 +9,7 @@ import copy
 
 from caput.memdata import fileformats, memh5
 from caput.util import mpitools
-from caput.darray import MPIArray
+from caput.mpiarray import MPIArray
 
 
 comm = mpitools.world
