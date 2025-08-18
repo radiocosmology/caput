@@ -12,8 +12,4 @@ from .memh5 import (
     is_group as is_group,
 )
 from .io import lock_file as lock_file
-from . import (
-    fileformats as fileformats,
-    io as io,
-    tod as tod,
-)
+from . import fileformats as fileformats, io as io

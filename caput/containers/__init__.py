@@ -15,6 +15,7 @@ from ._util import (
     empty_like as empty_like,
     copy_datasets_filter as copy_datasets_filter,
 )
+from . import tod as tod
 
 # Try to import bitshuffle to set the default compression options
 try:
