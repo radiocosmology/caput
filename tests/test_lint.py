@@ -6,7 +6,7 @@ from click.testing import CliRunner
 
 from caput.config import Property
 from caput.pipeline import TaskBase
-from caput.scripts import runner as caput_script
+from caput.pipeline import cli as caput_script
 
 
 class DoNothing(TaskBase):
