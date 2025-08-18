@@ -14,7 +14,7 @@ import h5py
 import numpy as np
 
 from .. import mpiarray
-from . import fileformats, memh5
+from ..memdata import fileformats, memh5
 
 
 class TOData(memh5.BasicCont):
