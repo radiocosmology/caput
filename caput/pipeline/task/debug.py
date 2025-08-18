@@ -148,7 +148,7 @@ class SaveModuleVersions(SingleTask):
         """Save module versions."""
         fname = f"{self.root}_versions.yml"
         f = open(fname, "w")
-        f.write(yaml.dump(self.versions))
+        f.write(yaml.safe_dump(self.versions))
         f.close()
         self.done = True
 
@@ -176,7 +176,7 @@ class SaveConfig(SingleTask):
         """Save module versions."""
         fname = f"{self.root}_config.yml"
         f = open(fname, "w")
-        f.write(yaml.dump(self.pipeline_config))
+        f.write(yaml.safe_dump(self.pipeline_config))
         f.close()
         self.done = True
 
