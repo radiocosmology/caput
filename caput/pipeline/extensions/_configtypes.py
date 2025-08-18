@@ -3,7 +3,6 @@
 from ...config import CaputConfigError, Property
 from ...memdata import fileformats
 
-
 __all__ = ["file_format"]
 
 
