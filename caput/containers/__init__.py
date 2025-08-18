@@ -1,6 +1,13 @@
 """caput.containers.
 
 A high-level in-memory data container format for `caput.pipeline`.
+
+Submodules
+----------
+.. autosummary::
+   :toctree: _autosummary
+
+   tod
 """
 
 from ._basic import (

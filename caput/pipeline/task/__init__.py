@@ -1,6 +1,16 @@
 """caput.pipeline.task.
 
 Base classes for building tasks for `caput.pipeline`.
+
+Submodules
+----------
+.. autosummary::
+   :toctree: _autosummary
+
+   debug
+   flow
+   io
+   random
 """
 
 from ._base import (
