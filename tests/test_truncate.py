@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from caput import truncate
+from caput.util import truncate
 
 
 def test_bit_truncate():
