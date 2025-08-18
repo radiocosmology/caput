@@ -3,7 +3,7 @@
 Base classes for building tasks for `caput.pipeline`.
 """
 
-from ._core import (
+from ._base import (
     SingleTask as SingleTask,
     MPILoggedTask as MPILoggedTask,
     SetMPILogging as SetMPILogging,
@@ -12,7 +12,7 @@ from ._core import (
 
 from . import (
     debug as debug,
-    basic as basic,
+    flow as flow,
     io as io,
     random as random,
 )

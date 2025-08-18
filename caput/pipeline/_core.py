@@ -1,4 +1,4 @@
-"""Core pipeline task infrastructure."""
+"""Core pipeline infrastructure."""
 
 import importlib
 import inspect

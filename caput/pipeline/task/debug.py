@@ -1,10 +1,11 @@
 """Pipeline task used for debugging and environment checks."""
 
 import numpy as np
-from yaml import dump as yamldump
+import yaml
 
-from .. import config, pipeline
-from ._core import MPILoggedTask, SetMPILogging, SingleTask
+from ... import config
+from .._core import TaskBase
+from ._base import MPILoggedTask, SetMPILogging, SingleTask
 
 
 class CheckMPIEnvironment(MPILoggedTask):
@@ -117,7 +118,7 @@ class DebugInfo(MPILoggedTask, SetMPILogging):
         return package_list
 
 
-class Print(pipeline.TaskBase):
+class Print(TaskBase):
     """Stupid module which just prints whatever it gets. Good for debugging."""
 
     def next(self, input_):
@@ -147,7 +148,7 @@ class SaveModuleVersions(SingleTask):
         """Save module versions."""
         fname = f"{self.root}_versions.yml"
         f = open(fname, "w")
-        f.write(yamldump(self.versions))
+        f.write(yaml.dump(self.versions))
         f.close()
         self.done = True
 
@@ -175,7 +176,7 @@ class SaveConfig(SingleTask):
         """Save module versions."""
         fname = f"{self.root}_config.yml"
         f = open(fname, "w")
-        f.write(yamldump(self.pipeline_config))
+        f.write(yaml.dump(self.pipeline_config))
         f.close()
         self.done = True
 
