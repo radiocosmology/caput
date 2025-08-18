@@ -8,7 +8,8 @@ import numpy as np
 
 from ... import config
 from ...memdata import fileformats, memh5
-from .._core import TaskBase
+from .._core import PipelineRuntimeError, PipelineStopIteration, TaskBase
+from ..extensions import BasicContMixin
 
 
 class MPILogFilter(logging.Filter):
@@ -197,7 +198,7 @@ class MPILoggedTask(MPITask, LoggedTask):
         self._log = logadapter
 
 
-class SingleTask(MPILoggedTask, pipeline.BasicContMixin):
+class SingleTask(MPILoggedTask, BasicContMixin):
     """Process a task with at most one input and output.
 
     Both input and output are expected to be :class:`memh5.BasicCont` objects.
@@ -334,7 +335,7 @@ class SingleTask(MPILoggedTask, pipeline.BasicContMixin):
                 "`process` method may not have variable length or optional"
                 " arguments."
             )
-            raise pipeline.PipelineRuntimeError(msg)
+            raise PipelineRuntimeError(msg)
 
         if n_args == 0:
             self._no_input = True
@@ -350,7 +351,7 @@ class SingleTask(MPILoggedTask, pipeline.BasicContMixin):
         # This should only be called once.
         try:
             if self.done:
-                raise pipeline.PipelineStopIteration()
+                raise PipelineStopIteration()
         except AttributeError:
             self.done = True
 
@@ -428,7 +429,7 @@ class SingleTask(MPILoggedTask, pipeline.BasicContMixin):
 
     def _process_output(self, output, ii: int = 0):
         if not isinstance(output, memh5.MemDiskGroup):
-            raise pipeline.PipelineRuntimeError(
+            raise PipelineRuntimeError(
                 f"Task must output a valid memh5 container; given {type(output)}"
             )
 
@@ -542,7 +543,7 @@ class SingleTask(MPILoggedTask, pipeline.BasicContMixin):
         # Returns the output or, None if it should be skipped
 
         if not isinstance(output, memh5.MemDiskGroup):
-            raise pipeline.PipelineRuntimeError(
+            raise PipelineRuntimeError(
                 f"Task must output a valid memh5 container; given {type(output)}"
             )
 
