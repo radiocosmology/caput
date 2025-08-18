@@ -5,7 +5,7 @@ import zlib
 import numpy as np
 
 from ... import config
-from ...blaze import random
+from ...algs import random
 from ._base import MPILoggedTask
 
 

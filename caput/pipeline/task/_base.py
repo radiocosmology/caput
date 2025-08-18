@@ -8,8 +8,8 @@ import numpy as np
 
 from ... import config
 from ...memdata import fileformats, memh5
+from .. import extensions
 from .._core import PipelineRuntimeError, PipelineStopIteration, TaskBase
-from ..extensions import BasicContMixin
 
 
 class MPILogFilter(logging.Filter):
@@ -198,7 +198,7 @@ class MPILoggedTask(MPITask, LoggedTask):
         self._log = logadapter
 
 
-class SingleTask(MPILoggedTask, BasicContMixin):
+class SingleTask(MPILoggedTask, extensions.BasicContMixin):
     """Process a task with at most one input and output.
 
     Both input and output are expected to be :class:`memh5.BasicCont` objects.
@@ -302,7 +302,7 @@ class SingleTask(MPILoggedTask, BasicContMixin):
         default="{output_root}{tag}.h5",
         proptype=lambda x: x if isinstance(x, list) else str(x),
     )
-    output_format = config.file_format()
+    output_format = extensions.file_format()
     compression = config.Property(
         default=True, proptype=lambda x: x if isinstance(x, dict) else bool(x)
     )
