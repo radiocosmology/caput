@@ -1,7 +1,7 @@
 """Simple pipeline task used for things like data flow."""
 
-from .. import config
-from ._core import MPILoggedTask, SingleTask
+from ... import config
+from ._base import MPILoggedTask, SingleTask
 
 
 class AccumulateList(MPILoggedTask):

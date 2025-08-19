@@ -28,16 +28,16 @@ else:
 # Set up project extensions
 extensions = [
     Extension(
-        name="caput.median.weighted",
-        sources=["caput/median/weighted.pyx"],
+        name="caput.algs.median.weighted",
+        sources=["caput/algs/median/weighted.pyx"],
         include_dirs=[numpy.get_include()],
         language="c++",
         extra_compile_args=[*omp_args, "-std=c++11", "-g0", "-O3"],
         extra_link_args=[*omp_args, "-std=c++11"],
     ),
     Extension(
-        name="caput.truncate",
-        sources=["caput/truncate.pyx"],
+        name="caput.util.truncate",
+        sources=["caput/util/truncate.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=[*omp_args, "-g0", "-O3"],
         extra_link_args=omp_args,
@@ -50,8 +50,8 @@ extensions = [
         extra_link_args=omp_args,
     ),
     Extension(
-        name="caput.darray._invert_no_zero._core",
-        sources=["caput/darray/_invert_no_zero/_core.pyx"],
+        name="caput.algs.invert_no_zero._core",
+        sources=["caput/algs/invert_no_zero/_core.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=[*omp_args, "-g0", "-O3"],
         extra_link_args=omp_args,

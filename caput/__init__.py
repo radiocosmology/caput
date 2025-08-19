@@ -6,9 +6,7 @@ Submodules
     :toctree: _autosummary
 
     config
-    pipeline
-    random
-    truncate
+    mpiarray
 """
 
 from importlib.metadata import PackageNotFoundError, version

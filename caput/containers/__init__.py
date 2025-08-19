@@ -1,9 +1,15 @@
 """caput.containers.
 
 A high-level in-memory data container format for `caput.pipeline`.
+
+Submodules
+----------
+.. autosummary::
+   :toctree: _autosummary
+
+   tod
 """
 
-from . import _basic, _core, _util
 from ._basic import (
     DataWeightContainer as DataWeightContainer,
     FreqContainer as FreqContainer,
@@ -16,6 +22,7 @@ from ._util import (
     empty_like as empty_like,
     copy_datasets_filter as copy_datasets_filter,
 )
+from . import tod as tod
 
 # Try to import bitshuffle to set the default compression options
 try:
@@ -26,3 +33,12 @@ try:
 except ImportError:
     COMPRESSION = None
     COMPRESSION_OPTS = None
+
+__all__ = [
+    "ContainerBase",
+    "DataWeightContainer",
+    "FreqContainer",
+    "TableBase",
+    "copy_datasets_filter",
+    "empty_like",
+]

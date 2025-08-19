@@ -1,27 +1,56 @@
-"""Caput distributed arrays.
+"""Tools for working with numpy arrays and subclasses."""
 
-An MPI-aware numpy array and array utilities.
-"""
+from collections.abc import Callable, Iterable
 
+import cachetools
 import numpy as np
 
-from . import _cache, _invert_no_zero, _mpiarray
-from ._cache import *  # noqa: F403
-from ._invert_no_zero import *  # noqa: F403
-from ._mpiarray import *  # noqa: F403
+__all__ = ["LRUCache", "listize", "scalarize", "unique_ordered", "vectorize"]
 
 
-__all__ = [
-    "listize",
-    "scalarize",
-    "vectorize",
-    *_cache.__all__,
-    *_invert_no_zero.__all__,
-    *_mpiarray.__all__,
-]
+class LRUCache(cachetools.LRUCache):
+    """An LRU cache for numpy arrays that will expand to a maximum size in bytes.
+
+    This should be used like a dictionary except that the least recently used entries
+    are evicted to restrict memory usage to the specified maximum.
+
+    Parameters
+    ----------
+    size_bytes
+        The maximum size of the cache in bytes.
+    """
+
+    def __init__(self, size_bytes: int):
+        def _array_size(arr: np.ndarray):
+            if not isinstance(arr, np.ndarray):
+                raise ValueError(f"Item must be a numpy array. Got {type(arr)}.")
+
+            return arr.nbytes
+
+        super().__init__(maxsize=size_bytes, getsizeof=_array_size)
 
 
-def vectorize(**base_kwargs):
+def unique_ordered(x: Iterable) -> list:
+    """Take unique values from an iterable with order preserved.
+
+    Parameters
+    ----------
+    x : Iterable
+        An iterable to get unique values from
+
+    Returns
+    -------
+    unique : list
+        unique items in x with order preserved
+    """
+    seen = set()
+    # So the method is only resolved once
+    seen_add = seen.add
+
+    return [i for i in x if not (i in seen or seen_add(i))]
+
+
+def vectorize(**base_kwargs) -> Callable:
     """Improved vectorization decorator.
 
     Unlike the :class:`np.vectorize` decorator this version works on methods in
@@ -73,7 +102,7 @@ def vectorize(**base_kwargs):
     return _vectorize_desc
 
 
-def scalarize(dtype=np.float64):
+def scalarize(dtype=np.float64) -> Callable:
     """Handle scalars and other iterables being passed to numpy requiring code.
 
     Parameters
@@ -154,7 +183,7 @@ def scalarize(dtype=np.float64):
     return _scalarize_desc
 
 
-def listize(**_):
+def listize(**_) -> Callable:
     """Make functions that already work with `np.ndarray` or scalars accept lists.
 
     Also works with tuples.

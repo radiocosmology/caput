@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from ..darray._mpiarray import _apply_sel
 from ..memdata import memh5
+from ..mpiarray import _apply_sel
 from ._core import ContainerBase
 
 

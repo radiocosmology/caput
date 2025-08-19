@@ -1,7 +1,7 @@
 """Unit tests for the tools module."""
 
 import numpy as np
-from caput import darray
+from caput import mpiarray
 from caput.util import objecttools
 
 
@@ -17,12 +17,12 @@ def test_allequal():
     # Test numpy arrays and mpiarrays
     assert objecttools.allequal(np.array([1, 2, 3]), np.array([1, 2, 3]))
     assert objecttools.allequal(
-        darray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
-        darray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
+        mpiarray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
+        mpiarray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
     )
     assert not objecttools.allequal(
         np.array([1, 2, 3]),
-        darray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
+        mpiarray.MPIArray.wrap(np.array([1, 2, 3]), axis=0),
     )
 
     # Test objects with numpy arrays in them
