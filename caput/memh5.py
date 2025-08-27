@@ -2685,16 +2685,6 @@ def deep_group_copy(
             )
         compression_kwargs["chunks"] = getattr(dset, "chunks", None)
 
-        # disable compression if not enabled for HDF5 files
-        # https://github.com/chime-experiment/Pipeline/issues/33
-        if (
-            to_file
-            and file_format == fileformats.HDF5
-            and not fileformats.HDF5.compression_enabled()
-            and isinstance(dset, MemDatasetDistributed)
-        ):
-            compression_kwargs = {}
-
         return compression_kwargs
 
     # If copying to file, datasets are not shared, so ensure that these
