@@ -129,18 +129,18 @@ def test_io(
         assert "world" in f["hello"]
 
         # Check compression/chunks
-        if file_format is fileformats.Zarr:
-            if chunks is None:
+        if chunks is None:
+            if file_format is fileformats.HDF5:
+                assert f["parallel_data"].chunks is None
+
+            elif file_format is fileformats.Zarr:
                 assert f["parallel_data"].chunks == f["parallel_data"].shape
                 assert f["parallel_data"].compressor is None
-            else:
-                assert f["parallel_data"].chunks == chunks
+        else:
+            assert f["parallel_data"].chunks == chunks
+
+            if file_format is fileformats.Zarr:
                 assert f["parallel_data"].compressor is not None
-        elif file_format is fileformats.HDF5:
-            # compression should be disabled
-            # (for some reason .compression is not set...)
-            assert str(fileformats.H5FILTER) not in f["parallel_data"]._filters
-            assert f["parallel_data"].chunks is None
 
     # Test that the read in group has the same structure as the original
     g2 = memh5.MemGroup.from_file(
