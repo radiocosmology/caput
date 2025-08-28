@@ -1,36 +1,58 @@
-"""A set of useful constants and conversions in Astronomy and Cosmology.
+r"""Constants and conversions for astronomy and cosmology.
 
-Most constants are just imported directly from `scipy.constants`.
-A few other units are defined here, as well as some aliases.
+Re-exports all constants in `scipy.constants`_, along with a few extras.
+
+Dynamic prefixes are also supported, using all prefixes defined
+in `scipy.constants`. Prefixes are separated from the
+unit by an underscore.
+
+Examples
+--------
+Prefixes are automatically multiplied. In this example, the `kilo`
+prefix multiplies the base unit `gram`.
+
+>>> from caput.astro import constants
+>>> constants.kilo_gram
+1.0
+
+.. _`scipy.constants`: https://docs.scipy.org/doc/scipy/reference/constants.html
 """
 
 from scipy.constants import *
 
 ## Include a handful of useful units which are not
 ## included in `scipy.constants`.
-#: Solar masses in kg
-solar_mass = 1.98892e30
-#: One second in seconds
-second = 1.0
-#: One sidereal day in seconds
-t_sidereal = 23.9344696 * hour
-#: Radiation constant (in J m^{-3} K^{-4})
-a_rad = 4 * Stefan_Boltzmann / c
-#: 21cm transition frequency (in MHz)
-nu21 = 1420.40575177
-# The approximate length of a UT1 second in SI seconds (i.e. LOD / 86400). This was
-# calculated from the IERS EOP C01 IAU2000 data, by calculating the derivative of UT1 -
-# TAI from 2019.5 to 2020.5. Note that the variations in this are quite substantial,
-# but it's typically 1ms over the course of a day
-UT1_second = 1.00000000205
-# Approximate number of seconds in a sidereal second.
-# The exact value used here is from https://hpiers.obspm.fr/eop-pc/models/constants.html
-# but can be derived from USNO Circular 179 Equation 2.12
-sidereal_second = 1.0 / 1.002737909350795 * UT1_second
-# Approximate length of a stellar second
-# This comes from the definition of ERA-UT1 (see IERS Conventions TR Chapter 1) giving
-# the first ratio a UT1 and stellar second
-stellar_second = 1.0 / 1.00273781191135448 * UT1_second
+
+solar_mass: float = 1.98892e30
+"""Solar mass in kg."""
+
+second: float = 1.0
+"""One second in seconds."""
+
+t_sidereal: float = 23.9344696 * hour
+"""One sidereal day in seconds, equal to `23.9344696 * hour`."""
+
+a_rad: float = 4.0 * Stefan_Boltzmann / c
+r"""Radiation constant (in J m\ :sup:`-3` K\ :sup:`-4}`, equal to `4 * Stefan_Boltzmann / c`."""
+
+nu21: float = 1420.40575177
+"""21cm transition frequency (in MHz)."""
+
+UT1_second: float = 1.00000000205
+"""The approximate length of a UT1 second in SI seconds (i.e. LOD / 86400). This was
+calculated from the IERS EOP C01 IAU2000 data, by calculating the derivative of UT1 -
+TAI from 2019.5 to 2020.5. Note that the variations in this are quite substantial,
+but it's typically 1ms over the course of a day."""
+
+sidereal_second: float = 1.0 / 1.002737909350795 * UT1_second
+"""Approximate number of seconds in a sidereal second.
+The exact value used here is from https://hpiers.obspm.fr/eop-pc/models/constants.html
+but can be derived from USNO Circular 179 Equation 2.12."""
+
+stellar_second: float = 1.0 / 1.00273781191135448 * UT1_second
+"""Approximate length of a stellar second.
+This comes from the definition of ERA-UT1 (see IERS Conventions TR Chapter 1) giving
+the first ratio a UT1 and stellar second."""
 
 # Aliases. Included in this dict in case we ever want
 # to change/remove them

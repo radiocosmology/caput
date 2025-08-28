@@ -3,7 +3,7 @@ r"""Time and ephemeris calculations for a local observer.
 Local Time Utilities
 ====================
 
-Routines which are location specific are grouped into the location aware class :py:class:`Observer`.
+Routines are provided through the location-aware class :py:class:`Observer`.
 
 This class can be used to calculate Local Stellar Angle (LSA), and the Local
 Stellar Day (LSD). LSA is an equivalent to the Local Sidereal Time based around
@@ -25,16 +25,27 @@ Note that the quantities LSA and LSD are not really used elsewhere. However, the
 concept of a Stellar Day as a length of time is well established (`IERS
 constants`_), and the Stellar Angle is an older term for the Earth Rotation
 Angle (`NFA Glossary`_).
+
+.. _`NFA Glossary`: http://syrte.obspm.fr/iauWGnfa/NFA_Glossary.pdf
+
+.. _`IERS constants`: http://hpiers.obspm.fr/eop-pc/models/constants.html
 """
 
-__all__ = ["Observer"]
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypeVar, overload
+
+if TYPE_CHECKING:
+    import numpy.typing as npt
 
 from datetime import datetime, timezone
 
 import numpy as np
 from scipy.optimize import brentq
+from skyfield.jpllib import ChebyshevPosition
 from skyfield.starlib import Star
 from skyfield.units import Angle
+from skyfield.vectorlib import VectorSum
 
 from .. import config
 from ..util import arraytools
@@ -42,96 +53,10 @@ from . import constants
 from . import skyfield as csf
 from . import time as ctime
 
-
-def _fixup_interval_and_step(t0, t1, step):
-    # Work routine used by Observer._sr_work and transit_times to sanitise the
-    # caller-supplied interval and initial step duration.
-    #
-    # Returns the interval limits converted to TT JD and the computed
-    # initial step size
-
-    # Get the ends of the search interval
-    t0 = ctime.ensure_unix(t0)
-    if t1 is None:
-        t1 = t0 + 24 * 3600.0 * constants.stellar_second
-    else:
-        t1 = ctime.ensure_unix(t1)
-        if t1 <= t0:
-            raise ValueError("End of the search interval (t1) is before the start (t0)")
-
-    # Calculate the initial search step
-    if step is None:
-        if t1 - t0 >= 24 * 3600.0:
-            step = 0.2
-        else:
-            step = (t1 - t0) / (5 * 24 * 3600.0)
-    elif step * 24 * 3600 >= t1 - t0:
-        raise ValueError("Initial search step is larger than the search interval")
-
-    # Convert the UNIX start and end times into Julian Days
-    t0jd, t1jd = csf.unix_to_skyfield_time([t0, t1]).tt
-
-    return t0jd, t1jd, step
+_SkySourceLike = TypeVar("_SkySourceLike", bound=Star | VectorSum | ChebyshevPosition)
 
 
-def _solve_all(f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kwargs):
-    """Find all roots of function f, within the interval [x0, x1].
-
-    To find all the roots we need an estimate of the spacing of the roots. This is
-    specified by the parameter `dx`. If this is too large, roots may be missed.
-
-    Parameters
-    ----------
-    f : callable
-        A numpy vectorized function which returns a single value f(x).
-    x0, x1 : float
-        The start and end of the interval to search.
-    dx : float
-        An interval known to be less than the spacing between the closest roots.
-    skip_increasing, skip_decreasing : bool, optional
-        Skip roots where the gradient is positive (or negative).
-    **kwargs
-        Passed to `scipy.optimize.brentq`. `xtol`, `rtol` and `maxiter` are probably
-        the most useful.
-
-    Returns
-    -------
-    roots : np.ndarray[np.float64]
-        The values of the roots found.
-    increasing : np.ndarray[bool]
-        If the gradient at the root is positive.
-    """
-    # Form a grid of points to find intervals to search over
-    x_init = np.linspace(x0, x1, int(np.ceil((x1 - x0) / dx)), endpoint=True)
-    f_init = f(x_init)
-
-    roots = []
-    increasing = []
-
-    # Search through intervals
-    for xa, xb, fa, fb in zip(x_init[:-1], x_init[1:], f_init[:-1], f_init[1:]):
-        # Entries are the same sign, so there is no solution in between.
-        # NOTE: we need to deal with the case where one edge might be an exact root,
-        # hence the strictly greater than 0.0
-        if fa * fb > 0.0:
-            continue
-
-        is_increasing = fa < fb
-
-        # Skip positive gradient roots
-        if skip_increasing and is_increasing:
-            continue
-
-        # Skip negative gradient roots
-        if skip_decreasing and not is_increasing:
-            continue
-
-        root = brentq(f, xa, xb, **kwargs)
-
-        roots.append(root)
-        increasing.append(is_increasing)
-
-    return (np.array(roots, dtype=np.float64), np.array(increasing, dtype=bool))
+__all__ = ["Observer"]
 
 
 class Observer:
@@ -139,16 +64,16 @@ class Observer:
 
     Parameters
     ----------
-    longitude : float
+    lon : float
         Longitude of observer in degrees.
-    latitude : float
+    lat : float
         Latitude of observer in degrees.
-    altitude : float, optional
+    alt : float
         Altitude of observer in metres.
-    lsd_start : float or datetime, optional
+    lsd_start : int | float, optional
         The zeroth LSD. If not set use the J2000 epoch start.
-    sf_wrapper
-        (optional) Skyfield wrapper
+    sf_wrapper : :py:class:`~caput.astro.skyfield.SkyfieldWrapper`, optional
+        Skyfield wrapper.
 
     Attributes
     ----------
@@ -158,8 +83,8 @@ class Observer:
         Latitude of observer in degrees.
     altitude : float
         Altitude of observer in metres.
-    lsd_start_day : float
-        UNIX time on the zeroth LSD. The actual zero point is the first time of
+    lsd_start_day : int | float, optional
+        UNIX time on the zeroth LSD. The actual zero point is the first instance of
         `LSA = 0.0` after the `lsd_start_day`.
     """
 
@@ -182,7 +107,7 @@ class Observer:
 
     _obs = None
 
-    def get_current_lsd(self) -> float:
+    def get_current_lsd(self):
         """Get the current LSD."""
         return self.lsd(ctime.datetime_to_unix(datetime.now(timezone.utc))).astype(
             np.float64
@@ -193,7 +118,8 @@ class Observer:
 
         Returns
         -------
-        obs : :class:`skyfield.toposlib.Topos`
+        skyfield_topos : skyfield.toposlib.Topos
+            Syfield object representing the current location.
         """
         from skyfield.api import Topos
 
@@ -212,17 +138,18 @@ class Observer:
     def unix_to_lsa(self, time):
         """Calculate the Local Stellar Angle.
 
-        This is the angle between the current meridian and the CIO, i.e. the ERA +
-        longitude.
+        This is the angle between the current meridian and the CIRS Celestial
+        Intermediate Origin (CIO), i.e. the ERA + longitude.
 
         Parameters
         ----------
-        time : float
+        time : array_like
             Unix time.
 
         Returns
         -------
-        lsa : float
+        lsa : ndarray
+            Local Stellar Angle in degrees.
         """
         era = ctime.unix_to_era(time)
 
@@ -236,15 +163,15 @@ class Observer:
 
         Parameters
         ----------
-        lsa : scalar or np.ndarray
-            Local Earth Rotation Angle degrees to convert.
-        time0 : scalar or np.ndarray
-            An earlier time within 24 sidereal hours. For example,
+        lsa : array_like
+            Local Stellar Angle to convert, in degrees.
+        time0 : array_like
+            An earlier UNIX time within 24 sidereal hours. For example,
             the start of the solar day of the observation.
 
         Returns
         -------
-        time : scalar or np.ndarray
+        time : ndarray
             Corresponding UNIX time.
         """
         era = (lsa - self.longitude) % 360.0
@@ -257,6 +184,7 @@ class Observer:
         Returns
         -------
         lsd_zero : float
+            Zero point of LSD as UNIX time.
         """
         return self.lsa_to_unix(0.0, self.lsd_start_day)
 
@@ -270,12 +198,13 @@ class Observer:
 
         Parameters
         ----------
-        time :  float or array of
-            UNIX time
+        time : array_like
+            UNIX time.
 
         Returns
         -------
-        lsd : float or array of
+        lsd : ndarray
+            LSD representation of provided time.
         """
         # Get fractional part from LRA
         frac_part = self.unix_to_lsa(time) / 360.0
@@ -300,13 +229,13 @@ class Observer:
 
         Parameters
         ----------
-        lsd : float or array of
-            Local Stellar Day to convert to unix
+        lsd : array_like
+            Local Stellar Day to convert to unix.
 
         Returns
         -------
-        time :  float or array of
-            UNIX time
+        unix_time : ndarray
+            UNIX time.
         """
         # Find the approximate UNIX time
         approx_unix = self.lsd_zero() + lsd * 3600 * 24 * constants.sidereal_second
@@ -326,12 +255,12 @@ class Observer:
 
         Parameters
         ----------
-        unix : float or array of
+        unix : array_like
             UNIX time in floating point seconds since the epoch.
 
         Returns
         -------
-        lst : float or array of
+        lst : ndarray
             The apparent LST in degrees.
         """
         st = csf.unix_to_skyfield_time(unix)
@@ -350,12 +279,12 @@ class Observer:
 
         Parameters
         ----------
-        time : float or array of floats
+        time : array_like
             Time as specified by the Unix/POSIX time.
 
         Returns
         -------
-        transit_RA : float or array of floats
+        RA : float
             Transiting RA in degrees.
 
         Notes
@@ -395,19 +324,19 @@ class Observer:
 
         Parameters
         ----------
-        source : skyfield source or float
+        source : _SkySourceLike
             The source we are calculating the transit of. This can be any body
             skyfield can observe, such as a star (`skyfield.api.Star`), planet or
             moon (`skyfield.vectorlib.VectorSum` or
             `skyfield.jpllib.ChebyshevPosition`). Additionally if a float is passed,
             this is equivalent to a body with ICRS RA given by the float, and DEC=0.
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that can be converted to a UNIX
             time by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of transit, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
@@ -420,10 +349,10 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             UNIX times of transits.
-        dec : np.ndarray
-            Only returned if `return_dec` is set. Declination of source at transit.
+        dec : bool (if `return_dec`)
+            Declination of source at transit, if `return_dec` is set.
         """
         if isinstance(source, float):
             source = csf.skyfield_star_from_ra_dec(source, 0.0)
@@ -464,21 +393,21 @@ class Observer:
 
         Parameters
         ----------
-        source : skyfield source
+        source : _SkySourceLike
             The source we are calculating the rising and setting of.
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of risings and settings, and should be set to something less than the
             spacing between events.  If None is passed, an initial search step of
             0.2 days, or else one fifth of the specified interval, is used, whichever
             is smaller.
-        diameter : float
+        diameter : float, optional
             The size of the source in degrees. Use this to ensure the whole source is
             below the horizon. Also, if the local horizon is higher (i.e. mountains),
             this can be set to a negative value to account for this.  You may also
@@ -487,9 +416,9 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Source rise/set times as UNIX epoch times.
-        rising : np.ndarray
+        rise_or_set : bool ndarray
             Boolean array of whether the time corresponds to a rising (True) or
             setting (False).
         """
@@ -505,20 +434,20 @@ class Observer:
 
         Parameters
         ----------
-        source : skyfield source
+        source : _SkySourceLike
             The source we are calculating the rising of.
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of rising, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
             or else one fifth of the specified interval, is used, whichever is smaller.
-        diameter : float
+        diameter : float, optional
             The size of the source in degrees. Use this to ensure the whole source is
             below the horizon. Also, if the local horizon is higher (i.e. mountains),
             this can be set to a negative value to account for this.  You may also
@@ -527,7 +456,7 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Source rise times as UNIX epoch times.
         """
         return self._sr_work(
@@ -542,20 +471,20 @@ class Observer:
 
         Parameters
         ----------
-        source : skyfield source
+        source : _SkySourceLike
             The source we are calculating the setting of.
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of setting, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
             or else one fifth of the specified interval, is used, whichever is smaller.
-        diameter : float
+        diameter : float, optional
             The size of the source in degrees. Use this to ensure the whole source is
             below the horizon. Also, if the local horizon is higher (i.e. mountains),
             this can be set to a negative value to account for this.  You may also
@@ -564,7 +493,7 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Source rise times as UNIX epoch times.
         """
         return self._sr_work(
@@ -576,13 +505,13 @@ class Observer:
 
         Parameters
         ----------
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of transit, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
@@ -591,11 +520,12 @@ class Observer:
             By default this only returns the upper (regular) transit. This will cause
             lower transits to be returned instead.
         return_dec : bool, optional
-            If set, also return the declination of the source at transit.
+            If set, also return the declination of the source at transit. Default
+            is ``False``
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Solar transit times as UNIX epoch times.
         """
         return self.transit_times(
@@ -607,13 +537,13 @@ class Observer:
 
         Parameters
         ----------
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of transit, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
@@ -626,7 +556,7 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Lunar transit times as UNIX epoch times.
         """
         return self.transit_times(
@@ -643,13 +573,13 @@ class Observer:
 
         Parameters
         ----------
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of setting, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
@@ -657,7 +587,7 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Solar setting times as UNIX epoch times.
         """
         return self.set_times(
@@ -678,13 +608,13 @@ class Observer:
 
         Parameters
         ----------
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of setting, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
@@ -692,7 +622,7 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Lunar setting times as UNIX epoch times.
         """
         return self.set_times(
@@ -713,13 +643,13 @@ class Observer:
 
         Parameters
         ----------
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of rising, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
@@ -727,7 +657,7 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Solar rising times as UNIX epoch times.
         """
         return self.rise_times(
@@ -748,13 +678,13 @@ class Observer:
 
         Parameters
         ----------
-        t0 : float unix time, or datetime
+        t0 : ctime.TimeLike
             The start time to search for. Any type that be converted to a UNIX time
             by caput.
-        t1 : float unix time, or datetime, optional
+        t1 : ctime.TimeLike | None, optional
             The end time of the search interval. If not set, this is 1 day after the
             start time `t0`.
-        step : float or None, optional
+        step : float | None, optional
             The initial search step in days. This is used to find the approximate
             times of rising, and should be set to something less than the spacing
             between events.  If None is passed, an initial search step of 0.2 days,
@@ -762,7 +692,7 @@ class Observer:
 
         Returns
         -------
-        times : np.ndarray
+        unix_times : ndarray
             Lunar rising times as UNIX epoch times.
         """
         return self.rise_times(
@@ -778,12 +708,12 @@ class Observer:
 
         Parameters
         ----------
-        source : skyfield.starlib.Star
+        source : Star
             Skyfield Star object with positions in CIRS coordinates.
 
         Returns
         -------
-        new_source : skyfield.starlib.Star
+        star_icrs : Star
             Skyfield Star object with positions in ICRS coordinates
         """
         from skyfield.functions import to_polar
@@ -808,20 +738,20 @@ class Observer:
 
         Parameters
         ----------
-        ra, dec : skyfield.api.Angle
+        ra, dec : Angle
             RA and dec of the source in CIRS coordinates
-        epoch : skyfield.api.Time
+        epoch : skyfield.timelib.Time
             Time of the observation
 
         Returns
         -------
-        body : skyfield.starlib.Star
+        icrs_star : Star
             Star object in ICRS coordinates
         """
         return self.cirs_radec(Star(ra=ra, dec=dec, epoch=epoch))
 
     def object_coords(self, source, date=None, deg=False):
-        """Calculates the RA and DEC of the source.
+        """Calculate the RA and DEC of a source.
 
         Gives the ICRS coordinates if no date is given (=J2000), or if a date is
         specified gives the CIRS coordinates at that epoch.
@@ -832,17 +762,17 @@ class Observer:
 
         Parameters
         ----------
-        source : skyfield source
+        source : _SkySourceLike
             skyfield.starlib.Star or skyfield.vectorlib.VectorSum or
             skyfield.jpllib.ChebyshevPosition body representing the source.
-        date : float
+        date : float | None, optional
             Determine coordinates at this unix time.  If None, use Jan 01 2000.
-        deg : bool
+        deg : bool, optional
             Return coordinates in degrees if True, radians if False (default).
 
         Returns
         -------
-        ra, dec: float
+        coordinates : tuple[float, float]
             Position of the source.
         """
         if date is None:  # No date, get ICRS coords
@@ -866,7 +796,16 @@ class Observer:
 
         return ra, dec
 
-    def _sr_work(self, source, t0, t1, step, diameter, skip_rise=False, skip_set=False):
+    def _sr_work(
+        self,
+        source,
+        t0,
+        t1=None,
+        step=None,
+        diameter=100.0 / 60,
+        skip_rise=False,
+        skip_set=False,
+    ):
         # A work routine factoring out common functionality
 
         # The function to find roots for. This is just the altitude of the source with
@@ -914,3 +853,104 @@ class Observer:
         # how unstable skyfields internal API seems to be, but it saves reinventing the
         # wheel. We'll see how it goes for now.
         return _to_altaz(pos, None, None)[0].degrees
+
+
+@overload
+def _fixup_interval_and_step(
+    t0: ctime.TimeLike, t1: ctime.TimeLike, step
+) -> tuple[tuple[ctime.TimeLike, 2], ...]: ...
+@overload
+def _fixup_interval_and_step(
+    t0: npt.ArrayLike[ctime.TimeLike], t1: npt.ArrayLike[ctime.TimeLike], step
+) -> tuple[tuple[np.ndarray[ctime.TimeLike], 2], ...]: ...
+def _fixup_interval_and_step(t0, t1, step: int | float):
+    # Work routine used by Observer._sr_work and transit_times to sanitise the
+    # caller-supplied interval and initial step duration.
+    #
+    # Returns the interval limits converted to TT JD and the computed
+    # initial step size
+
+    # Get the ends of the search interval
+    t0 = ctime.ensure_unix(t0)
+    if t1 is None:
+        t1 = t0 + 24 * 3600.0 * constants.stellar_second
+    else:
+        t1 = ctime.ensure_unix(t1)
+        if t1 <= t0:
+            raise ValueError("End of the search interval (t1) is before the start (t0)")
+
+    # Calculate the initial search step
+    if step is None:
+        if t1 - t0 >= 24 * 3600.0:
+            step = 0.2
+        else:
+            step = (t1 - t0) / (5 * 24 * 3600.0)
+    elif step * 24 * 3600 >= t1 - t0:
+        raise ValueError("Initial search step is larger than the search interval")
+
+    # Convert the UNIX start and end times into Julian Days
+    t0jd, t1jd = csf.unix_to_skyfield_time([t0, t1]).tt
+
+    return t0jd, t1jd, step
+
+
+def _solve_all(
+    f, x0, x1, dx, skip_increasing=False, skip_decreasing=False, **kwargs: dict
+):
+    """Find all roots of function f, within the interval [x0, x1].
+
+    To find all the roots we need an estimate of the spacing of the roots. This is
+    specified by the parameter `dx`. If this is too large, roots may be missed.
+
+    Parameters
+    ----------
+    f : callable
+        A numpy vectorized function which returns a single value f(x).
+    x0, x1 : float
+        The start and end of the interval to search.
+    dx : float
+        An interval known to be less than the spacing between the closest roots.
+    skip_increasing, skip_decreasing : bool, optional
+        Skip roots where the gradient is positive (or negative). Default is False.
+    **kwargs : dict
+        Passed to `scipy.optimize.brentq`. `xtol`, `rtol` and `maxiter` are probably
+        the most useful.
+
+    Returns
+    -------
+    values : float ndarray
+        The values of the roots found.
+    root_is_positive : bool ndarray
+        If the gradient at the root is positive.
+    """
+    # Form a grid of points to find intervals to search over
+    x_init = np.linspace(x0, x1, int(np.ceil((x1 - x0) / dx)), endpoint=True)
+    f_init = f(x_init)
+
+    roots = []
+    increasing = []
+
+    # Search through intervals
+    for xa, xb, fa, fb in zip(x_init[:-1], x_init[1:], f_init[:-1], f_init[1:]):
+        # Entries are the same sign, so there is no solution in between.
+        # NOTE: we need to deal with the case where one edge might be an exact root,
+        # hence the strictly greater than 0.0
+        if fa * fb > 0.0:
+            continue
+
+        is_increasing = fa < fb
+
+        # Skip positive gradient roots
+        if skip_increasing and is_increasing:
+            continue
+
+        # Skip negative gradient roots
+        if skip_decreasing and not is_increasing:
+            continue
+
+        root = brentq(f, xa, xb, **kwargs)
+
+        roots.append(root)
+        increasing.append(is_increasing)
+
+    return np.array(roots, dtype=np.float64), np.array(increasing, dtype=bool)
