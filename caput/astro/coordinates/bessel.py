@@ -1,26 +1,31 @@
-"""Fast spherical Bessel function and derivatives.
+"""Spherical Bessel function and derivatives.
 
 Although these functions are available in `scipy`,
 they tend to be inaccurate at large values of `l`.
 """
 
-__all__ = ["jl", "jl_d", "jl_d2"]
+from __future__ import annotations
 
 import numpy as np
 import scipy.special as ss
 
+__all__ = ["jl", "jl_d", "jl_d2"]
+
 
 def jl(l, z):
-    """A fast spherical bessel function using approximations at low and high z.
+    """A fast spherical bessel function using approximations at low- and high-`z`.
+
+    The corresponding `scipy` function is used for mid-range regions of `l` and `z`.
+
 
     Parameters
     ----------
-    l, z : scalar or np.ndarray
+    l, z : array_like
         Spherical bessel function arguments.
 
     Returns
     -------
-    jl : scalar or np.ndarray
+    jl : array_like
         Spherical bessel functions.
     """
     lt = l
@@ -53,39 +58,41 @@ def jl(l, z):
 
 
 def jl_d(l, z):
-    """First derivative of jl.
+    """First derivative of `jl`.
 
     Parameters
     ----------
-    l, z : scalar or np.ndarray
+    l, z : array_like
         Spherical bessel function arguments.
 
     Returns
     -------
-    jl_d : scalar or np.ndarray
+    jl_d : array_like
         Derivate of spherical bessel functions.
     """
     jl0 = jl(l, z)
     jl1 = jl(l + 1, z)
+
     return -jl1 + (l / z) * jl0
 
 
 def jl_d2(l, z):
-    """Second derivative of jl.
+    """Second derivative of `jl`.
 
     Parameters
     ----------
-    l, z : scalar or np.ndarray
+    l, z : array_like
         Spherical bessel function arguments.
 
     Returns
     -------
-    jl_d2 : scalar or np.ndarray
+    jl_d2 : array_like
         Second derivate of spherical bessel functions.
     """
     jl0 = jl(l, z)
     jl1 = jl(l + 1, z)
     jl2 = jl(l + 2, z)
+
     return jl2 - (2 * l / z) * jl1 + ((l**2 - 1) / z**2) * jl0
 
 
