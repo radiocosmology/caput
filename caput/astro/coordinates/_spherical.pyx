@@ -1,67 +1,18 @@
+"""Spherical co-ordinate utilities
+
+A module of useful functions when dealing with Spherical Polar co-ordinates.
 """
-Co-ordinate Utilities
-
-A module of useful functions when dealing with Spherical Polar
-co-ordinates.
-
-Transforms
-==========
-- :py:meth:`sph_to_cart`
-- :py:meth:`cart_to_sph`
-
-Vector operations
-=================
-- :py:meth:`sph_dot`
-- :py:meth:`norm_vec2`
-
-Tangent Plane
-=============
-- :py:meth:`thetaphi_plane`
-- :py:meth:`thetaphi_plane_cart`
-
-Miscellaneous
-=============
-- :py:meth:`great_circle_points`
-"""
-
-__all__ = [
-    "sph_to_cart",
-    "cart_to_sph",
-    "sph_dot",
-    "thetaphi_plane",
-    "thetaphi_plane_cart",
-    "norm_vec2",
-    "great_circle_points",
-    "cosine_rule",
-]
 
 cimport cython
-from cython.parallel cimport prange, parallel
+from cython.parallel cimport prange
 
 import numpy as np
-cimport numpy
+import numpy.typing as npt
 
-from libc.stdlib cimport abort, malloc, free
-from libc.math cimport sin, cos, tan, exp, hypot, M_PI, M_PI_2, M_LN2
+from libc.math cimport sin, cos, hypot, M_PI_2
 
 
 def sph_to_cart(sph_coords):
-    """Convert a vector in Spherical Polar coordinates to Cartesians.
-
-    This routine is OpenMP parallel.
-
-    Parameters
-    ----------
-    sph_coords : np.ndarry
-        A vector (or array of) in spherical polar co-ordinates. Values should be
-        packed as [r, theta, phi] along the last axis. Alternatively they can be
-        packed as [theta, phi] in which case r is assumed to be one.
-
-    Returns
-    -------
-    cart_coords : np.ndarray
-        Array of equivalent vectors in cartesian coordinartes.
-    """
     cdef double[:, ::1] sph_view, cart_view
     cdef Py_ssize_t i, n, nd
     cdef double r
@@ -105,21 +56,6 @@ def sph_to_cart(sph_coords):
 
 
 def cart_to_sph(cart_arr):
-    """Convert a cartesian vector into Spherical Polars.
-
-    Uses the same convention as `sph_to_cart`.
-
-    Parameters
-    ----------
-    cart_arr : np.ndarray
-        Array of cartesians.
-
-    Returns
-    -------
-    sph_arr : np.ndarray
-        Array of spherical polars (packed as [[ r1, theta1, phi1], [r2, theta2,
-        phi2], ...]
-    """
     sph_arr = np.empty_like(cart_arr)
 
     sph_arr[..., 2] = np.arctan2(cart_arr[..., 1], cart_arr[..., 0])
@@ -132,39 +68,10 @@ def cart_to_sph(cart_arr):
 
 
 def sph_dot(arr1, arr2):
-    """Take the scalar product in spherical polars.
-
-    Parameters
-    ----------
-    arr1, arr2 : np.ndarray
-        Two arrays of vectors in spherical polars [theta, phi], (or
-        alternatively as [theta, phi]). Should be broadcastable against each
-        other.
-
-    Returns
-    -------
-    dot : np.ndarray
-        An array of the dotted vectors.
-
-    """
     return np.inner(sph_to_cart(arr1), sph_to_cart(arr2))
 
 
 def thetaphi_plane(sph_arr):
-    """For each position, return the theta, phi unit vectors (in spherical
-    polars).
-
-    Parameters
-    ----------
-    sph_arr : np.ndarray
-        Angular positions (in spherical polar co-ordinates).
-
-    Returns
-    -------
-    thetahat, phihat : np.ndarray
-        Unit vectors in the theta and phi directions (still in spherical
-        polars).
-    """
     thetahat = sph_arr.copy()
     thetahat[..., -2] += np.pi / 2.0
 
@@ -180,21 +87,7 @@ def thetaphi_plane(sph_arr):
 
 
 def thetaphi_plane_cart(sph_coords):
-    """For each position, return theta, phi tangent vectors in cartesian coordinates.
-
-    This routine is OpenMP parallel.
-
-    Parameters
-    ----------
-    sph_coords : np.ndarray
-        Angular positions (in spherical polar co-ordinates).
-
-    Returns
-    -------
-    thetahat, phihat : np.ndarray
-        Unit vectors in the theta and phi directions now in cartesian coordinates.
-    """
-
+    
     cdef double[:, ::1] sph_view
     cdef double[:, :, ::1] tp_view
     cdef Py_ssize_t i, n
@@ -225,13 +118,6 @@ def thetaphi_plane_cart(sph_coords):
 
 
 def norm_vec2(vec2):
-    """For an array of 2D vectors, normalise each to unit length *inplace*.
-
-    Parameters
-    ----------
-    vec2 : np.ndarray[..., 2]
-        An array of 2D vectors
-    """
 
     cdef double[:, ::1] vec_view
     cdef Py_ssize_t i, n
@@ -253,21 +139,6 @@ def norm_vec2(vec2):
 
 
 def great_circle_points(sph1, sph2, npoints):
-    """Return the intermediate points on the great circle between points `sph1`
-    and `sph2`.
-
-    Parameters
-    ----------
-    sph1, sph2 : np.ndarray
-        Points on sphere, packed as [theta, phi]
-    npoints : integer
-        Number of intermediate points
-
-    Returns
-    -------
-    intpoints : np.ndarray
-        Intermediate points, packed as [ [theta1, phi1], [theta2, phi2], ...]
-    """
 
     # Turn points on circle into Cartesian vectors
     c1 = sph_to_cart(sph1)
@@ -300,23 +171,6 @@ def great_circle_points(sph1, sph2, npoints):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def cosine_rule(double[::1] mu, double[::1] x1, double[::1] x2):
-    """Calculate the distance between a grid of points.
-
-    This is a somewhat niche implementation intended to help calculate multi-distance
-    angular power spectra.
-
-    Parameters
-    ----------
-    mu
-        Angular separation in cos(theta)
-    x1, x2
-        Distance of the first and second points.
-
-    Returns
-    -------
-    r : np.ndarray[:, :, :]
-        The separation of the points for all combinations of mu, x1, x2.
-    """
 
     cdef int nm = len(mu)
     cdef int n1 = len(x1)

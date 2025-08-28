@@ -1,17 +1,6 @@
-"""caput.astro.
+"""Astronomical utilities.
 
-Astronomical utilities, including relevant coordinate transforms,
-time conversions, and constants.
-
-Submodules
-----------
-.. autosummary::
-   :toctree: _autosummary
-
-   constants
-   observer
-   skyfield
-   time
+Includes coordinate transforms, time conversions, and constants.
 """
 
 from . import (

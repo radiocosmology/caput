@@ -1,40 +1,17 @@
-"""Routines for dealing with Skyfield data and conversions.
+r"""Routines for dealing with skyfield data and conversions.
 
-http://rhodesmill.org/skyfield/
-
-
-Time Utilities
-==============
-Time conversion routine which are location independent.
-
-- :py:meth:`skyfield_time_to_unix`
-- :py:meth:`unix_to_skyfield_time`
-
-
-Skyfield Interface
-==================
-
-- :py:class:`SkyfieldWrapper`
-
-This module provides an interface to Skyfield which stores the required datasets
+This module provides an interface to `skyfield`_ which stores the required datasets
 (timescale data and an ephemeris) in a fixed location. The location is
 determined by the following (in order):
 
-- As the wrapper is initialised by passing in a ``path=<path>`` option.
+- By passing a ``path=<path>`` option to the :py:class:`.SkyfieldWrapper` constructor.
 - By setting the environment variable ``CAPUT_SKYFIELD_PATH``
 - If neither of the above is set, the data is placed in ``<path to caput>/caput/astro/_skyfield_data/``
 
-Other skyfield helper functions:
-
-- :py:meth:`skyfield_star_from_ra_dec`
+.. _`skyfield`: https://rhodesmill.org/skyfield/
 """
 
-__all__ = [
-    "SkyfieldWrapper",
-    "skyfield_star_from_ra_dec",
-    "skyfield_time_to_unix",
-    "unix_to_skyfield_time",
-]
+from __future__ import annotations
 
 import warnings
 
@@ -44,20 +21,27 @@ from skyfield.units import Angle
 
 from ..util import arraytools
 
+__all__ = [
+    "SkyfieldWrapper",
+    "skyfield_star_from_ra_dec",
+    "skyfield_time_to_unix",
+    "unix_to_skyfield_time",
+]
+
 
 class SkyfieldWrapper:
     """A wrapper to help with loading Skyfield and its data.
 
     Parameters
     ----------
-    path : string, optional
+    path : str | bytes | None
         Directory Skyfield should save data in. If not set data will be looked
         for in `$CAPUT_SKYFIELD_PATH` or in `<path to caput>/caput/astro/_skyfield_data`.
     expire : bool, optional
         Deprecated option. Skyfield no longer has a concept of expiring data. To get
         updated data you must force an explicit reload of it which can be done via
         `SkyFieldWrapper.reload`.
-    ephemeris : string, optional
+    ephemeris : str, optional
         The JPL ephemeris to use. Defaults to `'de421.bsp'`.
     """
 
@@ -138,7 +122,7 @@ class SkyfieldWrapper:
                     f"{self.load.directory}, an official download source or the CHIME "
                     f"mirror. If you can find a working mirror of "
                     f"{timescale_files} try using "
-                    '`caput.time.skyfield_wrapper.load.download("<mirror_url>") '
+                    '`caput.skyfield.skyfield_wrapper.load.download("<mirror_url>") '
                     "to download directly."
                 ) from e
 
@@ -163,18 +147,20 @@ class SkyfieldWrapper:
                 "Could not get ephemeris data from an official source. Trying the "
                 "CHIME mirror, but the products are likely out of date."
             )
-            try:
-                self.load.download(self.mirror_url + self._ephemeris_name)
-                self._ephemeris = self.load(self._ephemeris_name)
-            except OSError as e:
-                raise OSError(
-                    "Could not get ephemeris either from an existing installation at "
-                    f"{self.load.directory}, an official download source or the CHIME "
-                    f"mirror. If you can find a working mirror of "
-                    "{self._ephemeris_name} try using "
-                    '`caput.time.skyfield_wrapper.load.download("<mirror_url>") '
-                    "to download directly."
-                ) from e
+
+        try:
+            self.load.download(self.mirror_url + self._ephemeris_name)
+            self._ephemeris = self.load(self._ephemeris_name)
+            return self._ephemeris
+        except OSError as e:
+            raise OSError(
+                "Could not get ephemeris either from an existing installation at "
+                f"{self.load.directory}, an official download source or the CHIME "
+                f"mirror. If you can find a working mirror of "
+                f"{self._ephemeris_name} try using "
+                '`caput.skyfield.skyfield_wrapper.load.download("<mirror_url>") '
+                "to download directly."
+            ) from e
 
     def reload(self):
         """Reload the Skyfield data regardless of the `expire` setting.
@@ -197,12 +183,12 @@ def skyfield_time_to_unix(skyfield_time):
 
     Parameters
     ----------
-    skyfield_time : `skyfield.timelib.Time`
+    skyfield_time :timelib.Time
         Skyfield time.
 
     Returns
     -------
-    time : float or array of
+    unix_time : array_like
         UNIX time.
     """
     from .time import ensure_unix
@@ -219,12 +205,13 @@ def unix_to_skyfield_time(unix_time):
 
     Parameters
     ----------
-    unix_time : float or array of.
-        Unix/POSIX time.
+    unix_time : array_like
+        Unix time.
 
     Returns
     -------
-    time : :class:`skyfield.timelib.Time`
+    skyfield_time : timelib.Time
+        Skyfield time representation.
     """
     ts = skyfield_wrapper.timescale
 
@@ -245,12 +232,12 @@ def skyfield_star_from_ra_dec(ra, dec, name=()):
     ----------
     ra, dec : float
         The ICRS position in degrees.
-    name : str or tuple/list of str, optional
+    name : str | tuple[str] | list[str], optional
         The name(s) of the body.
 
     Returns
     -------
-    body : skyfield.starlib.Star
+    star : Star
         An object representing the body.
     """
     if isinstance(name, str):
