@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 try:
     import zarr
-except ImportError as err:
-    logger.info(f"zarr support disabled. Install zarr to change this: {err}")
+except ImportError:
+    logger.debug("zarr support disabled. Install zarr to change this.")
     zarr_available = False
 else:
     zarr_available = True
@@ -19,14 +19,25 @@ else:
 try:
     import numcodecs
     from bitshuffle.h5 import H5_COMPRESS_LZ4, H5FILTER
-except ModuleNotFoundError as e:
+except ModuleNotFoundError:
     logger.debug(
-        f"Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters.: {e}"
+        "Install with 'compression' extra_require to use bitshuffle/numcodecs compression filters."
     )
     compression_enabled = False
     H5FILTER, H5_COMPRESS_LZ4 = None, None
 else:
     compression_enabled = True
+
+if compression_enabled:
+    # hdf5 parallel compression is broken before 1.13.1
+    if h5py.version.hdf5_version_tuple < (1, 13, 1):
+        import warnings
+
+        warnings.warn(
+            "HDF5 parallel compression has flaws prior to version 1.13.1, and can fail "
+            f"unexpectedly. The current linked version is {h5py.version.hdf5_version_tuple}.",
+            RuntimeWarning,
+        )
 
 
 class FileFormat:
