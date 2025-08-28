@@ -1,16 +1,19 @@
 # distutils: language = c++
 # cython: language_level = 2
-
-"""Weighted Median Functions"""
+"""Fast weighted median."""
 
 import numpy as np
+import numpy.typing as npt
 
 from libcpp.memory cimport shared_ptr
 from libcpp.deque cimport deque
 from cython.parallel import prange, parallel
 from MedianTree cimport Tree, Data
+
 cimport numpy as np
 cimport cython
+
+__all__ = []
 
 # Required for numpy 2.0 compatibility
 np.import_array()
@@ -120,8 +123,6 @@ cdef data_t _quickselect_weight(data_t[::1] A, weight_t[::1] W, double qs, char 
             return A[i]
 
 
-
-
 @cython.wraparound(False)
 @cython.boundscheck(False)
 cdef int _max_non_zero(data_t[::1] d, weight_t[::1] w, int i, int j):
@@ -196,57 +197,7 @@ cpdef void _quickselect(
         quantile[i] = _quickselect_weight(At, Wt, qs, method)
 
 
-def quantile(A, W, q, method="split"):
-    """Calculate the weighted quantile of a set of data.
-
-    The weighted quantile is always calculated along the last axis.
-
-    The weights must be postive or zero for the calculation to make sense. This is
-    not checked within this routine, and so you must sanitize the input before
-    calling.
-
-    In the case that all elements have zero weight, a standard uniformly weighted
-    quantile calculation is performed. If there is one, and only one non-zero
-    weighted element that is always returned. For two or more non-zero weighted
-    elements, we can proceed as expected.
-
-    If the quantile is "split", i.e. it lies exactly on the boundary between two
-    elements, we use the bounding non-zero weighted elements to calculate the
-    quantile according to the chosen method.
-
-    Examples of special cases:
-
-    >>> quantile([1.0, 2.0, 3.0, 4.0], [1, 1, 0, 2], 0.5)
-    3.0
-    >>> quantile([1.0, 2.0, 3.0, 4.0], [1, 1, 0, 2], 0.5)
-    3.0
-    >>> quantile([1.0, 2.0, 4.0, 3.0], [0, 0, 0, 0], 0.5)
-    2.5
-
-    Parameters
-    ----------
-    A : array_like
-        The array of data. Only 32 and 64 bit integers and floats are supported.
-    W : array_like
-        The array of weights. Only 32 and 64 bit integers and floats are supported.
-    q : float
-        The quantile as a number from zero to one.
-    method : {"lower", "higher", "split"}:
-        Method to use if the requested quantile is exactly between two elements.
-
-    Returns
-    -------
-    r : np.ndarray or scalar
-        The calculated quantile. This has the same shape as A with the last axis
-        removed. If A was one dimensional the value returned is a scalar.
-
-    Raises
-    ------
-    ValueError
-        If the array shapes do not match, or the quantile value is invalid.
-    TypeError
-        If the array types are not supported.
-    """
+def quantile(A, W, q, method = "split"):
     cdef char methodc = _check_method(method)
 
     # Ensure that the inputs are numpy arrays
@@ -332,32 +283,13 @@ def quantile(A, W, q, method="split"):
         return res.reshape(A.shape[:-1])
 
 
-def weighted_median(A, W, method="split"):
-    """Calculate the weighted median of a set of data.
-
-    The weighted median is always calculated along the last axis.
-
-    See `quantile` for more information on the behaviour for some special cases.
-
-    Parameters
-    ----------
-    A : np.ndarray
-        The array of data.
-    W : np.ndarray
-        The array of weights.
-    method : {"lower", "higher", "split"}:
-        Method to use if the requested quantile is exactly between two elements.
-
-    Returns
-    -------
-    r : np.ndarray or scalar
-        The calculated median. This has the same shape as A with the last axis
-        removed. If A was one dimensional the value returned is a scalar.
-    """
+def weighted_median(A, W, method = "split"):
     return quantile(A, W, 0.5, method=method)
 
 
-def _check_arrays(data, weights):
+def _check_arrays(
+    data: npt.ArrayLike, weights: npt.ArrayLike,
+) -> tuple[np.ndarray, np.ndarray]:
 
     # make sure these are numpy arrays
     if not isinstance(data, np.ndarray):
@@ -389,50 +321,17 @@ def _check_arrays(data, weights):
     return data, weights
 
 
-def _check_method(method):
+def _check_method(method: str) -> int:
     METHODS = ['split', 'lower', 'higher']
     METHODS_C = ['s', 'l', 'h']
 
     if method not in METHODS:
-        raise ValueError('Method should be one of {}, found {}'.format(METHODS, method))
+        raise ValueError(f"Method should be one of {METHODS}, found {method}")
+    
     return ord(METHODS_C[METHODS.index(method)])
 
 
-def moving_weighted_median(data, weights, size, method="split"):
-    """Compute moving weighted median for 1 and 2 dimensional arrays.
-
-    Parameters
-    ----------
-    data : array_like
-        The data to move the window over. Can have 1 or 2 dimensions. The data type should be
-        float64 or something that can be converted to float64.
-    weights : array_like
-        The weights for the data. Can have 1 or 2 dimensions. The data type should be
-        float64 or something that can be converted to float64.
-    size : int or tuple of int
-        Size of the window. All values must be uneven.
-    method : str
-        Either 'split', 'lower' or 'higher'. If multiple values sastisfy the conditions to be the
-        weighted median of a window, this decides what is returned:
-        split: The average of all candidate values is returned.
-        lower: The lowest of all candidate values is returned.
-        higher: The highest of all candidate values is returned.
-
-    Returns
-    -------
-    :class:'numpy.ndarray'
-        An array containing the weighted median values. The size is the same as the given data and
-        weights, the data type is float64.
-
-    Raises
-    ------
-    ValueError
-        If the value of the window size was not odd.
-    RuntimeError
-        If there was an internal error in the C++ implementation.
-    NotImplementedError
-        If the data has more than two dimensions.
-    """
+def moving_weighted_median(data, weights, size, method = "split"):
     data, weights = _check_arrays(data, weights)
     cdef char c_method = _check_method(method)
 
@@ -465,9 +364,13 @@ def moving_weighted_median(data, weights, size, method="split"):
                          .format(data.ndim))
 
 
-def _mwm_1D(np.ndarray[data_t, ndim=1] data, np.ndarray[weight_t, ndim=1] weights, size,
-            method):
-
+def _mwm_1D(
+    np.ndarray[data_t, ndim=1] data,
+    np.ndarray[weight_t, ndim=1] weights,
+    int size,
+    char method,
+):
+    """Moving weighted median on a 1D array."""
     cdef Py_ssize_t len_data = data.shape[0]
     medians = np.ndarray(len_data, dtype=np.float64)
     cdef Tree[double] avl
@@ -511,9 +414,13 @@ def _mwm_1D(np.ndarray[data_t, ndim=1] data, np.ndarray[weight_t, ndim=1] weight
 
 @cython.boundscheck(False)  # Deactivate bounds checking
 @cython.wraparound(False)   # Deactivate negative indexing.
-def _mwm_2D(np.ndarray[data_t, ndim=2] data, np.ndarray[weight_t, ndim=2] weights, size,
-            char method):
-
+def _mwm_2D(
+    np.ndarray[data_t, ndim=2] data,
+    np.ndarray[weight_t, ndim=2] weights,
+    tuple[int, 2] size,
+    char method,
+):
+    """Moving weighted median on a 2D array."""
     # The 2D moving window goes through the matrix row-by-row, to simplify keeping track of
     # elements in the window with a fifo queue. But moving the window through the data in a zig-zag
     # could be more effizient, because it would reuse more elements when it jumps to the next line.

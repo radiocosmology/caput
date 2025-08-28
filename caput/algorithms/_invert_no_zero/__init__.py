@@ -1,35 +1,33 @@
-"""caput._invert_no_zero.
-
-Fast invert which maintins zeros.
-"""
+"""Fast invert which maintains zeros as zero."""
 
 import numpy as np
+import numpy.typing as npt
 from ._invert_no_zero import _invert_no_zero
 
 
-__all__ = [
-    "invert_no_zero",
-]
+__all__ = ["invert_no_zero"]
 
 
-def invert_no_zero(x, out=None):
+def invert_no_zero(x: npt.ArrayLike, out: npt.ArrayLike | None = None) -> npt.ArrayLike:
     """Return the reciprocal, but ignoring zeros.
 
-    Where `x != 0` return 1/x, or just return 0. Importantly this routine does
+    Where ``x != 0`` return ``1/x``; where ``x == 0``, return 0. Importantly this routine does
     not produce a warning about zero division.
 
     Parameters
     ----------
-    x : np.ndarray
+    x : array_like
         Array to invert
-    out : np.ndarray, optional
-        Output array to insert results
+    out : array_like, optional
+        Output array where the result is stored. Default is None,
+        in which case a new array is created.
 
     Returns
     -------
-    r : np.ndarray
-        Return the reciprocal of x. Where possible the output has the same memory layout
-        as the input, if this cannot be preserved the output is C-contiguous.
+    out : array_like
+        The reciprocal of x. Where possible the output has the same memory layout as the input,
+        if this cannot be preserved the output is C-contiguous. If `out` was not `None`,
+        this is `out`.
     """
     if not isinstance(x, np.generic | np.ndarray) or np.issubdtype(x.dtype, np.integer):
         with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
