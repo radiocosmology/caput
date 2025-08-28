@@ -1,31 +1,13 @@
-r"""Routines for calculation and of solar and sidereal times.
-
-Time Utilities
-==============
-Time conversion routine which are location independent.
-
-- :py:meth:`unix_to_skyfield_time`
-- :py:meth: `skyfield_time_to_unix`
-- :py:meth:`datetime_to_unix`
-- :py:meth:`unix_to_datetime`
-- :py:meth:`datetime_to_timestr`
-- :py:meth:`timestr_to_datetime`
-- :py:meth:`unix_to_era`
-- :py:meth:`era_to_unix`
-- :py:meth:`ensure_unix`
-- :py:meth:`leap_seconds_between`
-- :py:meth:`time_of_day`
-- :py:meth:`naive_datetime_to_utc`
+r"""Routines for calculation of solar and sidereal times.
 
 Constants
 =========
 
-These are re-exported from `caput.astro.constants`, and should be accessed
-from there instead of here.
+.. NOTE:: These are just re-exported from `caput.astro.constants`.
 
-:const:`SIDEREAL_S`
+:py:const:`SIDEREAL_S`
     Number of SI seconds in a sidereal second [s/sidereal s].
-:const:`STELLAR_S`
+:py:const:`STELLAR_S`
     Approximate number of SI seconds in a stellar second (i.e. 1/86400 of a stellar day) [s/stellar s].
 
 
@@ -69,11 +51,29 @@ and a complete cycle of ERA.
 .. _Skyfield: http://rhodesmill.org/skyfield/
 
 .. _`USNO Circular 179`: http://arxiv.org/abs/astro-ph/0602086
-
-.. _`NFA Glossary`: http://syrte.obspm.fr/iauWGnfa/NFA_Glossary.pdf
-
-.. _`IERS constants`: http://hpiers.obspm.fr/eop-pc/models/constants.html
 """
+
+from __future__ import annotations
+
+import warnings
+from datetime import datetime, timezone
+from typing import TypeVar
+
+import numpy as np
+from skyfield import timelib
+
+from ..util import arraytools
+from . import constants
+from .skyfield import unix_to_skyfield_time
+
+# Re-export a few constants for compatibility
+UT1_S = constants.UT1_second
+SIDEREAL_S = constants.sidereal_second
+STELLAR_S = constants.stellar_second
+
+# Custom types
+TimeLike = TypeVar("TimeLike", bound=np.floating | str | datetime | timelib.Time)
+
 
 __all__ = [
     "datetime_to_timestr",
@@ -88,21 +88,6 @@ __all__ = [
     "unix_to_era",
 ]
 
-import warnings
-from datetime import datetime, timezone
-
-import numpy as np
-from skyfield import timelib
-
-from ..util import arraytools
-from . import constants
-from .skyfield import unix_to_skyfield_time
-
-# Re-export a few constants for compatibility
-UT1_S = constants.UT1_second
-SIDEREAL_S = constants.sidereal_second
-STELLAR_S = constants.stellar_second
-
 
 @arraytools.scalarize()
 def unix_to_era(unix_time):
@@ -114,12 +99,12 @@ def unix_to_era(unix_time):
 
     Parameters
     ----------
-    unix_time : float or array of.
-        Unix/POSIX time.
+    unix_time : array_like
+        Unix time.
 
     Returns
     -------
-    era : float or array of
+    era : array_like
         The Earth Rotation Angle in degrees.
     """
     from skyfield import earthlib
@@ -143,16 +128,16 @@ def era_to_unix(era, time0):
 
     Parameters
     ----------
-    era : float or array of
+    era : array_like
         The Earth Rotation Angle in degrees.
-    time0 : scalar or np.ndarray
-        An earlier time within 24 sidereal hours. For example,
+    time0 : number
+        An earlier UNIX time within 24 sidereal hours. For example,
         the start of the solar day of the observation.
 
     Returns
     -------
-    unix_time : float or array of.
-        Unix/POSIX time.
+    unix_time : array_like
+        UNIX time.
     """
     era0 = unix_to_era(time0)
 
@@ -171,23 +156,23 @@ def era_to_unix(era, time0):
 
 @arraytools.vectorize(otypes=[object])
 def unix_to_datetime(unix_time):
-    """Converts unix time to a :class:`~datetime.datetime` object.
+    """Converts UNIX time to a :py:class:`~datetime.datetime` object.
 
-    Equivalent to timezone-aware :meth:`datetime.datetime.fromtimestamp`.
+    Equivalent to timezone-aware :py:meth:`datetime.datetime.fromtimestamp`.
 
     Parameters
     ----------
-    unix_time : float
-        Unix/POSIX time.
+    unix_time : array_like
+        Unix time.
 
     Returns
     -------
-    dt : :class:`datetime.datetime`
-        datetime object from the provided time
+    datetime : array_like
+        The time converted to a `datetime` object.
 
     See Also
     --------
-    :func:`datetime_to_unix`
+    :py:func:`datetime_to_unix`
     """
     dt = datetime.fromtimestamp(unix_time, timezone.utc)
 
@@ -202,23 +187,24 @@ def datetime_to_unix(dt):
 
     Parameters
     ----------
-    dt : :class:`datetime.datetime`
-        datetime object to convert to unix
+    dt : datetime | array_like
+        datetime object(s) to convert to unix.
 
     Returns
     -------
-    unix_time : float
-        Unix/POSIX time.
+    unix_time : array_like
+        Unix time.
 
     See Also
     --------
-    :func:`unix_to_datetime`
-    :meth:`datetime.datetime.utcfromtimestamp`
+    :py:func:`unix_to_datetime`
+    :py:meth:`datetime.datetime.utcfromtimestamp`
     """
     # Noting that this operation is ignorant of leap seconds.
     dt = naive_datetime_to_utc(dt)
     epoch_start = naive_datetime_to_utc(datetime.fromtimestamp(0, timezone.utc))
     since_epoch = dt - epoch_start
+
     return since_epoch.total_seconds()
 
 
@@ -230,17 +216,17 @@ def datetime_to_timestr(dt):
 
     Parameters
     ----------
-    dt : :class:`datetime.datetime`
+    dt : datetime | array_like
         datetime object to convert to timestring
 
     Returns
     -------
-    time_str : string
-        Formated date and time.
+    timestr : str | array_like
+        String representation of the datetime.
 
     See Also
     --------
-    :func:`timestr_to_datetime`
+    :py:func:`timestr_to_datetime`
     """
     return dt.strftime("%Y%m%dT%H%M%SZ")
 
@@ -251,17 +237,17 @@ def timestr_to_datetime(time_str):
 
     Parameters
     ----------
-    time_str : string
+    time_str : str | array_like
         Formated date and time.
 
     Returns
     -------
-    time_str : :class:`datetime.datetime`
+    dt : datetime | array_like
+    Formated date and time(s).
 
     See Also
     --------
-    :func:`datetime_to_timestr`
-
+    :py:func:`datetime_to_timestr`
     """
     return datetime.strptime(time_str[:15], "%Y%m%dT%H%M%S")
 
@@ -272,14 +258,14 @@ def leap_seconds_between(time_a, time_b):
 
     Parameters
     ----------
-    time_a : float
-        First Unix/POSIX time.
-    time_b : float
-        Second Unix/POSIX time.
+    time_a : array_like
+        First Unix time.
+    time_b : array_like
+        Second Unix time.
 
     Returns
     -------
-    int : bool
+    delta : array_like
         The number of leap seconds between *time_a* and *time_b*.
     """
     # Construct the elapse UNIX time
@@ -313,13 +299,13 @@ def ensure_unix(time):
 
     Parameters
     ----------
-    time : float, string, :class:`~datetime.datetime` or :class:`skyfield.timelib.Time`
+    time : TimeLike | array_like
         Input time, or array of times.
 
     Returns
     -------
-    unix_time : float, or array of
-        Output time.
+    unix_time : array_like
+        Output time(s).
     """
     if isinstance(time[0], datetime):
         return datetime_to_unix(time)
@@ -347,12 +333,12 @@ def naive_datetime_to_utc(dt):
 
     Parameters
     ----------
-    dt : datetime
+    dt : datetime | array_like
         datetime object without 'tzinfo'
 
     Returns
     -------
-    dt : datetime
+    dt : datetime | array_like
         New datetime with `tzinfo` added.
     """
     try:
@@ -378,12 +364,12 @@ def time_of_day(time):
 
     Parameters
     ----------
-    time : float (UNIX time), or datetime
+    time : TimeLike | array_like
         Find the start time of the day that `time` is in.
 
     Returns
     -------
-    time : float
+    seconds : float | array_like
         Time since start of UTC day in seconds.
     """
     dt = datetime.fromtimestamp(ensure_unix(time), timezone.utc)
