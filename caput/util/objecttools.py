@@ -1,4 +1,8 @@
-"""Generic object utilities."""
+"""Generic object utilities.
+
+A collection of utilities to deal with the properties
+of generic and/or complex Python objects.
+"""
 
 from collections import deque
 from collections.abc import Mapping
@@ -6,13 +10,14 @@ from itertools import chain
 from numbers import Number
 from sys import getsizeof
 from types import ModuleType
+from typing import Any
 
 import numpy as np
 
 __all__ = ["allequal", "total_size"]
 
 
-def allequal(obj1, obj2):
+def allequal(obj1: Any, obj2: Any) -> bool:
     """Check if two objects are equal.
 
     This comparison can check standard python types and numpy types,
@@ -21,10 +26,15 @@ def allequal(obj1, obj2):
 
     Parameters
     ----------
-    obj1 : scalar, list, tuple, dict, or np.ndarray
+    obj1 : Any
         Object to compare
-    obj2 : scalar, list, tuple, dict, or np.ndarray
+    obj2 : Any
         Object to compare
+
+    Returns
+    -------
+    objects_are_equal : bool
+        True if the objects are equal, False otherwise.
     """
     try:
         _assert_equal(obj1, obj2)
@@ -33,7 +43,7 @@ def allequal(obj1, obj2):
     return True
 
 
-def _assert_equal(obj1, obj2):
+def _assert_equal(obj1: Any, obj2: Any) -> None:
     """Assert two objects are equal.
 
     This comparison can check standard python types and numpy types,
@@ -45,10 +55,15 @@ def _assert_equal(obj1, obj2):
 
     Parameters
     ----------
-    obj1 : scalar, list, tuple, dict, or np.ndarray
+    obj1 : Any
         Object to compare
-    obj2 : scalar, list, tuple, dict, or np.ndarray
+    obj2 : Any
         Object to compare
+
+    Raises
+    ------
+    AssertionError
+        If the two objects are not equal.
     """
     __tracebackhide__ = True
     if isinstance(obj1, dict):
@@ -85,13 +100,18 @@ def _assert_equal(obj1, obj2):
     np.testing.assert_equal(obj1, obj2)
 
 
-def total_size(obj: object):
+def total_size(obj: Any) -> int:
     """Return the approximate memory used by an object and anything it references.
 
     Parameters
     ----------
-    obj
+    obj : Any
         Any object
+
+    Returns
+    -------
+    size_in_bytes : int
+        Approximate memory size in bytes of the object and anything it references.
     """
     # types not to iterate - these can handle their own internal
     # recursion/iteration when calling `sys.getsizeof`

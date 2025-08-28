@@ -1,17 +1,24 @@
-"""Helper routines for profiling the CPU and IO usage of code."""
+"""Context managers for profiling the CPU and IO usage of code."""
 
-import logging
+from __future__ import annotations
+
 import math
-import os
 import threading
 import time
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing import TYPE_CHECKING
 
 import numpy as np
 import psutil
 
 from . import mpitools
+
+if TYPE_CHECKING:
+    import logging
+    import os
+    from typing import Any, ClassVar
+
+    from mpi4py import MPI
 
 
 class Profiler:
@@ -19,26 +26,27 @@ class Profiler:
 
     Parameters
     ----------
-    profile
-        Whether to run the profiler or not.
-    profiler
+    profile : bool, optional
+        Whether to run the profiler or not. Default is ``True``.
+    profiler : {"cprofile", "pyinstrument"}, optional
         Which profiler to run. Currently `cProfile` and `pyinstrument` are supported.
-    comm
+        Default is "cprofile".
+    comm : MPI.Comm | None
         An optional MPI communicator. This is only used for labelling the output files.
-    path
+    path : os.PathLike | None
         The optional path under which to write the profiles.  If not set use the
         current directory.
     """
 
-    profilers: ClassVar = ["cprofile", "pyinstrument"]
+    profilers: ClassVar[list[str]] = ["cprofile", "pyinstrument"]
 
     def __init__(
         self,
         profile: bool = True,
         profiler: str = "cprofile",
-        comm: Optional["mpitools.MPI.IntraComm"] = None,
+        comm: MPI.Comm | None = None,
         path: os.PathLike | None = None,
-    ):
+    ) -> None:
         self.profile = profile
 
         if profiler not in self.profilers:
@@ -53,7 +61,7 @@ class Profiler:
         else:
             self.path = Path(path)
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         if not self.profile:
             return
 
@@ -69,7 +77,7 @@ class Profiler:
             self._pr = pyinstrument.Profiler()
             self._pr.start()
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(self, *args: Any, **kwargs: Any) -> None:
         if not self.profile:
             return
 
@@ -102,12 +110,12 @@ class IOUsage:
     >>> with u:
     ...     print("do some IO in here")
     do some IO in here
-    >>> print(u.usage)  #doctest: +ELLIPSIS
+    >>> print(u.usage)  # doctest: +ELLIPSIS
     {...}
 
     Parameters
     ----------
-    logger
+    logger : logging.Logger | None
         If a logging object is passed the values of the IO done counters are logged
         at INFO level.
     """
@@ -119,7 +127,7 @@ class IOUsage:
         self._usage = {}
 
     @staticmethod
-    def _get_io():  # pylint: disable=no-self-use
+    def _get_io() -> dict:
         # Get the cumulative IO performed
 
         if psutil.MACOS:
@@ -132,7 +140,7 @@ class IOUsage:
         return d._asdict()
 
     @staticmethod
-    def _units(key):  # pylint: disable=no-self-use
+    def _units(key) -> str:
         # Try and infer the units for this particular counter
 
         suffix = key.split("_")[-1]
@@ -145,10 +153,10 @@ class IOUsage:
             return "bytes"
         return ""
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         self._start = self._get_io()
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(self, *args: Any, **kwargs: Any) -> None:
         f = self._get_io()
 
         for name in f:
@@ -159,7 +167,7 @@ class IOUsage:
                 self._logger.info(f"IO usage({key}): {value} {self._units(key)}")
 
     @property
-    def usage(self):
+    def usage(self) -> dict:
         """The IO usage within the block."""
         return self._usage.copy()
 
@@ -172,35 +180,35 @@ class PSUtilProfiler(psutil.Process):
 
     Dumps results into csv file, one for each rank.
 
-    >>> p = PSUtilProfiler(label='task-label')
+    >>> p = PSUtilProfiler(label="task-label")
     >>> with p:
     ...     print("do some task in here")
     do some task in here
-    >>> print(p.usage)  #doctest: +ELLIPSIS
+    >>> print(p.usage)  # doctest: +ELLIPSIS
     {...}
 
     `start` and `stop` can be used to use the PSUtilProfiler outside of cotnext management.
 
-    >>> p = PSUtilProfiler(label='task-label')
+    >>> p = PSUtilProfiler(label="task-label")
     >>> p.start()
-    >>> print('do some task in here')
+    >>> print("do some task in here")
     do some task in here
     >>> p.stop()
-    >>> print(p.usage) #doctest: +ELLIPSIS
+    >>> print(p.usage)  # doctest: +ELLIPSIS
     {...}
 
     Parameters
     ----------
     use_profiler : bool
         Whether to run the profiler or not.
-    label : str
+    label : str, optional
         Default description of what is being profiled.
-    logger
+    logger : logging.Logger | None, optional
         If a logging object is passed the values of the IO done counters are logged
         at INFO level.
-    comm
+    comm : MPI.Comm | None, optional
         An optional MPI communicator. This is only used for labelling the output files.
-    path
+    path : os.PathLike | None, optional
         The optional directory path under which to write the profile csvs.  If not set use the
         current directory.
     """
@@ -210,7 +218,7 @@ class PSUtilProfiler(psutil.Process):
         use_profiler: bool = True,
         label: str = "",
         logger: logging.Logger | None = None,
-        comm: Optional["mpitools.MPI.IntraComm"] = None,
+        comm: MPI.Comm | None = None,
         path: os.PathLike | None = None,
     ):
         self._use_profiler = use_profiler
@@ -272,7 +280,7 @@ class PSUtilProfiler(psutil.Process):
         if self._use_profiler and self._logger:
             self._logger.info(f"Profiling pipeline: {self.cpu_count} cores available.")
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, psutil.Process):
             return False
         return (
@@ -283,21 +291,20 @@ class PSUtilProfiler(psutil.Process):
             and self._start_time == other._start_time
         )
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         if not self._use_profiler:
             return
         self.start()
 
-    def __exit__(self, *args, **kwargs):
+    def __exit__(self, *args: Any, **kwargs: Any) -> None:
         if not self._use_profiler:
             return
         self.stop()
 
-    def start(self):
+    def start(self) -> None:
         """Start profiling.
 
         Results generated when `stop` is called are based on this start time.
-
         """
         self._start_time = time.time()
 
@@ -318,30 +325,12 @@ class PSUtilProfiler(psutil.Process):
         self._monitor_thread = threading.Thread(target=self.monitor)
         self._monitor_thread.start()
 
-    def stop(self):
-        """Stop profiler. Dump results to csv file and/or log and/or set results on self.usage.
+    def stop(self) -> None:
+        """Stop profiler.
 
-        `start` must be called first.
-
-        Returns
-        -------
-        Sets usage dictionary on `self` with the following attributes, under 'label' key.
-
-        cpu_times : `dict`
-            dict version of `psutil.cpu_times`. Process CPU times since `start` was called in seconds.
-        cpu_percent :  float
-            Process CPU utilization since `start` was called as percentage. Can be >100 if multiple threads run on
-            different cores. See `PSUtil.cpu_count` for available cores.
-        disk_io : `dict`
-            dict version of `psutil.io_counters` (on Linux) or `psutil.disk_io_counters` (on MacOS).
-            Difference since `start` was called.
-        memory : str
-            Difference of memory in use by this process since `start` was called. If negative,
-            less memory is in use now.
-        used_memory : str
-            Current used memory at the time of the task's end.
-        available_memory : str
-            Current memory available to the system at the time of the task's end.
+        Dump results to csv file and/or log and/or set results on
+        :py:attr:`~.PSUtilProfiler.usage`. :py:meth:`~.PSUtilProfiler.start`
+        must be called first.
 
         Raises
         ------
@@ -446,7 +435,7 @@ class PSUtilProfiler(psutil.Process):
                 ]
             )
 
-    def monitor(self):
+    def monitor(self) -> None:
         """Track peak memory."""
         while self._thread_flag.is_set():
             current_mem = psutil.virtual_memory().used
@@ -454,13 +443,35 @@ class PSUtilProfiler(psutil.Process):
             time.sleep(0.5)
 
     @property
-    def cpu_count(self):
+    def cpu_count(self) -> int:
         """Number of cores available to this process."""
         if psutil.MACOS:
             return psutil.cpu_count()
         return len(self.cpu_affinity())
 
     @property
-    def usage(self):
-        """The memory and cpu usage within the block."""
+    def usage(self) -> dict[str, float]:
+        """The memory and cpu usage within the block.
+
+        Returns
+        -------
+        usage : dict
+            Usage dictionary with the following keys:
+
+            ``cpu_times`` : dict
+                dict version of `psutil.cpu_times`. Process CPU times since `start` was called in seconds.
+            ``cpu_percent`` :  float
+                Process CPU utilization since `start` was called as percentage. Can be >100 if multiple threads run on
+                different cores. See `PSUtil.cpu_count` for available cores.
+            ``disk_io`` : dict
+                dict version of `psutil.io_counters` (on Linux) or `psutil.disk_io_counters` (on MacOS).
+                Difference since `start` was called.
+            ``memory`` : str
+                Difference of memory in use by this process since `start` was called. If negative,
+                less memory is in use now.
+            ``used_memory`` : str
+                Current used memory at the time of the task's end.
+            ``available_memory`` : str
+                Current memory available to the system at the time of the task's end.
+        """
         return self._usage.copy()
