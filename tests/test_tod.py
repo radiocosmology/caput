@@ -45,7 +45,7 @@ class TestConcatenation(unittest.TestCase):
         self.assertEqual(data["dset1"].shape, (self.nchan, self.ntime))
 
     def test_reader(self):
-        reader = tod.Reader(self.todlist)
+        reader = tod.TODReader(self.todlist)
         reader.time_sel = (7, 87)
         reader.dataset_sel = ("dset1",)
 
@@ -61,7 +61,7 @@ class TestConcatenation(unittest.TestCase):
         self.assertEqual(list(data.keys()), ["dset1"])
 
     def test_reader_time_range(self):
-        reader = tod.Reader(self.todlist)
+        reader = tod.TODReader(self.todlist)
         reader.select_time_range(start_time=300.0, stop_time=500.0)
 
         data = reader.read()
