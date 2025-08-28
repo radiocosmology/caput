@@ -1,11 +1,15 @@
-"""Import helpers."""
+"""Tools for dynamic imports.
+
+Implements helpful tools which are not present in `importlib`.
+"""
 
 import importlib
+from typing import Any
 
 __all__ = ["import_class"]
 
 
-def import_class(class_path):
+def import_class(class_path: str) -> Any:
     """Import class dynamically from a string.
 
     Parameters
@@ -16,7 +20,7 @@ def import_class(class_path):
 
     Returns
     -------
-    class : class object
+    imported_class : Any
         The class we want to load.
     """
     path_split = class_path.split(".")
@@ -27,4 +31,5 @@ def import_class(class_path):
         task_cls = getattr(m, class_name)
     else:
         task_cls = globals()[class_name]
+
     return task_cls
