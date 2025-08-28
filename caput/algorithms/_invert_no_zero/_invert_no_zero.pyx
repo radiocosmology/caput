@@ -1,4 +1,9 @@
 #cython: language_level=3
+"""Fast invert which maintains zeros as zero."""
+from __future__ import annotations
+
+import numpy as np
+
 from cython.parallel import prange
 cimport cython
 
@@ -13,6 +18,7 @@ ctypedef fused real_or_complex:
     double complex
     float
     float complex
+
 
 @cython.wraparound(False)
 @cython.boundscheck(False)
