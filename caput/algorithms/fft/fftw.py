@@ -1,16 +1,16 @@
 """Fast FFT implementation using FFTW.
 
-This module adds some minor abstraction to use pyfftw in a way
-which seems to be faster than using the `pyfftw.builders` interface,
-and uses the same api as `scipy.fft` and `numpy.fft`.
+This module adds some minor abstraction to use `pyfftw`_ in a way
+which seems to be faster than using the `pyfftw.builders`_ interface,
+and uses the same api as `scipy.fft`_ and `numpy.fft`_.
 
 Only forward and reverse complex->complex transforms
 are currently supported.
 
 Examples
 --------
-The core of this module is the :class:`FFT`, which essentially just
-abstracts the :class:`pyfftw:FFTW` in the simplest way.
+The core of this module is the :py:class:`.FFTW`, which essentially just
+abstracts the :py:class:`pyfftw.FFTW` class in a simple way.
 
 >>> import numpy as np
 >>> from caput.algorithms.fft import fftw
@@ -18,7 +18,7 @@ abstracts the :class:`pyfftw:FFTW` in the simplest way.
 >>> shape = (24, 50)
 >>> x = np.random.rand(*shape) + 1j * np.random.rand(*shape)
 >>>
->>> fftobj = fftw.FFT(x.shape, x.dtype, axes=-1)
+>>> fftobj = fftw.FFTW(x.shape, x.dtype, axes=-1)
 >>>
 >>> X = fftobj.fft(x)
 >>> xi = fftobj.ifft(X)
@@ -26,84 +26,59 @@ abstracts the :class:`pyfftw:FFTW` in the simplest way.
 >>> np.allclose(x, xi)
 True
 
-The direct API can also be used, although it is slower when doing repeated
-transforms for arrays of the same shape and type because a new :class:`FFT`
-has to be created each time.
+Alternatively, for one-off transforms, the module-level functions
+can be used, which create :py:class:`.FFTW` objects internally.
 
-References
-----------
-.. https://pyfftw.readthedocs.io
-.. http://www.fftw.org
-
-Classes
-=======
-- :py:class:`FFT`
-
-Functions
-=========
-- :py:meth:`fft`
-- :py:meth:`ifft`
-- :py:meth:`fftconvolve`
-- :py:meth:`fftwindow`
+.. _`pyfftw`: https://pyfftw.readthedocs.io/en/latest/
+.. _`pyfftw.builders`: https://pyfftw.readthedocs.io/en/latest/source/pyfftw/builders/builders.html
+.. _`scipy.fft`: https://docs.scipy.org/doc/scipy/reference/fft.html
+.. _`numpy.fft`: https://numpy.org/doc/stable/reference/routines.fft.html
 """
 
 from __future__ import annotations
 
-# NOTE: Due to a bug in pyfftw, it needs to be imported before
-# numpy in order to avoid some sort of namespace collision.
-# If you run into a RuntimeError when trying to use the `FFT`
-# class, make sure that your environment imports `pyfftw`
-# before `numpy`. Hopefully this will be fixed soon.
-try:
-    import pyfftw
-except ImportError as exc:
-    raise ImportError(
-        "`pyfftw` is not installed. Install `pyfftw` via `caput[fftw]`."
-    ) from exc
-
 import numpy as np
+import pyfftw
 
 from ...util import mpitools
 
+__all__ = ["FFTW", "fft", "fftconvolve", "fftwindow", "ifft"]
 
-class FFT:
-    """Faster FFTs with FFTW."""
 
-    def __init__(
-        self,
-        shape: tuple,
-        dtype: type,
-        axes: None | int | tuple = None,
-        forward: bool = True,
-        backward: bool = True,
-    ):
-        """Create FFTW objects for repeat use.
+class FFTW:
+    r"""Create FFTW objects for repeat use.
 
-        This implementation is most efficient when used to repeatedly
-        apply ffts to arrays with the same shape and dtype, because a
-        single, highly optimised pathway can be used with a single
-        initialisation.
+    This implementation is most efficient when used to repeatedly
+    apply FFTs to arrays with the same shape and dtype, because a
+    single, highly optimised pathway can be used with a single
+    initialisation.
 
-        Even for a single use this will typically
-        be faster than the `scipy.fft` or `numpy.fft` implementations,
-        especially when multiple cores can be used.
+    Even for a single use, this will typically
+    be faster than the :py:meth:`scipy.fft` or :py:meth:`numpy.fft` implementations,
+    especially when multiple cores are available.
 
-        Parameters
-        ----------
-        shape
-            The shape of the arrays to initialise for
-        dtype
-            Datatype to create a pathway for. At the moment, only
-            complex -> complex or real -> real are supported. The
-            `pyfftw` implementation of the real -> real backward
-            transform will destroy the input array
-        axes
-            Axes over which to apply the fft. Default is all axes.
-        forward
-            If true, initialise the forward fft. Default is True.
-        backward
-            If true, initialise the backward fft. Default is True.
-        """
+    Parameters
+    ----------
+    shape : tuple[int, ...]
+        The shape of the arrays to initialise.
+    dtype : dtype
+        Datatype to create a pathway for. At the moment, only
+        ``complex -> complex`` or ``real -> real`` are supported. The
+        :py:mod:`pyfftw` implementation of the ``real -> real`` backward
+        transform will destroy the input array.
+    axes : int | iterable[int], optional
+        Axes over which to apply the FFT. Default is all axes.
+    forward : bool, optional
+        If true, initialise the forward FFT. Default is True.
+    backward : bool, optional
+        If true, initialise the backward FFT. Default is True.
+    """
+
+    def __init__(self, shape, dtype, axes=None, forward=True, backward=True):
+        """Create FFTW objects for repeat use."""
+        # Ensure dtype is a numpy dtype
+        dtype = np.dtype(dtype)
+
         if not np.issubdtype(dtype, np.complexfloating):
             raise TypeError("Only complex->complex transforms are currently supported.")
 
@@ -146,9 +121,9 @@ class FFT:
 
         Returns
         -------
-        params: dict
+        parameters : dict
             ncpu, simd alignment, shape, dtype, axes, and flags
-            used by this FFT object.
+            used by this FFTW object.
         """
         return self._params
 
@@ -157,14 +132,18 @@ class FFT:
 
         Parameters
         ----------
-        x : np.ndarray
-            Input array, must match the dtype specified
-            at creation
+        x : complex array_like
+            Input array, must match the dtype specified at creation.
 
         Returns
         -------
-        fft : np.ndarray
-            DFT of the input array over specified axes
+        fft : complex ndarray
+            DFT of the input array over specified axes.
+
+        Raises
+        ------
+        AttributeError
+            If the forward FFT is not initialized.
         """
         try:
             return self._fft(
@@ -177,19 +156,23 @@ class FFT:
     def ifft(self, x):
         """Perform a backward FFT.
 
-        When performing the backward real -> real IFFT,
+        When performing the backward ``real -> real`` IFFT,
         the input array is destroyed.
 
         Parameters
         ----------
-        x : np.ndarray
-            Input array, must match the dtype specified
-            at creation
+        x : complex array_like
+            Input array, must match the dtype specified at creation.
 
         Returns
         -------
-        fft : np.ndarray
-            IDFT of the input array over specified axes
+        ifft : complex ndarray
+            IDFT of the input array over specified axes.
+
+        Raises
+        ------
+        AttributeError
+            If the backward FFT is not initialized.
         """
         try:
             return self._ifft(
@@ -207,16 +190,21 @@ class FFT:
 
         Parameters
         ----------
-        in1 : np.ndarray
+        in1 : complex array_like
             First input array
-        in2 : np.ndarray
+        in2 : complex_array_like
             Second input array to by convolved with `x`. Must have
             the same dtype as `x`.
 
         Returns
         -------
-        out : np.ndarray
+        convolution : complex ndarray
             Discrete convolution of `in1` and `in2`
+
+        Raises
+        ------
+        AttributeError
+            If either the forward or the backward FFT is not initialized.
         """
         X1 = self.fft(in1)
         X2 = self.fft(in2)
@@ -229,22 +217,27 @@ class FFT:
         """Apply a window function in Fourier space.
 
         The only difference between this and `fftconvolve` is that
-        this assumes that `window` is _already_ in the Fourier domain,
+        this assumes that `window` is *already* in the Fourier domain,
         and `window` can be real or complex when `x` is complex.
 
         Both the forward and backward FFTs must be initialised.
 
         Parameters
         ----------
-        x : np.ndarray
+        x : (..., N, ...) complex array_like
             Input array
-        window : np.ndarray
+        window : (..., N, ...) array_like
             Window to be applied in the Fourier domain.
 
         Returns
         -------
-        out : np.ndarray
+        windowed : (..., N, ...) complex ndarray
             Input array `x` with `window` applied in the Fourier domain.
+
+        Raises
+        ------
+        AttributeError
+            If either the forward or the backward FFT is not initialized.
         """
         X = self.fft(x)
         X *= window
@@ -253,25 +246,25 @@ class FFT:
 
 
 def fft(x, axes=None):
-    """Perform a forward discrete Fourer Transform.
+    """Perform a forward discrete Fourier Transform.
 
     If the fourier transform is to be applied repeatedly to
     arrays with the same size and dtype, it is faster to use
-    the `FFT` class directly to avoid creating new `FFT` objects.
+    the :py:class:`.FFTW` class directly to avoid creating new `FFTW` objects.
 
     Parameters
     ----------
-    x : np.ndarray
-        Input array, real or complex
-    axes : None | int | tuple
+    x : complex array_like
+        Complex input array
+    axes : int | iterable[int], optional
         Axes over which to take the fft. Default is all axes.
 
     Returns
     -------
-    fft : np.ndarray
+    fft : complex ndarray
         DFT of the input array over specified axes
     """
-    fftobj = FFT(x.shape, x.dtype, axes, forward=True, backward=False)
+    fftobj = FFTW(x.shape, x.dtype, axes, forward=True, backward=False)
 
     return fftobj.fft(x)
 
@@ -281,21 +274,21 @@ def ifft(x, axes=None):
 
     If the fourier transform is to be applied repeatedly to
     arrays with the same size and dtype, it is faster to use
-    the `FFT` class directly to avoid creating new `FFT` objects.
+    the :py:class:`.FFTW` class directly to avoid creating new `FFTW` objects.
 
     Parameters
     ----------
-    x : np.ndarray
-        Input array, real or complex
-    axes : None | int | tuple
+    x : complex array_like
+        Complex input array
+    axes : int | iterable[int], optional
         Axes over which to take the ifft. Default is all axes.
 
     Returns
     -------
-    fft : np.ndarray
+    ifft : complex ndarray
         IDFT of the input array over specified axes
     """
-    fftobj = FFT(x.shape, x.dtype, axes, forward=False, backward=True)
+    fftobj = FFTW(x.shape, x.dtype, axes, forward=False, backward=True)
 
     return fftobj.ifft(x)
 
@@ -307,53 +300,54 @@ def fftconvolve(in1, in2, axes=None):
 
     If the convolution is to be applied repeatedly to
     arrays with the same size and dtype, it is faster to use
-    the `FFT` class directly to avoid creating new `FFT` objects.
+    the :py:class:`.FFTW` class directly to avoid creating new `FFTW` objects.
 
     Parameters
     ----------
-    in1 : np.ndarray
+    in1 : complex array_like
         First input array
-    in2 : np.ndarray
+    in2 : complex array_like
         Second input array to by convolved with `x`. Must have
         the same dtype as `x`.
-    axes : None | int | tuple
+    axes : int | iterable[int], optional
         Axes over which to do the convolution. Default is all axes.
 
     Returns
     -------
-    out : np.ndarray
+    convolution : complex ndarray
         Discrete convolution of `in1` and `in2`
     """
-    fftobj = FFT(in1.shape, in1.dtype, axes, forward=True, backward=True)
+    fftobj = FFTW(in1.shape, in1.dtype, axes, forward=True, backward=True)
 
     return fftobj.fftconvolve(in1, in2)
 
 
-def fftwindow(x, window, axes):
+def fftwindow(x, window, axes=None):
     """Apply a window function in Fourier space.
 
-    The only difference between this and `fftconvolve` is that
-    this assumes that `window` is _already_ in the Fourier domain,
-    and `window` can be real or complex when `x` is complex.
+    The only difference between this and :py:func:`.fftconvolve` is that
+    this assumes that ``window`` is *already* in the Fourier domain,
+    and ``window`` can be real or complex when ``x`` is complex.
 
     If the window is to be applied repeatedly to
     arrays with the same size and dtype, it is faster to use
-    the `FFT` class directly to avoid creating new `FFT` objects.
+    the :py:class:`.FFTW` class directly to avoid creating new :py:class`.FFTW`
+    objects.
 
     Parameters
     ----------
-    x : np.ndarray
+    x : (..., N, ...) complex array_like
         Input array
-    window : np.ndarray
+    window : (..., N, ...) array_like
         Window to be applied in the Fourier domain.
-    axes : None | int | tuple
+    axes : int | iterable[int], optional
         Axes over which to apply the window. Default is all axes.
 
     Returns
     -------
-    out : np.ndarray
+    out : (..., N, ...) complex ndarray
         Input array `x` with `window` applied in the Fourier domain.
     """
-    fftobj = FFT(x.shape, x.dtype, axes, forward=True, backward=True)
+    fftobj = FFTW(x.shape, x.dtype, axes, forward=True, backward=True)
 
     return fftobj.fftwindow(x, window)
