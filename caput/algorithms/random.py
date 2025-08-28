@@ -1,26 +1,39 @@
-"""Utilities for drawing random numbers."""
+"""Multithreaded random number generation."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+    from typing import ClassVar
+
+    import numpy.typing as npt
+
 
 import concurrent.futures
 import os
-from collections.abc import Callable
-from typing import ClassVar
 
 import numpy as np
 
-_rng = None
+_rng: np.random.Generator | None = None
 _default_bitgen = np.random.SFC64
 
 
-def default_rng():
+__all__ = ["MultithreadedRNG", "default_rng"]
+
+
+def default_rng() -> np.random.Generator:
     """Returns an instance of the default random number generator to use.
 
     This creates a randomly seeded generator using the fast SFC64 bit generator
-    underneath. This is only initialise on the first call, subsequent calls will
+    underneath. This is only initialised on the first call, subsequent calls will
     return the same Generator.
 
     Returns
     -------
-    rng : np.random.Generator
+    rng : :py:class:`~np.random.Generator`
+        The default random number generator instance.
     """
     global _rng
 
@@ -33,27 +46,35 @@ def default_rng():
 class MultithreadedRNG(np.random.Generator):
     """A multithreaded random number generator.
 
-    This wraps specific methods to allow generation across multiple threads. See
-    `PARALLEL_METHODS` for the specific methods wrapped.
+    This wraps specific methods to allow generation across multiple threads. The
+    following methods are supported:
+
+    - random
+    - integers
+    - uniform
+    - normal
+    - standard_normal
+    - poisson
+    - power
 
     Parameters
     ----------
-    seed
+    seed : int | None, optional
         The seed to use.
-    nthreads
+    threads : int | None, optional
         The number of threads to use. If not set, this tries to get the number from the
         `OMP_NUM_THREADS` environment variable, or just uses 4 if that is also not set.
-    bitgen
+    bitgen : :py:class:`~np.random.BitGenerator` | None, optional
         The BitGenerator to use, if not set this uses `_default_bitgen`.
     """
 
-    _parallel_threshold = 1000
+    _parallel_threshold: int = 1000
 
     # The methods to generate parallel versions for. This table is:
     # method name, number of initial parameter arguments, default data type, if there is
     # a dtype argument, and if there is an out argument. See `_build_method` for
     # details.
-    PARALLEL_METHODS: ClassVar = {
+    PARALLEL_METHODS: ClassVar[dict[str, tuple]] = {
         "random": (0, np.float64, True, True),
         "integers": (2, np.int64, True, False),
         "uniform": (2, np.float64, False, False),
@@ -64,11 +85,8 @@ class MultithreadedRNG(np.random.Generator):
     }
 
     def __init__(
-        self,
-        seed: int | None = None,
-        threads: int | None = None,
-        bitgen: np.random.BitGenerator | None = None,
-    ):
+        self, seed: int | None = None, threads: int | None = None, bitgen=None
+    ) -> None:
         if bitgen is None:
             bitgen = _default_bitgen
 
@@ -80,8 +98,8 @@ class MultithreadedRNG(np.random.Generator):
             threads = int(os.environ.get("OMP_NUM_THREADS", 4))
 
         # Initialise the parallel thread pool
-        self._threads = threads
-        self._random_generators = [
+        self._threads: int = threads
+        self._random_generators: list = [
             np.random.Generator(bitgen(seed=s))
             for s in np.random.SeedSequence(seed).spawn(threads)
         ]
@@ -95,7 +113,7 @@ class MultithreadedRNG(np.random.Generator):
         self,
         name: str,
         nparam: int,
-        defdtype: np.dtype,
+        defdtype: npt.DTypeLike,
         has_dtype: bool,
         has_out: bool,
     ) -> Callable:
@@ -106,21 +124,21 @@ class MultithreadedRNG(np.random.Generator):
 
         Parameters
         ----------
-        name
+        name : str
             The name of the generation method in `np.random.Generator`.
-        nparam
+        nparam : int
             The number of distribution parameters that come before the `size` argument.
-        defdtype
-            The default datatype used if non is explicitly supplied.
-        has_dtype
+        defdtype : dtype
+            The default datatype used if none is explicitly supplied.
+        has_dtype : bool
             Does the underlying method have a dtype argument?
-        has_out
+        has_out : bool
             Does the underlying method have an `out` parameter for directly filling an
             array.
 
         Returns
         -------
-        parallel_method
+        parallel_method : callable
             A method for generating in parallel.
         """
         method = getattr(np.random.Generator, name)
@@ -225,5 +243,5 @@ class MultithreadedRNG(np.random.Generator):
 
         return _call
 
-    def __del__(self):
+    def __del__(self) -> None:
         self._executor.shutdown(False)
