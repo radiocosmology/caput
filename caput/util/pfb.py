@@ -1,39 +1,40 @@
 """Tools for calculating the effects of the CASPER tools PFB.
 
 This module can:
+
 - Evaluate the typical window functions used
 - Evaluate a python model of the PFB
 - Calculate the decorrelation effect for signals offset by a known time delay.
 
-Window functions
-================
-- :py:meth:`sinc_window`
-- :py:meth:`sinc_hanning`
-- :py:meth:`sinc_hamming`
-
-PFB
-===
-- :py:meth:`pfb`
-- :py:meth:`decorrelation_ratio`
 """
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.interpolate import interp1d
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-def sinc_window(ntap, lblock):
+    import numpy.typing as npt
+
+
+def sinc_window(ntap: int, lblock: int) -> np.ndarray:
     """Sinc window function.
 
     Parameters
     ----------
-    ntap : integer
+    ntap : int
         Number of taps.
-    lblock: integer
+    lblock : int
         Length of block.
 
     Returns
     -------
-    window : np.ndarray[ntap * lblock]
+    window : ndarray
+        Array of length `ntap * lblock` with sinc window values.
     """
     # Sampling locations of sinc function
     X = np.linspace(-ntap / 2, ntap / 2, ntap * lblock, endpoint=False)
@@ -42,36 +43,38 @@ def sinc_window(ntap, lblock):
     return np.sinc(X)
 
 
-def sinc_hann(ntap, lblock):
+def sinc_hann(ntap: int, lblock: int) -> np.ndarray:
     """Hann-sinc window function.
 
     Parameters
     ----------
-    ntap : integer
+    ntap : int
         Number of taps.
-    lblock: integer
+    lblock : int
         Length of block.
 
     Returns
     -------
-    window : np.ndarray[ntap * lblock]
+    window : ndarray
+        Array of length `ntap * lblock` with Hann-sinc window values.
     """
     return sinc_window(ntap, lblock) * np.hanning(ntap * lblock)
 
 
-def sinc_hamming(ntap, lblock):
+def sinc_hamming(ntap: int, lblock: int) -> np.ndarray:
     """Hamming-sinc window function.
 
     Parameters
     ----------
-    ntap : integer
+    ntap : int
         Number of taps.
-    lblock: integer
+    lblock : int
         Length of block.
 
     Returns
     -------
-    window : np.ndarray[ntap * lblock]
+    window : ndarray
+        Array of length `ntap * lblock` with Hamming-sinc window values.
     """
     return sinc_window(ntap, lblock) * np.hamming(ntap * lblock)
 
@@ -88,31 +91,38 @@ class PFB:
     lblock : int
         The length of a block that gets transformed. This is twice the number
         of output frequencies.
-    window : function, optional
+    window : callable, optional
         The window function being used. If not set, use a Sinc-Hamming window.
     oversample : int, optional
         The amount to oversample when calculating the decorrelation ratio.
-        This will improve accuracy.
+        This will improve accuracy. Default is 4.
     """
 
-    def __init__(self, ntap, lblock, window=None, oversample=4):
+    def __init__(
+        self,
+        ntap: int,
+        lblock: int,
+        window: Callable | None = None,
+        oversample: int = 4,
+    ):
+        """Set PFB parameters."""
         self.ntap = ntap
         self.lblock = lblock
 
         self.window = sinc_hamming if window is None else window
         self.oversample = oversample
 
-    def apply(self, timestream):
+    def apply(self, timestream: npt.NDArray) -> np.ndarray[np.complex128]:
         """Apply the PFB to a timestream.
 
         Parameters
         ----------
-        timestream : np.ndarray
+        timestream : array_like
             Timestream to process.
 
         Returns
         -------
-        pfb : np.ndarray[:, lblock // 2]
+        freqs : complex ndarray
             Array of PFB frequencies.
         """
         # Number of blocks
@@ -139,21 +149,21 @@ class PFB:
 
     _decorr_interp = None
 
-    def decorrelation_ratio(self, delay):
-        """Calculate the decorrelation caused by a relative relay of two timestreams.
+    def decorrelation_ratio(self, delay: npt.ArrayLike) -> np.ndarray[np.float64]:
+        """Calculate the decorrelation caused by a relative delay between two timestreams.
 
-        This is caused by the fact that the PFB is generated from a finite
-        time window of data.
+        This is caused by the fact that the PFB is generated from a finite time window
+        of data.
 
         Parameters
         ----------
         delay : array_like
-            The relative delay between the correlated streams in units of
-            samples (not required to be an integer).
+            The relative delay between the correlated streams in units of samples
+            (not required to be an integer).
 
         Returns
         -------
-        decorrelation : array_like
+        ratio : ndarray
             The decorrelation ratio.
         """
         if self._decorr_interp is None:

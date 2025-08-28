@@ -1,20 +1,4 @@
-"""caput.util.
-
-Assorted utilities.
-
-Submodules
-----------
-.. autosummary::
-   :toctree: _autosummary
-
-   arraytools
-   importtools
-   mpitools
-   objecttools
-   pfb
-   profiler
-   truncate
-"""
+"""Assorted utilities."""
 
 from . import (
     arraytools as arraytools,

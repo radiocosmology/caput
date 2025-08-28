@@ -1,5 +1,4 @@
 # cython: language_level=3
-
 """Routines for truncating data to a specified precision."""
 
 cimport cython
@@ -29,6 +28,15 @@ cdef extern from "complex.h" nogil:
     double cabs(complex128)
 
 
+__all__ = [
+    "bit_truncate_float",
+    "bit_truncate_double",
+    "bit_truncate_weights",
+    "bit_truncate_relative",
+    "bit_truncate_max_complex",
+]
+
+
 def bit_truncate_int(int val, int err):
     """
     Bit truncation of a 32bit integer.
@@ -39,6 +47,7 @@ def bit_truncate_int(int val, int err):
     Made available for testing.
     """
     return bit_truncate(val, err)
+
 
 def bit_truncate_long(long val, long err):
     """
@@ -53,25 +62,6 @@ def bit_truncate_long(long val, long err):
 
 
 def bit_truncate_float(float val, float err):
-    """Truncate using a fixed error.
-
-    Parameters
-    ----------
-    val
-        The value to truncate.
-    err
-        The absolute precision to allow.
-
-    Returns
-    -------
-    val
-        The truncated value.
-
-    Raises
-    ------
-    ValueError
-        If `err` is a NaN.
-    """
     if err != err:
         raise ValueError(f"Error {err} is invalid.")
 
@@ -79,25 +69,6 @@ def bit_truncate_float(float val, float err):
 
 
 def bit_truncate_double(double val, double err):
-    """Truncate using a fixed error.
-
-    Parameters
-    ----------
-    val
-        The value to truncate.
-    err
-        The absolute precision to allow.
-
-    Returns
-    -------
-    val
-        The truncated value.
-
-    Raises
-    ------
-    ValueError
-        If `err` is a NaN.
-    """
     if err != err:
         raise ValueError(f"Error {err} is invalid.")
 
@@ -106,38 +77,19 @@ def bit_truncate_double(double val, double err):
 
 def bit_truncate_weights(val, inv_var, fallback):
     if val.dtype == np.float32 and inv_var.dtype == np.float32:
-        return bit_truncate_weights_float(val, inv_var, fallback)
+        return _bit_truncate_weights_float(val, inv_var, fallback)
     if val.dtype == np.float64 and inv_var.dtype == np.float64:
-        return bit_truncate_weights_double(val, inv_var, fallback)
+        return _bit_truncate_weights_double(val, inv_var, fallback)
     else:
-        raise RuntimeError(f"Can't truncate data of type {val.dtype}/{inv_var.dtype} "
-                           f"(expected float32 or float64).")
-
+        raise RuntimeError(
+            f"Can't truncate data of type {val.dtype}/{inv_var.dtype} "
+            "(expected float32 or float64)."
+        )
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_weights_float(float[:] val, float[:] inv_var, float fallback):
-    """Truncate using a set of inverse variance weights.
-
-    Giving the error as an inverse variance is particularly useful for data analysis.
-
-    N.B. non-contiguous arrays are supported in order to allow real and imaginary parts
-    of numpy arrays to be truncated without making a copy.
-
-    Parameters
-    ----------
-    val
-        The array of values to truncate the precision of. These values are modified in place.
-    inv_var
-        The acceptable precision expressed as an inverse variance.
-    fallback
-        A relative precision to use for cases where the inv_var is zero.
-
-    Returns
-    -------
-    val
-        The modified array. This shares the same underlying memory as the input.
-    """
+def _bit_truncate_weights_float(float[:] val, float[:] inv_var, float fallback):
+    """Truncate array of floats using a set of inverse variance weights."""
     cdef Py_ssize_t n = val.shape[0]
     cdef Py_ssize_t i = 0
 
@@ -158,28 +110,8 @@ def bit_truncate_weights_float(float[:] val, float[:] inv_var, float fallback):
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_weights_double(double[:] val, double[:] inv_var, double fallback):
-    """Truncate array of doubles using a set of inverse variance weights.
-
-    Giving the error as an inverse variance is particularly useful for data analysis.
-
-    N.B. non-contiguous arrays are supported in order to allow real and imaginary parts
-    of numpy arrays to be truncated without making a copy.
-
-    Parameters
-    ----------
-    val
-        The array of values to truncate the precision of. These values are modified in place.
-    inv_var
-        The acceptable precision expressed as an inverse variance.
-    fallback
-        A relative precision to use for cases where the inv_var is zero.
-
-    Returns
-    -------
-    val
-        The modified array. This shares the same underlying memory as the input.
-    """
+def _bit_truncate_weights_double(double[:] val, double[:] inv_var, double fallback):
+    """Truncate array of doubles using a set of inverse variance weights."""
     cdef Py_ssize_t n = val.shape[0]
     cdef Py_ssize_t i = 0
 
@@ -198,35 +130,21 @@ def bit_truncate_weights_double(double[:] val, double[:] inv_var, double fallbac
 
     return np.asarray(val)
 
+
 def bit_truncate_relative(val, prec):
     if val.dtype == np.float32:
-        return bit_truncate_relative_float(val, prec)
+        return _bit_truncate_relative_float(val, prec)
     if val.dtype == np.float64:
-        return bit_truncate_relative_double(val, prec)
+        return _bit_truncate_relative_double(val, prec)
     else:
-        raise RuntimeError(f"Can't truncate data of type {val.dtype} (expected float32 or float64).")
-
+        raise RuntimeError(
+            f"Can't truncate data of type {val.dtype} (expected float32 or float64)."
+        )
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_relative_float(float[:] val, float prec):
-    """Truncate using a relative tolerance.
-
-    N.B. non-contiguous arrays are supported in order to allow real and imaginary parts
-    of numpy arrays to be truncated without making a copy.
-
-    Parameters
-    ----------
-    val
-        The array of values to truncate the precision of. These values are modified in place.
-    prec
-        The fractional precision required.
-
-    Returns
-    -------
-    val
-        The modified array. This shares the same underlying memory as the input.
-    """
+def _bit_truncate_relative_float(float[:] val, float prec):
+    """Truncate array of floats using a relative tolerance."""
     cdef Py_ssize_t n = val.shape[0]
     cdef Py_ssize_t i = 0
 
@@ -235,27 +153,10 @@ def bit_truncate_relative_float(float[:] val, float prec):
 
     return np.asarray(val)
 
-
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def bit_truncate_relative_double(cnp.float64_t[:] val, cnp.float64_t prec):
-    """Truncate doubles using a relative tolerance.
-
-    N.B. non-contiguous arrays are supported in order to allow real and imaginary parts
-    of numpy arrays to be truncated without making a copy.
-
-    Parameters
-    ----------
-    val
-        The array of double values to truncate the precision of. These values are modified in place.
-    prec
-        The fractional precision required.
-
-    Returns
-    -------
-    val
-        The modified array. This shares the same underlying memory as the input.
-    """
+def _bit_truncate_relative_double(cnp.float64_t[:] val, cnp.float64_t prec):
+    """Truncate array of doubles using a relative tolerance."""
     cdef Py_ssize_t n = val.shape[0]
     cdef Py_ssize_t i = 0
 
@@ -268,27 +169,6 @@ def bit_truncate_relative_double(cnp.float64_t[:] val, cnp.float64_t prec):
 @cython.boundscheck(False)
 @cython.wraparound(False)
 def bit_truncate_max_complex(complex128[:, :] val, float prec, float prec_max_row):
-    """Truncate using a relative per element and per the maximum of the last dimension.
-
-    This scheme allows elements to be truncated based on their own value and a
-    measure of their relative importance compared to other elements. In practice the
-    per element absolute precision for an element `val[i, j]` is given by `max(prec *
-    val[i, j], prec_max_dim * val[i].max())`
-
-    Parameters
-    ----------
-    val
-        The array of values to truncate the precision of. These values are modified in place.
-    prec
-        The fractional precision on each elements.
-    prec_max_row
-        The precision to use relative to the maximum of the of each row.
-
-    Returns
-    -------
-    val
-        The modified array. This shares the same underlying memory as the input.
-    """
     cdef Py_ssize_t n = val.shape[0]
     cdef Py_ssize_t m = val.shape[1]
     cdef Py_ssize_t i = 0, j = 0
