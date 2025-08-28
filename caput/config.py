@@ -9,16 +9,14 @@ Examples
 In this example we set up a class to store information about a person.
 
 >>> class Person(Reader):
-...
-...     name = Property(default='Bill', proptype=str)
-...     age = Property(default=26, proptype=float, key='ageinyears')
+...     name = Property(default="Bill", proptype=str)
+...     age = Property(default=26, proptype=float, key="ageinyears")
 
 We then extend it to store information about a person with a pet. The
 configuration will be successfully inherited.
 
 >>> class PersonWithPet(Person):
-...
-...     petname = Property(default='Molly', proptype=str)
+...     petname = Property(default="Molly", proptype=str)
 
 Let's create a couple of objects from these classes.
 
@@ -27,7 +25,7 @@ Let's create a couple of objects from these classes.
 
 And a dictionary of replacement parameters.
 
->>> testdict = { 'name' : 'Richard', 'ageinyears' : 40, 'petname' : 'Sooty'}
+>>> testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
 First let's check what the default parameters are:
 
@@ -47,46 +45,62 @@ Then we'll print the output to see the updated configuration:
 Richard 40.0
 >>> print(person2.name, person2.age, person2.petname)
 Richard 40.0 Sooty
-
 """
 
+from __future__ import annotations
+
 import logging
-import warnings
+from typing import TYPE_CHECKING
 
 from yaml.loader import SafeLoader
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Mapping
+    from typing import Any
+
+    import numpy.typing as npt
+    from yaml.loader import MappingNode
+
+    from .astro.time import TimeLike
 
 logger = logging.getLogger(__name__)
 
 
 class Property:
-    """Custom property descriptor that can load values from a given dict."""
+    """Custom property descriptor that can load values from a given dict.
 
-    def __init__(self, default=None, proptype=None, key=None, deprecated=False):
-        """Make a new property type.
+    Parameters
+    ----------
+    default : Any | None, optional
+        The initial value for the property.
+    proptype : Callable | None, optional
+        The type of the property. In reality this is just a function which
+        gets called whenever we update the value: `val = proptype(newval)`,
+        so it can be used for conversion and validation
+    key : str | None, optional
+        The name of the dictionary key that we can fetch this value from.
+        If None (default), attempt to use the attribute name from the
+        class.
+    deprecated : bool, optional
+        An easy way to flag a property as deprecated. This will raise a deprecation
+        warning, but will not change the behaviour of this `Property` instance.
+    """
 
-        Parameters
-        ----------
-        default : object
-            The initial value for the property.
-        proptype : function
-            The type of the property. In reality this is just a function which
-            gets called whenever we update the value: `val = proptype(newval)`,
-            so it can be used for conversion and validation
-        key : string
-            The name of the dictionary key that we can fetch this value from.
-            If None (default), attempt to use the attribute name from the
-            class.
-        deprecated : bool
-            An easy way to flag a property as deprecated. This will raise a deprecation
-            warning, but will not change the behaviour of this `Property` instance.
-        """
+    def __init__(
+        self,
+        default: Any | None = None,
+        proptype: Callable | None = None,
+        key: str | None = None,
+        deprecated: bool = False,
+    ) -> None:
+        """Make a new property type."""
         self.proptype = (lambda x: x) if proptype is None else proptype
         self.default = default
         self.key = key
         self.propname = None
         self._deprecated = deprecated
 
-    def __get__(self, obj, objtype):
+    def __get__(self, obj: Any, objtype: Any) -> Any | None:
         # Object getter.
         if obj is None:
             return None
@@ -99,9 +113,10 @@ class Property:
         # actual value.
         if self.propname not in obj.__dict__:
             return self.proptype(self.default) if self.default is not None else None
+
         return obj.__dict__[self.propname]
 
-    def __set__(self, obj, val):
+    def __set__(self, obj: Any, val: Any) -> None:
         # Object setter.
         if obj is None:
             return
@@ -114,12 +129,12 @@ class Property:
         # for.
         obj.__dict__[self.propname] = self.proptype(val)
 
-    def _from_config(self, obj, config):
+    def _from_config(self, obj: Any, config: dict) -> None:
         """Load the configuration from the supplied dictionary.
 
         Parameters
         ----------
-        obj : object
+        obj : Any
             The parent object of the Property that we want to update.
         config : dict
             Dictionary of configuration values.
@@ -150,7 +165,7 @@ class Property:
             # actually being set by the config.
             self._set_propname_warn_deprecated(obj)
 
-    def _set_propname(self, obj):
+    def _set_propname(self, obj: Any) -> None:
         # As this config.Property instance lives on the class it's in, it
         # doesn't actually know what it's name is. We need to search the class
         # hierarchy for this instance to pull out the name. Once we have it, set
@@ -164,7 +179,7 @@ class Property:
                     if clsprop is self:
                         self.propname = propname
 
-    def _set_propname_warn_deprecated(self, obj):
+    def _set_propname_warn_deprecated(self, obj: Any) -> None:
         # Set the property name and emit a warning
         # if this property is deprecated
         self._set_propname(obj)
@@ -177,6 +192,8 @@ class Property:
             # Base category for warnings about deprecated features when
             # those warnings are intended for end users of applications
             # that are written in Python.
+            import warnings
+
             warnings.warn(
                 f"Property `{self.propname}` is deprecated and may behave unpredictably. "
                 "Check the documentation of the class where this is being used "
@@ -190,36 +207,45 @@ class Reader:
     """A class that allows the values of Properties to be assigned from a dictionary."""
 
     @classmethod
-    def from_config(cls, config, *args, **kwargs):
-        """Create a new instance with values loaded from config.
+    def from_config(cls, config: dict, *args: Any, **kwargs: Any) -> Reader:  # noqa: D417
+        r"""Create a new instance with values loaded from config.
 
         Parameters
         ----------
         config : dict
             Dictionary of configuration values.
-        *args : list
+        \*args : Any
             Variable length argument list
-        **kwargs : dict
+        \**kwargs : Any
             Arbitrary keyword arguments.
+
+        Returns
+        -------
+        reader_from_config : Reader
+            Class instance with values loaded from config.
         """
         c = cls(*args, **kwargs)
         c.read_config(config)
 
         return c
 
-    def read_config(self, config, compare_keys=False, use_defaults=True):
+    def read_config(
+        self,
+        config: dict,
+        compare_keys: bool | list[str] = False,
+        use_defaults: bool = True,
+    ) -> None:
         """Set all properties in this class from the supplied config.
 
         Parameters
         ----------
         config : dict
             Dictionary of configuration values.
-        compare_keys : bool or list[str]
+        compare_keys : bool | list[str], optional
             If True, a CaputConfigError is raised if there are unused keys in the
-            config dictionary.
-            If a list of strings is given, any unused keys except the ones in the
-            list lead to a CaputConfigError.
-        use_defaults : bool
+            config dictionary. If a list of strings is given, any unused keys except the ones in the
+            list lead to a :py:exc:`.CaputConfigError`.
+        use_defaults : bool, optional
             If False, a CaputConfigError is raised if a property is not defined by
             the config dictionary
 
@@ -264,27 +290,25 @@ class Reader:
         To be overridden in subclasses if we need to perform some processing
         post configuration.
         """
+        ...
 
 
-def utc_time(default=None):
+def utc_time(default: TimeLike | None = None) -> Property[TimeLike]:
     """Property for representing UTC as UNIX time.
 
     Parameters
     ----------
-    time : `float`, `string` or :class:`~datetime.datetime`
-        These are all easy to produce from a YAML file.
-    default : `float`, `string` or :class:`~datetime.datetime`, optional
+    default : TimeLike | None, optional
         The optional default time.
 
     Returns
     -------
-    prop : Property
+    utc_parser : Property
         A property instance setup to parse UTC time.
     """
 
     def _prop(val):
         # Include import here to get around circular import issues
-        # pylint: disable=R0401
         from .astro.time import ensure_unix
 
         return ensure_unix(val)
@@ -292,19 +316,21 @@ def utc_time(default=None):
     return Property(proptype=_prop, default=default)
 
 
-def float_in_range(start, end, default=None):
+def float_in_range(
+    start: float, end: float, default: float | None = None
+) -> Property[float]:
     """Property type that tests if its input is within the given range.
 
     Parameters
     ----------
     start, end : float
         Range to test.
-    default : `float`, optional
+    default : float | None, optional
         The optional default time.
 
     Returns
     -------
-    prop : Property
+    float_in_range : Property
         A property instance setup to validate an input float type.
 
     Examples
@@ -312,7 +338,6 @@ def float_in_range(start, end, default=None):
     Should be used like::
 
         class Position:
-
             longitude = config.float_in_range(0.0, 360.0, default=90.0)
     """
 
@@ -327,19 +352,19 @@ def float_in_range(start, end, default=None):
     return Property(proptype=_prop, default=default)
 
 
-def enum(options, default=None):
+def enum(options: list[Any], default: Any | None = None) -> Property:
     """Property type that accepts only a set of possible values.
 
     Parameters
     ----------
-    options : list
+    options : list[Any]
         List of allowed options.
-    default : optional
+    default : Any, optional
         The optional default value.
 
     Returns
     -------
-    prop : Property
+    enum : Property
         A property instance setup to validate an enum type.
 
     Raises
@@ -352,8 +377,7 @@ def enum(options, default=None):
     Should be used like::
 
         class Project:
-
-            mode = enum(['forward', 'backward'], default='forward')
+            mode = enum(["forward", "backward"], default="forward")
     """
 
     def _prop(val):
@@ -368,23 +392,28 @@ def enum(options, default=None):
     return Property(proptype=_prop, default=default)
 
 
-def list_type(type_=None, length=None, maxlength=None, default=None):
+def list_type(  # noqa: D417
+    type_: npt.DtypeLike | None = None,
+    length: int | None = None,
+    maxlength: int | None = None,
+    default: Any | None = None,
+) -> Property:
     """Property type that validates lists against required properties.
 
     Parameters
     ----------
-    type_ : type, optional
+    type\\_ : dtype | None, optional
         Type to apply. If `None` does not attempt to validate elements against type.
-    length : int, optional
+    length : int | None, optional
         Exact length of the list we expect. If `None` (default) accept any length.
-    maxlength : int, optional
+    maxlength : int | None, optional
         Maximum length of the list. If `None` (default) there is no maximum length.
-    default : optional
+    default : Any | None, optional
         The optional default value.
 
     Returns
     -------
-    prop : Property
+    list_type : Property
         A property instance setup to validate the type.
 
     Raises
@@ -397,9 +426,8 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
     Should be used like::
 
         class Project:
-
             mode = list_type(int, length=2, default=[3, 4])
-    """
+    """  # noqa: D301
 
     def _prop(val):
         if not isinstance(val, list | tuple):
@@ -436,7 +464,7 @@ def list_type(type_=None, length=None, maxlength=None, default=None):
     return Property(proptype=_prop, default=default)
 
 
-def logging_config(default=None):
+def logging_config(default: str | dict | None = None) -> Property[str | dict]:
     """Property type that validates the caput logging config.
 
     Allows the type to be either a string (for backward compatibility) or a dict
@@ -444,12 +472,12 @@ def logging_config(default=None):
 
     Parameters
     ----------
-    default : optional
+    default : str | dict | None, optional
         The optional default value.
 
     Returns
     -------
-    prop : Property
+    logging_config : Property
         A property instance setup to validate the type.
 
     Examples
@@ -457,7 +485,6 @@ def logging_config(default=None):
     Should be used like::
 
         class Project:
-
             loglevels = logging_config({"root": "INFO", "annoying.module": "WARNING"})
     """
     if default is None:
@@ -498,7 +525,7 @@ def logging_config(default=None):
 class _line_dict(dict):
     """A private dict subclass that also stores line numbers for debugging."""
 
-    __line__ = None
+    __line__: int | None = None
 
 
 class SafeLineLoader(SafeLoader):
@@ -508,31 +535,34 @@ class SafeLineLoader(SafeLoader):
     debugging and to describe linting errors.
     """
 
-    def construct_mapping(self, node, deep=False):
+    def construct_mapping(self, node: MappingNode, deep: bool = False) -> Mapping:
         """Construct the line mapping."""
-        mapping = super().construct_mapping(node, deep=deep)
-        mapping = _line_dict(mapping)
+        mapping: Mapping = super().construct_mapping(node, deep=deep)
+        mapping: _line_dict = _line_dict(mapping)
 
         # Add 1 so numbering starts at 1
         mapping.__line__ = node.start_mark.line + 1
+
         return mapping
 
 
 class CaputConfigError(RuntimeError):
-    """There was an error in the configuration.
+    r"""There was an error in the configuration.
 
     Parameters
     ----------
     message : str
         Message / description of error
-    file_ : str
-        Configuration file name (optional)
-    location : dict
-        If using :class:`SafeLineLoader` is used, a dict created by that can be
+    file\_ : str | None, optional
+        Configuration file name.
+    location : \_line\_dict | None, optional
+        If using :py:class:`.SafeLineLoader` is used, a dict created by that can be
         passed in here to report the line number where the error occurred.
     """
 
-    def __init__(self, message, file_=None, location=None):
+    def __init__(
+        self, message: str, file_: str | None = None, location: _line_dict | None = None
+    ) -> None:
         self.message = message
         self.file = file_
         if isinstance(location, _line_dict):
@@ -541,16 +571,10 @@ class CaputConfigError(RuntimeError):
             self.line = None
         super().__init__(message)
 
-    def __str__(self):
+    def __str__(self) -> str:
         location = ""
         if self.line is not None:
             location = f"\nError in block starting at L{self.line}"
             if self.file is not None:
                 location = f"{location} ({self.file})"
         return f"{self.message}{location}"
-
-
-if __name__ == "__main__":
-    import doctest
-
-    doctest.testmod()
