@@ -1,5 +1,7 @@
 """caput.
 
+Cluster Astronomical Python Utilities.
+
 Submodules
 ----------
 .. autosummary::
