@@ -1,26 +1,14 @@
-"""Dataset I/O utilities."""
+""":py:mod:`~.caput.memdata` I/O utilities.
+
+General MPI-I/O utilities used by `:py:mod:`~.caput.memdata`. Don't import there
+directly from the private module. They may be moved elsewhere at any time.
+"""
+
+from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import TYPE_CHECKING, Optional, overload
-
-import h5py
-
-if TYPE_CHECKING:
-    from mpi4py import MPI
 
 
-@overload
-def open_h5py_mpi(
-    f: str | Path | h5py.File,
-    mode: str,
-    use_mpi: bool = True,
-    comm: Optional["MPI.Comm"] = None,
-) -> h5py.File: ...
-@overload
-def open_h5py_mpi(
-    f: h5py.Group, mode: str, use_mpi: bool = True, comm: Optional["MPI.Comm"] = None
-) -> h5py.Group: ...
 def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
     """Ensure that we have an h5py File object.
 
@@ -32,21 +20,21 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
 
     Parameters
     ----------
-    f : string, h5py.File or h5py.Group
+    f : os.PathLike | h5py.File | h5py.Group
         Filename to open, or already open file object. If already open this
         is just returned as is.
-    mode : string
+    mode : str
         Mode to open file in.
     use_mpi : bool, optional
         Whether to use MPI-IO or not (default True)
-    comm : mpi4py.Comm, optional
+    comm : MPI.Comm | None, optional
         MPI communicator to use. Uses `COMM_WORLD` if not set.
 
     Returns
     -------
-    fh : h5py.File
-        File handle for h5py.File, with two extra attributes `.is_mpi` and
-        `.opened`.
+    file_handle : h5py.File
+        File handle for :py:class:`h5py.File`, with two extra attributes
+        ``.is_mpi`` and ``.opened``.
     """
     import h5py
 
@@ -84,29 +72,23 @@ class lock_file:
         Final name for the file.
     preserve : bool, optional
         Keep the temporary file in the event of failure.
-    comm : MPI.COMM, optional
-        If present only rank=0 will create/remove the lock file and move the
+    comm : MPI.Comm | None, optional
+        If not ``None``, only rank=0 will create/remove the lock file and move the
         file.
-
-    Returns
-    -------
-    tmp_name : str
-        File name to use in the locked block.
 
     Examples
     --------
-    >>> from . import memh5
-    >>> container = memh5.BasicCont()
-    >>> with lock_file('file_to_create.h5') as fname:
+    >>> from caput import memdata
+    >>> container = memdata.BasicCont()
+    >>> with lock_file("file_to_create.h5") as fname:
     ...     container.save(fname)
-    ...
     """
 
-    def __init__(self, name, preserve=False, comm=None):
+    def __init__(self, filename, preserve=False, comm=None):
         if comm is not None and not hasattr(comm, "rank"):
             raise ValueError("comm argument does not seem to be an MPI communicator.")
 
-        self.name = name
+        self.filename = filename
         # If comm not specified, set internal rank0 marker to True,
         # so that rank>0 tasks can open their own files
         self.rank0 = True if comm is None else comm.rank == 0
@@ -127,7 +109,7 @@ class lock_file:
                     os.remove(self.tmpfile)
             # Otherwise things were successful and we should move the file over
             else:
-                os.rename(self.tmpfile, self.name)
+                os.rename(self.tmpfile, self.filename)
 
             # Finally remove the lock file
             os.remove(self.lockfile)
@@ -137,7 +119,7 @@ class lock_file:
     @property
     def tmpfile(self):
         """Full path to the lockfile (without file extension)."""
-        base, fname = os.path.split(self.name)
+        base, fname = os.path.split(self.filename)
         return os.path.join(base, "." + fname)
 
     @property

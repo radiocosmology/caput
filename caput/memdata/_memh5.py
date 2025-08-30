@@ -1,51 +1,8 @@
 """Module for making in-memory mock-ups of :mod:`h5py` objects.
 
-It is sometimes useful to have a consistent API for data that is independent
-of whether that data lives on disk or in memory. :mod:`h5py` provides this to a
-certain extent, having :class:`h5py.Dataset` objects that act very much like
-:mod:`numpy` arrays. :mod:`memh5` extends this, providing an in-memory
-containers, analogous to :class:`h5py.Group`, :class:`h5py.AttributeManager` and
-:class:`h5py.Dataset` objects.
-
-In addition to these basic classes that copy the :mod:`h5py` API, A higher
-level data container is provided that utilizes these classes along with the
-:mod:`h5py` to provide data that is transparently stored either in memory or on
-disk.
-
-This also allows the creation and use of :mod:`memh5` objects which can hold
-data distributed over a number of MPI processes. These
-:class:`MemDatasetDistributed` datasets hold :class:`caput.mpiarray.MPIArray`
-objects and can be written to, and loaded from disk like normal :class:`memh5`
-objects.  Support for this must be explicitly enabled in the root group at
-creation with the `distributed=True` flag.
-
-.. warning::
-    It has been observed that the parallel write of distributed datasets can
-    lock up. This was when using macOS using `ompio` of OpenMPI 3.0.
-    Switching to `romio` as the MPI-IO backend helped here, but please report
-    any further issues.
-
-Basic Classes
-=============
-- :py:class:`ro_dict`
-- :py:class:`MemGroup`
-- :py:class:`MemAttrs`
-- :py:class:`MemDataset`
-- :py:class:`MemDatasetCommon`
-- :py:class:`MemDatasetDistributed`
-
-High Level Container
-====================
-- :py:class:`MemDiskGroup`
-- :py:class:`BasicCont`
-
-Utility Functions
-=================
-- :py:meth:`attrs2dict`
-- :py:meth:`is_group`
-- :py:meth:`get_h5py_File`
-- :py:meth:`copyattrs`
-- :py:meth:`deep_group_copy`
+Implementation of the :py:mod:`~caput.memdata` module that provides in-memory versions of
+:py:mod:`h5py`-like objects. This should be considered to be a private module,
+with the public interface being through the :py:mod:`~caput.memdata` module.
 """
 
 from __future__ import annotations
@@ -58,20 +15,15 @@ import warnings
 from ast import literal_eval
 from collections.abc import Mapping
 from copy import deepcopy
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypeVar
 
 import h5py
 import numpy as np
 
 from .. import mpiarray
 from ..util import importtools, mpitools, objecttools
-from . import fileformats
-from .io import open_h5py_mpi
-
-if TYPE_CHECKING:
-    from mpi4py import MPI
-
+from . import _typeutils, fileformats
+from ._io import open_h5py_mpi
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +34,28 @@ except ImportError as err:
     zarr_available = False
 else:
     zarr_available = True
+
+if TYPE_CHECKING:
+    # TODO: this break if `zarr` isn't installed - we need to port a bunch
+    # of this stuff to `fileformats` somehow. Maybe generic types (ex `FileLike`)
+    # created at run time based on what libraries are available?
+    import zarr
+
+    from ..mpiarray import SelectionLike
+
+
+# Custom type definitions
+# TODO: these can probably be improved by using protocols or something.
+GroupLike = TypeVar(
+    "GroupLike",
+    bound=type["MemGroup"] | type["MemDiskGroup"] | type[h5py.Group] | type[zarr.Group],
+)
+FileLike = TypeVar("FileLike", bound=type[h5py.File] | type[zarr.Group] | str | bytes)
+FileOrGroupLike = TypeVar("FileOrGroupLike", bound=GroupLike | FileLike)
+DatasetLike = TypeVar(
+    "DatasetLike", bound=type["MemDataset"] | type[h5py.Dataset] | type[zarr.Array]
+)
+AttributesLike = TypeVar("AttributesLike", bound=Mapping)
 
 
 # Basic Classes
@@ -96,11 +70,11 @@ class ro_dict(Mapping):
     a normal dictionary.
 
     Provides the same interface for reading as the builtin python
-    :class:`dict` but no methods for writing.
+    :py:class:`dict` but no methods for writing.
 
     Parameters
     ----------
-    d : dict
+    d : dict | None
         Initial data for the new dictionary.
     """
 
@@ -141,7 +115,8 @@ class _Storage(dict):
 
         Returns
         -------
-        attrs : MemAttrs
+        attributes : MemAttrs
+            Attributes container.
         """
         return self._attrs
 
@@ -175,6 +150,7 @@ class _StorageRoot(_Storage):
 
     @property
     def distributed(self):
+        """Whether this storage root supports distributed datasets."""
         return self._distributed
 
     def __getitem__(self, key):
@@ -206,19 +182,16 @@ class _StorageRoot(_Storage):
 
 
 class MemAttrs(dict):
-    """In memory implementation of the :class:`h5py.AttributeManager`.
+    """In memory implementation of the :py:class:`h5py.AttributeManager`."""
 
-    Currently just a normal dictionary.
-    """
-
-    pass
+    ...
 
 
 class _MemObjMixin:
     """Mixin represents the identity of an in-memory h5py-like object.
 
-    Implement a few attributes that all memh5 objects have, such as `parent`,
-    and `file`.
+    Implement a few attributes that all memh5 objects have, such as
+    :py:attr:`~._MemObjMixin.parent` and :py:attr:`~._MemObjMixin.file`.
     """
 
     @property
@@ -241,13 +214,13 @@ class _MemObjMixin:
 
     @property
     def parent(self):
-        """Parent :class:`MemGroup` that contains this group."""
+        """Parent :py:class:`MemGroup` that contains this group."""
         parent_name, _ = posixpath.split(self.name)
         return self._group_class._from_storage_root(self._storage_root, parent_name)
 
     @property
     def file(self):
-        """Not a file at all but the top most :class:`MemGroup` of the tree."""
+        """Not a file at all but the top most :py:class:`MemGroup` of the tree."""
         return self._group_class._from_storage_root(self._storage_root, "/")
 
     def __eq__(self, other):
@@ -279,6 +252,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
 
     @property
     def distributed(self):
+        """Whether this group supports distributed datasets."""
         return getattr(self._storage_root, "distributed", False)
 
     @property
@@ -287,7 +261,8 @@ class _BaseGroup(_MemObjMixin, Mapping):
 
         Returns
         -------
-        attrs : MemAttrs
+        attributes : MemAttrs
+            Attributes container.
         """
         return self._get_storage().attrs
 
@@ -295,6 +270,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
     def _from_storage_root(cls, storage_root, name):
         self = super().__new__(cls)
         super(_BaseGroup, self).__init__(storage_root, name)
+
         return self
 
     def _get_storage(self):
@@ -326,9 +302,11 @@ class _BaseGroup(_MemObjMixin, Mapping):
         """Delete item from group."""
         if name not in self:
             raise KeyError(f"Key {name} not present.")
+
         path = posixpath.join(self.name, name)
         parent_path, name = posixpath.split(path)
         parent = self._storage_root[parent_path]
+
         del parent[name]
 
     def __len__(self):
@@ -338,31 +316,67 @@ class _BaseGroup(_MemObjMixin, Mapping):
         keys = list(self._get_storage().keys())
         yield from keys
 
-    def require_dataset(self, name, shape, dtype, **kwargs):
-        """Require a dataset to exist, create if it doesn't.
+    def require_dataset(self, name, shape, dtype, **kwargs):  # noqa: D417
+        r"""Require a dataset to exist, create if it doesn't.
 
         All arguments are passed through to create_dataset.
 
+        Parameters
+        ----------
+        name : str
+            Dataset name.
+        shape : tuple
+            Shape tuple.
+        dtype : dtype
+            :py:mod:`numpy` dtype of the dataset.
+        \**kwargs : Any
+            Arbitrary keyword arguments use if a new dataset is created.
+
+        Returns
+        -------
+        dataset : DatasetLike
+            The requested dataset, or a new dataset if the requested one did not exist.
+
+        Raises
+        ------
+        :py:exc:`TypeError`
+            If an object with the requested name exists but it is not a Dataset.
         """
         try:
             d = self[name]
         except KeyError:
             return self.create_dataset(name, shape=shape, dtype=dtype, **kwargs)
+
         if is_group(d):
-            msg = f"Entry '{name}' exists and is not a Dataset."
-            raise TypeError(msg)
+            raise TypeError(f"Entry '{name}' exists and is not a Dataset.")
 
         return d
 
     def require_group(self, name):
-        """Require a group to exist, create if it doesn't."""
+        """Require a group to exist, create if it doesn't.
+
+        Parameters
+        ----------
+        name : str
+            Group name.
+
+        Returns
+        -------
+        group : GroupLike
+            The requested group, or a new group if the requested one did not exist.
+
+        Raises
+        ------
+        :py:exc:`TypeError`
+            If an object with the requested name exists but it is not a Group.
+        """
         try:
             g = self[name]
         except KeyError:
             return self.create_group(name)
+
         if not is_group(g):
-            msg = f"Entry '{name}' exists and is not a Group."
-            raise TypeError(msg)
+            raise TypeError(f"Entry '{name}' exists and is not a Group.")
 
         return g
 
@@ -376,17 +390,16 @@ class MemGroup(_BaseGroup):
 
     Parameters
     ----------
-    distributed : boolean, optional
+    distributed : bool
         Allow memh5 object to hold distributed datasets.
-    comm : MPI.Comm, optional
+    comm : MPI.Comm | None
         MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
     """
 
     def __init__(self, distributed=False, comm=None):
         # Default constructor is only used to create the root group.
         storage_root = _StorageRoot(distributed=distributed, comm=comm)
-        name = "/"
-        super().__init__(storage_root, name)
+        super().__init__(storage_root, "/")
 
     @property
     def mode(self):
@@ -400,8 +413,24 @@ class MemGroup(_BaseGroup):
     def from_group(cls, group):
         """Create a new instance by deep copying an existing group.
 
-        Agnostic as to whether the group to be copied is a `MemGroup` or an
-        `h5py.Group` (which includes `h5py.File` and `zarr.File` objects).
+        Agnostic as to whether the group to be copied is a :py:class:`MemGroup` or an
+        :py:class:`h5py.Group` (which includes :py:class:`h5py.File` and
+        :py:class:`zarr.File` objects).
+
+        Parameters
+        ----------
+        group : FileOrGroupLike
+            Group to copy from, or filename to load from.
+
+        Returns
+        -------
+        group : MemGroup
+            A new :py:class:`.MemGroup` instance.
+
+        Raises
+        ------
+        :py:exc:`RuntimeError`
+            If the input group is not a supported type.
         """
         if isinstance(group, MemGroup):
             self = cls()
@@ -418,46 +447,45 @@ class MemGroup(_BaseGroup):
         )
 
     @classmethod
-    def from_hdf5(
+    def from_hdf5(  # noqa: D417
         cls,
         filename,
         distributed=False,
         hints=True,
         comm=None,
-        selections=None,
+        selections={},
         convert_dataset_strings=False,
         convert_attribute_strings=True,
         **kwargs,
     ):
-        """Create a new instance by copying from an hdf5 group.
+        r"""Create a new instance by copying from an hdf5 group.
 
-        Any keyword arguments are passed on to the constructor for `h5py.File`.
+        Any keyword arguments are passed on to the constructor for :py:class:`h5py.File`.
 
         Parameters
         ----------
-        filename : string
+        filename : path_like
             Name of file to load.
-        distributed : boolean, optional
+        distributed : bool
             Whether to load file in distributed mode.
-        hints : boolean, optional
+        hints : bool
             If in distributed mode use hints to determine whether datasets are
             distributed or not.
-        comm : MPI.Comm, optional
+        comm : MPI.Comm | None
             MPI communicator to distributed over. If :obj:`None` use
-            :obj:`MPI.COMM_WORLD`.
+            :py:obj:`MPI.COMM_WORLD`.
         selections : dict
-            If this is not None, it should map dataset names to axis selections as valid
-            numpy indexes.
-        convert_attribute_strings : bool, optional
-            Try and convert attribute string types to unicode. Default is `True`.
-        convert_dataset_strings : bool, optional
-            Try and convert dataset string types to unicode. Default is `False`.
-        **kwargs : dict
+            Map dataset names to axis selections as valid numpy indexes.
+        convert_attribute_strings : bool
+            Try and convert attribute string types to unicode. Default is ``True``.
+        convert_dataset_strings : bool
+            Try and convert dataset string types to unicode. Default is ``False``.
+        \**kwargs : Any
             Arbitrary keyword arguments.
 
         Returns
         -------
-        group : memh5.Group
+        group : MemGroup
             Root group of loaded file.
         """
         return cls.from_file(
@@ -473,50 +501,49 @@ class MemGroup(_BaseGroup):
         )
 
     @classmethod
-    def from_file(
+    def from_file(  # noqa: D417
         cls,
         filename,
         distributed=False,
         hints=True,
         comm=None,
-        selections=None,
+        selections={},
         convert_dataset_strings=False,
         convert_attribute_strings=True,
         file_format=None,
         **kwargs,
     ):
-        """Create a new instance by copying from a file group.
+        r"""Create a new instance by copying from a file group.
 
-        Any keyword arguments are passed on to the constructor for `h5py.File` or
-        `zarr.File`.
+        Any keyword arguments are passed on to the constructor for :py:class:`h5py.File` or
+        :py:class:`zarr.File`.
 
         Parameters
         ----------
-        filename : string
+        filename : path_like
             Name of file to load.
-        distributed : boolean, optional
+        distributed : bool
             Whether to load file in distributed mode.
-        hints : boolean, optional
+        hints : bool
             If in distributed mode use hints to determine whether datasets are
             distributed or not.
-        comm : MPI.Comm, optional
+        comm : MPI.Comm | None
             MPI communicator to distributed over. If :obj:`None` use
-            :obj:`MPI.COMM_WORLD`.
+            :py:obj:`MPI.COMM_WORLD`.
         selections : dict
-            If this is not None, it should map dataset names to axis selections as valid
-            numpy indexes.
-        convert_attribute_strings : bool, optional
-            Try and convert attribute string types to unicode. Default is `True`.
-        convert_dataset_strings : bool, optional
-            Try and convert dataset string types to unicode. Default is `False`.
-        file_format : `fileformats.FileFormat`, optional
-            File format to use. Default is `None`, i.e. guess from the name.
-        **kwargs : dict
+            Map dataset names to axis selections as valid numpy indexes.
+        convert_attribute_strings: bool
+            Try and convert attribute string types to unicode. Default is ``True``.
+        convert_dataset_strings : bool
+            Try and convert dataset string types to unicode. Default is ``False``.
+        file_format : FileFormat | None
+            File format to use. Default is ``None``, i.e. guess from the name.
+        \**kwargs
             Arbitrary keyword arguments.
 
         Returns
         -------
-        group : memh5.Group
+        group : MemGroup
             Root group of loaded file.
         """
         if comm is None:
@@ -558,7 +585,7 @@ class MemGroup(_BaseGroup):
 
         return self
 
-    def to_hdf5(
+    def to_hdf5(  # noqa: D417
         self,
         filename,
         mode="w",
@@ -567,25 +594,25 @@ class MemGroup(_BaseGroup):
         convert_dataset_strings=False,
         **kwargs,
     ):
-        """Replicate object on disk in an hdf5 file.
+        r"""Replicate object on disk in an hdf5 file.
 
-        Any keyword arguments are passed on to the constructor for `h5py.File`.
+        Any keyword arguments are passed on to the constructor for :py:class:`h5py.File`.
 
         Parameters
         ----------
-        filename : str
+        filename : path_like
             File to save into.
-        mode : str, optional
-            Mode in which to open file
-        hints : boolean, optional
+        mode : str
+            Mode in which to open file. Default is "w".
+        hints : bool
             Whether to write hints into the file that described whether datasets
-            are distributed, or not.
-        convert_attribute_strings : bool, optional
+            are distributed, or not. Default is ``True``.
+        convert_attribute_strings : bool
             Try and convert attribute string types to a unicode type that HDF5
-            understands. Default is `True`.
-        convert_dataset_strings : bool, optional
-            Try and convert dataset string types to bytestrings. Default is `False`.
-        **kwargs : dict
+            understands. Default is ``True``.
+        convert_dataset_strings : bool
+            Try and convert dataset string types to bytestrings. Default is ``False``.
+        \**kwargs : Any
             Arbitrary keyword arguments.
         """
         self.to_file(
@@ -598,7 +625,7 @@ class MemGroup(_BaseGroup):
             **kwargs,
         )
 
-    def to_file(
+    def to_file(  # noqa: D417
         self,
         filename,
         mode="w",
@@ -608,27 +635,27 @@ class MemGroup(_BaseGroup):
         file_format=None,
         **kwargs,
     ):
-        """Replicate object on disk in an hdf5 or zarr file.
+        r"""Replicate object on disk in an hdf5 or zarr file.
 
-        Any keyword arguments are passed on to the constructor for `h5py.File` or `zarr.File`.
+        Any keyword arguments are passed on to the constructor for :py:class:`h5py.File` or :py:class:`zarr.File`.
 
         Parameters
         ----------
-        filename : str
+        filename : path_like
             File to save into.
-        mode : str, optional
-            Mode in which t open file
-        hints : boolean, optional
+        mode : str
+            Mode in which to open file. Default is "w".
+        hints : bool
             Whether to write hints into the file that described whether datasets
             are distributed, or not.
-        convert_attribute_strings : bool, optional
+        convert_attribute_strings : bool
             Try and convert attribute string types to a unicode type that HDF5
-            understands. Default is `True`.
-        convert_dataset_strings : bool, optional
-            Try and convert dataset string types to bytestrings. Default is `False`.
-        file_format : `fileformats.FileFormat`, optional
-            File format to use. Default is `None`, i.e. guess from the name.
-        **kwargs : dict
+            understands. Default is ``True``.
+        convert_dataset_strings : bool
+            Try and convert dataset string types to bytestrings. Default is ``False``.
+        file_format : FileFormat | None
+            File format to use. Default is ``None``, i.e. guess from the name.
+        \**kwargs : Any
             Arbitrary keyword arguments.
         """
         if file_format is None:
@@ -654,7 +681,18 @@ class MemGroup(_BaseGroup):
             )
 
     def create_group(self, name):
-        """Create a group within the storage tree."""
+        """Create a group within the storage tree.
+
+        Parameters
+        ----------
+        name : str
+            Name of the group to create.
+
+        Returns
+        -------
+        group : MemGroup
+            The created group.
+        """
         path = format_abs_path(posixpath.join(self.name, name))
         try:
             self[name]
@@ -685,7 +723,7 @@ class MemGroup(_BaseGroup):
         # Underlying storage has been created. Return the group object.
         return self[name]
 
-    def create_dataset(
+    def create_dataset(  # noqa: D417
         self,
         name,
         shape=None,
@@ -698,36 +736,37 @@ class MemGroup(_BaseGroup):
         compression_opts=None,
         **kwargs,
     ):
-        """Create a new dataset.
+        r"""Create a new dataset.
 
         Parameters
         ----------
-        name : string
+        name : str
             Dataset name.
-        shape : tuple, optional
+        shape : tuple[int, ...] | None
             Shape tuple. This gives the global shape for a distributed dataset.
-        dtype : np.dtype, optional
+        dtype : dtype | None
             Numpy datatype of the dataset.
-        data : np.ndarray or MPIArray, optional
+        data : array_like
             Data array to initialise from. Uses a view of the original where possible.
-        distributed : boolean, optional
+        distributed : bool
             Create a distributed dataset or not.
-        distributed_axis : int, optional
+        distributed_axis : int
             Axis to distribute the data over. If specified with initialisation
             data this will cause create a copy with the correct distribution.
-        chunks
+        chunks : tuple[int, ...] | None
             Chunking arguments for dataset
-        compression : str or int
+        compression : str | int | None
             Name or identifier of HDF5 or Zarr compression filter.
-        compression_opts
+        compression_opts : dict | None
             See HDF5 and Zarr documentation for compression filters.
             Compression options for the dataset.
-        **kwargs : dict
+        \**kwargs : any
             Arbitrary keyword arguments.
 
         Returns
         -------
-        dset : memh5.MemDataset
+        dataset : MemDataset
+            The created dataset.
         """
         parent_name, name = posixpath.split(posixpath.join(self.name, name))
         parent_name = format_abs_path(parent_name)
@@ -745,11 +784,10 @@ class MemGroup(_BaseGroup):
             distributed = False
 
         if kwargs:
-            msg = (
-                "No extra keyword arguments accepted, this is not an hdf5"
-                " object but a memory object mocked up to look like one."
+            raise TypeError(
+                "No extra keyword arguments accepted, this is not an hdf5 "
+                "object but a memory object mocked up to look like one."
             )
-            raise TypeError(msg)
             # XXX In future could accept extra arguments and use them if
             # writing to disk.
 
@@ -875,20 +913,22 @@ class MemGroup(_BaseGroup):
 
         Parameters
         ----------
-        name : string
+        name : str
             Dataset name.
-        distributed_axis : int, optional
-            Axis to distribute the data over.
+        distributed_axis : int
+            Axis to distribute the data over. Default is 0.
 
         Returns
         -------
-        dset : memh5.MemDatasetDistributed
+        dataset : MemDatasetDistributed
+            Distributed dataset from the common one.
         """
         dset = self[name]
 
         if dset.distributed:
             warnings.warn(
-                f"{name!s} is already a distributed dataset, redistribute it along the required axis {distributed_axis}"
+                f"{name!s} is already a distributed dataset, redistribute "
+                f"it along the required axis {distributed_axis}"
             )
             dset.redistribute(distributed_axis)
             return dset
@@ -927,12 +967,13 @@ class MemGroup(_BaseGroup):
 
         Parameters
         ----------
-        name : string
+        name : str
             Dataset name.
 
         Returns
         -------
-        dset : memh5.MemDatasetCommon
+        dataset : MemDatasetCommon
+            Common dataset from the distributed one.
         """
         dset = self[name]
 
@@ -971,10 +1012,10 @@ class MemGroup(_BaseGroup):
 
 
 class MemDataset(_MemObjMixin):
-    """Base class for an in memory implementation of :class:`h5py.Dataset`.
+    """Base class for an in memory implementation of :py:class:`h5py.Dataset`.
 
-    This is only an abstract base class. Use :class:`MemDatasetCommon` or
-    :class:`MemDatasetDistributed`.
+    This is only an abstract base class. Use :py:class:`MemDatasetCommon` or
+    :py:class:`MemDatasetDistributed`.
     """
 
     def __init__(self, **kwargs):
@@ -988,23 +1029,24 @@ class MemDataset(_MemObjMixin):
     def _group_class(self):
         return MemGroup
 
-    def copy(self, order: str = "A", shallow: bool = False) -> MemDataset:
-        """Create a new MemDataset from an existing one.
+    def copy(self, order="A", shallow=False):
+        """Create a new :py:class:`MemDataset` from an existing one.
 
         This creates a deep copy by default.
 
         Parameters
         ----------
-        order
+        order : {"C", "F", "A", "K"}, optional
             Memory layout of copied data. See
-            https://numpy.org/doc/stable/reference/generated/numpy.copy.html
-        shallow
-            True if this should be a shallow copy
+            https://numpy.org/doc/stable/reference/generated/numpy.copy.html.
+            Default is "A".
+        shallow : bool, optional
+            True if this should be a shallow copy. Default is ``False``.
 
         Returns
         -------
-        new_data
-            deep copy of this dataset
+        dataset : MemDataset
+            Deep copy of this dataset.
         """
         new = self.__class__.__new__(self.__class__)
         super(MemDataset, new).__init__(name=self.name, storage_root=self._storage_root)
@@ -1025,38 +1067,39 @@ class MemDataset(_MemObjMixin):
 
         return new
 
-    def __deepcopy__(self, memo, /) -> MemDataset:
+    def __deepcopy__(self, memo, /):
         """Called when copy.deepcopy is called on this class."""
         return self.copy()
 
-    def view(self) -> MemDataset:
+    def view(self):
         """Return a pseudo-view of this dataset.
 
-        This technically makes a new `MemDataset` object, but the
-        underlying attributes are views.
+        This technically makes a new :py:class:`MemDataset` object, but the
+        underlying attributes and data are views.
 
         Returns
         -------
-        view
-            shallow copy of this dataset
+        dataset : MemDataset
+            Shallow copy of this dataset
         """
         return self.copy(shallow=True)
 
     @property
     def attrs(self):
-        """Attributes attached to this object.
-
-        Returns
-        -------
-        attrs : MemAttrs
-
-        """
+        """Attributes attached to this object."""
         return self._attrs
 
     def resize(self):
-        """h5py datasets reshape() is different from numpy reshape."""
-        msg = "Dataset reshaping not allowed. Perhapse make an new array view."
-        raise NotImplementedError(msg)
+        """h5py datasets reshape() is different from numpy reshape.
+
+        Raises
+        ------
+        :py:exc:`NotImplementedError`
+            Always, as dataset reshaping is not allowed.
+        """
+        raise NotImplementedError(
+            "Dataset reshaping not allowed. Perhapse make an new array view."
+        )
 
     @property
     def shape(self):
@@ -1117,19 +1160,29 @@ class MemDataset(_MemObjMixin):
 
 
 class MemDatasetCommon(MemDataset):
-    """In memory implementation of :class:`h5py.Dataset`.
+    r"""In memory implementation of :py:class:`h5py.Dataset`.
 
-    Inherits from :class:`MemDataset`. Encapsulates a numpy array mocked up to
+    Inherits from :py:class:`.MemDataset`. Encapsulates a numpy array mocked up to
     look like an hdf5 dataset. Similar to h5py datasets, this implements
     slicing like a numpy array but as it is not actually a many operations
     won't work (e.g. ufuncs).
 
     Parameters
     ----------
-    shape : tuple
+    shape : tuple[int, ...]
         Shape of array to initialise.
-    dtype : numpy dtype
+    dtype : dtype
         Type of array to create.
+    chunks : tuple[int, ...]
+        Chunk sizes. If None, dataset is not chunked.
+    compression : str | int | None
+        Name or identifier of HDF5 or Zarr compression filter.
+    compression_opts : dict | None
+        See HDF5 and Zarr documentation for compression filters.
+        Compression options for the dataset.
+    \**kwargs : Any
+        Arbitrary keyword arguments passed to :py:class:`.MemDataset`
+        constructor.
     """
 
     def __init__(
@@ -1149,28 +1202,33 @@ class MemDatasetCommon(MemDataset):
         self._compression_opts = compression_opts
 
     @classmethod
-    def from_numpy_array(
-        cls, data, chunks=None, compression=None, compression_opts=None, **kwargs
+    def from_numpy_array(  # noqa: D417
+        cls,
+        data,
+        chunks=None,
+        compression=None,
+        compression_opts=None,
+        **kwargs,
     ):
-        """Initialise from a numpy array.
+        r"""Initialise from a numpy array.
 
         Parameters
         ----------
-        data : np.ndarray
+        data : ndarray
             Array to initialise from.
-        chunks
-            Chunking arguments
-        compression : str or int
+        chunks : tuple[int, ...] | None
+            Chunk sizes. If None, dataset is not chunked.
+        compression : str | int | None
             Name or identifier of HDF5 or Zarr compression filter.
-        compression_opts
+        compression_opts : dict | None
             See HDF5 and Zarr documentation for compression filters.
             Compression options for the dataset.
-        **kwargs : dict
-            Arbitrary keyword arguments.
+        \**kwargs : Any
+            Arbitrary keyword arguments passed to :py:class:`MemDataset`.
 
         Returns
         -------
-        dset : MemDatasetCommon
+        dataset : MemDatasetCommon
             Dataset encapsulating the numpy array.
         """
         if not isinstance(data, np.ndarray):
@@ -1179,7 +1237,7 @@ class MemDatasetCommon(MemDataset):
         self = cls.__new__(cls)
         super(MemDatasetCommon, self).__init__(**kwargs)
 
-        self._data = ensure_native_byteorder(data)
+        self._data = _typeutils.ensure_native_byteorder(data)
         self._chunks = chunks
         self._compression = compression
         self._compression_opts = compression_opts
@@ -1228,18 +1286,26 @@ class MemDatasetCommon(MemDataset):
 
     @chunks.setter
     def chunks(self, val):
-        """Set the data chunking information."""
+        """Set the data chunking information.
+
+        Parameters
+        ----------
+        val : tuple[int, ...] | None
+            If a tuple of chunk sizes Length must be equal to the
+            number of dimensions of the data. If ``None``, data
+            will not be chunked
+        """
         if val is None:
-            chunks = val
-        elif len(val) != len(self.shape):
+            self._chunks = None
+            return
+
+        if len(val) != len(self.shape):
             raise ValueError(
                 f"Chunk size {val} is not compatible with dataset shape {self.shape}."
             )
-        else:
-            chunks = ()
-            for i, l in enumerate(self.shape):
-                chunks += (min(val[i], l),)
-        self._chunks = chunks
+
+        chunks = [min(val[i], l) for i, l in enumerate(self.shape)]
+        self._chunks = tuple(chunks)
 
     @property
     def compression(self):
@@ -1293,24 +1359,34 @@ class MemDatasetCommon(MemDataset):
 
 
 class MemDatasetDistributed(MemDataset):
-    """Parallel, in-memory implementation of :class:`h5py.Dataset`.
+    r"""Parallel, in-memory implementation of :py:class:`h5py.Dataset`.
 
-    Inherits from :class:`MemDataset`. Encapsulates an :class:`MPIArray` mocked
-    up to look like an `h5py` dataset.  Similar to h5py datasets, this
-    implements slicing like a numpy array but as it is not actually a many
-    operations won't work (e.g. ufuncs).
+    Inherits from :py:class:`.MemDataset`. Encapsulates an :py:class:`~caput.mpiarray.MPIArray`
+    mocked up to look like an :py:mod:`h5py` dataset.  Similar to h5py datasets, this
+    implements slicing like a numpy array but as it is not actually a many operations won't
+    work (e.g. ufuncs).
 
     Parameters
     ----------
-    shape : tuple
+    shape : tuple[int, ...]
         Shape of array to initialise. This is the *global* shape.
-    dtype : numpy dtype
+    dtype : dtype
         Type of array to create.
     axis : int, optional
-        Index of axis to distribute the array over.
-    comm : MPI.Comm, optional
-        MPI communicator to distribute over. If :obj:`None` use
-        :obj:`MPI.COMM_WORLD`.
+        Index of axis to distribute the array over. Default is 0.
+    comm : MPI.Comm | None
+        MPI communicator to distribute over. If :py:obj:`None` use
+        :py:obj:`MPI.COMM_WORLD`.
+    chunks : tuple[int, ...] | None
+        Chunk sizes. If ``None``, dataset is not chunked. Default is ``None``.
+    compression : str | int | NOne
+        Name or identifier of HDF5 or Zarr compression filter.
+    compression_opts : dict | None
+        See HDF5 and Zarr documentation for compression filters.
+        Compression options for the dataset.
+    \**kwargs : Any
+        Arbitrary keyword arguments passed to :py:class:`.MemDataset`
+        constructor.
     """
 
     def __init__(
@@ -1332,29 +1408,34 @@ class MemDatasetDistributed(MemDataset):
         self._compression_opts = compression_opts
 
     @classmethod
-    def from_mpi_array(
-        cls, data, chunks=None, compression=None, compression_opts=None, **kwargs
+    def from_mpi_array(  # noqa: D417
+        cls,
+        data,
+        chunks=None,
+        compression=None,
+        compression_opts=None,
+        **kwargs,
     ):
-        """Initialise from a MPIArray.
+        r"""Initialise from a :py:class:`~caput.mpiarray.MPIArray`.
 
         Parameters
         ----------
-        data : mpiarray.MPIArray
+        data : :py:class:`~.caput.mpiarray.MPIArray`
             Array to initialise from.
-        chunks
-            Chunking arguments
-        compression : str or int
+        chunks : tuple[int, ...] | None
+            Chunk sizes. If None, dataset is not chunked.
+        compression : str | int | None
             Name or identifier of HDF5 or Zarr compression filter.
-        compression_opts
+        compression_opts : dict | None
             See HDF5 and Zarr documentation for compression filters.
             Compression options for the dataset.
-        **kwargs : dict
+        \**kwargs : Any
             Arbitrary keyword arguments.
 
         Returns
         -------
-        dset : MemDatasetDistributed
-            Dataset encapsulating the MPIArray.
+        dataset : MemDatasetDistributed
+            Dataset encapsulating the :py:class:`~caput.mpiarray.MPIArray`.
         """
         if not isinstance(data, mpiarray.MPIArray):
             raise TypeError("Object must be a numpy array (or subclass).")
@@ -1375,7 +1456,7 @@ class MemDatasetDistributed(MemDataset):
         return False
 
     @property
-    def distributed(self):
+    def distributed(self) -> bool:
         """Assert that this is a distributed dataset."""
         return True
 
@@ -1386,7 +1467,7 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def local_data(self):
-        """Access tthe underlying local data as a numpy array."""
+        """Access the underlying local data as a numpy array."""
         return self._data.local_array
 
     @property
@@ -1422,23 +1503,22 @@ class MemDatasetDistributed(MemDataset):
 
     @property
     def chunks(self):
-        """Acess the chunk shape of the dataset."""
+        """Access the chunk shape of the dataset."""
         return self._chunks
 
     @chunks.setter
     def chunks(self, val):
         """Set the chunk shape of the dataset."""
         if val is None:
-            chunks = val
-        elif len(val) != len(self.shape):
+            self._chunks = None
+            return
+
+        if len(val) != len(self.shape):
             raise ValueError(
                 f"Chunk size {val} is not compatible with dataset shape {self.shape}."
             )
-        else:
-            chunks = ()
-            for i, l in enumerate(self.shape):
-                chunks += (min(val[i], l),)
-        self._chunks = chunks
+
+        self._chunks = tuple(map(min, zip(val, self.shape)))
 
     @property
     def compression(self):
@@ -1473,9 +1553,13 @@ class MemDatasetDistributed(MemDataset):
     def redistribute(self, axis):
         """Change the axis that the dataset is distributed over.
 
+        This will make internal copies of the data to redistribute it
+        over the new axis, but the :py:obj:`MemDatasetDistributed`
+        object is unchanged.
+
         Parameters
         ----------
-        axis : integer
+        axis : int
             Axis to distribute over.
         """
         if self._storage_root is not None:
@@ -1528,40 +1612,43 @@ class MemDatasetDistributed(MemDataset):
 class MemDiskGroup(_BaseGroup):
     """Container whose data may either be stored on disk or in memory.
 
-    This container is intended to have the same basic API :class:`h5py.Group`
-    and :class:`MemGroup` but whose underlying data could live either on disk
+    This container is intended to have the same basic API :py:class:`h5py.Group`
+    and :py:class:`.MemGroup` but whose underlying data could live either on disk
     or in memory.
 
     Aside from providing a few convenience methods, this class isn't that
-    useful by itself. It is almost as easy to use :class:`h5py.Group`
-    or :class:`MemGroup` directly. Where it becomes more useful is for creating
+    useful by itself. It is almost as easy to use :py:class:`h5py.Group`
+    or :py:class:`.MemGroup` directly. Where it becomes more useful is for creating
     more specialized data containers which can subclass this class.  A basic
-    but useful example is provided in :class:`BasicCont`.
+    but useful example is provided in :py:class:`.BasicCont`.
 
-    This class also supports the same distributed features as :class:`MemGroup`,
+    This class also supports the same distributed features as :py:class:`.MemGroup`,
     but only when wrapping that class. Attempting to create a distributed object
-    wrapping a :class:`h5py.File` object will raise an exception. For similar
-    reasons, :meth:`MemDiskGroup.to_disk` will not work, however,
-    :meth:`MemDiskGroup.save` will work fine.
+    wrapping a :py:class:`h5py.File` object will raise an exception. For similar
+    reasons, :py:meth:`.MemDiskGroup.to_disk` will not work, however,
+    :py:meth:`.MemDiskGroup.save` will work fine.
 
     Parameters
     ----------
-    data_group : :class:`h5py.Group`, :class:`MemGroup` or string, optional
+    data_group : file_or_group_like
         Underlying :mod:`h5py` like data container where data will be stored.
         If a string, open a h5py file with that name. If not
         provided a new :class:`MemGroup` instance will be created.
-    distributed : boolean, optional
+    distributed : bool
         Allow the container to hold distributed datasets.
-    comm : MPI.Comm, optional
-        MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
-    detect_subclass: boolean, optional
-        If *data_group* is specified, whether to inspect for a
-        '__memh5_subclass' attribute which specifies a subclass to return.
-    file_format : `fileformats.FileFormat`
-        File format to use. File format will be guessed if not supplied. Default `None`.
+    comm : MPI.Comm | None
+        MPI Communicator to distributed over. If not set, use :py:obj:`MPI.COMM_WORLD`.
+    file_format : :py:class:`~caput.memdata.fileformats.FileFormat` | None
+        File format to use. File format will be guessed if not supplied. Default ``None``.
     """
 
-    def __init__(self, data_group=None, distributed=False, comm=None, file_format=None):
+    def __init__(
+        self,
+        data_group=None,
+        distributed=False,
+        comm=None,
+        file_format=None,
+    ):
         toclose = False
 
         if comm is None:
@@ -1650,15 +1737,17 @@ class MemDiskGroup(_BaseGroup):
 
         Parameters
         ----------
-        data_group : :class:`h5py.Group`, :class:`MemGroup` or string, optional
-            :mod:`h5py` like data containerto wrap.
-        detect_subclass: boolean, optional
+        data_group : FileOrGroupLike
+            :py:mod:`h5py`-like data containerto wrap.
+        detect_subclass : bool
             If *data_group* is specified, whether to inspect for a
             '__memh5_subclass' attribute which specifies a subclass to return.
+            Default is ``True``.
 
         Returns
         -------
-        grp : MemDiskGroup
+        group : MemDiskGroup
+            :py:class:`MemDiskGroup` instance wrapping *data_group*.
         """
         if detect_subclass:
             new_cls = cls._resolve_subclass(cls._detect_subclass_path(data_group))
@@ -1731,25 +1820,25 @@ class MemDiskGroup(_BaseGroup):
     def _make_selections(cls, sel_args):
         """Overwrite this method in your subclass if you want to implement axis downselection.
 
-        This may be useful when loading a container from an HDF5 file
+        This may be useful when loading a container from an HDF5 file.
 
         Parameters
         ----------
-        sel_args : dict
+        sel_args : dict[str | int, SelectionLike]
             Should contain valid numpy indexes as values and axis names (str) as keys.
 
         Returns
         -------
-        dict
+        selections : dict
             Mapping of dataset names to numpy indexes for downselection of the data.
             May include multiple layers of dicts to map the dataset tree
         """
-        return
+        ...
 
     # For creating new instances. #
 
     @classmethod
-    def from_file(
+    def from_file(  # noqa: D417
         cls,
         file_,
         ondisk=False,
@@ -1761,7 +1850,7 @@ class MemDiskGroup(_BaseGroup):
         file_format=None,
         **kwargs,
     ):
-        """Create data object from analysis hdf5 file, store in memory or on disk.
+        r"""Create data object from analysis hdf5 file, store in memory or on disk.
 
         If *ondisk* is True, do not load into memory but store data in h5py objects
         that remain associated with the file on disk. This is almost identical
@@ -1773,34 +1862,43 @@ class MemDiskGroup(_BaseGroup):
 
         Parameters
         ----------
-        file_ : string or :class:`h5py.Group` object
+        file\_ : FileOrGroupLike
             File with the hdf5 data. File must be compatible with memh5 objects.
-        ondisk : bool
+        ondisk : bool, optional
             Whether the data should be stored in-place in *file_* or should be copied
-            into memory.
-        distributed : boolean, optional
-            Allow the container to hold distributed datasets.
-        comm : MPI.Comm, optional
-            MPI Communicator to distributed over. If not set, use :obj:`MPI.COMM_WORLD`.
-        detect_subclass: boolean, optional
+            into memory. Default is ``False``.
+        distributed : bool, optional
+            Allow the container to hold distributed datasets. Default is ``False``.
+        comm : MPI.Comm | None, optional
+            MPI Communicator to distributed over. If not set, use :py:obj:`MPI.COMM_WORLD`.
+        detect_subclass : bool, optional
             If *data_group* is specified, whether to inspect for a
             '__memh5_subclass' attribute which specifies a subclass to return.
-        convert_attribute_strings : bool, optional
+            Default is ``True``.
+        convert_attribute_strings: bool, optional
             Try and convert attribute string types to unicode. If not specified, look
             up the name as a class attribute to find a default, and otherwise use
-            `True`.
-        convert_dataset_strings : bool, optional
+            ``True``.
+        convert_dataset_strings: bool, optional
             Try and convert dataset string types to unicode. If not specified, look
             up the name as a class attribute to find a default, and otherwise use
-            `False`.
-        <axis_name>_sel : list or slice
-            Axis selections can be given to only read a subset of the containers. A
-            slice can be given, or a list of specific array indices for that axis.
-        file_format : `fileformats.FileFormat`
-            File format to use. Default is `None`, i.e. guess from file name.
-        **kwargs : any other arguments
-            Any additional keyword arguments are passed to :class:`h5py.File`'s
-            constructor if *file_* is a filename and silently ignored otherwise.
+            ``False``.
+        file_format : FileFormat
+            File format to use. Default is ``None``, i.e. guess from file name.
+        \**kwargs : Any
+            Any additional keyword arguments are passed to :py:class:`h5py.File`'s
+            constructor if *file\_* is a filename and silently ignored otherwise.
+
+        Returns
+        -------
+        group : MemDiskGroup
+            :py:class:`.MemDiskGroup` instance wrapping data from *file\_*.
+
+        Notes
+        -----
+        Axis selections can be given to only read a subset of the containers using the
+        ``<axis_name>_sel`` keyword arguments. A slice can be given, or a list of specific
+        array indices for that axis.
         """
         if file_format is None and not is_group(file_):
             file_format = fileformats.guess_file_format(file_)
@@ -1889,9 +1987,9 @@ class MemDiskGroup(_BaseGroup):
     def group_name_allowed(name):
         """Used by subclasses to restrict creation of and access to groups.
 
-        This method is called by :meth:`create_group`, :meth:`require_group`,
-        and :meth:`__getitem__` to check that the supplied group name is
-        allowed.
+        This method is called by :py:meth:`.MemDiskGroup.create_group`,
+        :py:meth:`.MemDiskGroup.require_group`, and :py:meth:`.MemDiskGroup.__getitem__`
+        to check that the supplied group name is allowed.
 
         The idea is that subclasses that want to specialize and restrict the
         layout of the data container can implement this method instead of
@@ -1899,14 +1997,13 @@ class MemDiskGroup(_BaseGroup):
 
         Parameters
         ----------
-        name: string
+        name : str
             Absolute path to proposed group.
 
         Returns
         -------
-        allowed : bool
-            ``True``
-
+        is_allowed : bool
+            All group names are allowed by default.
         """
         return True
 
@@ -1914,9 +2011,9 @@ class MemDiskGroup(_BaseGroup):
     def dataset_name_allowed(name):
         """Used by subclasses to restrict creation of and access to datasets.
 
-        This method is called by :meth:`create_dataset`,
-        :meth:`require_dataset`, and :meth:`__getitem__` to check that the
-        supplied group name is allowed.
+        This method is called by :py:meth:`.MemDiskGroup.create_dataset`,
+        :py:meth:`.MemDiskGroup.require_dataset`, and :py:meth:`.MemDiskGroup.__getitem__`
+        to check that the supplied dataset name is allowed.
 
         The idea is that subclasses that want to specialize and restrict the
         layout of the data container can implement this method instead of
@@ -1924,23 +2021,22 @@ class MemDiskGroup(_BaseGroup):
 
         Parameters
         ----------
-        name: string
+        name : str
             Absolute path to proposed dataset.
 
         Returns
         -------
-        allowed : bool
-            ``True``
-
+        is_allowed : bool
+            All dataset names are allowed by default.
         """
         return True
 
     def create_dataset(self, name, *args, **kwargs):
         """Create and return a new dataset.
 
-        All parameters are passed through to the :meth:`create_dataset` method of
-        the underlying storage, whether it be an :class:`h5py.Group` or a
-        :class:`MemGroup`.
+        All parameters are passed through to the :py:meth:`create_dataset`
+        method of the underlying storage, whether it be an :py:class:`h5py.Group` or a
+        :py:class:`.MemGroup`.
         """
         path = posixpath.join(self.name, name)
         if not self.dataset_name_allowed(path):
@@ -1954,14 +2050,20 @@ class MemDiskGroup(_BaseGroup):
 
         Parameters
         ----------
-        name : string
+        name : str
             Dataset name.
         distributed_axis : int, optional
-            Axis to distribute the data over.
+            Axis to distribute the data over. Default is 0.
 
         Returns
         -------
-        dset : memh5.MemDatasetDistributed
+        dataset : MemDatasetDistributed
+            Distributed dataset.
+
+        Raises
+        ------
+        :py:exc:`RuntimeError`
+            If the underlying storage is not a :py:class:`MemGroup`.
         """
         if isinstance(self._data, MemGroup):
             return self._data.dataset_common_to_distributed(name, distributed_axis)
@@ -1975,13 +2077,18 @@ class MemDiskGroup(_BaseGroup):
 
         Parameters
         ----------
-        name : string
+        name : str
             Dataset name.
 
         Returns
         -------
-        dset : memh5.MemDatasetCommon
+        dataset : MemDatasetCommon
+            Common dataset.
 
+        Raises
+        ------
+        :py:exc:`RuntimeError`
+            If the underlying storage is not a :py:class:`MemGroup`.
         """
         if isinstance(self._data, MemGroup):
             return self._data.dataset_distributed_to_common(name)
@@ -1991,12 +2098,30 @@ class MemDiskGroup(_BaseGroup):
         )
 
     def create_group(self, name):
-        """Create and return a new group."""
+        """Create and return a new group.
+
+        Parameters
+        ----------
+        name : str
+            Name of group to create.
+
+        Returns
+        -------
+        group : GroupLike
+            The created group.
+
+        Raises
+        ------
+        :py:exc:`ValueError`
+            If the group name is not allowed.
+        """
         path = posixpath.join(self.name, name)
+
         if not self.group_name_allowed(path):
-            msg = f"Group name {path} not allowed."
-            raise ValueError(msg)
+            raise ValueError(f"Group name {path} not allowed.")
+
         self._data.create_group(path)
+
         return self._group_class._from_storage_root(self._data, path)
 
     def to_memory(self):
@@ -2006,31 +2131,40 @@ class MemDiskGroup(_BaseGroup):
 
         return self.__class__.from_file(self._data)
 
-    def to_disk(self, filename, file_format=fileformats.HDF5, **kwargs):
-        """Return a version of this data that lives on disk.
+    def to_disk(self, filename, file_format=fileformats.HDF5, **kwargs):  # noqa: D417
+        r"""Return a version of this data that lives on disk.
+
+        Cannot run if the underlying data is distributed. Use :meth:`save` instead.
 
         Parameters
         ----------
         filename : str
             File name.
-        file_format : `fileformats.FileFormat`
-            File format to use. Default `fileformats.HDF5`.
-        **kwargs
+        file_format : FileFormat, optional
+            File format to use. Default :py:attr:`~caput.memdata.fileformats.HDF5`.
+        \**kwargs : Any
             Keyword arguments passed through to the file creating, e.g. `mode`.
 
         Returns
         -------
         Instance of this data object that is written to disk.
+
+        Raises
+        ------
+        :py:exc:`NotImplementedError`
+            If the underlying data is distributed.
         """
         if not isinstance(self._data, MemGroup):
-            msg = "This data already lives on disk.  Copying to new file anyway."
-            warnings.warn(msg)
+            logger.warning(
+                "This data already lives on disk. Copying to new file anyway."
+            )
         elif self._data.distributed:
             raise NotImplementedError(
                 "Cannot run to_disk on a distributed object. Try running save instead."
             )
 
         self.save(filename, file_format=file_format)
+
         return self.__class__.from_file(
             filename, ondisk=True, file_format=file_format, **kwargs
         )
@@ -2040,20 +2174,21 @@ class MemDiskGroup(_BaseGroup):
         if self.ondisk:
             self._data.flush()
 
-    def copy(self, shared: list = [], shallow: bool = False) -> MemDiskGroup:
+    def copy(self, shared=[], shallow=False):
         """Return a deep copy of this class or subclass.
 
         Parameters
         ----------
-        shared
-            dataset names to share (i.e. don't deep copy)
-        shallow
-            True if this should be a shallow copy
+        shared : list[str]
+            dataset names to share (i.e. don't deep copy).
+        shallow : bool, optional
+            True if this should be a shallow copy. Default
+            is ``False``.
 
         Returns
         -------
-        copy
-            Copy of this group
+        group : MemDiskGroup
+            Copy of this group.
         """
         cls = self.__class__.__new__(self.__class__)
         MemDiskGroup.__init__(cls, distributed=self.distributed, comm=self.comm)
@@ -2061,11 +2196,11 @@ class MemDiskGroup(_BaseGroup):
 
         return cls
 
-    def __deepcopy__(self, memo, /) -> MemDiskGroup:
+    def __deepcopy__(self, memo, /):
         """Called when copy.deepcopy is called on this class."""
         return self.copy()
 
-    def save(
+    def save(  # noqa: D417
         self,
         filename,
         convert_attribute_strings=None,
@@ -2073,7 +2208,7 @@ class MemDiskGroup(_BaseGroup):
         file_format=fileformats.HDF5,
         **kwargs,
     ):
-        """Save data to hdf5/zarr file.
+        r"""Save data to hdf5/zarr file.
 
         Parameters
         ----------
@@ -2087,9 +2222,9 @@ class MemDiskGroup(_BaseGroup):
             Try and convert dataset string types to bytestrings before saving to
             HDF5. If not specified, look up the name as a class attribute to find a
             default, and otherwise use `False`.
-        file_format : `fileformats.FileFormat`
-            File format to use. Default `fileformats.HDF5`.
-        **kwargs
+        file_format : FileFormat
+            File format to use. Default :py:attr:`~caput.memdata.fileformats.HDF5`.
+        \**kwargs : Any
             Keyword arguments passed through to the file creating, e.g. `mode`.
         """
         if file_format == fileformats.Zarr and not zarr_available:
@@ -2127,20 +2262,18 @@ class MemDiskGroup(_BaseGroup):
 class BasicCont(MemDiskGroup):
     """Basic high level data container.
 
-    Inherits from :class:`MemDiskGroup`.
-
     Basic one-level data container that allows any number of datasets in the
     root group but no nesting. Data history tracking (in
-    :attr:`BasicCont.history`) and array axis interpretation (in
-    :attr:`BasicCont.index_map`) is also provided.
+    :py:attr:`~.BasicCont.history`) and array axis interpretation (in
+    :py:attr:`~.BasicCont.index_map`) is also provided.
 
     This container is intended to be an example of how a high level container,
     with a strictly controlled data layout can be implemented by subclassing
-    :class:`MemDiskGroup`.
+    :py:class:`MemDiskGroup`.
 
-    Parameters
-    ----------
-    Parameters are passed through to the base class constructor.
+    Notes
+    -----
+    Parameters are passed through to the :py:class:`MemDiskGroup` constructor.
     """
 
     def __init__(self, *args, **kwargs):
@@ -2159,11 +2292,11 @@ class BasicCont(MemDiskGroup):
         """Stores the analysis history for this data.
 
         Do not try to add a new entry by assigning to an element of this
-        property. Use :meth:`~BasicCont.add_history` instead.
+        property. Use :py:meth:`~.BasicCont.add_history` instead.
 
         Returns
         -------
-        history : read only dictionary
+        history : ro_dict
             Each entry is a dictionary containing metadata about that stage in
             history.  There is also an 'order' entry which specifies how the
             other entries are ordered in time.
@@ -2184,7 +2317,7 @@ class BasicCont(MemDiskGroup):
         # TODO: this seems like a trememndous hack. I've changed it to a safer version of
         # eval, but this should probably be removed
         out["order"] = literal_eval(
-            bytes_to_unicode(self._data["history"].attrs["order"])
+            _typeutils.bytes_to_unicode(self._data["history"].attrs["order"])
         )
 
         return ro_dict(out)
@@ -2198,11 +2331,11 @@ class BasicCont(MemDiskGroup):
         the visibilities are described in the index map.
 
         Do not try to add a new index_map by assigning to an item of this
-        property. Use :meth:`~BasicCont.create_index_map` instead.
+        property. Use :py:meth:`~.BasicCont.create_index_map` instead.
 
         Returns
         -------
-        index_map : read only dictionary
+        index_map : ro_dict
             Entries are 1D arrays used to interpret the axes of datasets.
         """
         return ro_dict({k: v[:] for k, v in self._data["index_map"].items()})
@@ -2217,22 +2350,22 @@ class BasicCont(MemDiskGroup):
 
         Returns
         -------
-        index_attrs : read-write dict
-            Attribute dicts for each index_map entry
+        index_attrs : ro_dict
+            Attribute dicts for each index_map entry.
         """
         return ro_dict({k: v.attrs for k, v in self._data["index_map"].items()})
 
     @property
     def reverse_map(self):
-        """Stores the reverse map from product index to stack index.
+        """Stores mappings between :py:attr:`~.BasicCont.index_map` entries.
 
         Do not try to add a new reverse_map by assigning to an item of this
-        property. Use :meth:`~BasicCont.create_reverse_map` instead.
+        property. Use :py:meth:`~.BasicCont.create_reverse_map` instead.
 
         Returns
         -------
-        reverse_map : read only dictionary
-            Entry is a 1D arrays used to map from product index to stack index.
+        reverse_map : ro_dict
+            Entries are 1D arrays used to map from product index to stack index.
         """
         out = {}
         for name, value in self._data.get("reverse_map", {}).items():
@@ -2246,9 +2379,10 @@ class BasicCont(MemDiskGroup):
     def dataset_name_allowed(self, name):
         """Datasets may only be created and accessed in the root level group.
 
-        Returns ``True`` is *name* is a path in the root group i.e. '/dataset'.
+        Returns ``True`` if *name* is a path in the root group i.e. '/dataset'.
         """
-        parent_name, name = posixpath.split(name)
+        parent_name, _ = posixpath.split(name)
+
         return parent_name == "/"
 
     def create_index_map(self, axis_name, index_map):
@@ -2274,7 +2408,7 @@ class BasicCont(MemDiskGroup):
         ----------
         name : str
             Name for history entry.
-        history
+        history : dict | None
             History entry (optional). Needs to be json serializable.
 
         Notes
@@ -2286,8 +2420,7 @@ class BasicCont(MemDiskGroup):
         """
         if name == "order":
             raise ValueError(
-                '"order" is a reserved name and may not be the'
-                " name of a history entry."
+                '"order" is a reserved name and may not be the name of a history entry.'
             )
         if history is None:
             history = {}
@@ -2301,9 +2434,13 @@ class BasicCont(MemDiskGroup):
     def redistribute(self, dist_axis):
         """Redistribute parallel datasets along a specified axis.
 
+        Walks the tree of datasets and redistributes any distributed datasets
+        found with the specified axis. The underlying dataset objects remain
+        the same, but the underlying data arrays are new.
+
         Parameters
         ----------
-        dist_axis : int, string, or list of
+        dist_axis : int | str | Sequence[int | str]
             The axis can be specified by an integer index (positive or
             negative), or by a string label which must correspond to an entry in
             the `axis` attribute on the dataset. If a list is supplied, each
@@ -2368,7 +2505,18 @@ class BasicCont(MemDiskGroup):
 
 
 def attrs2dict(attrs):
-    """Safely copy an h5py attributes object to a dictionary."""
+    """Safely copy an h5py attributes object to a dictionary.
+
+    Parameters
+    ----------
+    attrs : AttributesLike
+        Attributes object to copy.
+
+    Returns
+    -------
+    attributes : dict
+        Dictionary copy of attributes.
+    """
     return {k: deepcopy(v) for k, v in attrs.items()}
 
 
@@ -2377,6 +2525,16 @@ def is_group(obj):
 
     In most cases, if it isn't a Group it's a Dataset, so this can be used to
     check for Datasets as well.
+
+    Parameters
+    ----------
+    obj : Any
+        Object to check.
+
+    Returns
+    -------
+    is_a_group : bool
+        ``True`` if the object is a Group.
     """
     return hasattr(obj, "create_group")
 
@@ -2386,24 +2544,28 @@ def get_h5py_File(f, **kwargs):
     return get_file(f, file_format=fileformats.HDF5, **kwargs)
 
 
-def get_file(f, file_format=None, **kwargs):
+def get_file(
+    f,
+    file_format=None,
+    **kwargs,
+):
     """Checks if input is a `zarr`/`h5py.File` or filename and returns the former.
 
     Parameters
     ----------
-    f : h5py/zarr Group or filename string
+    f : FileOrGroupLike
         File to check.
-    file_format : `fileformats.FileFormat`
+    file_format : FileFormat | None
             File format to use. File format will be guessed if not supplied. Default `None`.
-    **kwargs : all keyword arguments
-        Passed to :class:`h5py.File` constructor or `zarr.open_group`. If `f` is already an open file,
-        silently ignores all keywords.
+    **kwargs : Any
+        Passed to :py:class:`h5py.File` constructor or :py:meth:`zarr.open_group`. If `f`
+        is already an open file, silently ignores all keywords.
 
     Returns
     -------
-    f : hdf5 or zarr group
-    opened : bool
-        Whether the a file was opened or not (i.e. was already open).
+    file : FileOrGroupLike
+        Opened file object and Wboolean whether the a file was opened or not
+        (i.e. was already open).
     """
     # Figure out if F is a file or a filename, and whether the file should be
     # closed.
@@ -2415,27 +2577,22 @@ def get_file(f, file_format=None, **kwargs):
 
     if file_format == fileformats.Zarr and not zarr_available:
         raise RuntimeError("Unable to open zarr file. Please install zarr.")
-    try:
-        f = file_format.open(f, **kwargs)
-    except OSError as e:
-        msg = f"Opening file {f!s} caused an error: "
-        raise OSError(msg + str(e)) from e
 
-    return f, True
+    return file_format.open(f, **kwargs), True
 
 
 def copyattrs(a1, a2, convert_strings=False):
-    """Copy attributes from one h5py/zarr/memh5 attribute object to another.
+    """Copy attributes from one attribute-like object to another.
 
     Parameters
     ----------
-    a1 : h5py/zarr/memh5 object
+    a1 : AttributesLike
         Attributes to copy from.
-    a2 : h5py/zarr/memh5 object
+    a2 : AttributesLike
         Attributes to copy into.
     convert_strings : bool, optional
         Convert string attributes (or lists/arrays of them) to ensure that they are
-        unicode.
+        unicode. Default is ``False``.
     """
     # Make sure everything is a copy.
     a1 = attrs2dict(a1)
@@ -2461,7 +2618,7 @@ def copyattrs(a1, a2, convert_strings=False):
             return value
 
         # If we are copying into memh5 ensure that any string are unicode
-        return bytes_to_unicode(value)
+        return _typeutils.bytes_to_unicode(value)
 
     def _map_json(value):
         # Serialize/deserialize "special" json values
@@ -2524,20 +2681,21 @@ def deep_group_copy(
     skip_distributed=False,
     postprocess=None,
     shallow=False,
-    shared=[],
+    shared=None,
 ):
     """Copy full data tree from one group to another.
 
     Copies from g1 to g2:
+
     - The default behaviour creates a deep copy of each dataset.
     - If `g2` is on disk, the behaviour is the same as making a deep copy. In this
-    case, both `shallow` and `shared` are ignored.
+      case, both `shallow` and `shared` are ignored.
     - Otherwise, when shallow is False, datasets not listed in `shared` are fully
-    deep copied and any datasets in `shared` will point to the object in `g1` storage.
+      deep copied and any datasets in `shared` will point to the object in `g1` storage.
 
     An axis downselection can be specified by supplying the
     parameter 'selections'. For example to select the first two indexes in
-    g1["foo"]["bar"], do
+    g1["foo"]["bar"], do::
 
     >>> g1 = MemGroup()
     >>> foo = g1.create_group("foo")
@@ -2551,11 +2709,11 @@ def deep_group_copy(
 
     Parameters
     ----------
-    g1 : h5py.Group or zarr.Group or MemGroup
+    g1 : GroupLike
         Deep copy from this group.
-    g2 : h5py.Group or zarr.Group or MemGroup
+    g2 : GroupLike
         Deep copy to this group.
-    selections : dict
+    selections : dict | None, optional
         If this is not None, it should have a subset of the same hierarchical structure
         as g1, but ultimately describe axis selections for group entries as valid
         numpy indexes. Selections cannot be applied to shared datasets.
@@ -2564,30 +2722,30 @@ def deep_group_copy(
         unicode.
     convert_dataset_strings : bool, optional
         Convert strings within datasets to ensure that they are unicode.
-    file_format : `fileformats.FileFormat`
-        File format to use. Default `fileformats.HDF5`.
+    file_format : :py:class:`~caput.memdata.fileformats.FileFormat`
+        File format to use. Default :py:class:`~caput.memdata.fileformats.HDF5`.
     skip_distributed : bool, optional
         If `True` skip the write for any distributed dataset, and return a list of the
         names of all datasets that were skipped. If `False` (default) throw a
         `ValueError` if any distributed datasets are encountered.
-    postprocess : function, optional
+    postprocess : callable | None, optional
         A function which is called on each node, with the source and destination
         entries, and can modify either.
     shallow : bool, optional
         Explicitly share all datasets. This will only alter behaviour when copying
         from memory to memory. If False, any dataset listed in `shared` will NOT be copied.
         Default is False.
-    shared : iterable, optional
-        Iterable (list, set, generator) of datasets to share, if `shallow` is False.
+    shared : Sequence| None, optional
+        Sequence (list, set, generator) of datasets to share, if `shallow` is False.
         Shared datasets just point to the existing object in g1 storage. Axis selections
         cannot be applied to shared datasets. Ignored if `shallow` is True, since, in that
         case, _all_ datasets are shared.
 
     Returns
     -------
-    distributed_dataset_names : list
+    distributed_dataset_names : list[str] | None
         Names of the distributed datasets if `skip_distributed` is True. Otherwise
-        `None` is returned.
+        ``None`` is returned.
     """
     distributed_dset_names = []
 
@@ -2598,7 +2756,7 @@ def deep_group_copy(
     to_file = isinstance(g2, file_format.module.Group)
 
     # Define functions applied to each dataset
-    def _get_selection(dset):
+    def _get_selection(dset: DatasetLike) -> SelectionLike:
         """Get the selections associated with this dataset.
 
         Returns: slice
@@ -2613,7 +2771,7 @@ def deep_group_copy(
 
         return selection
 
-    def _prepare_dataset(dset):
+    def _prepare_dataset(dset: DatasetLike) -> dict:
         """Prepare a dataset for writing, applying selections and transforming datatypes.
 
         Returns: dict(dtype, shape, data_to_write)
@@ -2650,16 +2808,16 @@ def deep_group_copy(
             # Convert unicode strings back into ascii byte strings. This will break
             # if there are characters outside of the ascii range
             if to_file:
-                data = ensure_bytestring(data)
+                data = _typeutils.ensure_bytestring(data)
 
             # Convert strings in an HDF5 dataset into unicode
             else:
-                data = ensure_unicode(data)
+                data = _typeutils.ensure_unicode(data)
 
         elif to_file:
             # If we shouldn't convert we at least need to ensure there aren't any
             # Unicode characters before writing
-            data = check_unicode(entry)
+            data = _typeutils.check_unicode(entry)
 
         dset_args = {"dtype": data.dtype, "shape": data.shape, "data": data}
         # If we're copying memory to memory we can allow distributed datasets
@@ -2670,7 +2828,7 @@ def deep_group_copy(
 
         return dset_args
 
-    def _prepare_compression_args(dset):
+    def _prepare_compression_args(dset: DatasetLike) -> dict:
         """Get compression options and chunking for this dataset.
 
         Returns: dict(compression, compression_opts, chunks)
@@ -2694,6 +2852,10 @@ def deep_group_copy(
 
         return compression_kwargs
 
+    # Parse the `shared` argument
+    if shared is None:
+        shared = []
+
     # If copying to file, datasets are not shared, so ensure that these
     # datasets are properly processed
     if to_file:
@@ -2702,7 +2864,7 @@ def deep_group_copy(
                 f"Attempted to share datasets {(*shared,)}, but target group "
                 f"{g2} is on disk. Datasets cannot be shared."
             )
-            shared = {}
+            shared = []
 
         if shallow:
             warnings.warn(
@@ -2763,24 +2925,24 @@ def deep_group_copy(
     return distributed_dset_names if skip_distributed else None
 
 
-def deep_copy_dataset(dset: Any, order: str = "A") -> Any:
+def deep_copy_dataset(dset, order="A"):
     """Return a deep copy of a dataset.
 
-    If the dataset is a ndarray or subclass, the memory
+    If the dataset is a :py:class:`np.ndarray` or subclass, the memory
     layout can be set.
 
     Parameters
     ----------
-    dset
+    dset : Any
         Dataset to deep copy
-    order
+    order : {"C", "F", "A", "K"}, optional
         Controls the memory layout of the copy, for any dataset which
-        takes this parameter (np.ndarray and subclasses)
+        takes this parameter (np.ndarray and subclasses). Default is "A".
 
     Returns
     -------
-    dset_copy
-        A deep copy of the dataset
+    dataset : Any
+        A deep copy of the dataset.
     """
     if isinstance(dset, np.ndarray):
         # Set the order
@@ -2823,6 +2985,7 @@ def format_abs_path(path):
     out = "/"
     for p in path_parts:
         out = posixpath.join(out, p)
+
     return out
 
 
@@ -2842,12 +3005,12 @@ def _distributed_group_to_file(
     This routine works in two stages:
 
     - First rank=0 copies all of the groups, attributes and non-distributed datasets
-    into the target file. The distributed datasets are identified and created in this
-    step, but their contents are not written. This is done by `deep_group_copy` to try
-    and centralize as much of the copying code.
+      into the target file. The distributed datasets are identified and created in this
+      step, but their contents are not written. This is done by `deep_group_copy` to try
+      and centralize as much of the copying code.
     - In the second step, the distributed datasets are written to disk. This is mostly
-    offloaded to `MPIArray.to_file`, but some code around this needs to change depending
-    on the file type, and if the data can be written in parallel.
+      offloaded to `MPIArray.to_file`, but some code around this needs to change depending
+      on the file type, and if the data can be written in parallel.
     """
     comm = group.comm
 
@@ -2880,7 +3043,7 @@ def _distributed_group_to_file(
     def _write_distributed_datasets(dest):
         for name in distributed_dataset_names:
             dset = group[name]
-            data = check_unicode(dset)
+            data = _typeutils.check_unicode(dset)
 
             data.to_file(
                 dest,
@@ -2921,12 +3084,12 @@ def _distributed_group_to_file(
 
 
 def _distributed_group_from_file(
-    fname: str | Path,
-    comm: MPI.Comm | None = None,
-    hints: bool | dict = True,
-    convert_dataset_strings: bool = False,
-    convert_attribute_strings: bool = True,
-    file_format: type[fileformats.FileFormat] = fileformats.HDF5,
+    fname,
+    comm=None,
+    hints=True,
+    convert_dataset_strings=False,
+    convert_attribute_strings=True,
+    file_format=fileformats.HDF5,
     **kwargs,
 ):
     """Restore full tree from an HDF5 or Zarr into a distributed memh5 object.
@@ -3019,10 +3182,10 @@ def _distributed_group_from_file(
 
                         # Convert ascii string back to unicode if requested
                         if convert_dataset_strings:
-                            cdata = ensure_unicode(cdata)
+                            cdata = _typeutils.ensure_unicode(cdata)
 
                         # only needed until fixed: https://github.com/mpi4py/mpi4py/issues/177
-                        cdata = ensure_native_byteorder(cdata)
+                        cdata = _typeutils.ensure_native_byteorder(cdata)
 
                     cdata = comm.bcast(cdata, root=0)
 
@@ -3045,313 +3208,3 @@ def _distributed_group_from_file(
     comm.Barrier()
 
     return group
-
-
-# Some extra functions for types. Should maybe move elsewhere
-
-
-def bytes_to_unicode(s):
-    """Ensure that a string (or collection of) are unicode.
-
-    Any byte strings found will be transformed into unicode. Standard
-    collections are processed recursively. Numpy arrays of byte strings
-    are converted. Any other types are returned as is.
-
-    Note that as HDF5 files will often contain ASCII strings which h5py
-    converts to byte strings this will be needed even when fully
-    transitioned to Python 3.
-
-    Parameters
-    ----------
-    s : object
-        Object to convert.
-
-    Returns
-    -------
-    u : object
-        Converted object.
-    """
-    if isinstance(s, bytes):
-        return s.decode("utf8")
-
-    if isinstance(s, np.ndarray) and s.dtype.kind == "S":
-        return s.astype(str)
-
-    if isinstance(s, list | tuple | set):
-        return s.__class__(bytes_to_unicode(t) for t in s)
-
-    if isinstance(s, dict):
-        return {bytes_to_unicode(k): bytes_to_unicode(v) for k, v in s.items()}
-
-    return s
-
-
-def dtype_to_unicode(dt):
-    """Convert byte strings in a dtype to unicode.
-
-    This will attempt to parse a numpy dtype and convert strings to unicode.
-
-    .. warning:: Custom alignment will not be preserved in these type conversions as
-                 the byte and unicode string types are of different sizes.
-
-    Parameters
-    ----------
-    dt : np.dtype
-        Data type to convert.
-
-    Returns
-    -------
-    new_dt : np.dtype
-        A new datatype with the converted string type.
-    """
-    return _convert_dtype(dt, "|S", "<U")
-
-
-def dtype_to_bytestring(dt):
-    """Convert unicode strings in a dtype to byte strings.
-
-    This will attempt to parse a numpy dtype and convert strings to bytes.
-
-    .. warning:: Custom alignment will not be preserved in these type conversions as
-                 the byte and unicode string types are of different sizes.
-
-    Parameters
-    ----------
-    dt : np.dtype
-        Data type to convert.
-
-    Returns
-    -------
-    new_dt : np.dtype
-        A new datatype with the converted string type.
-    """
-    return _convert_dtype(dt, "<U", "|S")
-
-
-def _convert_dtype(dt, type_from, type_to):
-    """Convert types in a numpy dtype to another type.
-
-    .. warning:: Custom alignment will not be preserved in these type conversions as
-                 the byte and unicode string types are of different sizes.
-
-    Parameters
-    ----------
-    dt : np.dtype
-        Data type to convert.
-    type_from : str
-        Type code (with alignment) to find.
-    type_to : str
-        Type code (with alignment) to convert to.
-
-    Returns
-    -------
-    new_dt : np.dtype
-        A new datatype with the converted string types.
-    """
-
-    def _conv(t):
-        # If we get a tuple that should mean it's a type with some extended metadata, extract the
-        # type and throw away the metadata
-        if isinstance(t, tuple):
-            t = t[0]
-        return t.replace(type_from, type_to)
-
-    # For compound types we must recurse over the full compound type structure
-    def _iter_conv(x):
-        items = []
-
-        for item in x:
-            name = item[0]
-            type_ = item[1]
-
-            # Recursively convert the type
-            newtype = _iter_conv(type_) if isinstance(type_, list) else _conv(type_)
-
-            items.append((name, newtype))
-
-        return items
-
-    # For scalar types the conversion is easy
-    if not dt.names:
-        return np.dtype(_conv(dt.str))
-    # For compound types we need to iterate through
-    return np.dtype(_iter_conv(dt.descr))
-
-
-def check_byteorder(arr_byteorder):
-    """Test if a native byteorder; if not, check if byteorder matches the architecture.
-
-    Parameters
-    ----------
-    arr_byteorder : np.dtype.byteorder
-        Array byteorder to check.
-
-    Returns
-    -------
-    check_byteorder : bool
-        True if the byteorder should be set to native. False, otherwise.
-    """
-    if arr_byteorder == "=":
-        return False
-
-    if has_matching_byteorder(arr_byteorder):
-        return True
-
-    return False
-
-
-def has_matching_byteorder(arr_byteorder):
-    """Test if byteorder marches the architecture.
-
-    Parameters
-    ----------
-    arr_byteorder : np.dtype.byteorder
-        Array byteorder to check.
-
-    Returns
-    -------
-    has_matching_byteorder : bool
-        True if the byteorder matches the architecture.
-    """
-    from sys import byteorder
-
-    return (arr_byteorder == "<" and byteorder == "little") or (
-        arr_byteorder == ">" and byteorder == "big"
-    )
-
-
-def has_kind(dt, kind):
-    """Test if a numpy datatype has any fields of a specified type.
-
-    Parameters
-    ----------
-    dt : np.dtype
-        Data type to convert.
-    kind : str
-        Numpy type code character. e.g. "S" for bytestring and "U" for unicode.
-
-    Returns
-    -------
-    has_kind : bool
-        True if it contains the requested kind.
-    """
-    # For scalar types the conversion is easy
-    if not dt.names:
-        return dt.kind == kind
-
-    # For compound types we must recurse over the full compound type structure
-    def _iter_conv(x):
-        for item in x:
-            type_ = item[1]
-
-            # Recursively convert the type
-            if isinstance(type_, list) and _iter_conv(type_):
-                return True
-            if isinstance(type_, tuple) and type_[0][1] == kind:
-                return True
-            if type_[1] == kind:
-                return True
-
-        return False
-
-    return _iter_conv(dt.descr)
-
-
-def has_unicode(dt):
-    """Test if data type contains any unicode fields.
-
-    See `has_kind`.
-    """
-    return has_kind(dt, "U")
-
-
-def has_bytestring(dt):
-    """Test if data type contains any unicode fields.
-
-    See `has_kind`.
-    """
-    return has_kind(dt, "S")
-
-
-def ensure_native_byteorder(arr):
-    """If architecture and arr byteorder are the same, ensure byteorder is native.
-
-    Because of https://github.com/mpi4py/mpi4py/issues/177 mpi4py does not handle
-    explicit byte order of little endian. A byteorder of native ("=" in numpy) however,
-    works fine.
-
-    Parameters
-    ----------
-    arr : np.ndarray
-        Input array.
-
-    Returns
-    -------
-    arr_conv : np.ndarray
-        The converted array. If no conversion was required, just returns `arr`.
-    """
-    if check_byteorder(arr.dtype.byteorder):
-        return arr.view(arr.dtype.newbyteorder("="))
-
-    return arr
-
-
-def ensure_bytestring(arr):
-    """If needed convert the array to contain bytestrings not unicode.
-
-    Parameters
-    ----------
-    arr : np.ndarray
-        Input array.
-
-    Returns
-    -------
-    arr_conv : np.ndarray
-        The converted array. If no conversion was required, just returns `arr`.
-    """
-    if has_unicode(arr.dtype):
-        return arr.astype(dtype_to_bytestring(arr.dtype))
-
-    return arr
-
-
-def ensure_unicode(arr):
-    """If needed convert the array to contain unicode strings not bytestrings.
-
-    Parameters
-    ----------
-    arr : np.ndarray
-        Input array.
-
-    Returns
-    -------
-    arr_conv : np.ndarray
-        The converted array. If no conversion was required, just returns `arr`.
-    """
-    if has_bytestring(arr.dtype):
-        return arr.astype(dtype_to_unicode(arr.dtype))
-
-    return arr
-
-
-def check_unicode(dset):
-    """Test if dataset contains unicode so we can raise an appropriate error.
-
-    If there is no unicode, return the data from the array.
-
-    Parameters
-    ----------
-    dset : MemDataset
-        Dataset to check.
-
-    Returns
-    -------
-    dset :
-        The converted array. If no conversion was required, just returns `arr`.
-    """
-    if has_unicode(dset.dtype):
-        raise TypeError(
-            f'Can not write dataset "{dset.name!s}" of unicode type into HDF5.'
-        )
-
-    return dset.data
