@@ -31,14 +31,21 @@ ignore = [
     "D213", # D213: Multi-line docstring summary should start at the second line
     "D400", # D400: First line should end with a period (only ignoring this because there's another error that catches the same thing)
     "D401", # D401: First line should be in imperative mood
-    "D402", # D402: First line should not be the function’s “signature”
+    "D407", # D407: Missing dashed underline after section
     "D413", # D413: Missing blank line after last section
-    "D416", # D416: Section name should end with a colon
     "NPY002", # NPY002: replace legacy numpy.random calls with np.random.Generator
 ]
-
-
 
 [lint.per-file-ignores]
 "*/__init__.py" = ["I", "F401", "F403"]
 "caput/astro/constants.py" = ["F403", "F405"]
+"caput/astro/coordinates/spherical.py" = ["F405"]
+
+[format]
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+indent-style = "space"
+line-ending = "auto"
+preview = false
+quote-style = "double"
+skip-magic-trailing-comma = false
