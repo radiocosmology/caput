@@ -21,7 +21,7 @@ class Input(TaskBase):
         try:
             return next(self._iter)
         except StopIteration as e:
-            raise PipelineStopIteration() from e
+            raise PipelineStopIteration from e
 
 
 class Output(TaskBase):
