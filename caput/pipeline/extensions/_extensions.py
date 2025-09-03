@@ -208,7 +208,7 @@ class SingleBase(_OneAndOne):
         # This should only be called once.
         try:
             if self.done:
-                raise PipelineStopIteration()
+                raise PipelineStopIteration
         except AttributeError:
             self.done = True
 
@@ -272,7 +272,7 @@ class IterBase(_OneAndOne):
         if self.iteration >= len(self.file_middles):
             if not self.input_root == "None":
                 # We are iterating over input files and have run out.
-                raise PipelineStopIteration()
+                raise PipelineStopIteration
             # Not iterating over input files, and unable to assign
             # filenames.
             input_filename = None

@@ -351,7 +351,7 @@ class SingleTask(MPILoggedTask, extensions.BasicContMixin):
         # This should only be called once.
         try:
             if self.done:
-                raise PipelineStopIteration()
+                raise PipelineStopIteration
         except AttributeError:
             self.done = True
 

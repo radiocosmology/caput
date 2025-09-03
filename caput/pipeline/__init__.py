@@ -70,7 +70,7 @@ trivial but fully implemented task:
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
-...             raise PipelineStopIteration()
+...             raise PipelineStopIteration
 ...         print("Spam and %s eggs." % self.eggs[self.i])
 ...         self.i += 1
 ...
@@ -96,7 +96,7 @@ that are designed to operate in this manner.
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
-...             raise PipelineStopIteration()
+...             raise PipelineStopIteration
 ...         egg = self.eggs[self.i]
 ...         self.i += 1
 ...         return egg
@@ -389,7 +389,6 @@ See the documentation for these base classes for more details.
 
 """
 
-from . import _core
 from ._core import *
 
 from . import task as task, extensions as extensions
