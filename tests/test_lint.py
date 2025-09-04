@@ -6,7 +6,7 @@ from click.testing import CliRunner
 
 from caput.config import Property
 from caput.pipeline import TaskBase
-from caput.pipeline import cli as caput_script
+from caput.pipeline._cli import cli as caput_script
 
 
 class DoNothing(TaskBase):
@@ -46,16 +46,16 @@ def simple_config():
 
 
 def write_to_file(config_json):
-    with tempfile.NamedTemporaryFile(mode="w+t", delete=False) as temp:
-        yaml.safe_dump(config_json, temp, encoding="utf-8")
-        temp.flush()
-        return temp.name
+    with tempfile.NamedTemporaryFile(mode="w+t", delete=False) as configfile:
+        yaml.safe_dump(config_json, configfile, encoding="utf-8")
+        configfile.flush()
+        return configfile.name
 
 
 def test_load_yaml(simple_config):
     test_runner = CliRunner()
     config_file = write_to_file(simple_config)
-    result = test_runner.invoke(caput_script.lint_config, [config_file])
+    result = test_runner.invoke(caput_script, ["lint", config_file])
     assert result.exit_code == 0
 
 
@@ -63,7 +63,7 @@ def test_unknown_task(simple_config):
     test_runner = CliRunner()
     simple_config["pipeline"]["tasks"][0]["type"] = "what.was.the.name.of.my.Task"
     config_file = write_to_file(simple_config)
-    result = test_runner.invoke(caput_script.lint_config, [config_file])
+    result = test_runner.invoke(caput_script, ["lint", config_file])
     assert result.exit_code != 0
 
 
@@ -71,7 +71,7 @@ def test_wrong_type(simple_config):
     test_runner = CliRunner()
     simple_config["pipeline"]["tasks"][2]["params"]["a_list"] = 1
     config_file = write_to_file(simple_config)
-    result = test_runner.invoke(caput_script.lint_config, [config_file])
+    result = test_runner.invoke(caput_script, ["lint", config_file])
     assert result.exit_code != 0
 
 
@@ -79,7 +79,7 @@ def test_lonely_in(simple_config):
     test_runner = CliRunner()
     simple_config["pipeline"]["tasks"][2]["in"] = "foo"
     config_file = write_to_file(simple_config)
-    result = test_runner.invoke(caput_script.lint_config, [config_file])
+    result = test_runner.invoke(caput_script, ["lint", config_file])
     assert result.exit_code != 0
 
 
@@ -87,5 +87,5 @@ def test_lonely_requires(simple_config):
     test_runner = CliRunner()
     simple_config["pipeline"]["tasks"][2]["requires"] = "bar"
     config_file = write_to_file(simple_config)
-    result = test_runner.invoke(caput_script.lint_config, [config_file])
+    result = test_runner.invoke(caput_script, ["lint", config_file])
     assert result.exit_code != 0
