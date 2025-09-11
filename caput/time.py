@@ -831,7 +831,7 @@ class Observer:
         new_source : skyfield.starlib.Star
             Skyfield Star object with positions in ICRS coordinates
         """
-        from skyfield.functions import to_polar
+        from skyfield.functions import to_spherical
 
         ts = skyfield_wrapper.timescale
 
@@ -840,7 +840,7 @@ class Observer:
         pos = self.skyfield_obs().at(epoch).observe(source)
 
         # Matrix CT transforms from CIRS to ICRF (https://rhodesmill.org/skyfield/time.html)
-        r_au, dec, ra = to_polar(
+        _, dec, ra = to_spherical(
             np.einsum("ij...,j...->i...", epoch.CT, pos.position.au)
         )
 
