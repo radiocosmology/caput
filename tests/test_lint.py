@@ -5,8 +5,8 @@ import yaml
 from click.testing import CliRunner
 
 from caput.config import Property
-from caput.pipeline import TaskBase
-from caput.pipeline._cli import cli as caput_script
+from caput.pipeline.manager import TaskBase
+from caput.pipeline.runner._cli import cli as caput_script
 
 
 class DoNothing(TaskBase):

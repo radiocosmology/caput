@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 from caput.memdata import fileformats
-from caput.pipeline import PipelineStopIteration, TaskBase, Manager
-from caput.pipeline._cli import cli
+from caput.pipeline.manager import PipelineStopIteration, TaskBase, Manager
+from caput.pipeline.runner._cli import cli
 from caput.pipeline.extensions._extensions import IterBase
 from caput.util import mpitools
 from caput import config
