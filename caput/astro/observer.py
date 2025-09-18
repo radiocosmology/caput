@@ -795,9 +795,7 @@ class Observer:
         pos = self.skyfield_obs().at(epoch).observe(source)
 
         # Matrix CT transforms from CIRS to ICRF (https://rhodesmill.org/skyfield/time.html)
-        r_au, dec, ra = to_polar(
-            np.einsum("ij...,j...->i...", epoch.CT, pos.position.au)
-        )
+        _, dec, ra = to_polar(np.einsum("ij...,j...->i...", epoch.CT, pos.position.au))
 
         return Star(
             ra=Angle(radians=ra, preference="hours"),
