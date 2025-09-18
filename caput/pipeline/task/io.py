@@ -35,7 +35,7 @@ import numpy as np
 from ... import config
 from ...memdata import fileformats, memh5
 from ...util import truncate
-from .._core import PipelineStopIteration
+from ..manager import PipelineStopIteration
 from ._base import MPILoggedTask, SingleTask
 
 

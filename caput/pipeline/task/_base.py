@@ -9,7 +9,7 @@ import numpy as np
 from ... import config
 from ...memdata import fileformats, memh5
 from .. import extensions
-from .._core import PipelineRuntimeError, PipelineStopIteration, TaskBase
+from ..manager import PipelineRuntimeError, PipelineStopIteration, TaskBase
 
 
 class MPILogFilter(logging.Filter):
@@ -636,6 +636,37 @@ class SingleTask(MPILoggedTask, extensions.BasicContMixin):
         return self.comm.allreduce(found, op=MPI.MAX)
 
 
+def group_tasks(*tasks):
+    """Create a Task that groups a bunch of tasks together.
+
+    This method creates a class that inherits from all the subtasks, and
+    calls each `process` method in sequence, passing the output of one to the
+    input of the next.
+
+    This should be used like:
+
+    >>> class SuperTask(group_tasks(SubTask1, SubTask2)):  # doctest: +SKIP
+    ...     pass
+
+    At the moment if the ensemble has more than one setup method, the
+    SuperTask will need to implement an override that correctly calls each.
+
+    """
+
+    class TaskGroup(*tasks):
+        # TODO: figure out how to make the setup work at the moment it just picks the first in MRO
+        # def setup(self, x): pass
+
+        def process(self, x):
+            for t in tasks:
+                self.log.debug(f"Calling process for subtask {t.__name__!s}")
+                x = t.process(self, x)
+
+            return x
+
+    return TaskGroup
+
+
 # =========================================================
 # Stuff that is likely deprecated but I still have to check
 # =========================================================
@@ -700,34 +731,3 @@ class _ReturnFirstInputOnFinish(SingleTask):
             Last input to process.
         """
         return self.x
-
-
-def group_tasks(*tasks):
-    """Create a Task that groups a bunch of tasks together.
-
-    This method creates a class that inherits from all the subtasks, and
-    calls each `process` method in sequence, passing the output of one to the
-    input of the next.
-
-    This should be used like:
-
-    >>> class SuperTask(group_tasks(SubTask1, SubTask2)):  # doctest: +SKIP
-    ...     pass
-
-    At the moment if the ensemble has more than one setup method, the
-    SuperTask will need to implement an override that correctly calls each.
-
-    """
-
-    class TaskGroup(*tasks):
-        # TODO: figure out how to make the setup work at the moment it just picks the first in MRO
-        # def setup(self, x): pass
-
-        def process(self, x):
-            for t in tasks:
-                self.log.debug(f"Calling process for subtask {t.__name__!s}")
-                x = t.process(self, x)
-
-            return x
-
-    return TaskGroup

@@ -4,6 +4,8 @@ import yaml
 import numpy
 import caput
 
+from caput.pipeline.manager import Manager
+
 
 class TestConfig(unittest.TestCase):
     def test_default_params(self):
@@ -12,7 +14,7 @@ class TestConfig(unittest.TestCase):
             bla: "foo"
         """
 
-        man = caput.pipeline.Manager.from_yaml_str(testconfig)
+        man = Manager.from_yaml_str(testconfig)
 
         self.assertIn("versions", man.all_tasks_params)
         self.assertIn("pipeline_config", man.all_tasks_params)
@@ -35,7 +37,7 @@ class TestConfig(unittest.TestCase):
             bla: "foo"
         """
 
-        man = caput.pipeline.Manager.from_yaml_str(testconfig)
+        man = Manager.from_yaml_str(testconfig)
 
         self.assertIn("versions", man.all_tasks_params)
         self.assertIn("pipeline_config", man.all_tasks_params)
@@ -59,7 +61,7 @@ class TestConfig(unittest.TestCase):
             save_config: False
         """
 
-        man = caput.pipeline.Manager.from_yaml_str(testconfig)
+        man = Manager.from_yaml_str(testconfig)
 
         self.assertIn("versions", man.all_tasks_params)
         self.assertIn("pipeline_config", man.all_tasks_params)
