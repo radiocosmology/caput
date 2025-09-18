@@ -4,7 +4,7 @@ import numpy as np
 import yaml
 
 from ... import config
-from .._core import TaskBase
+from ..manager import TaskBase
 from ._base import MPILoggedTask, SetMPILogging, SingleTask
 
 

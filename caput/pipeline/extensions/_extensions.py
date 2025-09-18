@@ -9,7 +9,7 @@ import os
 
 from ... import config
 from ...memdata import fileformats, lock_file
-from .._core import PipelineStopIteration, TaskBase
+from ..manager import PipelineStopIteration, TaskBase
 from ._configtypes import file_format
 
 __all__ = ["BasicContMixin", "H5IOMixin"]
