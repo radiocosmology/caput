@@ -1,6 +1,6 @@
 """Extensions to port pipelines to an interactive python environment."""
 
-from .._core import PipelineStopIteration, TaskBase
+from ..manager import PipelineStopIteration, TaskBase
 
 __all__ = ["Input", "Output"]
 

@@ -41,7 +41,7 @@ instances of :class:`config.Property`. For instance a task definition might begi
 with
 
 >>> from caput import config
->>> class SpamTask(TaskBase):
+>>> class SpamTask(manager.TaskBase):
 ...     eggs = config.Property(proptype=str)
 
 This defines a new task named :class:`SpamTask` with a parameter named *eggs*, whose
@@ -57,7 +57,7 @@ possibly being executed many times.  Iteration of :meth:`next` is halted by
 raising a :exc:`PipelineStopIteration`.  Here is a example of a somewhat
 trivial but fully implemented task:
 
->>> class PrintEggs(TaskBase):
+>>> class PrintEggs(manager.TaskBase):
 ...
 ...     eggs = config.Property(proptype=list)
 ...
@@ -70,7 +70,7 @@ trivial but fully implemented task:
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
-...             raise PipelineStopIteration
+...             raise manager.PipelineStopIteration
 ...         print("Spam and %s eggs." % self.eggs[self.i])
 ...         self.i += 1
 ...
@@ -83,7 +83,7 @@ may accept (positional only) arguments which will be received as the outputs of
 early tasks in a pipeline chain. The following is an example of a pair of tasks
 that are designed to operate in this manner.
 
->>> class GetEggs(TaskBase):
+>>> class GetEggs(manager.TaskBase):
 ...
 ...     eggs = config.Property(proptype=list)
 ...
@@ -96,7 +96,7 @@ that are designed to operate in this manner.
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
-...             raise PipelineStopIteration
+...             raise manager.PipelineStopIteration
 ...         egg = self.eggs[self.i]
 ...         self.i += 1
 ...         return egg
@@ -104,7 +104,7 @@ that are designed to operate in this manner.
 ...     def finish(self):
 ...         print("Finished GetEggs.")
 
->>> class CookEggs(TaskBase):
+>>> class CookEggs(manager.TaskBase):
 ...
 ...     style = config.Property(proptype=str)
 ...
@@ -181,11 +181,10 @@ for the various tasks, as specified be the 'params' keys.
 Execution Order
 ---------------
 
-There are two options when choosing how to execute a pipeline: standard and legacy.
-When the above pipeline is executed in standard mode, it produces the following output.
+When the above pipeline is executed, it produces the following output.
 
->>> local_tasks.update(globals())  # Required for interactive sessions.
->>> m = Manager.from_yaml_str(spam_config)
+>>> manager.local_tasks.update(globals())  # Required for interactive sessions.
+>>> m = manager.Manager.from_yaml_str(spam_config)
 >>> m.run()
 Setting up PrintEggs.
 Setting up GetEggs.
@@ -200,28 +199,8 @@ Cooking fried ostrich eggs.
 Finished GetEggs.
 Finished CookEggs.
 
-When executed in legacy mode, it produces this output.
-
->>> local_tasks.update(globals())  # Required for interactive sessions.
->>> m = Manager.from_yaml_str(spam_config)
->>> m.execution_order = "legacy"
->>> m.run()
-Setting up PrintEggs.
-Setting up GetEggs.
-Setting up CookEggs.
-Spam and green eggs.
-Cooking fried green eggs.
-Spam and duck eggs.
-Cooking fried duck eggs.
-Spam and ostrich eggs.
-Cooking fried ostrich eggs.
-Finished PrintEggs.
-Finished GetEggs.
-Finished CookEggs.
-
-To understand the differences, compare the rules for each strategy.
-The `standard` method uses a priority system based on the following criteria,
-in decreasing importance:
+The order in which tasks are executed is determined by a priority system
+using the following criteria, in decreasing importance:
 
 1. Task must be available to execute some step.
 2. Task priority. This is set by two factors:
@@ -233,8 +212,7 @@ in decreasing importance:
 
 3. Pipeline configuration order.
 
-If no tasks are available to run, the `legacy` method is used, which uses the
-following execution order rules:
+If no tasks are available to run, the following execution rules are applied:
 
 1. One of the methods `setup()`, `next()` or `finish()`, as appropriate, will
    be executed from each task, in order.
@@ -247,16 +225,16 @@ following execution order rules:
 5. Once a method from the last member of the `tasks` list is executed, restart
    at the beginning of the list.
 
-The difference in outputs is because `PrintEggs` will always have higher priority
+The example output order is because `PrintEggs` will always have higher priority
 than `GetEggs`, so it will run to completion _before_ `GetEggs` starts generating
 anything. Only once `PrintEggs` is done will the other tasks run. Even though
 `CookEggs` has the highest priority, it cannot do anything without `GetEggs` running
 first.
 
-If the above `legacy` rules seem somewhat opaque, consider the following example which
+If the above rules seem somewhat opaque, consider the following example which
 illustrates these rules in a pipeline with a slightly more non-trivial flow.
 
->>> class DoNothing(TaskBase):
+>>> class DoNothing(manager.TaskBase):
 ...
 ...     def setup(self):
 ...         print("Setting up DoNothing.")
@@ -267,7 +245,7 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 ...     def finish(self):
 ...         print("Finished DoNothing.")
 
->>> local_tasks.update(globals())  # Required for interactive sessions only.
+>>> manager.local_tasks.update(globals())  # Required for interactive sessions only.
 >>> new_spam_config = '''
 ... pipeline :
 ...     tasks:
@@ -298,8 +276,7 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 The following would error, because the pipeline config is checked for errors, like an 'in\_' parameter without a
 corresponding 'out'::
 
-    m = Manager.from_yaml_str(new_spam_config)
-    m.execution_order = "legacy"
+    m = manager.Manager.from_yaml_str(new_spam_config)
     m.run()
 
 But this is what it would produce otherwise::
@@ -346,7 +323,7 @@ simply saves everything it receives into a list (which can be accessed via the t
 `outputs` attribute, e.g. with `save_output.outputs` after running the example below),
 but it can be given a callback function to apply processing to each argument in turn.
 
->>> m = Manager()
+>>> m = manager.Manager()
 >>> m.add_task(extensions.Input(["platypus", "dinosaur"]), out="key1")
 >>> cook = CookEggs()
 >>> cook.style = "coddled"
@@ -355,7 +332,6 @@ but it can be given a callback function to apply processing to each argument in 
 >>> m.add_task(save_output, in_="key1")
 >>> print_output = extensions.Output(lambda x: print("I love %s eggs!" % x))
 >>> m.add_task(print_output, in_="key1")
->>> m.execution_order = "legacy"
 >>> m.run()
 Setting up CookEggs.
 Cooking coddled platypus eggs.
@@ -389,6 +365,8 @@ See the documentation for these base classes for more details.
 
 """
 
-from ._core import *
-
-from . import task as task, extensions as extensions
+from . import (
+    extensions as extensions,
+    manager as manager,
+    task as task,
+)

@@ -113,17 +113,13 @@ class Manager(config.Reader):
     ----------
     logging : Dict(str, str)
         Log levels per module. The key "root" stores the root log level.
-    multiprocessing : int
-        TODO
-    cluster : dict
-        TODO
     task_specs : list
         Configuration of pipeline tasks.
-    execution_order : str
-        Set the task execution order for this pipeline instance. `legacy` round-robins
-        through all tasks based on the config order, and tries to clear out finished
-        tasks as soon as possible. `standard` uses a priority and availability system
-        to select the next task to run, and falls back to `legacy` if nothing is available.
+    key_pattern : str, optional
+        Regex pattern to match on in order to pass a key to subsequent tasks. This is
+        useful for controlling which keys are passed in tasks which produce multiple
+        outputs. Default is `[^\W_]`, which will cause any key that contains no
+        alphanumeric characters to be ignored.
     interactive: bool, optional
         If True, the `.run()` method becomes a generator and stops on each iteration after
         selecting the next task to run. This allows a user to interact with the pipeline
@@ -138,29 +134,21 @@ class Manager(config.Reader):
         If True, task breakpoints are enabled. If a task requests a breakpoint, a call to
         `breakpoint()` is made every time the task is selected to be run. If `interactive`
         is True, this does nothing. Default is False.
-    key_pattern : str, optional
-        Regex pattern to match on in order to pass a key to subsequent tasks. This is
-        useful for controlling which keys are passed in tasks which produce multiple
-        outputs. Default is `[^\W_]`, which will cause any key that contains no
-        alphanumeric characters to be ignored.
     save_versions : list
         Module names (str). This list together with the version strings from these
         modules are attached to output metadata. Default is [].
     save_config : bool
         If this is True, the global pipeline configuration is attached to output
         metadata. Default is `True`.
-    psutil_profiling : bool
-        Use psutil to profile CPU and memory usage. Default is `False`.
     """
 
     logging = config.logging_config(default={"root": "WARNING"})
-    multiprocessing = config.Property(default=1, proptype=int)
-    cluster = config.Property(default={}, proptype=dict)
     task_specs = config.Property(default=[], proptype=list, key="tasks")
-    execution_order = config.enum(["standard", "legacy"], default="standard")
+    key_pattern = config.Property(proptype=str, default=r"[^\W_]")
+
+    # Options for pipeline execution
     interactive = config.Property(proptype=bool, default=False)
     enable_breakpoints = config.Property(proptype=bool, default=False)
-    key_pattern = config.Property(proptype=str, default=r"[^\W_]")
 
     # Options to be stored in self.all_tasks_params
     versions = config.Property(default=[], proptype=_get_versions, key="save_versions")
@@ -176,10 +164,6 @@ class Manager(config.Reader):
 
         # Precompile the key pattern to skip
         self.key_match = re.compile(self.key_pattern)
-
-        logger.debug(
-            f"CPU and memory profiling using psutil {'enabled' if self._psutil_profiling else 'disabled'}."
-        )
 
     @classmethod
     def from_yaml_file(cls, file_name, lint=False, psutil_profiling=False):
@@ -317,8 +301,6 @@ class Manager(config.Reader):
         # Log MPI information
         if mpitools._comm is not None:
             logger.debug(f"Running with {mpitools.size} MPI process(es)")
-        else:
-            logger.debug("Running in single process without MPI.")
 
         # Index of first task in the list which has
         # not finished running
@@ -326,19 +308,12 @@ class Manager(config.Reader):
         # Pointer to next task index
         self._task_idx = 0
 
-        # Choose how to order tasks based on the execution order
-        next_task = (
-            self._iter_tasks if self.execution_order == "legacy" else self._next_task
-        )
-
-        logger.debug(f"Using `{self.execution_order}` iteration method.")
-
         # Run the pipeline.
         while True:
             # Get the next task. `StopIteration` is raised when there are no
             # non-None tasks left in the tasks list
             try:
-                task = next_task()
+                task = self._next_task()
             except StopIteration:
                 # No tasks remaining
                 break
@@ -380,10 +355,6 @@ class Manager(config.Reader):
                             self._task_head += ii
                             break
                     continue
-
-            if self.execution_order == "legacy":
-                # Advance the task pointer
-                self._task_idx += 1
 
             # Ensure the output(s) are correctly structured
             out = self._check_task_output(out, task)
@@ -776,7 +747,6 @@ class TaskBase(config.Reader):
 
     # Overridable Attributes
     # -----------------------
-
     def __init__(self):
         """Initialize pipeline task.
 
@@ -787,7 +757,7 @@ class TaskBase(config.Reader):
         pass
 
     def __str__(self):
-        """Clean string representation of the task and its state.
+        """String representation of the task and its state.
 
         If no state has been set yet, the state is None.
         """
@@ -864,7 +834,6 @@ class TaskBase(config.Reader):
 
     # Pipeline Infrastructure
     # -----------------------
-
     @property
     def _pipeline_is_available(self):
         """True if this task can be run."""
@@ -1212,9 +1181,3 @@ class TaskBase(config.Reader):
                 result = True
 
         return result
-
-
-if __name__ == "__main__":
-    import doctest
-
-    doctest.testmod()
