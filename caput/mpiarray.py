@@ -964,7 +964,7 @@ class MPIArray(np.ndarray):
         dset = fh[dataset]
         dshape = dset.shape  # Shape of the underlying dataset
         naxis = len(dshape)
-        dtype = dset.dtype
+        dtype = np.dtype(dset.dtype)
 
         # Check that the axis is valid and wrap to an actual position
         if axis < -naxis or axis >= naxis:
@@ -1013,7 +1013,17 @@ class MPIArray(np.ndarray):
                     islice, fslice = _partition_sel(
                         sel, split_axis, dshape[split_axis], part
                     )
-                    dist_arr[fslice] = dset[islice]
+                    if dtype.byteorder == "=":
+                        # Native dtype so use `read_direct` to limit copies. This won't
+                        # necessarily always be faster, but it should never be slower
+                        dset.read_direct(dist_arr, islice, fslice)
+                    else:
+                        # There's a bug in `h5py` which causes endianess conversions
+                        # to be very slow, so it's faster to just read and let numpy
+                        # do the conversion. I haven't quite nailed down the cases where
+                        # this happens, so for now just do it most of the time.
+                        # https://github.com/h5py/h5py/issues/1851
+                        dist_arr[fslice] = dset[islice]
 
             if fh.opened:
                 fh.close()
@@ -1111,7 +1121,17 @@ class MPIArray(np.ndarray):
                 islice, fslice = _partition_sel(
                     sel, split_axis, self.global_shape[split_axis], part
                 )
-                dset[islice] = self[fslice]
+                if np.dtype(dset.dtype).byteorder == "=" and self.flags["C_CONTIGUOUS"]:
+                    # Native dtype and C contiguous so use `write_direct` to limit copies.
+                    # This won't necessarily always be faster, but it should never be slower
+                    dset.write_direct(self, fslice, islice)
+                else:
+                    # There's a bug in `h5py` which causes endianess conversions
+                    # to be very slow, so it's faster to just write and let numpy
+                    # do the conversion. I haven't quite nailed down the cases where
+                    # this happens, so for now just do it most of the time.
+                    # https://github.com/h5py/h5py/issues/1851
+                    dset[islice] = self[fslice]
 
         if fh.opened:
             fh.close()
