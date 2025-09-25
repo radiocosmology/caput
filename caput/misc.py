@@ -240,9 +240,9 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
             from mpi4py import MPI
 
             comm = comm if comm is not None else MPI.COMM_WORLD
-            fh = h5py.File(f, mode, driver="mpio", comm=comm)
+            fh = h5py.File(f, mode, libver="latest", driver="mpio", comm=comm)
         else:
-            fh = h5py.File(f, mode)
+            fh = h5py.File(f, mode, libver="latest")
         fh.opened = True
     elif isinstance(f, h5py.File | h5py.Group):
         fh = f
