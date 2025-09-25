@@ -999,17 +999,15 @@ class MPIArray(np.ndarray):
             # collective IO to work around an h5py issue (#965)
             no_null_slices = dist_arr.global_shape[axis] >= dist_arr.comm.size
 
-            # Only use collective IO if:
-            # - there are no null slices (h5py bug)
-            # - we are not distributed over axis=0 as there is no advantage for
-            #   collective IO which is usually slow
-            # TODO: change if h5py bug fixed
-            # TODO: better would be a test on contiguous IO size
-            # TODO: do we need collective IO to read chunked data?
-            use_collective = fh.is_mpi and no_null_slices and axis > 0
+            if fh.is_mpi and no_null_slices:
+                iocontext = dset.collective
+            else:
+                from contextlib import nullcontext
+
+                iocontext = nullcontext()
 
             # Read using collective MPI-IO if specified
-            with dset.collective if use_collective else DummyContext():
+            with iocontext:
                 # Loop over partitions of the IO and perform them
                 for part in partitions:
                     islice, fslice = _partition_sel(
@@ -1066,37 +1064,6 @@ class MPIArray(np.ndarray):
         mode = "a" if create else "r+"
         fh = misc.open_h5py_mpi(f, mode, self.comm)
 
-        # Check that there are no null slices, otherwise we need to turn off
-        # collective IO to work around an h5py issue (#965)
-        no_null_slices = self.global_shape[self.axis] >= self.comm.size
-
-        # Decide whether to use collective IO. There are a few relevant aspects to this
-        # one:
-        # - we must use collective IO if writing chunked/compressed data. If it's not
-        #   available we cannot compress the data
-        # - we cannot use collective IO if there are null slices present (h5py bug)
-        # - due to coordination overhead and no speed up from the writing, collective IO
-        #   is typically slower if the the data is striped across axis=0, so we should
-        #   disable
-
-        # TODO: change if h5py bug fixed https://github.com/h5py/h5py/issues/965
-        collective_will_not_work = not (fh.is_mpi and no_null_slices)
-
-        if compression is not None and collective_will_not_work:
-            # Need to disable compression if we can't use collective IO
-            logger.warn(
-                "Cannot use collective IO, must disable compression. "
-                f"MPI enabled: {fh.is_mpi}, null slice present: {not no_null_slices}."
-            )
-            chunks, compression, compression_opts = None, None, None
-
-        # TODO: better would be a test on contiguous IO size
-        faster_without_collective = self.axis == 0
-
-        use_collective = (compression is not None) or not (
-            collective_will_not_work or faster_without_collective
-        )
-
         sel = self._make_selections()
 
         # Split the axis to get the IO size under ~2GB (only if MPI-IO)
@@ -1112,8 +1079,33 @@ class MPIArray(np.ndarray):
             compression_opts=compression_opts,
         )
 
+        # Decide whether to use collective IO. There are a few relevant aspects to this
+        # one:
+        # - we must use collective IO if writing chunked/compressed data. If it's not
+        #   available we cannot compress the data
+        # - we cannot use collective IO if there are null slices present (h5py bug)
+        # TODO: change if h5py bug fixed https://github.com/h5py/h5py/issues/965
+        no_null_slices = self.global_shape[self.axis] >= self.comm.size
+
+        if fh.is_mpi and no_null_slices:
+            # We can use collective IO
+            iocontext = dset.collective
+        elif compression is not None:
+            # There's a logic case here where `fh.is_mpi` is False but compression
+            # is set. In theory, this should never be possible since we checked
+            # for MPI support at the start of this function
+            raise RuntimeError(
+                "Cannot use collective IO, must disable compression. "
+                f"MPI enabled: {fh.is_mpi}, null slice present: {not no_null_slices}."
+            )
+        else:
+            # We cannot use collective IO, so use a dummy context manager
+            from contextlib import nullcontext
+
+            iocontext = nullcontext()
+
         # Read using collective MPI-IO if specified
-        with dset.collective if use_collective else DummyContext():
+        with iocontext:
             # Loop over partitions of the IO and perform them
             for part in partitions:
                 islice, fslice = _partition_sel(
@@ -1635,6 +1627,7 @@ class MPIArray(np.ndarray):
             raise RuntimeError("To parition an array we must have multiple axes.")
 
         # Try and find the axis to split over
+        # TODO: we should be able to be clever and split over the distributed axis
         for split_axis in range(self.ndim):
             if (
                 split_axis != self.axis
@@ -2346,16 +2339,6 @@ def sanitize_slice(
         )
 
     return sl, tuple(axis_map), tuple(final_positions)
-
-
-class DummyContext:
-    """A completely dummy context manager."""
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
 
 
 class AxisException(ValueError):
