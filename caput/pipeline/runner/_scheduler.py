@@ -1,7 +1,10 @@
 """Special handling for systems with a job scheduler."""
 
+__all__ = ["queue", "template_queue"]
+
 import itertools
 import logging
+from pathlib import Path
 
 from ._core import _from_template, _load_config, lint_config
 
@@ -17,6 +20,109 @@ _PBS_MAIL_TYPES = list(
     )
 )
 MAIL_TYPES = _SLURM_MAIL_TYPES + _PBS_MAIL_TYPES
+
+
+REGISTERED_SYSTEMS = {
+    "pbs": {
+        "command": "qsub",
+        "mail": {
+            "types": _PBS_MAIL_TYPES,
+            "options": "-M {email} -m {mailtype}",
+        },
+        "script": """#!/bin/bash
+#PBS -l nodes=%(nodes)i:ppn=%(ppn)i
+#PBS -q %(queue)s
+#PBS -r n
+#PBS -m abe
+#PBS -V
+#PBS -l walltime=%(time)s
+#PBS -N %(name)s
+
+# exit if a command returns non-zero code
+set -e
+
+# set status to crashed upon non-zero status of command
+function setCrashed {
+    echo CRASHED > %(statuspath)s
+}
+
+trap setCrashed ERR
+
+%(module)s
+
+source %(venv)s
+
+cd %(workdir)s
+export OMP_NUM_THREADS=%(ompnum)i
+
+mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
+
+# Set the status
+echo FINISHED > %(statuspath)s
+
+# If the job was successful, then move the output to its final location
+if [ %(usetemp)s -eq 1 ]
+then
+    mkdir -p $(dirname \"%(finaldir)s\")
+    mv \"%(workdir)s\" \"%(finaldir)s\"
+fi
+""",
+    },
+    "slurm": {
+        "command": "sbatch",
+        "mail": {
+            "types": _SLURM_MAIL_TYPES,
+            "options": "--mail-user={email} --mail-type={mailtype}",
+        },
+        "script": """#!/bin/bash
+#SBATCH --account=%(account)s
+#SBATCH --nodes=%(nodes)i
+#SBATCH --ntasks-per-node=%(pernode)i # number of MPI processes
+#SBATCH --cpus-per-task=%(ompnum)i # number of OpenMP processes
+#SBATCH --mem=%(mem)s # memory per node
+#SBATCH --time=%(time)s
+#SBATCH --job-name=%(name)s
+
+# exit if a command returns non-zero code
+set -e
+
+# set status to crashed upon non-zero status of command
+function setCrashed {
+    echo CRASHED > %(statuspath)s
+}
+
+trap setCrashed ERR
+
+echo RUNNING > %(statuspath)s
+
+%(modules)s
+
+source %(venv)s
+
+cd %(workdir)s
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+srun python %(scriptpath)s run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
+
+# Set the status
+echo FINISHED > %(statuspath)s
+
+# If the job was successful, then move the output to its final location
+if [ %(usetemp)s -eq 1 ]
+then
+    mkdir -p $(dirname \"%(finaldir)s\")
+    mv \"%(workdir)s\" \"%(finaldir)s\"
+fi
+""",
+    },
+}
+
+# Global dictionary of registered systems and their default parameters
+REGISTERED_CLUSTERS = {
+    "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
+    "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
+    "fir": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
+}
 
 
 def template_queue(templatefile, var, overwrite, email=None, mailtype=None):
@@ -112,58 +218,156 @@ def queue(
     if lint:
         lint_config(configfile)
 
-    yconf = _load_config(configfile)
+    conf = _load_config(configfile)
 
-    # Global configuration
+    # Resolve the full queue system configuration and
+    # ensure that all required keys are present
+    required_keys = {"nodes", "time", "directory", "ppn", "queue", "ompnum", "pernode"}
+    resolved_config = _resolve_system_config(conf, required_keys)
+
+    system = resolved_config["queue_sys"]
+    system_config = REGISTERED_SYSTEMS[system]
+
+    directories = _create_job_directories(resolved_config, overwrite)
+
+    if not directories:
+        # The job already exists and we are not overwriting
+        return
+
+    # Copy the config file to the job directory
+    sfile = _fix_path(configfile)
+    dfile = _fix_path(directories["jobdir"] / "config.yaml")
+
+    if sfile != dfile:
+        shutil.copyfile(sfile, dfile)
+
+    # Forward profiler configuration
+    resolved_config["profile"] = "--profile" if profile else ""
+    resolved_config["profiler"] = f"--profiler={profiler}" if profile else ""
+    resolved_config["psutil"] = "--psutil" if psutil else ""
+
+    # Resolve the cluster job script based on the configuration
+    jobscript = _resolve_job_script(resolved_config, directories)
+
+    # Write the job script to the job directory
+    with open(directories["jobdir"] / "jobscript.sh", "w") as f:
+        f.write(jobscript)
+
+    # Resolve mail options, if available for the queue system
+    extra_options = []
+
+    if email is not None:
+        if mailtype is None:
+            logger.warning(f"Must specify {system} mailtype for email notifications")
+
+        mail_config = system_config.get("mail")
+
+        if mail_config is None:
+            logger.warning(f"Email notifications not supported for {system}")
+        else:
+            if mailtype not in mail_config["types"]:
+                raise ValueError(
+                    f"Invalid {system} mailtype specified: ({mailtype}). "
+                    f"Valid types are: ({mail_config['types']})."
+                )
+
+            extra_options = (
+                mail_config["options"].format(email=email, mailtype=mailtype).split()
+            )
+
+    if submit:
+        # NOTE: explicitly set the environment to what Python thinks it should
+        # be. This is because mpi4py will incorrectly modify the environment
+        # using lowlevel calls which Python cannot detect.
+        subprocess.run(
+            [system_config["command"], *extra_options, "jobscript.sh"],
+            cwd=directories["jobdir"],
+            env=os.environ,
+        )
+
+
+def _expand_path(path):
+    """Expand any variables, user directories in path."""
+    import os
+
+    return Path(os.path.expandvars(path)).expanduser().resolve()
+
+
+def _fix_path(path):
+    """Turn path to an absolute path."""
+    from pathlib import Path
+
+    return Path(path).resolve()
+
+
+def _resolve_system_config(conf: dict, required_keys: set) -> dict:
+    """Resolve a cluster configuration dictionary."""
     # Create output directory and copy over params file.
     try:
-        conf = yconf["cluster"]
+        cluster_conf = conf["cluster"]
     except KeyError as exc:
-        raise KeyError('Configuration file must have a "cluster" section.') from exc
+        raise KeyError(
+            "Configuration file must have a 'cluster' section. " f"Got {conf.keys()}"
+        ) from exc
 
     # Base setting if nothing else is set
-    defaults = {"name": "job", "queue": "batch", "pernode": 1, "ompnum": 8}
+    resolved_conf = {"name": "job", "queue": "batch", "pernode": 1, "ompnum": 8}
 
-    # Per system overrides (i.e. specialisations for Scinet GPC and Westgrid
-    # cedar)
-    system_defaults = {
-        "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
-        "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
-        "fir": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
-    }
+    # Resolve default system parameters from registered systems
+    try:
+        system = cluster_conf["system"]
+    except KeyError as exc:
+        raise ValueError(
+            "Cluster configuration must specify a queue system. "
+            f"Got {cluster_conf.keys()}"
+        ) from exc
 
-    # Start to generate the full resolved config
-    rconf = defaults.copy()
+    try:
+        sysconfig = REGISTERED_CLUSTERS[system]
+    except KeyError as exc:
+        raise ValueError(
+            f"Specified system `{system}`: is not known. "
+            f"Known systems are: {list(REGISTERED_CLUSTERS.keys())}"
+        ) from exc
 
-    # If the system is specified update the current config with it
-    if "system" in conf:
-        system = conf["system"]
+    # Update the resolved configuration with default system parameters,
+    # then overwrite with user specified parameters
+    resolved_conf.update(**sysconfig)
+    resolved_conf.update(**cluster_conf)
 
-        if system not in system_defaults:
-            raise ValueError(f'Specified system "{system}": is not known.')
-
-        rconf.update(**system_defaults[system])
-
-    # Update the current config with the rest of the users variables
-    rconf.update(**conf)
+    # Make sure the queue system is valid
+    if resolved_conf["queue_sys"] not in REGISTERED_SYSTEMS:
+        raise ValueError(
+            f"Specified queue system `{resolved_conf['queue_sys']}` is not known. "
+            f"Known systems are: {list(REGISTERED_SYSTEMS.keys())}"
+        )
 
     # Check to see if any required keys are missing
-    required_keys = {"nodes", "time", "directory", "ppn", "queue", "ompnum", "pernode"}
-    missing_keys = required_keys - set(rconf.keys())
+    missing_keys = required_keys - set(resolved_conf.keys())
+
     if missing_keys:
         raise ValueError(f"Missing required keys: {missing_keys}")
 
+    return resolved_conf
+
+
+def _create_job_directories(conf: dict, overwrite: str) -> dict[Path, 3 | 0]:
+    """Create job directories based on a configuration dictionary."""
+    directories = {}
+
     # If no temporary directory set, just use the final directory
-    if "temp_directory" not in rconf:
-        rconf["temp_directory"] = rconf["directory"]
+    if "temp_directory" not in conf:
+        conf["temp_directory"] = conf["directory"]
 
     # Construct the working directory
-    workdir = _expand_path(rconf["temp_directory"])
+    workdir = _expand_path(conf["temp_directory"])
+
     if not workdir.is_absolute():
         raise ValueError(f"Working directory path {workdir} must be absolute")
 
     # Construct the output directory
-    finaldir = _expand_path(rconf["directory"])
+    finaldir = _expand_path(conf["directory"])
+
     if not finaldir.is_absolute():
         raise ValueError(f"Final output directory path {finaldir} must be absolute")
 
@@ -174,7 +378,7 @@ def queue(
     if jobdir.exists():
         if overwrite == "never":
             logger.info(f"Job already exists at {workdir}. Skipping.")
-            return
+            return None
 
         if overwrite == "failed" and statusfile.exists():
             with open(statusfile) as fh:
@@ -183,19 +387,26 @@ def queue(
                     logger.info(
                         f"Successful job already exists at {workdir}. Skipping."
                     )
-                    return
+                    return None
     else:
         jobdir.mkdir(parents=True)
 
-    # Copy config file into output directory (check it's not already there first)
-    sfile = _fix_path(configfile)
-    dfile = _fix_path(jobdir / "config.yaml")
-    if sfile != dfile:
-        shutil.copyfile(sfile, dfile)
+    directories["jobdir"] = jobdir
+    directories["workdir"] = workdir
+    directories["finaldir"] = finaldir
 
+    return directories
+
+
+def _create_job_environment_strings(conf: dict) -> tuple[str, 2]:
+    """Load the job environment based on a configuration dictionary.
+
+    Returns a tuple consisting of the module load string and the
+    virtual environment path.
+    """
     # Get any modules that should be loaded
-    modlist = rconf.get("module_list")
-    modpath = rconf.get("module_path")
+    modlist = conf.get("module_list")
+    modpath = conf.get("module_path")
     modstr = ""
 
     if modpath:
@@ -211,168 +422,36 @@ def queue(
     if modstr:
         modstr = "module --force purge\n" + modstr
 
-    rconf["modules"] = modstr
-
     # Set up virtualenv
-    if "venv" in rconf:
-        venvpath = _expand_path(rconf["venv"] + "/bin/activate")
-        if not venvpath.exists():
-            raise ValueError(f"Could not find virtualenv at path {rconf['venv']}")
-        rconf["venv"] = venvpath
-    else:
-        rconf["venv"] = "/dev/null"
+    if "venv" in conf:
+        venvpath = _expand_path(conf["venv"] + "/bin/activate")
 
-    # Forward profiler configuration
-    rconf["profile"] = "--profile" if profile else ""
-    rconf["profiler"] = f"--profiler={profiler}" if profile else ""
-    rconf["psutil"] = "--psutil" if psutil else ""
+        if not venvpath.exists():
+            raise ValueError(f"Could not find virtualenv at path {conf['venv']}")
+    else:
+        venvpath = "/dev/null"
+
+    return modstr, venvpath
+
+
+def _resolve_job_script(conf: dict, directories: dict) -> str:
+    """Resolve the job script based on a configuration dictionary."""
+    # Parse the module load string and virtualenv path
+    modstr, venvpath = _create_job_environment_strings(conf)
+    conf["modules"] = modstr
+    conf["venv"] = venvpath
 
     # Derived vars only needed to create script
-    rconf["mpiproc"] = rconf["nodes"] * rconf["pernode"]
-    rconf["workdir"] = workdir
-    rconf["finaldir"] = finaldir
-    rconf["scriptpath"] = _fix_path(__file__)
-    rconf["logpath"] = jobdir / "jobout.log"
-    rconf["configpath"] = jobdir / "config.yaml"
-    rconf["statuspath"] = jobdir / "STATUS"
-    rconf["usetemp"] = 1 if rconf["finaldir"] != rconf["workdir"] else 0
+    conf["mpiproc"] = conf["nodes"] * conf["pernode"]
+    conf["workdir"] = directories["workdir"]
+    conf["finaldir"] = directories["finaldir"]
+    conf["scriptpath"] = _fix_path(__file__)
+    conf["logpath"] = directories["jobdir"] / "jobout.log"
+    conf["configpath"] = directories["jobdir"] / "config.yaml"
+    conf["statuspath"] = directories["jobdir"] / "STATUS"
+    conf["usetemp"] = 1 if conf["finaldir"] != conf["workdir"] else 0
 
-    pbs_script = """#!/bin/bash
-#PBS -l nodes=%(nodes)i:ppn=%(ppn)i
-#PBS -q %(queue)s
-#PBS -r n
-#PBS -m abe
-#PBS -V
-#PBS -l walltime=%(time)s
-#PBS -N %(name)s
+    system = conf["queue_sys"]
 
-# exit if a command returns non-zero code
-set -e
-
-# set status to crashed upon non-zero status of command
-function setCrashed {
-    echo CRASHED > %(statuspath)s
-}
-
-trap setCrashed ERR
-
-%(module)s
-
-source %(venv)s
-
-cd %(workdir)s
-export OMP_NUM_THREADS=%(ompnum)i
-
-mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
-
-# Set the status
-echo FINISHED > %(statuspath)s
-
-# If the job was successful, then move the output to its final location
-if [ %(usetemp)s -eq 1 ]
-then
-    mkdir -p $(dirname \"%(finaldir)s\")
-    mv \"%(workdir)s\" \"%(finaldir)s\"
-fi
-"""
-    slurm_script = """#!/bin/bash
-#SBATCH --account=%(account)s
-#SBATCH --nodes=%(nodes)i
-#SBATCH --ntasks-per-node=%(pernode)i # number of MPI processes
-#SBATCH --cpus-per-task=%(ompnum)i # number of OpenMP processes
-#SBATCH --mem=%(mem)s # memory per node
-#SBATCH --time=%(time)s
-#SBATCH --job-name=%(name)s
-
-# exit if a command returns non-zero code
-set -e
-
-# set status to crashed upon non-zero status of command
-function setCrashed {
-    echo CRASHED > %(statuspath)s
-}
-
-trap setCrashed ERR
-
-echo RUNNING > %(statuspath)s
-
-%(modules)s
-
-source %(venv)s
-
-cd %(workdir)s
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-
-srun python %(scriptpath)s run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
-
-# Set the status
-echo FINISHED > %(statuspath)s
-
-# If the job was successful, then move the output to its final location
-if [ %(usetemp)s -eq 1 ]
-then
-    mkdir -p $(dirname \"%(finaldir)s\")
-    mv \"%(workdir)s\" \"%(finaldir)s\"
-fi
-"""
-
-    if rconf["queue_sys"] == "pbs":
-        script = pbs_script
-        job_command = "qsub"
-
-        if email is None:
-            job_options = []
-        else:
-            if mailtype is None:
-                raise ValueError("Must specify PBS mailtype for email notifications")
-            if mailtype not in _PBS_MAIL_TYPES:
-                raise ValueError(f"Invalid PBS mailtype specified ({mailtype})")
-
-            job_options = [f"-M {email}", f"-m {mailtype}"]
-
-    elif rconf["queue_sys"] == "slurm":
-        script = slurm_script
-        job_command = "sbatch"
-
-        if email is None:
-            job_options = []
-        else:
-            if mailtype is None:
-                raise ValueError("Must specify slurm mailtype for email notifications")
-            if mailtype not in _SLURM_MAIL_TYPES:
-                raise ValueError(f"Invalid slurm mailtype specified ({mailtype})")
-
-            job_options = [f"--mail-user={email}", f"--mail-type={mailtype}"]
-
-    else:
-        raise ValueError("Specified queueing system not recognized")
-
-    # Fill in the template variables
-    script = script % rconf
-
-    # Write and submit the jobscript
-    with open(jobdir / "jobscript.sh", "w") as f:
-        f.write(script)
-
-    if submit:
-        # NOTE: explicitly set the environment to what Python thinks it should
-        # be. This is because mpi4py will incorrectly modify the environment
-        # using lowlevel calls which Python cannot detect.
-        subprocess.run(
-            [job_command, *job_options, "jobscript.sh"], cwd=jobdir, env=os.environ
-        )
-
-
-def _expand_path(path):
-    """Expand any variables, user directories in path."""
-    import os
-    from pathlib import Path
-
-    return Path(os.path.expandvars(path)).expanduser().resolve()
-
-
-def _fix_path(path):
-    """Turn path to an absolute path."""
-    from pathlib import Path
-
-    return Path(path).resolve()
+    # Get the default system queue script and fill in the template variables
+    return REGISTERED_SYSTEMS[system]["script"] % conf
