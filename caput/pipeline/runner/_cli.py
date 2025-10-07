@@ -266,3 +266,18 @@ def queue(
         email,
         mailtype,
     )
+
+
+@cli.command()
+@click.argument(
+    "file",
+    type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
+)
+def register_system(file):
+    """Register a new cluster system from the given FILE to a toml file.
+
+    The toml file should contain a table with the name of the system, and
+    contain at least the keys `script` and `command`, which provide a formattable
+    job submission script template, and the command to submit jobs, respectively.
+    """
+    _scheduler.register_system(file)

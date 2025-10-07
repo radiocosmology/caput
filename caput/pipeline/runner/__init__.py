@@ -8,4 +8,5 @@ from ._core import (
 from ._scheduler import (
     template_queue as template_queue,
     queue as queue,
+    register_system as register_system,
 )
