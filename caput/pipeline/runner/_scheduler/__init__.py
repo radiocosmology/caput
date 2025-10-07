@@ -1,128 +1,68 @@
 """Special handling for systems with a job scheduler."""
 
-__all__ = ["queue", "template_queue"]
+__all__ = ["queue", "register_system", "template_queue"]
 
-import itertools
 import logging
 from pathlib import Path
-
-from ._core import _from_template, _load_config, lint_config
 
 logger = logging.getLogger(__name__)
 # Set the logging level and format
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-# Email notification options for slurm and PBS
-_SLURM_MAIL_TYPES = ["BEGIN", "END", "FAIL", "REQUEUE", "ALL"]
-_PBS_MAIL_TYPES = list(
-    itertools.chain.from_iterable(
-        ("".join(p) for p in itertools.permutations("abe", n)) for n in [1, 2, 3]
-    )
-)
-MAIL_TYPES = _SLURM_MAIL_TYPES + _PBS_MAIL_TYPES
+# Global dictionary of registered queue systems
+REGISTERED_SYSTEMS = {}
+# Global list of supported mail types across all systems
+MAIL_TYPES = []
 
 
-REGISTERED_SYSTEMS = {
-    "pbs": {
-        "command": "qsub",
-        "mail": {
-            "types": _PBS_MAIL_TYPES,
-            "options": "-M {email} -m {mailtype}",
-        },
-        "script": """#!/bin/bash
-#PBS -l nodes=%(nodes)i:ppn=%(ppn)i
-#PBS -q %(queue)s
-#PBS -r n
-#PBS -m abe
-#PBS -V
-#PBS -l walltime=%(time)s
-#PBS -N %(name)s
+def _expand_path(path):
+    """Expand any variables, user directories in path."""
+    import os
 
-# exit if a command returns non-zero code
-set -e
+    return Path(os.path.expandvars(path)).expanduser().resolve()
 
-# set status to crashed upon non-zero status of command
-function setCrashed {
-    echo CRASHED > %(statuspath)s
-}
 
-trap setCrashed ERR
+def _fix_path(path):
+    """Turn path to an absolute path."""
+    from pathlib import Path
 
-%(module)s
+    return Path(path).resolve()
 
-source %(venv)s
 
-cd %(workdir)s
-export OMP_NUM_THREADS=%(ompnum)i
+def register_system(path: str | Path) -> dict:
+    """Register new queue system(s) from a TOML file."""
+    import toml
 
-mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
+    global REGISTERED_SYSTEMS
+    global MAIL_TYPES
 
-# Set the status
-echo FINISHED > %(statuspath)s
+    required_keys = {"script", "command"}
 
-# If the job was successful, then move the output to its final location
-if [ %(usetemp)s -eq 1 ]
-then
-    mkdir -p $(dirname \"%(finaldir)s\")
-    mv \"%(workdir)s\" \"%(finaldir)s\"
-fi
-""",
-    },
-    "slurm": {
-        "command": "sbatch",
-        "mail": {
-            "types": _SLURM_MAIL_TYPES,
-            "options": "--mail-user={email} --mail-type={mailtype}",
-        },
-        "script": """#!/bin/bash
-#SBATCH --account=%(account)s
-#SBATCH --nodes=%(nodes)i
-#SBATCH --ntasks-per-node=%(pernode)i # number of MPI processes
-#SBATCH --cpus-per-task=%(ompnum)i # number of OpenMP processes
-#SBATCH --mem=%(mem)s # memory per node
-#SBATCH --time=%(time)s
-#SBATCH --job-name=%(name)s
+    path = _fix_path(path)
 
-# exit if a command returns non-zero code
-set -e
+    with open(path) as f:
+        data = toml.load(f)
 
-# set status to crashed upon non-zero status of command
-function setCrashed {
-    echo CRASHED > %(statuspath)s
-}
+    for system, conf in data.items():
+        if not required_keys.issubset(conf.keys()):
+            raise ValueError(
+                f"System {system} is missing required keys: "
+                f"{required_keys - set(conf.keys())}"
+            )
 
-trap setCrashed ERR
+        REGISTERED_SYSTEMS[system] = conf
 
-echo RUNNING > %(statuspath)s
+        if "mail" in conf:
+            MAIL_TYPES.extend(conf["mail"]["types"])
 
-%(modules)s
 
-source %(venv)s
+# Register default queue systems
+register_system(Path(__file__).parent / "_default_systems.toml")
 
-cd %(workdir)s
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-
-srun python %(scriptpath)s run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
-
-# Set the status
-echo FINISHED > %(statuspath)s
-
-# If the job was successful, then move the output to its final location
-if [ %(usetemp)s -eq 1 ]
-then
-    mkdir -p $(dirname \"%(finaldir)s\")
-    mv \"%(workdir)s\" \"%(finaldir)s\"
-fi
-""",
-    },
-}
-
-# Global dictionary of registered systems and their default parameters
-REGISTERED_CLUSTERS = {
-    "gpc": {"ppn": 8, "mem": "16000M", "queue_sys": "pbs", "account": None},
-    "cedar": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
-    "fir": {"ppn": 32, "mem": "0", "queue_sys": "slurm", "account": "rpp-chime"},
-}
+# Global dictionary of registered systems and their default parameters.
+# This shouldn't be used, and is just a fallback to support legacy config files.
+# New config files should specify the queue system directly.
+REGISTERED_CLUSTERS = {"gpc": "pbs", "cedar": "slurm", "fir": "slurm"}
 
 
 def template_queue(templatefile, var, overwrite, email=None, mailtype=None):
@@ -134,6 +74,8 @@ def template_queue(templatefile, var, overwrite, email=None, mailtype=None):
     contain a comma themselves. If multiple variables are specified, each with multiple
     substitutions the outer product of all possible values is generated.
     """
+    from .._core import _from_template
+
     for tfh_name in _from_template(templatefile, var):
         queue(
             configfile=tfh_name,
@@ -178,7 +120,7 @@ def queue(
         A name of the cluster that we are running on, if this is supported
         (currently ``gpc``, ``cedar``, ``fir``), this uses more relevant default
         values.
-    ``queue_sys``
+    ``system``
         The queue system to run on. Either ``pbs`` or ``slurm``.
     ``queue``
         The queue to submit to. Only used for *PBS*
@@ -215,17 +157,17 @@ def queue(
     import shutil
     import subprocess
 
+    from .._core import _load_config, lint_config
+
     if lint:
         lint_config(configfile)
 
     conf = _load_config(configfile)
 
     # Resolve the full queue system configuration and
-    # ensure that all required keys are present
-    required_keys = {"nodes", "time", "directory", "ppn", "queue", "ompnum", "pernode"}
-    resolved_config = _resolve_system_config(conf, required_keys)
+    resolved_config = _resolve_system_config(conf)
 
-    system = resolved_config["queue_sys"]
+    system = resolved_config["system"]
     system_config = REGISTERED_SYSTEMS[system]
 
     directories = _create_job_directories(resolved_config, overwrite)
@@ -286,21 +228,7 @@ def queue(
         )
 
 
-def _expand_path(path):
-    """Expand any variables, user directories in path."""
-    import os
-
-    return Path(os.path.expandvars(path)).expanduser().resolve()
-
-
-def _fix_path(path):
-    """Turn path to an absolute path."""
-    from pathlib import Path
-
-    return Path(path).resolve()
-
-
-def _resolve_system_config(conf: dict, required_keys: set) -> dict:
+def _resolve_system_config(conf: dict) -> dict:
     """Resolve a cluster configuration dictionary."""
     # Create output directory and copy over params file.
     try:
@@ -310,45 +238,40 @@ def _resolve_system_config(conf: dict, required_keys: set) -> dict:
             "Configuration file must have a 'cluster' section. " f"Got {conf.keys()}"
         ) from exc
 
-    # Base setting if nothing else is set
-    resolved_conf = {"name": "job", "queue": "batch", "pernode": 1, "ompnum": 8}
-
     # Resolve default system parameters from registered systems
     try:
-        system = cluster_conf["system"]
+        system = REGISTERED_CLUSTERS[cluster_conf["system"]]
     except KeyError as exc:
         raise ValueError(
             "Cluster configuration must specify a queue system. "
             f"Got {cluster_conf.keys()}"
         ) from exc
 
-    try:
-        sysconfig = REGISTERED_CLUSTERS[system]
-    except KeyError as exc:
-        raise ValueError(
-            f"Specified system `{system}`: is not known. "
-            f"Known systems are: {list(REGISTERED_CLUSTERS.keys())}"
-        ) from exc
+    if system not in REGISTERED_SYSTEMS:
+        # As a fallback, see if the user specified a known system directly
+        cluster_name = cluster_conf.get("system")
 
-    # Update the resolved configuration with default system parameters,
-    # then overwrite with user specified parameters
-    resolved_conf.update(**sysconfig)
-    resolved_conf.update(**cluster_conf)
+        if cluster_name is not None and cluster_name in REGISTERED_CLUSTERS:
+            system = REGISTERED_CLUSTERS[cluster_name]
 
-    # Make sure the queue system is valid
-    if resolved_conf["queue_sys"] not in REGISTERED_SYSTEMS:
-        raise ValueError(
-            f"Specified queue system `{resolved_conf['queue_sys']}` is not known. "
-            f"Known systems are: {list(REGISTERED_SYSTEMS.keys())}"
-        )
+        else:
+            raise ValueError(
+                f"Specified system `{system}`: is not known. "
+                f"Known systems are: {list(REGISTERED_SYSTEMS.keys())}"
+            )
+
+    cluster_name["system"] = system
+
+    # Certain keys are required
+    required_keys = set(REGISTERED_SYSTEMS[system].get("required", set()))
 
     # Check to see if any required keys are missing
-    missing_keys = required_keys - set(resolved_conf.keys())
+    missing_keys = required_keys - set(cluster_conf.keys())
 
     if missing_keys:
         raise ValueError(f"Missing required keys: {missing_keys}")
 
-    return resolved_conf
+    return cluster_conf
 
 
 def _create_job_directories(conf: dict, overwrite: str) -> dict[Path, 3 | 0]:
@@ -451,7 +374,7 @@ def _resolve_job_script(conf: dict, directories: dict) -> str:
     conf["statuspath"] = directories["jobdir"] / "STATUS"
     conf["usetemp"] = 1 if conf["finaldir"] != conf["workdir"] else 0
 
-    system = conf["queue_sys"]
+    system = conf["system"]
 
     # Get the default system queue script and fill in the template variables
     return REGISTERED_SYSTEMS[system]["script"] % conf
