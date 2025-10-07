@@ -29,6 +29,7 @@ dependencies = [
     "numpy>=1.24",
     "psutil",
     "PyYAML",
+    "toml",
     "scipy>=1.13",
     "skyfield>=1.31",
 ]
@@ -67,3 +68,6 @@ enabled = true
 
 [tool.setuptools.packages]
 find = {}
+
+[tool.setuptools.package-data]
+"caput.pipeline.runner._scheduler" = ["_default_systems.toml"]
