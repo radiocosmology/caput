@@ -1,0 +1,94 @@
+[slurm]
+command = "sbatch"
+required = ["name", "nodes", "time", "mem", "directory", "ompnum", "pernode", "account"]
+script = """#!/bin/bash
+#SBATCH --account=%(account)s
+#SBATCH --nodes=%(nodes)i
+#SBATCH --ntasks-per-node=%(pernode)i # number of MPI processes
+#SBATCH --cpus-per-task=%(ompnum)i # number of OpenMP processes
+#SBATCH --mem=%(mem)s # memory per node
+#SBATCH --time=%(time)s
+#SBATCH --job-name=%(name)s
+
+# exit if a command returns non-zero code
+set -e
+
+# set status to crashed upon non-zero status of command
+function setCrashed {
+    echo CRASHED > %(statuspath)s
+}
+
+trap setCrashed ERR
+
+echo RUNNING > %(statuspath)s
+
+%(modules)s
+
+source %(venv)s
+
+cd %(workdir)s
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
+srun python %(scriptpath)s run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
+
+# Set the status
+echo FINISHED > %(statuspath)s
+
+# If the job was successful, then move the output to its final location
+if [ %(usetemp)s -eq 1 ]
+then
+    mkdir -p $(dirname \"%(finaldir)s\")
+    mv \"%(workdir)s\" \"%(finaldir)s\"
+fi
+"""
+
+[slurm.mail]
+types = ["BEGIN", "END", "FAIL", "REQUEUE", "ALL"]
+options = "--mail-user={email} --mail-type={mailtype}"
+
+
+[pbs]
+command = "qsub"
+required = ["name", "nodes", "time", "directory", "ppn", "queue"]
+script = """#!/bin/bash
+#PBS -l nodes=%(nodes)i:ppn=%(ppn)i
+#PBS -q %(queue)s
+#PBS -r n
+#PBS -m abe
+#PBS -V
+#PBS -l walltime=%(time)s
+#PBS -N %(name)s
+
+# exit if a command returns non-zero code
+set -e
+
+# set status to crashed upon non-zero status of command
+function setCrashed {
+    echo CRASHED > %(statuspath)s
+}
+
+trap setCrashed ERR
+
+%(module)s
+
+source %(venv)s
+
+cd %(workdir)s
+export OMP_NUM_THREADS=%(ompnum)i
+
+mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none python %(scriptpath)s run %(configpath)s &> %(logpath)s
+
+# Set the status
+echo FINISHED > %(statuspath)s
+
+# If the job was successful, then move the output to its final location
+if [ %(usetemp)s -eq 1 ]
+then
+    mkdir -p $(dirname \"%(finaldir)s\")
+    mv \"%(workdir)s\" \"%(finaldir)s\"
+fi
+"""
+
+[pbs.mail]
+types = ['a', 'b', 'e', 'ab', 'ae', 'ba', 'be', 'ea', 'eb', 'abe', 'aeb', 'bae', 'bea', 'eab', 'eba']
+options = "-M {email} -m {mailtype}"
