@@ -14,18 +14,13 @@ import yaml
 
 from .. import config
 from ..util import importtools, mpitools, objecttools
+from . import exceptions
 
 # Set the module logger.
 logger = logging.getLogger(__name__)
 
 
-__all__ = [
-    "Manager",
-    "PipelineRuntimeError",
-    "PipelineStopIteration",
-    "TaskBase",
-    "local_tasks",
-]
+__all__ = ["Manager", "Task", "local_tasks"]
 
 
 # Search this dictionary for tasks.
@@ -33,24 +28,8 @@ __all__ = [
 local_tasks = {}
 
 
-# Exceptions
-# ----------
-
-
-class PipelineRuntimeError(RuntimeError):
-    """Raised when there is a pipeline related error at runtime."""
-
-
-class PipelineStopIteration(Exception):
-    """Stop the iteration of `next()` in pipeline tasks.
-
-    Pipeline tasks should raise this excetions in the `next()` method to stop
-    the iteration of the task and to proceed to `finish()`.
-
-    Note that if `next()` recieves input data as an argument, it is not
-    required to ever raise this exception.  The pipeline will proceed to
-    `finish()` once the input data has run out.
-    """
+# Pipeline Manager
+# ----------------
 
 
 class _PipelineMissingData(Exception):
@@ -59,10 +38,6 @@ class _PipelineMissingData(Exception):
 
 class _PipelineFinished(Exception):
     """Raised by tasks that have been completed."""
-
-
-# Pipeline Manager
-# ----------------
 
 
 def _get_versions(modules):
@@ -487,7 +462,7 @@ class Manager(config.Reader):
                     out = (out,)
 
         elif len(task._out_keys) != len(out):
-            raise PipelineRuntimeError(
+            raise exceptions.PipelineRuntimeError(
                 f"Found unexpected number of outputs in {task!s} "
                 f"(got {len(out)} expected {len(task._out_keys)})"
             )
@@ -702,11 +677,11 @@ def _format_product_keys(keys):
     return keys
 
 
-class TaskBase(config.Reader):
+class Task(config.Reader):
     """Base class for all pipeline tasks.
 
     All pipeline tasks should inherit from this class, with functionality and
-    analysis added by over-riding `__init__`, `setup`, `next` and/or
+    analysis added by over-riding `__init__`, `setup`, `validate`, `next` and/or
     `finish`.
 
     In addition, input parameters may be specified by adding class attributes
@@ -756,15 +731,6 @@ class TaskBase(config.Reader):
         """
         pass
 
-    def __str__(self):
-        """String representation of the task and its state.
-
-        If no state has been set yet, the state is None.
-        """
-        state = getattr(self, "_pipeline_state", None)
-
-        return f"{self.__class__.__name__}.{state}"
-
     def setup(self, requires=None):
         """First analysis stage of pipeline task.
 
@@ -795,7 +761,7 @@ class TaskBase(config.Reader):
         Any return values will be treated as pipeline data-products as
         specified by the `out` keys in the pipeline setup.
         """
-        raise PipelineStopIteration()
+        raise exceptions.PipelineStopIteration
 
     def finish(self):
         """Final analysis stage of pipeline task.
@@ -831,6 +797,17 @@ class TaskBase(config.Reader):
         No caching infrastructure has yet been implemented.
         """
         return False
+
+    # Basic Attributes
+    # ----------------
+    def __str__(self):
+        """String representation of the task and its state.
+
+        If no state has been set yet, the state is None.
+        """
+        state = getattr(self, "_pipeline_state", None)
+
+        return f"{self.__class__.__name__}.{state}"
 
     # Pipeline Infrastructure
     # -----------------------
@@ -1053,7 +1030,7 @@ class TaskBase(config.Reader):
             pass
 
         else:
-            raise PipelineRuntimeError()
+            raise exceptions.PipelineRuntimeError
 
     def _pipeline_next(self):
         """Execute the next stage of the pipeline.
@@ -1066,7 +1043,7 @@ class TaskBase(config.Reader):
             # Check if we have all the required input data.
             for req in self._requires:
                 if req is None:
-                    raise _PipelineMissingData()
+                    raise _PipelineMissingData
 
             logger.debug(f"Task {self!s} calling 'setup()'.")
 
@@ -1079,7 +1056,7 @@ class TaskBase(config.Reader):
             # Check if we have all the required input data.
             for in_ in self._in:
                 if in_.empty():
-                    raise _PipelineMissingData()
+                    raise _PipelineMissingData
 
             if self.broadcast_inputs:
                 raise NotImplementedError
@@ -1093,7 +1070,7 @@ class TaskBase(config.Reader):
 
             try:
                 out = self.next(*args)
-            except PipelineStopIteration:
+            except exceptions.PipelineStopIteration:
                 # Finished iterating `next()`.
                 self._pipeline_advance_state()
                 out = None
@@ -1133,9 +1110,9 @@ class TaskBase(config.Reader):
             return out
 
         if self._pipeline_state == "raise":
-            raise _PipelineFinished()
+            raise _PipelineFinished
 
-        raise PipelineRuntimeError()
+        raise exceptions.PipelineRuntimeError
 
     def _pipeline_queue_product(self, key, product):
         """Put a product into an input queue as applicable.
@@ -1155,11 +1132,11 @@ class TaskBase(config.Reader):
                     f"{self!s} stowing data product with key {key} for `requires`."
                 )
                 if self._requires is None:
-                    raise PipelineRuntimeError(
+                    raise exceptions.PipelineRuntimeError(
                         "Tried to set 'requires' data product, but `setup()` already run."
                     )
                 if self._requires[ii] is not None:
-                    raise PipelineRuntimeError(
+                    raise exceptions.PipelineRuntimeError(
                         "'requires' data product set more than once."
                     )
                 self._requires[ii] = product
@@ -1172,7 +1149,7 @@ class TaskBase(config.Reader):
             for ii in indices:
                 logger.debug(f"{self!s} stowing data product with key {key} for `in`.")
                 if self._in is None:
-                    raise PipelineRuntimeError(
+                    raise exceptions.PipelineRuntimeError(
                         "Tried to queue 'in' data product, but `next()` already run."
                     )
 

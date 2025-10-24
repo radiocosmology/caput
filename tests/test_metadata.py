@@ -4,7 +4,7 @@ import yaml
 import numpy
 import caput
 
-from caput.pipeline.manager import Manager
+from caput.pipeline import Manager
 
 
 class TestConfig(unittest.TestCase):

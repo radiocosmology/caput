@@ -1,11 +1,12 @@
 """Extensions to port pipelines to an interactive python environment."""
 
-from ..manager import PipelineStopIteration, TaskBase
+from .. import exceptions
+from .._pipeline import Task
 
 __all__ = ["Input", "Output"]
 
 
-class Input(TaskBase):
+class Input(Task):
     """Pass inputs into the pipeline from outside."""
 
     def __init__(self, inputs=None):
@@ -21,10 +22,10 @@ class Input(TaskBase):
         try:
             return next(self._iter)
         except StopIteration as e:
-            raise PipelineStopIteration from e
+            raise exceptions.PipelineStopIteration from e
 
 
-class Output(TaskBase):
+class Output(Task):
     """Take outputs from the pipeline and place them in a list.
 
     To apply some processing to pipeline output (i.e. this tasks input), use the

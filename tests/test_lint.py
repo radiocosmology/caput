@@ -5,11 +5,11 @@ import yaml
 from click.testing import CliRunner
 
 from caput.config import Property
-from caput.pipeline.manager import TaskBase
+from caput.pipeline import Task
 from caput.pipeline.runner._cli import cli as caput_script
 
 
-class DoNothing(TaskBase):
+class DoNothing(Task):
     pass
 
 

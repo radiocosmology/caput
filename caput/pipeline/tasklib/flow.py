@@ -1,7 +1,7 @@
 """Simple pipeline task used for things like data flow."""
 
 from ... import config
-from ._base import MPILoggedTask, SingleTask
+from .basic import ContainerTask, MPILoggedTask
 
 
 class AccumulateList(MPILoggedTask):
@@ -51,7 +51,7 @@ class AccumulateList(MPILoggedTask):
         return items if self.group_size is None else None
 
 
-class Delete(SingleTask):
+class Delete(ContainerTask):
     """Delete pipeline products to free memory."""
 
     def process(self, x):
@@ -69,7 +69,7 @@ class Delete(SingleTask):
         gc.collect()
 
 
-class MakeCopy(SingleTask):
+class MakeCopy(ContainerTask):
     """Make a copy of the passed container."""
 
     def process(self, data):
