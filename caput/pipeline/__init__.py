@@ -16,7 +16,7 @@ Flow control classes
 
 Task base classes
 =================
-- :py:class:`TaskBase`
+- :py:class:`Task`
 - :py:class:`SingleBase`
 - :py:class:`IterBase`
 - :py:class:`H5IOMixin`
@@ -31,7 +31,7 @@ Examples
 Basic Tasks
 -----------
 
-A pipeline task is a subclass of :class:`TaskBase` intended to perform some small,
+A pipeline task is a subclass of :class:`Task` intended to perform some small,
 modular piece analysis. The developer of the task must specify what input
 parameters the task expects as well as code to perform the actual processing
 for the task.
@@ -41,7 +41,7 @@ instances of :class:`config.Property`. For instance a task definition might begi
 with
 
 >>> from caput import config
->>> class SpamTask(manager.TaskBase):
+>>> class SpamTask(Task):
 ...     eggs = config.Property(proptype=str)
 
 This defines a new task named :class:`SpamTask` with a parameter named *eggs*, whose
@@ -50,14 +50,14 @@ instance attribute when an instance of the task is initialized, with it's value
 read from the pipeline configuration YAML file (see next section).
 
 The actual work for the task is specified by over-ridding any of the
-:meth:`~TaskBase.setup`, :meth:`~TaskBase.next` or
-:meth:`~TaskBase.finish` methods (:meth:`~TaskBase.__init__` may also be
+:meth:`~Task.setup`, :meth:`~Task.next` or
+:meth:`~Task.finish` methods (:meth:`~Task.__init__` may also be
 implemented`).  These are executed in order, with :meth:`~TaskBask.next`
 possibly being executed many times.  Iteration of :meth:`next` is halted by
 raising a :exc:`PipelineStopIteration`.  Here is a example of a somewhat
 trivial but fully implemented task:
 
->>> class PrintEggs(manager.TaskBase):
+>>> class PrintEggs(Task):
 ...
 ...     eggs = config.Property(proptype=list)
 ...
@@ -70,7 +70,7 @@ trivial but fully implemented task:
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
-...             raise manager.PipelineStopIteration
+...             raise exceptions.PipelineStopIteration
 ...         print("Spam and %s eggs." % self.eggs[self.i])
 ...         self.i += 1
 ...
@@ -83,7 +83,7 @@ may accept (positional only) arguments which will be received as the outputs of
 early tasks in a pipeline chain. The following is an example of a pair of tasks
 that are designed to operate in this manner.
 
->>> class GetEggs(manager.TaskBase):
+>>> class GetEggs(Task):
 ...
 ...     eggs = config.Property(proptype=list)
 ...
@@ -96,7 +96,7 @@ that are designed to operate in this manner.
 ...
 ...     def next(self):
 ...         if self.i >= len(self.eggs):
-...             raise manager.PipelineStopIteration
+...             raise exceptions.PipelineStopIteration
 ...         egg = self.eggs[self.i]
 ...         self.i += 1
 ...         return egg
@@ -104,7 +104,7 @@ that are designed to operate in this manner.
 ...     def finish(self):
 ...         print("Finished GetEggs.")
 
->>> class CookEggs(manager.TaskBase):
+>>> class CookEggs(Task):
 ...
 ...     style = config.Property(proptype=str)
 ...
@@ -183,8 +183,8 @@ Execution Order
 
 When the above pipeline is executed, it produces the following output.
 
->>> manager.local_tasks.update(globals())  # Required for interactive sessions.
->>> m = manager.Manager.from_yaml_str(spam_config)
+>>> local_tasks.update(globals())  # Required for interactive sessions.
+>>> m = Manager.from_yaml_str(spam_config)
 >>> m.run()
 Setting up PrintEggs.
 Setting up GetEggs.
@@ -234,7 +234,7 @@ first.
 If the above rules seem somewhat opaque, consider the following example which
 illustrates these rules in a pipeline with a slightly more non-trivial flow.
 
->>> class DoNothing(manager.TaskBase):
+>>> class DoNothing(Task):
 ...
 ...     def setup(self):
 ...         print("Setting up DoNothing.")
@@ -245,7 +245,7 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 ...     def finish(self):
 ...         print("Finished DoNothing.")
 
->>> manager.local_tasks.update(globals())  # Required for interactive sessions only.
+>>> local_tasks.update(globals())  # Required for interactive sessions only.
 >>> new_spam_config = '''
 ... pipeline :
 ...     tasks:
@@ -276,7 +276,7 @@ illustrates these rules in a pipeline with a slightly more non-trivial flow.
 The following would error, because the pipeline config is checked for errors, like an 'in\_' parameter without a
 corresponding 'out'::
 
-    m = manager.Manager.from_yaml_str(new_spam_config)
+    m = Manager.from_yaml_str(new_spam_config)
     m.run()
 
 But this is what it would produce otherwise::
@@ -312,7 +312,7 @@ construction and configuration, and allows injection and inspection of pipeline
 products.
 
 To add a task to the pipeline you need to: create an instance of it; set any
-configuration attributes directly (or call :meth:`~TaskBase.read_config` on an
+configuration attributes directly (or call :meth:`~Task.read_config` on an
 appropriate dictionary); and then added to the pipeline using the
 :meth:`~Manager.add_task` to add the instance and specify the queues it connects to.
 
@@ -323,7 +323,7 @@ simply saves everything it receives into a list (which can be accessed via the t
 `outputs` attribute, e.g. with `save_output.outputs` after running the example below),
 but it can be given a callback function to apply processing to each argument in turn.
 
->>> m = manager.Manager()
+>>> m = Manager()
 >>> m.add_task(extensions.Input(["platypus", "dinosaur"]), out="key1")
 >>> cook = CookEggs()
 >>> cook.style = "coddled"
@@ -343,7 +343,7 @@ Finished CookEggs.
 Advanced Tasks
 --------------
 
-Several subclasses of :class:`TaskBase` provide advanced functionality for tasks that
+Several subclasses of :class:`Task` provide advanced functionality for tasks that
 conform to the most common patterns. This functionality includes: optionally
 reading inputs from disk, instead of receiving them from the pipeline;
 optionally writing outputs to disk automatically; and caching the results of a
@@ -365,8 +365,14 @@ See the documentation for these base classes for more details.
 
 """
 
+from ._pipeline import (
+    Manager as Manager,
+    Task as Task,
+    local_tasks as local_tasks,
+)
+
 from . import (
+    exceptions as exceptions,
     extensions as extensions,
-    manager as manager,
-    task as task,
+    tasklib as tasklib,
 )
