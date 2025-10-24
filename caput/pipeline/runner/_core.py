@@ -16,7 +16,7 @@ def lint_config(configfile):
     configfile : str or tuple of str
         Path to a pipeline config file, or multiple config files.
     """
-    from ..manager import Manager
+    from .._pipeline import Manager
 
     # nargs=-1 packs multiple arguments (or glob patterns) into tuples
     if not isinstance(configfile, tuple):
@@ -31,7 +31,7 @@ def lint_config(configfile):
 def run_pipeline(configfile, profile, profiler, mpi_abort, psutil):
     """Run a pipeline immediately from the given `configfile`."""
     from ...util import profiler as prfl
-    from ..manager import Manager
+    from .._pipeline import Manager
 
     if mpi_abort:
         from ...util import mpitools

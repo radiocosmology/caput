@@ -35,8 +35,8 @@ import numpy as np
 from ... import config
 from ...memdata import fileformats, memh5
 from ...util import truncate
-from ..manager import PipelineStopIteration
-from ._base import MPILoggedTask, SingleTask
+from ..exceptions import PipelineStopIteration
+from .basic import ContainerTask, MPILoggedTask
 
 
 def list_of_filelists(files: list[str] | list[list[str]]) -> list[list[str]]:
@@ -181,7 +181,7 @@ def list_of_filegroups(groups: list[dict] | dict) -> list[dict]:
     return groups
 
 
-class FindFiles(SingleTask):
+class FindFiles(ContainerTask):
     """Take a glob or list of files and pass on to other tasks.
 
     Files are specified as a parameter in the configuration file.
@@ -307,7 +307,7 @@ class SelectionsMixin:
         return list(x)
 
 
-class BaseLoadFiles(SelectionsMixin, SingleTask):
+class BaseLoadFiles(SelectionsMixin, ContainerTask):
     """Base class for loading containers from a file on disk.
 
     Provides the capability to make selections along axes.
@@ -590,7 +590,7 @@ class LoadFiles(LoadFilesFromParams):
         self.files = files
 
 
-class Save(SingleTask):
+class Save(ContainerTask):
     """Save out the input, and pass it on.
 
     Assumes that the input has a `to_hdf5` method. Appends a *tag* if there is
@@ -629,7 +629,7 @@ class Save(SingleTask):
         return data
 
 
-class Truncate(SingleTask):
+class Truncate(ContainerTask):
     """Precision truncate data prior to saving with bitshuffle compression.
 
     If no configuration is provided, will look for preset values for the
@@ -830,7 +830,7 @@ class Truncate(SingleTask):
         return data
 
 
-class ZipZarrContainers(SingleTask):
+class ZipZarrContainers(ContainerTask):
     """Zip up a Zarr container into a single file.
 
     This is useful to save on file quota and speed up IO by combining the chunk

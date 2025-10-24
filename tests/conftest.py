@@ -7,9 +7,10 @@ import numpy as np
 import pytest
 
 from caput.memdata import fileformats
-from caput.pipeline.manager import PipelineStopIteration, TaskBase, Manager
+from caput.pipeline import Manager, Task
+from caput.pipeline.exceptions import PipelineStopIteration
 from caput.pipeline.runner._cli import cli
-from caput.pipeline.extensions._extensions import IterBase
+
 from caput.util import mpitools
 from caput import config
 
@@ -28,7 +29,7 @@ def datasets():
     return dset1, dset2
 
 
-class PrintEggs(TaskBase):
+class PrintEggs(Task):
     """Simple task used for testing."""
 
     eggs = config.Property(proptype=list)
@@ -53,7 +54,7 @@ class PrintEggs(TaskBase):
         print("Finished PrintEggs.")
 
 
-class GetEggs(TaskBase):
+class GetEggs(Task):
     """Simple task used for testing."""
 
     eggs = config.Property(proptype=list)
@@ -79,7 +80,7 @@ class GetEggs(TaskBase):
         print("Finished GetEggs.")
 
 
-class CookEggs(IterBase):
+class CookEggs(Task):
     """Simple task used for testing."""
 
     style = config.Property(proptype=str)

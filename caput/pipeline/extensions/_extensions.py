@@ -9,7 +9,8 @@ import os
 
 from ... import config
 from ...memdata import fileformats, lock_file
-from ..manager import PipelineStopIteration, TaskBase
+from .. import exceptions
+from .._pipeline import Task
 from ._configtypes import file_format
 
 __all__ = ["BasicContMixin", "H5IOMixin"]
@@ -19,7 +20,7 @@ __all__ = ["BasicContMixin", "H5IOMixin"]
 logger = logging.getLogger(__name__)
 
 
-class _OneAndOne(TaskBase):
+class _OneAndOne(Task):
     """Base class for tasks that have (at most) one input and one output.
 
     This is not a user base class and simply holds code that is common to
@@ -208,7 +209,7 @@ class SingleBase(_OneAndOne):
         # This should only be called once.
         try:
             if self.done:
-                raise PipelineStopIteration
+                raise exceptions.PipelineStopIteration
         except AttributeError:
             self.done = True
 
@@ -272,7 +273,7 @@ class IterBase(_OneAndOne):
         if self.iteration >= len(self.file_middles):
             if not self.input_root == "None":
                 # We are iterating over input files and have run out.
-                raise PipelineStopIteration
+                raise exceptions.PipelineStopIteration
             # Not iterating over input files, and unable to assign
             # filenames.
             input_filename = None
