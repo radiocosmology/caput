@@ -4,8 +4,8 @@ import numpy as np
 import yaml
 
 from ... import config
-from ..manager import TaskBase
-from ._base import MPILoggedTask, SetMPILogging, SingleTask
+from .._pipeline import Task
+from .basic import ContainerTask, MPILoggedTask, SetMPILogging
 
 
 class CheckMPIEnvironment(MPILoggedTask):
@@ -118,7 +118,7 @@ class DebugInfo(MPILoggedTask, SetMPILogging):
         return package_list
 
 
-class Print(TaskBase):
+class Print(Task):
     """Stupid module which just prints whatever it gets. Good for debugging."""
 
     def next(self, input_):
@@ -128,7 +128,7 @@ class Print(TaskBase):
         return input_
 
 
-class SaveModuleVersions(SingleTask):
+class SaveModuleVersions(ContainerTask):
     """Write module versions to a YAML file.
 
     The list of modules should be added to the configuration under key 'save_versions'.
@@ -158,7 +158,7 @@ class SaveModuleVersions(SingleTask):
         return
 
 
-class SaveConfig(SingleTask):
+class SaveConfig(ContainerTask):
     """Write pipeline config to a text file.
 
     Yaml configuration document is written to a text file.

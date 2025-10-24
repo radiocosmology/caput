@@ -8,8 +8,8 @@ import numpy as np
 
 from ... import config
 from ...memdata import fileformats, memh5
-from .. import extensions
-from ..manager import PipelineRuntimeError, PipelineStopIteration, TaskBase
+from .. import exceptions, extensions
+from .._pipeline import Task
 
 
 class MPILogFilter(logging.Filter):
@@ -89,7 +89,7 @@ def _log_level(x):
     raise ValueError(f"Logging level {x!r} not understood")
 
 
-class SetMPILogging(TaskBase):
+class SetMPILogging(Task):
     """A task used to configure MPI aware logging.
 
     Attributes
@@ -128,7 +128,7 @@ class SetMPILogging(TaskBase):
         ch.setFormatter(formatter)
 
 
-class LoggedTask(TaskBase):
+class LoggedTask(Task):
     """A task with logger support."""
 
     log_level = config.Property(proptype=_log_level, default=None)
@@ -147,7 +147,7 @@ class LoggedTask(TaskBase):
         return self._log
 
 
-class MPITask(TaskBase):
+class MPITask(Task):
     """Base class for MPI using tasks.
 
     Just ensures that the task gets a `comm` attribute.
@@ -198,7 +198,7 @@ class MPILoggedTask(MPITask, LoggedTask):
         self._log = logadapter
 
 
-class SingleTask(MPILoggedTask, extensions.BasicContMixin):
+class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
     """Process a task with at most one input and output.
 
     Both input and output are expected to be :class:`memh5.BasicCont` objects.
@@ -335,7 +335,7 @@ class SingleTask(MPILoggedTask, extensions.BasicContMixin):
                 "`process` method may not have variable length or optional"
                 " arguments."
             )
-            raise PipelineRuntimeError(msg)
+            raise exceptions.PipelineRuntimeError(msg)
 
         if n_args == 0:
             self._no_input = True
@@ -351,7 +351,7 @@ class SingleTask(MPILoggedTask, extensions.BasicContMixin):
         # This should only be called once.
         try:
             if self.done:
-                raise PipelineStopIteration
+                raise exceptions.PipelineStopIteration
         except AttributeError:
             self.done = True
 
@@ -429,7 +429,7 @@ class SingleTask(MPILoggedTask, extensions.BasicContMixin):
 
     def _process_output(self, output, ii: int = 0):
         if not isinstance(output, memh5.MemDiskGroup):
-            raise PipelineRuntimeError(
+            raise exceptions.PipelineRuntimeError(
                 f"Task must output a valid memh5 container; given {type(output)}"
             )
 
@@ -543,7 +543,7 @@ class SingleTask(MPILoggedTask, extensions.BasicContMixin):
         # Returns the output or, None if it should be skipped
 
         if not isinstance(output, memh5.MemDiskGroup):
-            raise PipelineRuntimeError(
+            raise exceptions.PipelineRuntimeError(
                 f"Task must output a valid memh5 container; given {type(output)}"
             )
 
@@ -634,6 +634,21 @@ class SingleTask(MPILoggedTask, extensions.BasicContMixin):
 
         # All ranks need to know if any rank found a NaN/Inf
         return self.comm.allreduce(found, op=MPI.MAX)
+
+
+# Alias for backwards compatibility
+class SingleTask(ContainerTask):
+    """Alias for Task for backwards compatibility."""
+
+    def __init__(self):
+        import warnings
+
+        warnings.warn(
+            "`SingleTask` is deprecated, and is an alias of `ContainerTask`. "
+            "Please use `ContainerTask` instead.",
+            DeprecationWarning,
+        )
+        super().__init__()
 
 
 def group_tasks(*tasks):

@@ -6,7 +6,7 @@ import numpy as np
 
 from ... import config
 from ...algorithms import random
-from ._base import MPILoggedTask
+from .basic import MPILoggedTask
 
 
 class RandomTask(MPILoggedTask):
