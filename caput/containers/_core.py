@@ -1,75 +1,88 @@
-"""Core classes for a distributed pipeline container.
+"""Core classes for a distributed pipeline container."""
 
-Classes
--------
-- :py:class:`ContainerBase`
-- :py:class:`TableBase`
-"""
+from __future__ import annotations
 
 import inspect
-from typing import ClassVar
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from ..memdata import memh5
+from .. import memdata
+from ..memdata._memh5 import ro_dict
+
+if TYPE_CHECKING:
+    from typing import ClassVar
+
+    import numpy.typing as npt
+
+    from ..mpiarray import SelectionLike
 
 
-class ContainerBase(memh5.BasicCont):
+__all__ = ["ContainerBase", "TableBase"]
+
+
+class ContainerBase(memdata.BasicCont):
     """A base class for pipeline containers.
 
     This class is designed to do much of the work of setting up pipeline
-    containers. It should be derived from, and two variables set `_axes` and
-    `_dataset_spec`. See the :ref:`Notes <containerbase_notes>` section for details.
+    containers. It should be subclassed, with two class variables set:
+    :py:attr:`~.ContainerBase._axes` and :py:attr:`~.ContainerBase._dataset_spec`.
+    See the :ref:`Notes <containerbase_notes>` section for details.
 
-    Parameters
-    ----------
-    data_group : `memh5.MemDiskGroup`
+    Optional Parameters
+    ~~~~~~~~~~~~~~~~~~~
+    Some combination of the following parameters must br provided when creating
+    a new container. In particular, the container requires axis definitions to
+    be provided for all axes in :py:attr:`~.ContainerBase._axes`, whether by
+    direct keyword arguments, or by copying from another container.
+
+    data_group : :py:class:`~caput.memdata.MemDiskGroup`
         A container to pass through for making a shallow copy. This is used by
-        routine like `caput.tod.concatenate` and generally shouldn't be used
-        directly. Either a keyword argument, or the first positional argument.
-    axes_from : `memh5.BasicCont`, optional
+        routines like :py:func:`~caput.memdata.tod.concatenate` and generally
+        shouldn't be used directly. Either a keyword argument, or the first
+        positional argument.
+    axes_from : :py:class:`~caput.memdata.BasicCont`, optional
         Another container to copy axis definitions from. Must be supplied as
         keyword argument.
-    attrs_from : `memh5.BasicCont`, optional
-        Another container to copy attributes from. Must be supplied as keyword
+    attrs_from : :py:class:`~caput.memdata.BasicCont`, optional
+        Another container to copy dataset attributes from. Must be supplied as keyword
         argument. This applies to attributes in default datasets too.
-    dsets_from : `memh5.BasicCont`, optional
+    dsets_from : :py:class:`~caput.memdata.BasicCont`, optional
         A container to copy datasets from. Any dataset which an axis whose definition
         has been explicitly set (i.e. does not come from `axes_from`) will not be
         copied.
-    copy_from : `memh5.BasicCont`, optional
-        Set `axes_from`, `attrs_from` and `dsets_from` to this instance if they are
+    copy_from : :py:class:`~caput.memdata.BasicCont`, optional
+        Set ``axes_from``, ``attrs_from`` and ``dsets_from`` to this instance if they are
         not set explicitly.
     skip_datasets : bool, optional
-        Skip creating datasets. They must all be added manually with
-        `.add_dataset` regardless of the entry in `.dataset_spec`. Default is False.
+        Skip creating datasets. Instead, they will all need to be added manually
+        with :py:meth:`~.ContainerBase.add_dataset` regardless of the entry in
+        :py:attr:`~.ContainerBase._dataset_spec`. Default is ``False``.
     distributed : bool, optional
-        Should this be a distributed container. Defaults to True.
-    comm : mpi4py.MPI.Comm, optional
+        Should this be a distributed container? Defaults to ``True``.
+    comm : :py:obj:`~mpi4py.MPI.Comm`, optional
         The MPI communicator to distribute over. Use COMM_WORLD if not set.
     allow_chunked : bool, optional
         Allow the datasets to be chunked. Default is True.
-
-    kwargs : dict
+    kwargs : Any
         Should contain entries for all other axes.
 
     Notes
     -----
     .. _containerbase_notes:
 
-    Inheritance from other `ContainerBase` subclasses should work as expected,
-    with datasets defined in super classes appearing as expected, and being
+    Inheritance from other :py:class:`ContainerBase` subclasses should work as expected,
+    with datasets defined in parent classes appearing as expected, and being
     overridden where they are redefined in the derived class.
 
-    The variable `_axes` should be a tuple containing the names of axes that
+    The variable :py:attr:`~.ContainerBase._axes` should be a tuple containing the names of axes that
     datasets in this container will use.
 
-    The variable `_dataset_spec` should define the datasets. It's a dictionary
-    with the name of the dataset as key. Each entry should be another
-    dictionary, the entry 'axes' is mandatory and should be a list of the axes
-    the dataset has (these should correspond to entries in `_axes`), as is
-    `dtype` which should be a datatype understood by numpy. Other possible
-    entries are:
+    The variable :py:attr:`~.ContainerBase._dataset_spec` should define the datasets. It's a dictionary
+    with the names of the datasets as keys. The value for each  key should be another dictionary. In that
+    sub-dictionary, the key `axes` is mandatory and should be a list of the axes the dataset has (these
+    should correspondto entries in `_axes`), as is the key `dtype` which should be a datatype understood by
+    numpy. Other possible keys are:
 
     - `initialise` : if set to `True` the dataset will be created as the
       container is initialised.
@@ -82,15 +95,15 @@ class ContainerBase(memh5.BasicCont):
       in the `axes` entry.
     """
 
-    _axes = ()
+    _axes: ClassVar[tuple[str, ...]] = ()
 
-    _dataset_spec: ClassVar = {}
+    _dataset_spec: ClassVar[dict[str, dict]] = {}
 
-    convert_attribute_strings = True
-    convert_dataset_strings = True
-    allow_chunked = True
+    convert_attribute_strings: bool = True
+    convert_dataset_strings: bool = True
+    allow_chunked: bool = True
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: tuple, **kwargs: dict):
         # Arguments for pulling in definitions from other containers
         copy_from = kwargs.pop("copy_from", None)
         axes_from = kwargs.pop("axes_from", copy_from)
@@ -121,7 +134,7 @@ class ContainerBase(memh5.BasicCont):
         super().__init__(data_group=data_group, distributed=dist, comm=comm)
 
         # If data_group was provided we need to exit early to behave like
-        # memh5.MemDiskGroup would have. In this case we're probably trying to
+        # memdata.MemDiskGroup would have. In this case we're probably trying to
         # create a bare container, or a shallow clone, so don't initialise any
         # datasets. This behaviour is needed to support tod.concatenate
         if has_data_group:
@@ -153,7 +166,7 @@ class ContainerBase(memh5.BasicCont):
 
             if copy_axis_attrs:
                 # Copy over axis attributes if we're copying the axis from another dataset
-                memh5.copyattrs(axes_from.index_attrs[axis], self.index_attrs[axis])
+                memdata.copyattrs(axes_from.index_attrs[axis], self.index_attrs[axis])
 
         # Iterate over datasets and initialise any that specify it
         if not skip_datasets:
@@ -188,7 +201,7 @@ class ContainerBase(memh5.BasicCont):
         # Copy over attributes
         if attrs_from is not None:
             # Copy attributes from container root
-            memh5.copyattrs(attrs_from.attrs, self.attrs)
+            memdata.copyattrs(attrs_from.attrs, self.attrs)
 
             # Copy attributes over from any common datasets
             for name in self.dataset_spec.keys():
@@ -198,7 +211,7 @@ class ContainerBase(memh5.BasicCont):
                         for k, v in attrs_from.datasets[name].attrs.items()
                         if k != "axis"
                     }
-                    memh5.copyattrs(attrs_no_axis, self.datasets[name].attrs)
+                    memdata.copyattrs(attrs_no_axis, self.datasets[name].attrs)
 
             # Make sure that the __memh5_subclass attribute is accurate
             clspath = self.__class__.__module__ + "." + self.__class__.__name__
@@ -206,19 +219,20 @@ class ContainerBase(memh5.BasicCont):
             if clsattr and (clsattr != clspath):
                 self.attrs["__memh5_subclass"] = clspath
 
-    def add_dataset(self, name):
-        """Create an empty dataset.
+    def add_dataset(self, name: str) -> memdata.MemDataset:
+        """Add a new, empty dataset to the container.
 
         The dataset must be defined in the specification for the container.
 
         Parameters
         ----------
-        name : string
+        name : str
             Name of the dataset to create.
 
         Returns
         -------
-        dset : `memh5.MemDataset`
+        dataset : memdata.MemDataset
+            The created dataset.
         """
         # Normalise name
         name = name.strip("/")
@@ -283,7 +297,7 @@ class ContainerBase(memh5.BasicCont):
 
         return dset
 
-    def _ensure_chunked(self):
+    def _ensure_chunked(self) -> None:
         """Ensure datasets that have chunk/compression specs are chunked.
 
         For every dataset, check if chunks and compression are set, and
@@ -314,26 +328,25 @@ class ContainerBase(memh5.BasicCont):
                 ]["compression_opts"]
 
     @property
-    def datasets(self):
-        """Return the datasets in this container.
+    def datasets(self) -> ro_dict[str, memdata.MemDataset]:
+        """A read-only view of the datasets in this container.
 
-        Do not try to add a new dataset by assigning to an item of this
-        property. Use `create_dataset` instead.
+        Do not try to add a new dataset by adding keys to this property.
+        Use :py:attr:`~.ContainerBase.create_dataset` instead.
 
         Returns
         -------
-        datasets : read only dictionary
-            Entries are :mod:`caput.memh5` datasets.
-
+        datasets : ro_dict
+            Entries are :py:class:`~caput.memdata.MemDataset` datasets.
         """
         out = {}
         for name, value in self._data.items():
-            if not memh5.is_group(value):
+            if not memdata.is_group(value):
                 out[name] = value
-        return memh5.ro_dict(out)
+        return ro_dict(out)
 
     @classmethod
-    def _class_dataset_spec(cls):
+    def _class_dataset_spec(cls) -> dict[str, dict]:
         """Get the inherited set of dataset spec entries."""
         ddict = {}
 
@@ -353,7 +366,7 @@ class ContainerBase(memh5.BasicCont):
         return {k: ddict[k] for k in sorted(ddict)}
 
     @property
-    def dataset_spec(self):
+    def dataset_spec(self) -> dict[str, dict]:
         """Return a copy of the fully resolved dataset specifiction as a dictionary."""
         ddict = self.__class__._class_dataset_spec()
 
@@ -364,7 +377,7 @@ class ContainerBase(memh5.BasicCont):
         return {k: ddict[k] for k in sorted(ddict)}
 
     @classmethod
-    def _class_axes(cls):
+    def _class_axes(cls) -> tuple[str, ...]:
         """Get the set of axes defined by the container and it's base classes."""
         axes = set()
 
@@ -382,7 +395,7 @@ class ContainerBase(memh5.BasicCont):
         return tuple(sorted(axes))
 
     @property
-    def axes(self):
+    def axes(self) -> tuple[str, ...]:
         """The set of axes for this container including any defined on the instance."""
         axes = set(self._class_axes())
 
@@ -395,7 +408,7 @@ class ContainerBase(memh5.BasicCont):
         return tuple(sorted(axes))
 
     @classmethod
-    def _make_selections(cls, sel_args):
+    def _make_selections(cls, sel_args: dict[str, SelectionLike]) -> dict[str, tuple]:
         """Match down-selection arguments to axes of datasets.
 
         Parses sel_* argument and returns dict mapping dataset names to selections.
@@ -403,11 +416,11 @@ class ContainerBase(memh5.BasicCont):
         Parameters
         ----------
         sel_args : dict
-            Should contain valid numpy indexes as values and axis names (str) as keys.
+            Should contain valid selection entries for axes defined in this container.
 
         Returns
         -------
-        dict
+        selections : dict
             Mapping of dataset names to numpy indexes for downselection of the data.
             Also includes another dict under the key "index_map" that includes
             the selections for those.
@@ -423,12 +436,14 @@ class ContainerBase(memh5.BasicCont):
             ds_axes = dataset["axes"]
             sel = []
             ds_relevant = False
+
             for axis in ds_axes:
                 if axis in sel_args:
                     sel.append(sel_args[axis])
                     ds_relevant = True
                 else:
                     sel.append(slice(None))
+
             if ds_relevant:
                 selections["/" + name] = tuple(sel)
 
@@ -442,19 +457,14 @@ class ContainerBase(memh5.BasicCont):
 class TableBase(ContainerBase):
     """A base class for containers holding tables of data.
 
-    Similar to the `ContainerBase` class, the container is defined through a
-    dictionary given as a `_table_spec` class attribute. The container may also
-    hold generic datasets by specifying `_dataset_spec` as with `ContainerBase`.
+    Similar to the :py:class:`ContainerBase` class, a container is defined through a
+    dictionary given as a :py:attr:`~.TableBase._table_spec` class attribute when subclassing
+    this base class. The container may also hold generic datasets by specifying
+    :py:attr:`~.ContainerBase._dataset_spec` as with :py:class:`ContainerBase`.
     See :ref:`Notes <tablebase_notes>` for details.
 
-    Parameters
-    ----------
-    axes_from : `memh5.BasicCont`, optional
-        Another container to copy axis definitions from. Must be supplied as
-        keyword argument.
-    attrs_from : `memh5.BasicCont`, optional
-        Another container to copy attributes from. Must be supplied as keyword
-        argument. This applies to attributes in default datasets too.
+    Optional Parameters
+    ~~~~~~~~~~~~~~~~~~~
     kwargs : dict
         Should contain definitions for all other table axes.
 
@@ -462,20 +472,19 @@ class TableBase(ContainerBase):
     -----
     .. _tablebase_notes:
 
-    A `_table_spec` consists of a dictionary mapping table names into a
+    A :py:attr:`_table_spec` consists of a dictionary mapping table names into a
     description of the table. That description is another dictionary containing
     several entries.
 
-    - `columns` : the set of columns in the table. Given as a list of
+    - ``columns`` : the set of columns in the table. Given as a list of
       `(name, dtype)` pairs.
 
-    - `axis` : an optional name for the rows of the table. This is automatically
-      generated as `'<tablename>_index'` if not explicitly set. This corresponds
+    - ``axis`` : an optional name for the rows of the table. This is automatically
+      generated as ``<tablename>_index`` if not explicitly set. This corresponds
       to an `index_map` entry on the container.
 
-    - `initialise` : whether to create the table by default.
-
-    - `distributed` : whether the table is distributed, or common across all MPI ranks.
+    - ``initialise`` : whether to create the table by default.
+    - ``distributed`` : whether the table is distributed, or common across all MPI ranks.
 
     An example `_table_spec` entry is::
 
@@ -498,9 +507,9 @@ class TableBase(ContainerBase):
         }
     """
 
-    _table_spec: ClassVar = {}
+    _table_spec: ClassVar[dict[str, dict]] = {}
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: tuple, **kwargs: dict):
         # Get the dataset specifiction for this class (not any base classes), or
         # an empty dictionary if it does not exist. Do the same for the axes entry..
         dspec = self.__class__.__dict__.get("_dataset_spec", {})
@@ -533,7 +542,9 @@ class TableBase(ContainerBase):
 
         super().__init__(*args, **kwargs)
 
-    def _create_dtype(self, columns):
+    def _create_dtype(
+        self, columns: dict[str, npt.DTypeLike]
+    ) -> list[tuple[str, np.dtype]]:
         """Take a dictionary of columns and turn into the appropriate compound data type."""
         dt = []
         for ci, (name, dtype) in enumerate(columns):
@@ -544,7 +555,7 @@ class TableBase(ContainerBase):
         return dt
 
     @property
-    def table_spec(self):
+    def table_spec(self) -> dict[str, dict]:
         """Return a copy of the fully resolved table specifiction as a dictionary."""
         import inspect
 
