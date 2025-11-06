@@ -1,64 +1,74 @@
 """Caput container utilities."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from ..mpiarray import SelectionLike
+    from ._core import ContainerBase
+
 import numpy as np
 
-from ..memdata import memh5
+from ..memdata import _memh5
 from ..mpiarray import _apply_sel
 from ._core import ContainerBase
 
 
-def empty_like(obj, **kwargs):
-    """Create an empty container like `obj`.
+def empty_like(cont: ContainerBase, **kwargs: dict) -> ContainerBase:  # noqa: D417
+    r"""Create an empty container with the same properties as `cont`.
 
     Parameters
     ----------
-    obj : ContainerBase
+    cont : ContainerBase
         Container to base this one off.
-    kwargs : optional
+    \**kwargs : dict
         Optional definitions of specific axes we want to override. Works in the
-        same way as the `ContainerBase` constructor, though `axes_from=obj` and
+        same way as the :py:class:`ContainerBase` constructor, though `axes_from=obj` and
         `attrs_from=obj` are implied.
 
     Returns
     -------
-    newobj : container.ContainerBase
-        New data container.
+    container : ContainerBase
+        New, empty container.
     """
-    if isinstance(obj, ContainerBase):
-        return obj.__class__(axes_from=obj, attrs_from=obj, **kwargs)
+    if isinstance(cont, ContainerBase):
+        return cont.__class__(axes_from=cont, attrs_from=cont, **kwargs)
 
-    raise RuntimeError(f"Unknown object type `{obj.__class__.__name__}`")
+    raise RuntimeError(f"Unknown object type `{cont.__class__.__name__}`")
 
 
 def copy_datasets_filter(
     source: ContainerBase,
     dest: ContainerBase,
-    axis: str | list | tuple = [],
-    selection: np.ndarray | list | slice | dict = {},
-    exclude_axes: list[str] | None = None,
+    axis: str | Iterable[str] = [],
+    selection: SelectionLike = {},
+    exclude_axes: tuple[str] | list[str] | None = None,
     copy_without_selection: bool = False,
-):
+) -> None:
     """Copy datasets while filtering a given axis.
 
     By default, only datasets containing the axis to be filtered will be copied.
 
     Parameters
     ----------
-    source
+    source : ContainerBase
         Source container
-    dest
+    dest : ContainerBase
         Destination container. The axes in this container should reflect the
         selections being made to the source.
-    axis
+    axis : str | tuple[str] | list[str]
         Name of the axes to filter. These must match the axes in `selection`,
         unless selection is a single item. This is partially here for legacy
         reasons, as the selections can be fully specified by `selection`
-    selection
+    selection : dict, optional
         A filtering selection to be applied to each axis.
-    exclude_axes
+    exclude_axes : list[str] | tuple[str], optional
         An optional set of axes that if a dataset contains one means it will
         not be copied.
-    copy_without_selection
+    copy_without_selection : bool, optional
         If set to True, then datasets that do not have an axis appearing in
         selection will still be copied over in full.  Default is False.
     """
@@ -97,7 +107,7 @@ def copy_datasets_filter(
     while stack:
         item = stack.pop()
 
-        if memh5.is_group(item):
+        if _memh5.is_group(item):
             stack += list(item.values())
             continue
 
@@ -117,8 +127,8 @@ def copy_datasets_filter(
         dest_dset = dest[item.name]
 
         # Make sure that both datasets are distributed to the same axis
-        if isinstance(item, memh5.MemDatasetDistributed):
-            if not isinstance(dest_dset, memh5.MemDatasetDistributed):
+        if isinstance(item, _memh5.MemDatasetDistributed):
+            if not isinstance(dest_dset, _memh5.MemDatasetDistributed):
                 raise ValueError(
                     "Cannot filter a distributed dataset into a non-distributed "
                     "dataset using this method."
@@ -160,8 +170,8 @@ def copy_datasets_filter(
         dest_dset[:] = arr[:]
 
         # also copy attritutes
-        memh5.copyattrs(item.attrs, dest_dset.attrs)
+        _memh5.copyattrs(item.attrs, dest_dset.attrs)
 
-        if isinstance(dest_dset, memh5.MemDatasetDistributed):
+        if isinstance(dest_dset, _memh5.MemDatasetDistributed):
             # Redistribute back to the original axis
             dest_dset.redistribute(original_ax_id)
