@@ -1,8 +1,10 @@
-"""Basic pipeline I/O tasks.
+r"""A collection of tasks for loading and saving files.
+
+Most of these are just variations on loading and saving :py:class:`~caput.memdata.BasicCont`
+containers from different input strings or containers attributes (or combinations thereof).
 
 File Groups
-===========
-
+~~~~~~~~~~~
 Several tasks accept groups of files as arguments.
 These are specified in the YAML file as a dictionary like below.
 
@@ -24,39 +26,43 @@ These are specified in the YAML file as a dictionary like below.
         files: ['file1.h5', 'file2.h5']
 """
 
+from __future__ import annotations
+
 import os
 import shutil
 import subprocess
 from functools import partial
-from typing import ClassVar
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from ... import config
-from ...memdata import fileformats, memh5
-from ...util import truncate
+from ...memdata import BasicCont, MemDataset, MemDiskGroup, fileformats
 from ..exceptions import PipelineStopIteration
-from .basic import ContainerTask, MPILoggedTask
+from .base import ContainerTask, MPILoggedTask
+
+if TYPE_CHECKING:
+    from typing import ClassVar
 
 
-def list_of_filelists(files: list[str] | list[list[str]]) -> list[list[str]]:
-    """Take in a list of lists/glob patterns of filenames.
+def list_of_filelists(files):
+    r"""Take in a list of lists/glob patterns of filenames.
 
     Parameters
     ----------
-    files
-        A path or glob pattern (e.g. /my/data/*.h5) or a list of those (or a list of
+    files : Sequence[PathLike] | Sequence[list[Pathlike]]
+        A path or glob pattern (e.g. "/my/data/\*.h5)" or a list of those (or a list of
         lists of those).
 
     Raises
     ------
-    config.CaputConfigError
-        If files has the wrong format or refers to a file that doesn't exist.
+    :py:exc:`~caput.config.CaputConfigError`
+        If `files` has the wrong format or refers to a file that doesn't exist.
 
     Returns
     -------
-    The input file list list. Any glob patterns will be flattened to file path string
-    lists.
+    flattened_list : list[PathLike]
+        The input file list. Any glob patterns will be flattened to file path string lists.
     """
     import glob
 
@@ -77,22 +83,23 @@ def list_of_filelists(files: list[str] | list[list[str]]) -> list[list[str]]:
     return f2
 
 
-def list_or_glob(files: str | list[str]) -> list[str]:
-    """Take in a list of lists/glob patterns of filenames.
+def list_or_glob(files):
+    r"""Take in a list of lists/glob patterns of filenames.
 
     Parameters
     ----------
-    files
-        A path or glob pattern (e.g. /my/data/*.h5) or a list of those
+    files : PathLike | Sequence[PathLike]
+        A path or glob pattern (e.g. /my/data/\*.h5) or a list of those
 
     Returns
     -------
-    The input file list. Any glob patterns will be flattened to file path string lists.
+    file_list : list[PathLike]
+        The input file list. Any glob patterns will be flattened to file path string lists.
 
     Raises
     ------
-    config.CaputConfigError
-        If files has the wrong type or if it refers to a file that doesn't exist.
+    :py:exc:`~caput.config.CaputConfigError`
+        If `files` has the wrong type or if it refers to a file that doesn't exist.
     """
     import glob
 
@@ -126,24 +133,25 @@ def list_or_glob(files: str | list[str]) -> list[str]:
     )
 
 
-def list_of_filegroups(groups: list[dict] | dict) -> list[dict]:
+def list_of_filegroups(groups):
     """Process a file group/groups.
 
     Parameters
     ----------
-    groups
+    groups : dict[str, PathLike] | list[dict[str, PathLike]]
         Dicts should contain keys 'files': An iterable with file path or glob pattern
         strings, 'tag': the group tag str
 
     Returns
     -------
-    The input groups. Any glob patterns in the 'files' list will be flattened to file
-    path strings.
+    file_list : list[PathLike]
+        The input groups. Any glob patterns in the 'files' list will be flattened to file
+        path strings.
 
     Raises
     ------
-    config.CaputConfigError
-        If groups has the wrong format.
+    :py:exc:`~caput.config.CaputConfigError`
+        If `groups` has the wrong format.
     """
     import glob
 
@@ -181,14 +189,15 @@ def list_of_filegroups(groups: list[dict] | dict) -> list[dict]:
     return groups
 
 
-class FindFiles(ContainerTask):
+class FindFiles(MPILoggedTask):
     """Take a glob or list of files and pass on to other tasks.
 
     Files are specified as a parameter in the configuration file.
 
-    Parameters
+    Attributes
     ----------
-    files : list or glob
+    files : PathLike | list[PathLike]
+        Can either be a glob pattern, or lists of actual files.
     """
 
     files = config.Property(proptype=list_or_glob)
@@ -206,16 +215,15 @@ class SelectionsMixin:
 
     Attributes
     ----------
-    selections : dict, optional
+    selections : dict[str, SelectionLike], optional
         A dictionary of axis selections. See below for details.
-
-    allow_index_map : bool, optional
+    allow_index_map : bool, optonal
         If true, selections can be made based on an index_map dataset.
         This cannot be implemented when reading from disk. See below for
-        details. Default is False.
+        details. Default is ``False``.
 
-    Selections
-    ----------
+    Notes
+    -----
     Selections can be given to limit the data read to specified subsets. They can be
     given for any named axis in the container.
 
@@ -241,7 +249,7 @@ class SelectionsMixin:
             pol_map: ["XX", "YY"] # Select the indices corresponding to these entries
     """
 
-    selections = config.Property(proptype=dict, default=None)
+    selections = config.Property(proptype=dict, default={})
     allow_index_map = config.Property(proptype=bool, default=False)
 
     def setup(self):
@@ -249,8 +257,7 @@ class SelectionsMixin:
         self._sel = self._resolve_sel()
 
     def _resolve_sel(self):
-        # Turn the selection parameters into actual selectable types
-
+        """Turn the selection parameters into actual selectable types."""
         sel = {}
 
         sel_parsers = {
@@ -281,8 +288,7 @@ class SelectionsMixin:
         return sel
 
     def _parse_range(self, x):
-        # Parse and validate a range type selection
-
+        """Parse and validate a range type selection."""
         if not isinstance(x, list | tuple) or len(x) > 3 or len(x) < 2:
             raise ValueError(
                 f"Range spec must be a length 2 or 3 list or tuple. Got {x}."
@@ -295,8 +301,7 @@ class SelectionsMixin:
         return slice(*x)
 
     def _parse_index(self, x, type_=object):
-        # Parse and validate an index type selection
-
+        """Parse and validate an index type selection."""
         if not isinstance(x, list | tuple) or len(x) == 0:
             raise ValueError(f"Index spec must be a non-empty list or tuple. Got {x}.")
 
@@ -314,13 +319,14 @@ class BaseLoadFiles(SelectionsMixin, ContainerTask):
 
     Attributes
     ----------
-    distributed : bool, optional
+    distributed : bool
         Whether the file should be loaded distributed across ranks.
-    convert_strings : bool, optional
-        Convert strings to unicode when loading.
-    redistribute : str, optional
+        Default is ``True``.
+    convert_strings : bool
+        Convert strings to unicode when loading. Default is ``True``.
+    redistribute : str | None
         An optional axis name to redistribute the container over after it has
-        been read.
+        been read. Default is ``None``.
     """
 
     distributed = config.Property(proptype=bool, default=True)
@@ -343,13 +349,13 @@ class BaseLoadFiles(SelectionsMixin, ContainerTask):
         if self._sel:
             if self.comm.rank == 0:
                 with fileformats.guess_file_format(filename).open(filename, "r") as fh:
-                    clspath = memh5.MemDiskGroup._detect_subclass_path(fh)
+                    clspath = MemDiskGroup._detect_subclass_path(fh)
             else:
                 clspath = None
             clspath = self.comm.bcast(clspath, root=0)
-            new_cls = memh5.MemDiskGroup._resolve_subclass(clspath)
+            new_cls = MemDiskGroup._resolve_subclass(clspath)
         else:
-            new_cls = memh5.BasicCont
+            new_cls = BasicCont
 
         cont = new_cls.from_file(
             filename,
@@ -371,7 +377,7 @@ class LoadFilesFromParams(BaseLoadFiles):
 
     Attributes
     ----------
-    files : glob pattern, or list
+    files : Sequence[PathLike]
         Can either be a glob pattern, or lists of actual files.
     """
 
@@ -384,7 +390,8 @@ class LoadFilesFromParams(BaseLoadFiles):
 
         Returns
         -------
-        cont : subclass of `memh5.BasicCont`
+        container : BasicCont
+            A container populated with data from the loaded file.
         """
         # Garbage collect to workaround leaking memory from containers.
         # TODO: find actual source of leak
@@ -419,11 +426,11 @@ class LoadFilesFromAttrs(BaseLoadFiles):
 
     This class enables the dynamic generation of file paths by formatting a specified
     filename template with attributes from an input container.  It inherits from
-    `BaseLoadFiles` and provides functionality to load files into a container.
+    :py:class:`BaseLoadFiles` and provides functionality to load files into a container.
 
     Attributes
     ----------
-    filename : str
+    filename : PathLike
         Template for the file path, which can include placeholders referencing attributes
         in the input container.  For example: `rfi_mask_lsd_{lsd}.h5`.  The placeholders
         will be replaced with corresponding attribute values from the input container.
@@ -436,12 +443,12 @@ class LoadFilesFromAttrs(BaseLoadFiles):
 
         Parameters
         ----------
-        incont : subclass of `memh5.BasicCont`
+        incont : BasicCont
             Input container whose attributes are used to construct the file path.
 
         Returns
         -------
-        outcont : subclass of `memh5.BasicCont`
+        container : BasicCont
             A container populated with data from the loaded file.
         """
         # Construct the filename from the attributes in the input container
@@ -457,9 +464,9 @@ class LoadFilesAndSelect(BaseLoadFiles):
 
     Attributes
     ----------
-    files : list of str or str
+    files : Sequence[PathLike]
         A list of file paths or a glob pattern specifying the files to load.
-    key_format : str, optional
+    key_format : str
         A format string used to generate keys for file selection.  Can reference
         any variables contained in the attributes of the containers.  If `None`,
         files are stored with numerical indices.
@@ -494,23 +501,23 @@ class LoadFilesAndSelect(BaseLoadFiles):
     def process(self, incont):
         """Select and return a file from the collection based on the input container.
 
-        If `key_format` is provided, the selection key is derived from the attributes
+        If ``key_format`` is provided, the selection key is derived from the attributes
         of the input container.  If the resulting key is not found in the collection,
         a warning is logged, and `None` is returned.
 
-        If `key_format` is not provided, files are selected sequentially from
+        If ``key_format`` is not provided, files are selected sequentially from
         the collection, cycling back to the beginning if more input containers
         are received than the number of available files.
 
         Parameters
         ----------
-        incont : memh5.BasicCont subclass
+        incont : BasicCont
             Container whose attributes are used to determine the selection key.
 
         Returns
         -------
-        outcont : memh5.BasicCont subclass or None
-            The selected file if found, otherwise `None`.
+        container : BasicCont | None
+            The selected file if found, otherwise ``None``.
         """
         if self.key_format is None:
             key = self._count % len(self.collection)
@@ -532,19 +539,19 @@ class LoadFilesAndSelect(BaseLoadFiles):
 class LoadFilesFromPathAndTag(LoadFilesFromParams):
     """Load files using all combinations of given paths and tags.
 
-    `paths` should be provided with `{tag}` as a stand-in for places
-    the tag is inserted. Specifically, tags are insterted by calling
-    `path.format{tag=tag}`
+    :py:attr:`~.LoadFilesFromPathAndTag.paths` should be provided with `{tag}`
+    as a stand-in for places where the tag is inserted. Specifically, tags are insterted
+    by calling `path.format(tag=tag)`.
 
     This is intended to replicate specific patterns which arent available
     with `glob`, such as `/path/to/files/*[tag1, tag2]/*.h5`.
 
     Attributes
     ----------
-    paths : list[str]
+    paths : list[PathLike]
         List of files paths, with `{tag}` as a stand-in where tags
         should be inserted.
-    tags: list[str]
+    tags : list[str]
         List of tags
     """
 
@@ -566,10 +573,7 @@ class LoadFilesFromPathAndTag(LoadFilesFromParams):
 
 
 class LoadFiles(LoadFilesFromParams):
-    """Load data from files passed into the setup routine.
-
-    File must be a serialised subclass of :class:`memh5.BasicCont`.
-    """
+    """Load data from files passed into the setup routine."""
 
     files = None
 
@@ -578,8 +582,8 @@ class LoadFiles(LoadFilesFromParams):
 
         Parameters
         ----------
-        files : list
-            Files to load
+        files : Sequence[PathLike]
+            Files to load.
         """
         # Call the baseclass setup to resolve any selections
         super().setup()
@@ -593,12 +597,12 @@ class LoadFiles(LoadFilesFromParams):
 class Save(ContainerTask):
     """Save out the input, and pass it on.
 
-    Assumes that the input has a `to_hdf5` method. Appends a *tag* if there is
-    a `tag` entry in the attributes, otherwise just uses a count.
+    Assumes that the input has a :py:meth:`to_hdf5` method. Appends a *tag* if there is
+    a `tag` entry in the attributes, otherwise just appends a count.
 
     Attributes
     ----------
-    root : str
+    root : PathLike
         Root of the file name to output to.
     """
 
@@ -609,11 +613,11 @@ class Save(ContainerTask):
     def next(self, data):
         """Write out the data file.
 
-        Assumes it has an MPIDataset interface.
+        Assumes it has a :py:class:`~caput.memdata.MemGroup` interface.
 
         Parameters
         ----------
-        data : mpidataset.MPIDataset
+        data : MemGroup
             Data to write out.
         """
         if "tag" not in data.attrs:
@@ -630,7 +634,7 @@ class Save(ContainerTask):
 
 
 class Truncate(ContainerTask):
-    """Precision truncate data prior to saving with bitshuffle compression.
+    """Precision truncate data prior to saving with compression.
 
     If no configuration is provided, will look for preset values for the
     input container. Any properties defined in the config will override the
@@ -644,11 +648,13 @@ class Truncate(ContainerTask):
 
     Attributes
     ----------
-    dataset : dict
+    dataset : dict[str, bool | float | dict[str, float]]
         Datasets to be truncated as keys. Possible values are:
-        - bool : Whether or not to truncate, using default fixed precision.
-        - float : Truncate to this relative precision.
-        - dict : Specify values for `weight_dataset`, `fixed_precision`, `variance_increase`.
+
+        - ``bool`` : Whether or not to truncate, using default fixed precision.
+        - ``float`` : Truncate to this relative precision.
+        - ``dict`` : Specify values for `weight_dataset`, `fixed_precision`, `variance_increase`.
+
     ensure_chunked : bool
         If True, ensure datasets are chunked according to their dataset_spec.
     """
@@ -667,15 +673,15 @@ class Truncate(ContainerTask):
 
         Parameters
         ----------
-        container
+        container : ContainerBase
             Container class.
         dset : str
             Dataset name
 
         Returns
         -------
-        Dict or None
-            Returns `None` if the dataset shouldn't get truncated.
+        truncation_params : dict | None
+            Returns ``None`` if the dataset shouldn't get truncated.
         """
         # Check if dataset should get truncated at all
         if (self.dataset is None) or (dset not in self.dataset):
@@ -705,11 +711,11 @@ class Truncate(ContainerTask):
         return params
 
     def _get_weights(self, container, dset, wdset):
-        """Extract the weight dataset and broadcast agaonst the truncation dataset.
+        """Extract the weight dataset and broadcast against the truncation dataset.
 
         Parameters
         ----------
-        container
+        container : ContainerBase
             Container class.
         dset : str
             Dataset name
@@ -718,15 +724,15 @@ class Truncate(ContainerTask):
 
         Returns
         -------
-        weight : np.ndarray
+        weights : array_like
             Array of weights to use in truncation. If `dset` is complex,
             this is scaled by a factor of 2.
 
         Raises
         ------
-        KeyError
+        :pe:exc:`KeyError`
             Raised if either `dset` or `wdset` does not exist.
-        ValueError
+        :py:exc:`ValueError`
             Raised if the weight dataset cannot be broadcast to
             the shape of the dataset to be truncated.
         """
@@ -738,7 +744,7 @@ class Truncate(ContainerTask):
 
         data = container[dset]
 
-        if isinstance(weight, memh5.MemDataset):
+        if isinstance(weight, MemDataset):
             # Add missing broadcast axes to the weights dataset
             waxes = weight.attrs.get("axis", [])
             daxes = data.attrs.get("axis", [])
@@ -761,20 +767,22 @@ class Truncate(ContainerTask):
 
         Parameters
         ----------
-        data : containers.ContainerBase
+        data : ContainerBase
             Data to truncate.
 
         Returns
         -------
-        truncated_data : containers.ContainerBase
-            Truncated data.
+        truncated : ContainerBase
+            Container with truncated datasets.
 
         Raises
         ------
-        `config.CaputConfigError`
+        :py:exc:`~caput.config.CaputConfigError`
              If the input data container has no preset values and `fixed_precision` or
              `variance_increase` are not set in the config.
         """
+        from ...util import truncate
+
         if self.ensure_chunked:
             data._ensure_chunked()
 
@@ -843,7 +851,7 @@ class ZipZarrContainers(ContainerTask):
 
     Attributes
     ----------
-    containers : list
+    containers : list[str]
         The names of the Zarr containers to compress. The zipped files will
         have the same names with `.zip` appended.
     remove : bool
@@ -937,7 +945,7 @@ class ZipZarrContainers(ContainerTask):
 class ZarrZipHandle:
     """A handle for keeping track of background Zarr-zipping job."""
 
-    def __init__(self, filename: str, handle: subprocess.Popen | None):
+    def __init__(self, filename, handle):
         self.filename = filename
         self.handle = handle
 
@@ -947,7 +955,7 @@ class SaveZarrZip(ZipZarrContainers):
 
     This task saves the output first as a .zarr container, and then starts a background
     job to start turning it into a zip file. It returns a handle to this job. All these
-    handles should be fed into a `WaitZarrZip` task to ensure the pipeline run does not
+    handles should be fed into a :py:class:`WaitZarrZip` task to ensure the pipeline run does not
     terminate before they are complete.
 
     This accepts most parameters that a standard task would for saving, including
@@ -972,19 +980,19 @@ class SaveZarrZip(ZipZarrContainers):
         super().setup()
 
     # Override next as we don't want the usual mechanism
-    def next(self, container: memh5.BasicCont) -> ZarrZipHandle:
+    def next(self, container):
         """Take a container and save it out as a .zarr.zip file.
 
         Parameters
         ----------
-        container
+        container : BasicCont
             Container to save out.
 
         Returns
         -------
-        handle
+        handle : ZarrZipHandle
             A handle to use to determine if the job has successfully completed. This
-            should be given to the `WaitZarrZip` task.
+            should be given to the :py:class:`.WaitZarrZip` task.
         """
         outfile = self._save_output(container)
         dest_file = outfile + ".zip"
@@ -1020,14 +1028,14 @@ class SaveZarrZip(ZipZarrContainers):
 class WaitZarrZip(MPILoggedTask):
     """Collect Zarr-zipping jobs and wait for them to complete."""
 
-    _handles: list[ZarrZipHandle] | None = None
+    _handles = None
 
-    def next(self, handle: ZarrZipHandle):
+    def next(self, handle):
         """Receive the handles to wait on.
 
         Parameters
         ----------
-        handle
+        handle : ZarrZipHandle
             The handle to wait on.
         """
         if self._handles is None:

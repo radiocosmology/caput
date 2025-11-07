@@ -1,7 +1,15 @@
 """Extensions to port pipelines to an interactive python environment."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from .. import exceptions
 from .._pipeline import Task
+
+if TYPE_CHECKING:
+    from typing import Any
+
 
 __all__ = ["Input", "Output"]
 
@@ -15,7 +23,13 @@ class Input(Task):
         self._iter = None
 
     def next(self):
-        """Pop and return the first element of inputs."""
+        """Pop and return successive inputs.
+
+        Raises
+        ------
+        :py:exc:`~..exceptions.PipelineStopIteration`
+            No more inputs to provide.
+        """
         if self._iter is None:
             self._iter = iter(self.inputs)
 
@@ -36,7 +50,7 @@ class Output(Task):
 
     Parameters
     ----------
-    callback : function, optional
+    callback : callable | None
         A function which can apply some processing to the pipeline output.
     """
 
@@ -45,8 +59,12 @@ class Output(Task):
         self.outputs = []
         self.callback = callback
 
-    def next(self, in_):
-        """Pop and return the first element of inputs."""
+    def next(self, in_: Any) -> None:
+        """Append `in_` to the outputs.
+
+        If `callback` is not ``None``, that is called first to
+        process `in_`.
+        """
         if self.callback:
             in_ = self.callback(in_)
 

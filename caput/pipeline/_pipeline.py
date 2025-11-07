@@ -1,19 +1,18 @@
 """Core pipeline infrastructure."""
 
+from __future__ import annotations
+
 import importlib
 import inspect
 import logging
 import queue
 import re
-import traceback
-import warnings
-from collections.abc import Generator
 from copy import deepcopy
 
 import yaml
 
 from .. import config
-from ..util import importtools, mpitools, objecttools
+from ..util import importtools, mpitools
 from . import exceptions
 
 # Set the module logger.
@@ -45,12 +44,13 @@ def _get_versions(modules):
 
     Parameters
     ----------
-    modules : List[str]
+    modules : sequence[str]
         Names of python modules.
 
     Returns
     -------
-    Dict[str, str]
+    versions : dict[str, str]
+        Dictionary of module names and their version strings.
     """
     if isinstance(modules, str):
         modules = [modules]
@@ -73,6 +73,7 @@ def _get_versions(modules):
                 "Failure getting versions requested with config parameter "
                 "'save_versions'."
             ) from err
+
     return versions
 
 
@@ -84,32 +85,39 @@ class Manager(config.Reader):
     the each task in the appropriate order. It also handles intermediate data
     products and ensuring that the correct products are passed between tasks.
 
+    Parameters
+    ----------
+    psutil_profiling : bool, optional
+        Use psutil to profile CPU and memory usage. Default is `False`.
+
     Attributes
     ----------
-    logging : Dict(str, str)
+    logging : dict[str, str]
         Log levels per module. The key "root" stores the root log level.
     task_specs : list
         Configuration of pipeline tasks.
-    key_pattern : str, optional
+    key_pattern : str
         Regex pattern to match on in order to pass a key to subsequent tasks. This is
         useful for controlling which keys are passed in tasks which produce multiple
-        outputs. Default is `[^\W_]`, which will cause any key that contains no
+        outputs. Default is ``[^\W_]``, which will cause any key that contains no
         alphanumeric characters to be ignored.
-    interactive: bool, optional
-        If True, the `.run()` method becomes a generator and stops on each iteration after
-        selecting the next task to run. This allows a user to interact with the pipeline
-        at each step and to probe the internal state of each task. This feature should be
-        used as follows:
+    interactive : bool
+        If True, the :py:meth`~.Manager.run` method becomes a generator and stops on
+        each iteration after selecting the next task to run. This allows a user to interact
+        with the pipeline at each step and to probe the internal state of each task. This
+        feature should be used as follows:
+
         - p = Manager()
         - p.interactive = True
         - runner = p.runner()
         - next(runner)
+
         Default is False.
-    enable_breakpoints : bool, optional
+    enable_breakpoints : bool
         If True, task breakpoints are enabled. If a task requests a breakpoint, a call to
-        `breakpoint()` is made every time the task is selected to be run. If `interactive`
-        is True, this does nothing. Default is False.
-    save_versions : list
+        :py:meth`~.Task.breakpoint` is made every time the task is selected to be run. If
+        `interactive` is True, this does nothing. Default is False.
+    versions : bool
         Module names (str). This list together with the version strings from these
         modules are attached to output metadata. Default is [].
     save_config : bool
@@ -129,7 +137,7 @@ class Manager(config.Reader):
     versions = config.Property(default=[], proptype=_get_versions, key="save_versions")
     save_config = config.Property(default=True, proptype=bool)
 
-    def __init__(self, psutil_profiling=False):
+    def __init__(self, psutil_profiling: bool = False):
         # Initialise the list of task instances
         self.tasks = []
         self.all_params = []
@@ -146,7 +154,7 @@ class Manager(config.Reader):
 
         Parameters
         ----------
-        file_name: string
+        file_name : os.PathLike
             Path to YAML pipeline configuration file.
         lint : bool
             Instantiate Manager only to lint config. Disables debug logging.
@@ -155,7 +163,8 @@ class Manager(config.Reader):
 
         Returns
         -------
-        self: Pipeline object
+        manager : :py:class:`.Manager`
+            Instantiated pipeline manager.
         """
         try:
             with open(file_name) as f:
@@ -173,7 +182,7 @@ class Manager(config.Reader):
 
         Parameters
         ----------
-        yaml_doc: string
+        yaml_doc : str
             Yaml configuration document.
         lint : bool
             Instantiate Manager only to lint config. Disables debug logging.
@@ -182,7 +191,8 @@ class Manager(config.Reader):
 
         Returns
         -------
-        self: Pipeline object
+        manager : :py:class:`.Manager`
+            Instantiated pipeline manager.
         """
         from ..config import SafeLineLoader
 
@@ -219,7 +229,7 @@ class Manager(config.Reader):
 
         Parameters
         ----------
-        lint : bool
+        lint : bool, optional
             Instantiate Manager only to lint config. Disables debug logging.
         """
         # set root log level and set up default formatter
@@ -251,7 +261,7 @@ class Manager(config.Reader):
         # Pipeline is done
         logger.info("FIN")
 
-    def runner(self) -> Generator:
+    def runner(self):
         """Main driver for the pipeline.
 
         This function creates a generator object to initialize and run
@@ -262,14 +272,13 @@ class Manager(config.Reader):
 
         Raises
         ------
-        PipelineRuntimeError
+        :py:exc:`~caput.pipeline.exceptions.PipelineRuntimeError`
             If a task stage returns the wrong number of outputs.
 
         Returns
         -------
-        runner : Generator
+        pipeline_runner : generator
             Generator object to run the pipeline.
-
         """
         from ..util.profiler import PSUtilProfiler
 
@@ -362,6 +371,7 @@ class Manager(config.Reader):
         """Get the next task to run from the task list.
 
         Task is chosen based the following criteria:
+
         - able to do something in its current state
         - highest priority
         - highest base priority
@@ -369,6 +379,11 @@ class Manager(config.Reader):
 
         If no task is available to do anything, restart from the
         pipeline task head.
+
+        Returns
+        -------
+        next_task : :py:class:`.Task`
+            Next task to run.
         """
         # Get a list of tasks which are availble to run
         available = []
@@ -436,15 +451,22 @@ class Manager(config.Reader):
     def _check_task_output(out, task):
         """Check if task stage's output is as expected.
 
-        Returns
-        -------
-        out : Same as `TaskBase.next` or None
+        Parameters
+        ----------
+        out : Any | None
             Pipeline product, or None if there is no output of the task stage that
             has to be handled further.
+        task : :py:class:`.Task`
+            Pipeline task instance.
+
+        Returns
+        -------
+        task_output : Any | tuple[Any] | None
+            Verified output from the task stage, or None.
 
         Raises
         ------
-        PipelineRuntimeError
+        :py:exc:`PipelineRuntimeError`
             If a task stage returns the wrong number of outputs.
         """
         # This iteration supplied no output, or the output is not
@@ -484,15 +506,14 @@ class Manager(config.Reader):
                 # Load the task instance and add it to the pipeline
                 task = self._get_task_from_spec(task_spec)
                 self.add_task(task, task_spec)
-            except config.CaputConfigError as e:
+            except config.CaputConfigError as exc:
                 raise config.CaputConfigError(
-                    f"Setting up task {ii} caused an error:\n\t{traceback.format_exc()}",
-                    location=task_spec if e.line is None else e.line,
-                ) from e
+                    f"Error setting up task {ii}\n",
+                    location=task_spec if exc.line is None else exc.line,
+                ) from exc
 
     def _validate_task_inputs(self):
-        # Make sure all tasks' in/requires values have corresponding
-        # out keys from another task
+        """Make sure all in/requires values have corresponding out keys from another task."""
         all_out_values = []
         for t in self.task_specs:
             if "out" in t:
@@ -527,8 +548,18 @@ class Manager(config.Reader):
                             f"`out` from another task (Value {v} is not in {unique_out_values})."
                         )
 
-    def _get_task_from_spec(self, task_spec: dict):
-        """Set up a pipeline task from the spec given in the tasks list."""
+    def _get_task_from_spec(self, task_spec):
+        """Set up a pipeline task from the spec given in the tasks list.
+
+        Parameters
+        ----------
+        task_spec
+            Dictionary specifying the task type, parameters, and keys.
+
+        Returns
+        -------
+        The initialized pipeline task instance.
+        """
         # Check that only the expected keys are in the task spec.
         for key in task_spec.keys():
             if key not in ["type", "params", "requires", "in", "out"]:
@@ -549,10 +580,14 @@ class Manager(config.Reader):
         else:
             try:
                 task_cls = importtools.import_class(task_path)
-            except (config.CaputConfigError, AttributeError, ModuleNotFoundError) as e:
+            except (
+                config.CaputConfigError,
+                AttributeError,
+                ModuleNotFoundError,
+            ) as exc:
                 raise config.CaputConfigError(
-                    f"Loading task `{task_path}` caused an error:\n\t{traceback.format_exc()}"
-                ) from e
+                    f"Error loading task `{task_path}`\n"
+                ) from exc
 
         # Get the parameters and initialize the class.
         params = {}
@@ -585,33 +620,33 @@ class Manager(config.Reader):
         # Create and configure the task instance
         try:
             task = task_cls._from_config(task_params)
-        except config.CaputConfigError as e:
+        except config.CaputConfigError as exc:
             raise config.CaputConfigError(
-                f"Failed instantiating {task_cls} from config.\n\t{traceback.format_exc()}",
+                f"Failed instantiating `{task_cls}` from config.\n",
                 location=task_spec.get("params", task_spec),
-            ) from e
+            ) from exc
 
         return task
 
-    def add_task(self, task, task_spec: dict = {}, **kwargs):
+    def add_task(self, task, task_spec={}, **kwargs):  # noqa: D417
         r"""Add a task instance to the pipeline.
 
         Parameters
         ----------
-        task : TaskBase
+        task : :py:class:`.Task`
             A pipeline task instance.
         task_spec : dict
-            include optional argument: requires, in\_, out : list or string
+            include optional argument: ``requires``, ``in_``, ``out`` : list or string
             The names of the task inputs and outputs.
-        **kwargs : dict
+        \**kwargs : Any
             Included for legacy purposes. Alternative method to provide
-            `requires`, `in\_`, and `out` arguments. These should *only*
-            be provided if `task_spec` is not provided - a ValueError
+            ``requires``, ``in_``, and ``out`` arguments. These should *only*
+            be provided if ``task_spec`` is not provided - a ValueError
             will be raised otherwise.
 
         Raises
         ------
-        caput.config.CaputConfigError
+        :py:exc:`~caput.config.CaputConfigError`
             If there was an error in the task configuration.
         """
 
@@ -638,10 +673,8 @@ class Manager(config.Reader):
         try:
             task._setup_keys(in_, out, requires)
         # Want to blindly catch errors
-        except Exception as e:
-            raise config.CaputConfigError(
-                f"Adding task {task!s} caused an error:\n\t{traceback.format_exc()}"
-            ) from e
+        except Exception as exc:
+            raise config.CaputConfigError(f"Error adding task {task!s}\n") from exc
 
         self.tasks.append(task)
         logger.debug(f"Added {task!s} to task list.")
@@ -672,8 +705,8 @@ def _format_product_keys(keys):
     # Check that all the keys provided are strings.
     for key in keys:
         if not isinstance(key, str):
-            msg = "Data product keys must be strings."
-            raise config.CaputConfigError(msg)
+            raise config.CaputConfigError("Data product keys must be strings.")
+
     return keys
 
 
@@ -681,14 +714,14 @@ class Task(config.Reader):
     """Base class for all pipeline tasks.
 
     All pipeline tasks should inherit from this class, with functionality and
-    analysis added by over-riding `__init__`, `setup`, `validate`, `next` and/or
-    `finish`.
+    analysis added by over-riding :py:class:`~.Task.__init__`, :py:meth:`~.Task.setup`,
+    :py:meth:`~.Task.validate`, :py:meth:`~.Task.next` and/or :py:meth:`~.Task.finish`.
 
     In addition, input parameters may be specified by adding class attributes
-    which are instances of `config.Property`. These will then be read from the
-    pipeline yaml file when the pipeline is initialized.  The class attributes
-    will be overridden with instance attributes with the same name but with the
-    values specified in the pipeline file.
+    which are instances of :py:class:`~caput.config.Property`. These will then
+    be read from the pipeline yaml file when the pipeline is initialized.  The
+    class attributes will be overridden with instance attributes with the same
+    name but with the values specified in the pipeline file.
 
     Attributes
     ----------
@@ -709,7 +742,7 @@ class Task(config.Reader):
         `base_priority` should be used sparingly when a user wants to enforce a
         specific non-standard pipeline behaviour. See method `priority` for details
         about dynamic priority. Default is 0.
-    breakpoint: bool
+    breakpoint : bool
         If true, signals to the pipeline runner to make a call to `breakpoint` each
         time this task is run. This will drop the interpreter into pdb, allowing for
         interactive debugging of the current pipeline and task state. Default is False.
@@ -726,8 +759,8 @@ class Task(config.Reader):
         """Initialize pipeline task.
 
         May be overridden with no arguments.  Will be called after any
-        `config.Property` attributes are set and after 'input' and 'requires'
-        keys are set up.
+        :py:class:`~caput.config.Property` attributes are set and after
+        ``input`` and ``requires`` keys are set up.
         """
         pass
 
@@ -775,16 +808,16 @@ class Task(config.Reader):
 
     @property
     def embarrassingly_parallelizable(self):
-        """Override to return `True` if `next()` is trivially parallelizeable.
+        """Override to return `True` if :py:meth:`~.Task.next` is trivially parallelizeable.
 
         This property tells the pipeline that the problem can be parallelized
-        trivially. This only applies to the `next()` method, which should not
+        trivially. This only applies to the :py:meth:`~.Task.next` method, which should not
         change the state of the task.
 
-        If this returns `True`, then the Pipeline will execute `next()` many
+        If this returns `True`, then the Pipeline will execute :py:meth:`~.Task.next` many
         times  in parallel and handle all the intermediate data efficiently.
-        Otherwise `next()` must be parallelized internally if at all. `setup()`
-        and `finish()` must always be parallelized internally.
+        Otherwise :py:meth:`~.Task.next` must be parallelized internally if at all.
+        :py:meth:`~.Task.setup` and :py:meth:`~.Task.finish` must always be parallelized internally.
 
         Usage of this has not implemented.
         """
@@ -838,28 +871,29 @@ class Task(config.Reader):
 
         If the task is not yet initialized, dynamic priority is zero.
 
-        If the task in in state `setup`, dynamic priority is one
-        if all `requires` items are stashed and zero otherwise.
+        If the task in in state ``setup``, dynamic priority is one
+        if all ``requires`` items are stashed and zero otherwise.
 
-        If the task is in state `next`, dynamic priority is the total
+        If the task is in state ``next``, dynamic priority is the total
         net consumption of the task.
 
         For example:
+
         - A task which consumes 2 items, produces one, and can currently run
-        once will have priority (2 - 1) * 1 + base = 1 + base
+          once will have priority (2 - 1) * 1 + base = 1 + base
         - A task which does not consume anything but produces one item
-        will have priority (0 - 1) * 1 + base = -1 + base
+          will have priority (0 - 1) * 1 + base = -1 + base
 
         In any other state, priority is just net consumption for one
         iteration.
 
-        The priority returned is the sum of `base_priority` and the
+        The priority returned is the sum of ``base_priority`` and the
         calculated dynamic priority.
 
         Returns
         -------
-        priority : int
-            `base_priority` plus dynamic priority calculated based on
+        task_priority : int | float
+            ``base_priority`` plus dynamic priority calculated based on
             task state and inputs/outputs
         """
         if not hasattr(self, "_pipeline_state"):
@@ -887,10 +921,13 @@ class Task(config.Reader):
     @property
     def mem_used(self):
         """Return the approximate total memory referenced by this task."""
-        return objecttools.total_size(self)
+        from ..util.objecttools import total_size
+
+        return total_size(self)
 
     @classmethod
     def _from_config(cls, config):
+        """Instantiate a pipeline task from a config dictionary."""
         self = cls.__new__(cls)
         # Check for unused keys, but ignore the ones not put there by the user.
         self.read_config(config, compare_keys=["versions", "pipeline_config"])
@@ -898,8 +935,24 @@ class Task(config.Reader):
 
         return self
 
-    def _setup_keys(self, in_=None, out=None, requires=None):
-        """Setup the 'requires', 'in' and 'out' keys for this task."""
+    def _setup_keys(self, in_, out=None, requires=None):  # noqa: D417
+        r"""Setup the 'requires', 'in' and 'out' keys for this task.
+
+        Parameters
+        ----------
+        in\_ : Sequence[str] | str | None
+            The names of the input data products for the `next` method.
+        out : Sequence[str] | str | None
+            The names of the output data products.
+        requires : Sequence[str] | str | None
+            The names of the required data products for the `setup` method.
+
+        Raises
+        ------
+        :py:exc:`~caput.config.CaputConfigError`
+            If the number of ``requires`` or ``in`` keys does not match the
+            number of arguments in ``setup`` or ``next`` methods.
+        """
         # Parse the task spec.
         requires = _format_product_keys(requires)
         in_ = _format_product_keys(in_)
@@ -985,7 +1038,7 @@ class Task(config.Reader):
     def _pipeline_advance_state(self):
         """Advance this pipeline task to the next stage.
 
-        The task stages are 'setup', 'next', 'finish' or 'raise'.  This
+        The task stages are ``setup``, ``next``, ``finish`` or ``raise``. This
         method sets the state of the task, advancing it to the next stage.
 
         Also performs some clean up tasks and checks associated with changing
@@ -1001,7 +1054,7 @@ class Task(config.Reader):
             # `finish`, because some input requirement was never generated.
             for req, req_key in zip(self._requires, self._requires_keys):
                 if req is None:
-                    warnings.warn(
+                    logger.warning(
                         f"Task {self!s} tried to advance to `next` "
                         f"without completing `setup`. Input `{req_key}` was never received. "
                         "Advancing to `finish`."
@@ -1015,7 +1068,7 @@ class Task(config.Reader):
             # can be queued.
             for in_, in_key in zip(self._in, self._in_keys):
                 if not in_.empty():
-                    warnings.warn(
+                    logger.warning(
                         f"Task {self!s} finished iterating `next()` "
                         f"but input queue `{in_key}` isn't empty."
                     )
@@ -1035,9 +1088,14 @@ class Task(config.Reader):
     def _pipeline_next(self):
         """Execute the next stage of the pipeline.
 
-        Execute `setup()`, `next()`, `finish()` or raise `PipelineFinished`
-        depending on the state of the task.  Advance the state to the next
-        stage if applicable.
+        Execute :py:meth:`~.Task.setup`, :py:meth:`~.Task.next`, :py:meth:`~.Task.finish`
+        or raise :py:exc:`~.PipelineFinished` depending on the state of the task.  Advance
+        the state to the next stage if applicable.
+
+        Returns
+        -------
+        pipeline_product : Any | None
+            Output data product(s) from the current stage, or None.
         """
         if self._pipeline_state == "setup":
             # Check if we have all the required input data.
@@ -1117,8 +1175,15 @@ class Task(config.Reader):
     def _pipeline_queue_product(self, key, product):
         """Put a product into an input queue as applicable.
 
-        Add a product to either a `requires` slot or an input queue based
+        Add a product to either a ``requires`` slot or an input queue based
         on the associated key.
+
+        Parameters
+        ----------
+        key : str
+            The data product key.
+        product : Any
+            The data product to be queued.
         """
         result = False
 
