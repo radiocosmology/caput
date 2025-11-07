@@ -1,10 +1,7 @@
-"""caput.pipeline.tasklib.
-
-Collection of basic tasks.
-"""
+"""A collection of basic pipeline tasks."""
 
 from . import (
-    basic as basic,
+    base as base,
     debug as debug,
     flow as flow,
     io as io,

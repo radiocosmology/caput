@@ -1,4 +1,11 @@
-"""Core implementation of the caput pipeline task class."""
+"""Base pipeline tasks.
+
+Base pipeline tasks provide standard functionality, like logging,
+MPI support, and container handling. These are intended to be subclassed
+when building more complex and/or distributed tasks.
+"""
+
+from __future__ import annotations
 
 import logging
 import os
@@ -7,9 +14,18 @@ from inspect import getfullargspec
 import numpy as np
 
 from ... import config
-from ...memdata import fileformats, memh5
-from .. import exceptions, extensions
-from .._pipeline import Task
+from ...memdata import MemDataset, MemDiskGroup, MemGroup, fileformats
+from .. import Task, exceptions, extensions
+
+__all__ = [
+    "ContainerTask",
+    "LoggedTask",
+    "MPILogFilter",
+    "MPILoggedTask",
+    "MPITask",
+    "SetMPILogging",
+    "group_tasks",
+]
 
 
 class MPILogFilter(logging.Filter):
@@ -20,16 +36,19 @@ class MPILogFilter(logging.Filter):
 
     Parameters
     ----------
-    add_mpi_info : boolean, optional
+    add_mpi_info : bool, optional
         Add MPI rank/size info to log records that don't already have it.
-    level_rank0 : int
-        Log level for messages from rank=0.
-    level_all : int
-        Log level for messages from all other ranks.
+    level_rank0 : int, optional
+        Log level for messages from rank=0. Default is `logging.INFO`.
+    level_all : int, optional
+        Log level for messages from all other ranks. Default is `logging.WARN`.
     """
 
     def __init__(
-        self, add_mpi_info=True, level_rank0=logging.INFO, level_all=logging.WARN
+        self,
+        add_mpi_info: bool = True,
+        level_rank0: int = logging.INFO,
+        level_all: int = logging.WARN,
     ):
         from mpi4py import MPI
 
@@ -63,13 +82,19 @@ def _log_level(x):
 
     Parameters
     ----------
-    x : int or str
+    x : int | str
         Explicit integer logging level or one of 'DEBUG', 'INFO', 'WARN',
         'ERROR' or 'CRITICAL'.
 
     Returns
     -------
-    level : int
+    log_level_integer : int
+        The logging level as an integer.
+
+    Raises
+    ------
+    ValueError
+        If the input is not a valid logging level.
     """
     level_dict = {
         "DEBUG": logging.DEBUG,
@@ -94,8 +119,10 @@ class SetMPILogging(Task):
 
     Attributes
     ----------
-    level_rank0, level_all : int or str
-        Log level for rank=0, and other ranks respectively.
+    level_rank0 : int, optional
+        Log level for rank=0. Default is "INFO".
+    level_all : int, optional
+        Log level for all ranks except rank=0. Default is "WARN".
     """
 
     level_rank0 = config.Property(proptype=_log_level, default=logging.INFO)
@@ -129,7 +156,13 @@ class SetMPILogging(Task):
 
 
 class LoggedTask(Task):
-    """A task with logger support."""
+    """A task with logger support.
+
+    Attributes
+    ----------
+    log_level : int, optional
+        Logging level for this task. Default is ``None``.
+    """
 
     log_level = config.Property(proptype=_log_level, default=None)
 
@@ -151,6 +184,11 @@ class MPITask(Task):
     """Base class for MPI using tasks.
 
     Just ensures that the task gets a `comm` attribute.
+
+    Attributes
+    ----------
+    comm : MPI.Comm | None, optional
+        MPI communicator.
     """
 
     comm = None
@@ -167,13 +205,13 @@ class _AddRankLogAdapter(logging.LoggerAdapter):
 
     Attributes
     ----------
-    calling_obj : object
+    calling_obj : Any | None
         An object with a `comm` property that will be queried for the rank.
     """
 
     calling_obj = None
 
-    def process(self, msg, kwargs):
+    def process(self, msg, **kwargs):
         if "extra" not in kwargs:
             kwargs["extra"] = {}
 
@@ -199,31 +237,23 @@ class MPILoggedTask(MPITask, LoggedTask):
 
 
 class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
-    """Process a task with at most one input and output.
+    """Implements a task whose inputs and outputs are :py:class:`~caput.memdata.BasicCont` objects.
 
-    Both input and output are expected to be :class:`memh5.BasicCont` objects.
-    This class allows writing of the output when requested.
+    This task implements writing of the output when requested, and handles various
+    types of metadata associated with the container objects.
 
-    Tasks inheriting from this class should override `process` and optionally
-    :meth:`setup` or :meth:`finish`. They should not override :meth:`next`.
+    Tasks inheriting from this class should override :py:meth:`~.ContainerTask.process`
+    and optionally :py:meth:`~.ContainerTask.setup` or :py:meth:`~.ContainerTask.process_finish`.
+    They should not override :py:meth:`~.ContainerTask.next` or :py:meth:`~.ContainerBase.finish`.
 
-    If the value of :attr:`input_root` is anything other than the string "None"
-    then the input will be read (using :meth:`read_input`) from the file
-    ``self.input_root + self.input_filename``.  If the input is specified both as
-    a filename and as a product key in the pipeline configuration, an error
-    will be raised upon initialization.
-
-
-    If the value of :attr:`output_root` is anything other than the string
-    "None" then the output will be written (using :meth:`write_output`) to the
-    file ``self.output_root + self.output_filename``.
+    Output will be written (using :py:meth:`write_output`) to the file ``self.output_name``.
 
     Attributes
     ----------
-    save : list | bool
+    save : bool | list[bool], optional
         Whether to save the output to disk or not. Can be provided as a list
         if multiple outputs are being handled. Default is False.
-    attrs : dict, optional
+    attrs : dict | None, optional
         A mapping of attribute names and values to set in the `.attrs` at the root of
         the output container. String values will be formatted according to the standard
         Python `.format(...)` rules, and can interpolate several other values into the
@@ -240,12 +270,14 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
           its key. The specific values above will override any attribute with the same
           name.
 
-        Incorrectly formatted values will cause an error to be thrown.
+        Incorrectly formatted values will cause an error to be thrown. Default is
+        ``None``
     tag : str, optional
         Set a format for the tag attached to the output. This is a Python format string
         which can interpolate the variables listed under `attrs` above. For example a
         tag of "cat{count}" will generate catalogs with the tags "cat1", "cat2", etc.
-    output_name : list | string
+        Default is `{tag}`.
+    output_name : str | list[str], optional
         A python format string used to construct the filename. All variables given under
         `attrs` above can be interpolated into the filename. Can be provided as a list
         if multiple output are being handled.
@@ -261,7 +293,9 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
                            and is just used for legacy support. The default value of
                            `output_name` means the previous behaviour works.
 
-    compression : dict or bool, optional
+        Default is `{output_root}{tag}.h5`.
+
+    compression : bool | dict, optional
         Set compression options for each dataset. Provided as a dict with the dataset
         names as keys and values for `chunks`, `compression`, and `compression_opts`.
         Any datasets not included in the dict (including if the dict is empty), will use
@@ -270,25 +304,27 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
         be disabled for all datasets. If no argument in provided, the default parameters
         set in the dataset spec are used. Note that this will modify these parameters on
         the container itself, such that if it is written out again downstream in the
-        pipeline these will be used.
-    output_root : string
+        pipeline these will be used. Default is ``True``.
+    output_root : str, optional
         Pipeline settable parameter giving the first part of the output path.
-        Deprecated in favour of `output_name`.
-    nan_check : bool
-        Check the output for NaNs (and infs) logging if they are present.
-    nan_dump : bool
-        If NaN's are found, dump the container to disk.
-    nan_skip : bool
-        If NaN's are found, don't pass on the output.
-    versions : dict
+        Deprecated in favour of specifying the output path directly in `output_name`.
+    nan_check : bool, optional
+        Check the output for NaNs (and infs) logging if they are present. Default
+        is ``True``.
+    nan_dump : bool, optional
+        If NaN's are found, dump the container to disk. Default is ``True``.
+    nan_skip : bool, optional
+        If NaN's are found, don't pass on the output. Default is ``True``.
+    versions : dict[str, str], optional
         Keys are module names (str) and values are their version strings. This is
-        attached to output metadata.
-    pipeline_config : dict
-        Global pipeline configuration. This is attached to output metadata.
+        attached to output metadata. Default is {}.
+    pipeline_config : dict, optional
+        Global pipeline configuration. This is attached to output metadata. Default
+        is {}.
 
     Raises
     ------
-    `caput.pipeline.PipelineRuntimeError`
+    :py:exc:`~caput.pipeline.exceptions.PipelineRuntimeError`
         If this is used as a baseclass to a task overriding `self.process` with variable
         length or optional arguments.
     """
@@ -331,10 +367,7 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
         n_args = len(pro_argspec.args) - 1
 
         if pro_argspec.varargs or pro_argspec.varkw or pro_argspec.defaults:
-            msg = (
-                "`process` method may not have variable length or optional"
-                " arguments."
-            )
+            msg = "`process` method may not have variable length or optional arguments."
             raise exceptions.PipelineRuntimeError(msg)
 
         if n_args == 0:
@@ -343,7 +376,11 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
             self._no_input = False
 
     def next(self, *input):
-        """Should not need to override. Implement `process` instead."""
+        """Iterates through inputs.
+
+        You should not need to override this. Implement
+        :py:meth:`~.ContainerTask.process` instead.
+        """
         self.log.info(f"Starting next for task {self.__class__.__name__}")
 
         self.comm.Barrier()
@@ -357,11 +394,7 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
 
         # Extract a list of the tags for all input arguments
         input_tags = [
-            (
-                str(icont.attrs.get("tag"))
-                if isinstance(icont, memh5.MemDiskGroup)
-                else ""
-            )
+            (str(icont.attrs.get("tag")) if isinstance(icont, MemDiskGroup) else "")
             for icont in input
         ]
 
@@ -399,7 +432,7 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
         return output if len(output) > 1 else output[0]
 
     def finish(self):
-        """Should not need to override. Implement `process_finish` instead."""
+        """Should not need to override. Implement :py:meth:`~.ContainerTask.process_finish` instead."""
         class_name = self.__class__.__name__
 
         self.log.info(f"Starting finish for task {class_name}")
@@ -427,10 +460,11 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
         # If there is only a single output, don't wrap as a tuple
         return output if len(output) > 1 else output[0]
 
-    def _process_output(self, output, ii: int = 0):
-        if not isinstance(output, memh5.MemDiskGroup):
+    def _process_output(self, output, ii=0):
+        """Check a single output container and write it if needed."""
+        if not isinstance(output, MemDiskGroup):
             raise exceptions.PipelineRuntimeError(
-                f"Task must output a valid memh5 container; given {type(output)}"
+                f"Task must output a valid memdata container; given {type(output)}"
             )
 
         # Set the tag according to the format
@@ -453,8 +487,8 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
 
         return output
 
-    def _save_output(self, output: memh5.MemDiskGroup, ii: int = 0) -> str | None:
-        """Save the output and return the file path if it was saved."""
+    def _save_output(self, output, ii=0):
+        """Save a single output container and return the file path if it was saved."""
         if output is None:
             return None
 
@@ -463,7 +497,7 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
             # won't find forbidden datasets like index_map but we are not compressing those
             datasets = []
             for key in grp:
-                if isinstance(grp[key], memh5.MemGroup):
+                if isinstance(grp[key], MemGroup):
                     datasets += walk_dset_tree(grp[key], f"{root}{key}/")
                 else:
                     datasets.append(root + key)
@@ -539,12 +573,10 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
         return None
 
     def _nan_process_output(self, output):
-        # Process the output to check for NaN's
-        # Returns the output or, None if it should be skipped
-
-        if not isinstance(output, memh5.MemDiskGroup):
+        """Check a single output container for NaN's and handle them."""
+        if not isinstance(output, MemDiskGroup):
             raise exceptions.PipelineRuntimeError(
-                f"Task must output a valid memh5 container; given {type(output)}"
+                f"Task must output a valid memdata container; given {type(output)}"
             )
 
         if self.nan_check:
@@ -554,7 +586,9 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
                 # Construct the filename
                 tag = output.attrs["tag"] if "tag" in output.attrs else self._count
                 outfile = "nandump_" + self.__class__.__name__ + "_" + str(tag) + ".h5"
-                self.log.debug("NaN found. Dumping %s", outfile)
+
+                self.log.debug(f"NaN found. Dumping {outfile}")
+
                 self.write_output(outfile, output)
 
             if nan_found and self.nan_skip:
@@ -563,8 +597,8 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
 
         return output
 
-    def _interpolation_dict(self, output, ii: int = 0):
-        # Get the set of variables the can be interpolated into the various strings
+    def _interpolation_dict(self, output, ii=0):
+        """Get the set of variables that can be used to create the output filename."""
         idict = dict(output.attrs)
         if "tag" in output.attrs:
             tag = output.attrs["tag"]
@@ -587,11 +621,13 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
         return idict
 
     def _nan_check_walk(self, cont):
-        # Walk through a memh5 container and check for NaN's and Inf's.
-        # Logs any issues found and returns True if there were any found.
+        """Walk through a memdata container and check for NaN's and Inf's.
+
+        Logs any issues found and returns True if there were any found.
+        """
         from mpi4py import MPI
 
-        if isinstance(cont, memh5.MemDiskGroup):
+        if isinstance(cont, MemDiskGroup):
             cont = cont._data
 
         stack = [cont]
@@ -602,7 +638,7 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
             n = stack.pop()
 
             # Check the dataset for non-finite numbers
-            if isinstance(n, memh5.MemDataset):
+            if isinstance(n, MemDataset):
                 # Try to test for NaN's and infs. This will fail for compound datatypes...
                 # casting to ndarray, bc MPI ranks may fall out of sync, if a nan or inf are found
                 arr = n[:].view(np.ndarray)
@@ -628,7 +664,7 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
                         found = True
                         break
 
-            elif isinstance(n, memh5.MemGroup | memh5.MemDiskGroup):
+            elif isinstance(n, MemGroup | MemDiskGroup):
                 for item in n.values():
                     stack.append(item)
 
@@ -638,7 +674,7 @@ class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
 
 # Alias for backwards compatibility
 class SingleTask(ContainerTask):
-    """Alias for Task for backwards compatibility."""
+    """Alias for :py:meth:`~caput.pipeline.tasklib.ContainerTask` for backwards compatibility."""
 
     def __init__(self):
         import warnings
@@ -652,7 +688,7 @@ class SingleTask(ContainerTask):
 
 
 def group_tasks(*tasks):
-    """Create a Task that groups a bunch of tasks together.
+    r"""Create a Task that groups a bunch of tasks together.
 
     This method creates a class that inherits from all the subtasks, and
     calls each `process` method in sequence, passing the output of one to the
@@ -663,9 +699,8 @@ def group_tasks(*tasks):
     >>> class SuperTask(group_tasks(SubTask1, SubTask2)):  # doctest: +SKIP
     ...     pass
 
-    At the moment if the ensemble has more than one setup method, the
+    At the moment, if the ensemble has more than one setup method, the
     SuperTask will need to implement an override that correctly calls each.
-
     """
 
     class TaskGroup(*tasks):
@@ -701,7 +736,7 @@ class _ReturnLastInputOnFinish(SingleTask):
 
         Parameters
         ----------
-        x : object
+        x : Any
             Object to cache
         """
         self.x = x
@@ -711,7 +746,7 @@ class _ReturnLastInputOnFinish(SingleTask):
 
         Returns
         -------
-        x : object
+        last_input : Any
             Last input to process.
         """
         return self.x
@@ -731,7 +766,7 @@ class _ReturnFirstInputOnFinish(SingleTask):
 
         Parameters
         ----------
-        x : object
+        x : Any
             Object to cache
         """
         if self.x is None:
@@ -742,7 +777,7 @@ class _ReturnFirstInputOnFinish(SingleTask):
 
         Returns
         -------
-        x : object
+        last_input : Any
             Last input to process.
         """
         return self.x

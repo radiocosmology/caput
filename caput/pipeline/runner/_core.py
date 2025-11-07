@@ -1,19 +1,32 @@
-"""caput.pipeline.runner."""
+"""Core pipeline runner functions.
+
+These don't provide much functionality on their own, but are used
+in the command-line interface.
+"""
+
+from __future__ import annotations
 
 import logging
 import sys
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import os
+    from collections.abc import Generator
+    from typing import Any, Literal
+
 
 logger = logging.getLogger(__name__)
 # Set the logging level and format
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-def lint_config(configfile):
+def lint_config(configfile: os.PathLike | tuple[os.PathLike, ...]) -> None:
     """Lint a pipeline config file without running it.
 
     Parameters
     ----------
-    configfile : str or tuple of str
+    configfile : os.PathLike | tuple[os.PathLike, ...]
         Path to a pipeline config file, or multiple config files.
     """
     from .._pipeline import Manager
@@ -28,8 +41,30 @@ def lint_config(configfile):
         Manager.from_yaml_file(cfg, lint=True)
 
 
-def run_pipeline(configfile, profile, profiler, mpi_abort, psutil):
-    """Run a pipeline immediately from the given `configfile`."""
+def run_pipeline(
+    configfile: os.PathLike,
+    profile: bool,
+    profiler: Literal["cprofile", "pyinstrument"],
+    mpi_abort: bool,
+    psutil: bool,
+) -> None:
+    """Run a pipeline immediately from the given `configfile`.
+
+    Parameters
+    ----------
+    configfile : os.PathLike
+        Path to a pipeline config file.
+    profile : bool
+        Whether to enable profiling.
+    profiler : {"cprofile", "pyinstrument"}
+        Which profiler to use (cprofile or pyinstrument).
+    mpi_abort : bool
+        Whether to enable MPI-aware exception handling. If True, any uncaught
+        exceptions will cause an MPI_Abort to be called, terminating all
+        processes in the MPI job.
+    psutil : bool
+        Whether to enable psutil-based memory profiling inside the pipeline manager.
+    """
     from ...util import profiler as prfl
     from .._pipeline import Manager
 
@@ -44,20 +79,33 @@ def run_pipeline(configfile, profile, profiler, mpi_abort, psutil):
         Manager.from_yaml_file(configfile, psutil_profiling=psutil).run()
 
 
-def template_run(templatefile, var, *args, **kwargs):
-    """Run a pipeline from the given `templatefile`.
+def template_run(  # noqa: D417
+    templatefile: os.PathLike, var: Any, *args: Any, **kwargs: Any
+) -> None:
+    r"""Run a pipeline from the given `templatefile`.
 
     Template variable substitutions are specified with `--var <varname>=<val>`
     arguments, with one for each variable. `<val>` may be a comma separated list, in
     which case item represents a separate value that is processed. Values *must* not
     contain a comma themselves. If multiple variables are specified, each with multiple
     substitutions the outer product of all possible values is generated.
+
+    Parameters
+    ----------
+    templatefile : str
+        A yaml file containing the pipeline template.
+    var : Any
+        A list of variable substitutions to apply to the template.
+    \*args : Any
+        Positional arguments to pass to `run_pipeline`.
+    \**kwargs : Any
+        Keyword arguments to pass to `run_pipeline`.
     """
     for tfh_name in _from_template(templatefile, var):
         run_pipeline(tfh_name, *args, **kwargs)
 
 
-def _from_template(templatefile, var):
+def _from_template(templatefile: os.PathLike, var: Any) -> Generator[str]:
     """Run a pipeline from the given `templatefile`.
 
     This is either run immediately (default), or can be placed in the batch
@@ -99,7 +147,7 @@ def _from_template(templatefile, var):
             yield tfh.name
 
 
-def _load_config(configfile):
+def _load_config(configfile: os.PathLike) -> dict[str, Any]:
     """Load the given configfile, returning the parsed YAML."""
     import yaml
 
@@ -107,7 +155,7 @@ def _load_config(configfile):
         return yaml.safe_load(f)
 
 
-def _load_venv(configfile):
+def _load_venv(configfile: os.PathLike) -> None:
     """Load the venv specified under cluster/venv in the given configfile."""
     import site
     from pathlib import Path

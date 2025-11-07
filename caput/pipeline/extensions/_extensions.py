@@ -1,17 +1,24 @@
-"""Assorted extensions for `TaskBase`.
+"""Assorted extensions for :py:class:`~caput.pipeline.Task`.
 
 Anything in here will potentially be deprecated.
 """
 
+from __future__ import annotations
+
 import inspect
 import logging
 import os
+from typing import TYPE_CHECKING
 
 from ... import config
 from ...memdata import fileformats, lock_file
 from .. import exceptions
 from .._pipeline import Task
 from ._configtypes import file_format
+
+if TYPE_CHECKING:
+    from ...memdata import MemGroup
+    from ...memdata._memh5 import GroupLike
 
 __all__ = ["BasicContMixin", "H5IOMixin"]
 
@@ -24,7 +31,7 @@ class _OneAndOne(Task):
     """Base class for tasks that have (at most) one input and one output.
 
     This is not a user base class and simply holds code that is common to
-    `SingleBase` and `IterBase`.
+    :py:class:`SingleBase` and :py:class:`IterBase`.
     """
 
     input_root = config.Property(default="None", proptype=str)
@@ -50,13 +57,13 @@ class _OneAndOne(Task):
         """Validate the task after instantiation.
 
         May be overriden to add any special task validation before the task is run.
-        This is called by the :py:class:`Manager` after it's added to the pipeline and has special attributes like
-        `_requires_keys`, `_requires`, `_in_keys`, `_in`, `-_out_keys` set.
-        Call `super().validate()` if you overwrite this.
+        This is called by the :py:class:`Manager` after it's added to the pipeline
+        and has special attributes like ``_requires_keys``, ``_requires``, ``_in_keys``,
+        ``_in``, ``-_out_keys`` set. Call :py:meth:`super().validate` if you overwrite this.
 
         Raises
         ------
-        caput.config.CaputConfigError
+        :py:exc:`~caput.config.CaputConfigError`
             If there was an error in the task configuration.
         """
         # Inspect the `process` method to see how many arguments it takes.
@@ -72,10 +79,7 @@ class _OneAndOne(Task):
             or pro_argspec.kwonlyargs
             or pro_argspec.defaults
         ):
-            msg = (
-                "`process` method may not have variable length or optional"
-                " arguments."
-            )
+            msg = "`process` method may not have variable length or optional arguments."
             raise config.CaputConfigError(msg)
 
         # Make sure we know where to get the data from.
@@ -95,10 +99,7 @@ class _OneAndOne(Task):
                 )
                 raise config.CaputConfigError(msg)
             if n_args != 1:
-                msg = (
-                    "Reading input from disk but `process` method takes no"
-                    " arguments."
-                )
+                msg = "Reading input from disk but `process` method takes no arguments."
                 raise config.CaputConfigError(msg)
 
     def read_process_write(self, input, input_filename, output_filename):
@@ -164,45 +165,47 @@ class _OneAndOne(Task):
 class SingleBase(_OneAndOne):
     """Base class for non-iterating tasks with at most one input and output.
 
-    Inherits from :class:`TaskBase`.
+    Inherits from :py:class:`~caput.pipeline.Task`.
 
-    Tasks inheriting from this class should override `process` and optionally
-    :meth:`setup`, :meth:`finish`, :meth:`read_input`, :meth:`write_output` and
-    :meth:`cast_input`.  They should not override :meth:`next`.
+    Tasks inheriting from this class should override :py:meth:`~caput.pipeline.Task.process`
+    and optionally :py:meth:`~caput.pipeline.Task.setup`, :py:meth:`~caput.pipeline.Task.finish`,
+    :py:meth:`~caput.pipeline._OneAndOne.read_input`, :py:meth:`~caput.pipeline._OneAndOne.write_output`
+    and :py:meth:`~caput.pipeline._OneAndOne.cast_input`.
+    They should not override :py:meth:`~caput.pipeline.Task.next`.
 
-    If the value of :attr:`input_root` is anything other than the string "None"
-    then the input will be read (using :meth:`read_input`) from the file
+    If the value of :py:attr:`~.SingleBase.input_root` is anything other than the string "None"
+    then the input will be read (using :py:meth:`~.SingleBase.read_input`) from the file
     ``self.input_root + self.input_filename``.  If the input is specified both as
     a filename and as a product key in the pipeline configuration, an error
     will be raised upon initialization.
 
 
-    If the value of :attr:`output_root` is anything other than the string
-    "None" then the output will be written (using :meth:`write_output`) to the
+    If the value of :py:attr:`~.SingleBase.output_root` is anything other than the string
+    "None" then the output will be written (using :py:meth:`~.SingleBase.write_output`) to the
     file ``self.output_root + self.output_filename``.
 
     Attributes
     ----------
-    input_root : string
+    input_root
         Pipeline settable parameter giving the first part of the input path.
         If set to 'None' no input is read. Either it is assumed that no input
         is required or that input is recieved from the pipeline.
-    input_filename : string
+    input_filename
         Pipeline settable parameter giving the last part of input path. The
         full input path is ``self.input_root + self.input_filename``.
-    output_root : strig
+    output_root
         Pipeline settable parameter giving the first part of the output path.
         If set to 'None' no output is written.
-    output_filename : string
+    output_filename
         Pipeline settable parameter giving the last part of output path. The
         full output path is ``self.output_root + self.output_filename``.
     """
 
-    input_filename = config.Property(default="", proptype=str)
-    output_filename = config.Property(default="", proptype=str)
+    input_filename: str = config.Property(default="", proptype=str)
+    output_filename: str = config.Property(default="", proptype=str)
     output_format = file_format()
-    output_compression = config.Property(default=None, proptype=str)
-    output_compression_opts = config.Property(default=None)
+    output_compression: str = config.Property(default=None, proptype=str)
+    output_compression_opts: dict | str | None = config.Property(default=None)
 
     def next(self, input=None):
         """Should not need to override."""
@@ -294,53 +297,56 @@ class IterBase(_OneAndOne):
 
 
 class H5IOMixin:
-    """Provides hdf5/zarr IO for pipeline tasks.
+    """Provides HDF5 IO for pipeline tasks.
 
     As a mixin, this must be combined (using multiple inheritance) with a
     subclass of `TaskBase`, providing the full task API.
 
     Provides the methods `read_input`, `read_output` and `write_output` for
-    hdf5 data.
+    HDF5 data.
     """
 
     # TODO, implement reading on disk (i.e. no copy to memory).
     # ondisk = config.Property(default=False, proptype=bool)
 
     @staticmethod
-    def read_input(filename):
-        """Method for reading hdf5 input."""
+    def read_input(filename: str) -> MemGroup:
+        """Method for reading HDF5 input."""
         from ...memdata import MemGroup
 
         return MemGroup.from_hdf5(filename, mode="r")
 
     @staticmethod
-    def read_output(filename):
-        """Method for reading hdf5 output (from caches)."""
+    def read_output(filename: str) -> MemGroup:
+        """Method for reading HDF5 output (from caches)."""
+        from ...memdata import MemGroup
+
         # Replicate code from read_input in case read_input is overridden.
-        from ...memdata import MemGroup
-
         return MemGroup.from_hdf5(filename, mode="r")
 
     @staticmethod
-    def write_output(filename, output, file_format=None, **kwargs):
-        """Method for writing hdf5/zarr output.
+    def write_output(  # noqa: D417
+        filename: str,
+        output: GroupLike,
+        file_format: fileformats.FileFormat | None = None,
+        **kwargs: dict,
+    ) -> None:
+        r"""Method for writing HDF5 output.
 
         Parameters
         ----------
-        filename : str
+        filename
             File name
-        output : memh5.Group, zarr.Group or h5py.Group
+        output
             `output` to be written. If this is a `h5py.Group` (which include `hdf5.File` objects)
             the buffer is flushed if `filename` points to the same file and a copy is made otherwise.
-        file_format : fileformats.Zarr, fileformats.HDF5 or None
+        file_format
             File format to use. If this is not specified, the file format is guessed based on the type of
             `output` or the `filename`. If guessing is not successful, HDF5 is used.
-        **kwargs : dict
+        \**kwargs
             Arbitrary keyword arguments.
         """
         import h5py
-
-        from ...memdata import MemGroup
 
         file_format = fileformats.check_file_format(filename, file_format, output)
 
@@ -359,6 +365,7 @@ class H5IOMixin:
                 # It's possible the directory was created by another MPI task
                 if not os.path.isdir(dirname):
                     raise e
+
         # Cases for `output` object type.
         if isinstance(output, MemGroup):
             # Already in memory.
@@ -390,7 +397,7 @@ class H5IOMixin:
                 pass
             else:
                 logger.debug(f"Copying {output.store}:{output.path} to {filename}.")
-                from . import mpitools
+                from ...util import mpitools
 
                 if mpitools.rank == 0:
                     n_copied, n_skipped, n_bytes_copied = zarr.copy_store(
@@ -409,8 +416,9 @@ class BasicContMixin:
     As a mixin, this must be combined (using multiple inheritance) with a
     subclass of `TaskBase`, providing the full task API.
 
-    Provides the methods `read_input`, `read_output` and `write_output` for
-    BasicCont data which gets written to HDF5 files.
+    Provides the methods :py:meth:`~.BasicContMixin.read_input`,
+    :py:meth:`~.BasicContMixin.read_output` and :py:meth:`~.BasicContMixin.write_output`
+    for :py:class:`~caput.memdata.BasicCont` data which gets written to disk.
     """
 
     # TODO, implement reading on disk (i.e. no copy to memory).
@@ -421,7 +429,21 @@ class BasicContMixin:
     _comm = None
 
     def read_input(self, filename):
-        """Method for reading hdf5 input."""
+        """Method for reading input from disk.
+
+        Any file format supported by :py:class:`~caput.memdata.BasicCont`
+        is supported.
+
+        Parameters
+        ----------
+        filename : PathLike
+            Path to a file to load.
+
+        Returns
+        -------
+        container : BasicCont
+            Container instance from a file.
+        """
         from ...memdata import BasicCont
 
         return BasicCont.from_file(
@@ -429,7 +451,18 @@ class BasicContMixin:
         )
 
     def read_output(self, filename):
-        """Method for reading hdf5 output (from caches)."""
+        """Method for reading output (from caches).
+
+        Parameters
+        ----------
+        filename : PathLike
+            Path to a file to read.
+
+        Returns
+        -------
+        container : BasicCont
+            Container instance from a file.
+        """
         # Replicate code from read_input in case read_input is overridden.
         from ...memdata import BasicCont
 
@@ -438,18 +471,24 @@ class BasicContMixin:
         )
 
     @staticmethod
-    def write_output(filename, output, file_format=None, **kwargs):
-        """Method for writing output to disk.
+    def write_output(  # noqa: D417
+        filename,
+        output,
+        file_format=None,
+        **kwargs,
+    ):
+        r"""Method for writing output to disk.
 
         Parameters
         ----------
-        filename : str
+        filename : PathLike
             File name.
-        output : :class:`memh5.BasicCont`
+        output : BasicCont
             Data to be written.
-        file_format : `fileformats.FileFormat`
-            File format to use. Default `fileformats.HDF5`.
-        **kwargs : dict
+        file_format : FileFormat
+            File format to use. Default is ``None``, in which
+            case the file format is guessed.
+        \**kwargs : Any
             Arbitrary keyword arguments.
         """
         from ...memdata import BasicCont
@@ -468,7 +507,7 @@ class BasicContMixin:
         # Cases for `output` object type.
         if not isinstance(output, BasicCont):
             raise RuntimeError(
-                "Object to write out is not an instance of memh5.BasicCont"
+                "Object to write out is not an instance of memdata.BasicCont"
             )
 
         # Already in memory.
@@ -481,13 +520,9 @@ class SingleH5Base(H5IOMixin, SingleBase):
     Inherits from :class:`H5IOMixin` and :class:`SingleBase`.
     """
 
-    pass
-
 
 class IterH5Base(H5IOMixin, IterBase):
     """Base class for iterating over hdf5 input and output.
 
     Inherits from :class:`H5IOMixin` and :class:`IterBase`.
     """
-
-    pass

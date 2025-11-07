@@ -1,11 +1,18 @@
-"""Pipeline task used for debugging and environment checks."""
+"""Pipeline tasks used for debugging and environment checks."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 import yaml
 
 from ... import config
-from .._pipeline import Task
-from .basic import ContainerTask, MPILoggedTask, SetMPILogging
+from .. import Task
+from .base import ContainerTask, MPILoggedTask, SetMPILogging
+
+if TYPE_CHECKING:
+    pass
 
 
 class CheckMPIEnvironment(MPILoggedTask):
@@ -87,7 +94,7 @@ class DebugInfo(MPILoggedTask, SetMPILogging):
             for name, version in versions:
                 self.log.info(f"Package: {name:40s} version={version}")
 
-    def _get_external_ip(self) -> str:
+    def _get_external_ip(self):
         # Reference here:
         # https://community.cloudflare.com/t/can-1-1-1-1-be-used-to-find-out-ones-public-ip-address/14971/6
 
@@ -102,7 +109,7 @@ class DebugInfo(MPILoggedTask, SetMPILogging):
 
         return str(res[0]).replace('"', "")
 
-    def _get_package_versions(self) -> list[tuple[str, str]]:
+    def _get_package_versions(self):
         import json
         import subprocess
 

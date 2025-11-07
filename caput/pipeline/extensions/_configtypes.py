@@ -1,29 +1,35 @@
 """Property config types."""
 
+from __future__ import annotations
+
 from ...config import CaputConfigError, Property
 from ...memdata import fileformats
 
 __all__ = ["file_format"]
 
 
-def file_format(default: str | fileformats.FileFormat | None = None) -> Property:
+def file_format(default=None):
     """Property type that accepts only "zarr", or "hdf5".
 
-    Returns the selected `caput.fileformat.FileFormat` subclass or `caput.fileformats.HDF5` if `value == default`.
+    Returns a :py:class:`~caput.config.Property` providing the selected
+    :py:class:`~caput.memdata.fileformats.FileFormat` subclass or
+    :py:class:`~caput.memdata.fileformats.HDF5` if no value is specified.
 
     Parameters
     ----------
-    default
-        A string or type object specifying the fileformat
+    default : {"hdf5", "zarr"} | FileFormat | None, optional
+        The default value for the Property. Only "zarr" or "hdf5" are
+        supported options as strings, but a `FileFormat` subclass is
+        also allowed, or ``None``.
 
     Returns
     -------
-    prop
-        A property instance setup to validate a file format.
+    prop : Property
+        A property instance set up to validate a file format.
 
     Raises
     ------
-    ValueError
+    :py:exc:`~caput.config.CaputConfigError`
         If the default value is not `"hdf5"` or `"zarr"`.
 
     Examples
@@ -31,8 +37,7 @@ def file_format(default: str | fileformats.FileFormat | None = None) -> Property
     Should be used like::
 
         class Project:
-
-            mode = file_format(default='zarr')
+            mode = file_format(default="zarr")
     """
     options = ("hdf5", "zarr")
 
