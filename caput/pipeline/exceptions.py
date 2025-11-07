@@ -1,4 +1,4 @@
-"""Pipeline exceptions."""
+"""Custom exceptions used throughout :py:mod:`caput.pipeline`."""
 
 __all__ = ["PipelineRuntimeError", "PipelineStopIteration"]
 

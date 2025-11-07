@@ -1,4 +1,4 @@
-"""Base class for distributed random number generation."""
+"""Base Task for distributed random number generation."""
 
 import zlib
 
@@ -6,7 +6,7 @@ import numpy as np
 
 from ... import config
 from ...algorithms import random
-from .basic import MPILoggedTask
+from .base import MPILoggedTask
 
 
 class RandomTask(MPILoggedTask):
@@ -14,11 +14,11 @@ class RandomTask(MPILoggedTask):
 
     Attributes
     ----------
-    seed : int, optional
+    seed : int
         Set the seed for use in the task. If not set, a random seed is generated and
         broadcast to all ranks. The seed being used is logged, to repeat a previous
         run, simply set this as the seed parameter.
-    threads : int, optional
+    threads : int
         Set the number of threads to use for the random number generator. If not
         explicitly set this will use the value of the `OMP_NUM_THREADS` environment
         variable, or fall back to four.
@@ -30,7 +30,7 @@ class RandomTask(MPILoggedTask):
     _rng = None
 
     @property
-    def rng(self) -> np.random.Generator:
+    def rng(self):
         """A random number generator for this task.
 
         .. warning::
@@ -39,7 +39,7 @@ class RandomTask(MPILoggedTask):
 
         Returns
         -------
-        rng : np.random.Generator
+        rng : MultiThreadedRNG
             A deterministically seeded random number generator suitable for use in
             MPI jobs.
         """
@@ -51,12 +51,17 @@ class RandomTask(MPILoggedTask):
     _local_seed = None
 
     @property
-    def local_seed(self) -> int:
+    def local_seed(self):
         """Get the seed to be used on this rank.
 
         .. warning::
             Generating the seed is a collective operation if the seed is not set,
             and so all ranks must participate in the first access of this property.
+
+        Returns
+        -------
+        rank_local_seed : int
+            Seed local to this rank.
         """
         if self._local_seed is None:
             if self.seed is None:
