@@ -1,7 +1,9 @@
-"""Simple pipeline task used for things like data flow."""
+"""Simple pipeline tasks used to control how data flows through the pipeline."""
+
+from __future__ import annotations
 
 from ... import config
-from .basic import ContainerTask, MPILoggedTask
+from .base import MPILoggedTask
 
 
 class AccumulateList(MPILoggedTask):
@@ -12,7 +14,7 @@ class AccumulateList(MPILoggedTask):
 
     Attributes
     ----------
-    group_size
+    group_size : int | None
         If this is set, this task will return the list of accumulated
         data whenever it reaches this length. If not set, wait until
         no more input is received and then return everything.
@@ -24,8 +26,22 @@ class AccumulateList(MPILoggedTask):
         super().__init__()
         self._items = []
 
-    def next(self, input_):
-        """Append an input to the list of inputs."""
+    def next(self, input_):  # noqa: D417
+        r"""Append an input to the list of inputs.
+
+        Parameters
+        ----------
+        input\_ : Any
+            Arbitrary input to accumulate.
+
+        Returns
+        -------
+        output : list[Any] | None
+            If :py:attr:`~.AccumulateList.group_size` is ``None``,
+            nothing is returned until this task reaches
+            :py:meth:`~.AccumulateList.finish`. Otherwise, return
+            a list of length `group_size`.
+        """
         self._items.append(input_)
 
         if self.group_size is not None:
@@ -41,6 +57,13 @@ class AccumulateList(MPILoggedTask):
         """Remove the internal reference.
 
         Prevents the items from hanging around after the task finishes.
+
+        Returns
+        -------
+        items : list | None
+            Accumulated list of inputs, or ``None`` if `group_size`
+            was set, in which case the inputs are returned from
+            :py:meth:`~.AccumulateList.next`.
         """
         items = self._items
         del self._items
@@ -51,7 +74,7 @@ class AccumulateList(MPILoggedTask):
         return items if self.group_size is None else None
 
 
-class Delete(ContainerTask):
+class Delete(MPILoggedTask):
     """Delete pipeline products to free memory."""
 
     def process(self, x):
@@ -59,7 +82,7 @@ class Delete(ContainerTask):
 
         Parameters
         ----------
-        x : object
+        x : Any
             The object to be deleted.
         """
         import gc
@@ -69,18 +92,25 @@ class Delete(ContainerTask):
         gc.collect()
 
 
-class MakeCopy(ContainerTask):
-    """Make a copy of the passed container."""
+class MakeCopy(MPILoggedTask):
+    """Make a copy of the passed object."""
 
     def process(self, data):
-        """Return a copy of the given container.
+        """Return a deep copy of the given object.
 
         Parameters
         ----------
-        data : containers.ContainerBase
-            The container to copy.
+        data : Any
+            The object to copy.
+
+        Returns
+        -------
+        copied_object : Any
+            A deep copy of the input object.
         """
-        return data.copy()
+        import copy
+
+        return copy.deepcopy(data)
 
 
 class PassOn(MPILoggedTask):
@@ -96,7 +126,7 @@ class PassOn(MPILoggedTask):
 
 
 class WaitUntil(MPILoggedTask):
-    """Wait until the the requires before forwarding inputs.
+    """Wait until the ``requires`` key is received before forwarding inputs.
 
     This simple synchronization task will forward on whatever inputs it gets, however, it won't do
     this until it receives any requirement to it's setup method. This allows certain parts of the

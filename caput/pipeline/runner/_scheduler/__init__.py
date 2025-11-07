@@ -2,8 +2,10 @@
 
 __all__ = ["queue", "register_system", "template_queue"]
 
+import os
 import logging
 from pathlib import Path
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 # Set the logging level and format
@@ -15,21 +17,19 @@ REGISTERED_SYSTEMS = {}
 MAIL_TYPES = []
 
 
-def _expand_path(path):
-    """Expand any variables, user directories in path."""
+def _expand_path(path: os.PathLike) -> Path:
+    """Expand any environment variables, user directories in path."""
     import os
 
     return Path(os.path.expandvars(path)).expanduser().resolve()
 
 
-def _fix_path(path):
+def _fix_path(path: os.PathLike) -> Path:
     """Turn path to an absolute path."""
-    from pathlib import Path
-
     return Path(path).resolve()
 
 
-def register_system(path: str | Path) -> dict:
+def register_system(path: os.PathLike) -> None:
     """Register new queue system(s) from a TOML file."""
     import toml
 
@@ -65,7 +65,13 @@ register_system(Path(__file__).parent / "_default_systems.toml")
 REGISTERED_CLUSTERS = {"gpc": "pbs", "cedar": "slurm", "fir": "slurm"}
 
 
-def template_queue(templatefile, var, overwrite, email=None, mailtype=None):
+def template_queue(
+    templatefile: os.PathLike,
+    var: str,
+    overwrite: Literal["never", "failed"],
+    email: str | None = None,
+    mailtype: str | None = None,
+):
     """Queue a pipeline from the given `templatefile`.
 
     Template variable substitutions are specified with `--var <varname>=<val>`
@@ -73,6 +79,21 @@ def template_queue(templatefile, var, overwrite, email=None, mailtype=None):
     which case item represents a separate value that is processed. Values *must* not
     contain a comma themselves. If multiple variables are specified, each with multiple
     substitutions the outer product of all possible values is generated.
+
+    Parameters
+    ----------
+    templatefile : os.PathLike
+        Path to a `.yaml` file containing the pipeline template.
+    var : str
+        Template variable substitutions.
+    overwrite : {"never", "failed"}
+        How to handle job directories which already exist. If "failed",
+        only jobs which have reported `FAILED` will be re-queued.
+    email : str | None, optional
+        Email address for job status notifications.
+    mailtype : str | None, optional
+        Types of job events for which to send email notifications. These
+        are typically specific to the queue system used.
     """
     from .._core import _from_template
 
@@ -87,24 +108,54 @@ def template_queue(templatefile, var, overwrite, email=None, mailtype=None):
 
 
 def queue(
-    configfile,
-    submit=False,
-    lint=True,
-    profile=False,
-    profiler="cProfiler",
-    psutil=False,
-    overwrite="never",
-    email=None,
-    mailtype=None,
+    configfile: os.PathLike,
+    submit: bool = False,
+    lint: bool = True,
+    profile: bool = False,
+    profiler: str | None = "cProfiler",
+    psutil: bool = False,
+    overwrite: Literal["never", "failed"] = "never",
+    email: str | None = None,
+    mailtype: str | None = None,
 ):
-    r"""Queue a pipeline on a cluster from the given CONFIGFILE.
+    """Queue a pipeline on a cluster from the given `configfile`.
 
     This queues the job, using parameters from the `cluster` section of the
     submitted YAML file.
 
+    Parameters
+    ----------
+    configfile : os.PathLike
+        Path to a `.yaml` pipeline config file.
+    submit : bool, optional
+        If True, the job will be submitted to the scheduler. Otherwise, the
+        job directory and files will be created but not submitted. Default
+        is False.
+    lint : bool, optional
+        If True, lint the `configfile` before creating any job files. Default
+        is True.
+    profile : bool, optional
+        If True, use a profiler to monitor the time and resource usage of
+        the pipeline job. Default is False.
+    profiler : {"cprofile", "pyinstrument"}, optional
+        Which profiler to use if `profile` is True. Default is `cprofile`.
+    psutil : bool, optional
+        If True, use `psutil` to monitor the memory use of the pipeline job.
+        Default is False.
+    overwrite : {"never", "failed"}, optional
+        How to handle job directories which already exist. If "failed",
+        only jobs which have reported `FAILED` will be re-queued. Default
+        is "never".
+    email : str | None, optional
+        Email address for job status notifications. Default is None
+    mailtype : str | None, optional
+        Types of job events for which to send email notifications. These
+        are typically specific to the queue system used. Default is None.
+
+    Cluster Config
+    ~~~~~~~~~~~~~~
     There are several *required* keys:
 
-    \b
     ``nodes``
         The number of nodes to run the job on.
     ``time``
@@ -115,11 +166,9 @@ def queue(
 
     There are many *optional* keys that control more functionality:
 
-    \b
     ``system``
-        A name of the cluster that we are running on, if this is supported
-        (currently ``gpc``, ``cedar``, ``fir``), this uses more relevant default
-        values.
+        The name of the cluster that we are running on. If this is a known system
+        (currently ``gpc``, ``cedar``, ``fir``), more relevant defaults are used.
     ``system``
         The queue system to run on. Either ``pbs`` or ``slurm``.
     ``queue``
@@ -235,7 +284,7 @@ def _resolve_system_config(conf: dict) -> dict:
         cluster_conf = conf["cluster"]
     except KeyError as exc:
         raise KeyError(
-            "Configuration file must have a 'cluster' section. " f"Got {conf.keys()}"
+            f"Configuration file must have a 'cluster' section. Got {conf.keys()}"
         ) from exc
 
     # Resolve default system parameters from registered systems
@@ -274,7 +323,7 @@ def _resolve_system_config(conf: dict) -> dict:
     return cluster_conf
 
 
-def _create_job_directories(conf: dict, overwrite: str) -> dict[Path, 3 | 0]:
+def _create_job_directories(conf: dict, overwrite: str) -> dict[str, Path]:
     """Create job directories based on a configuration dictionary."""
     directories = {}
 
@@ -321,7 +370,7 @@ def _create_job_directories(conf: dict, overwrite: str) -> dict[Path, 3 | 0]:
     return directories
 
 
-def _create_job_environment_strings(conf: dict) -> tuple[str, 2]:
+def _create_job_environment_strings(conf: dict) -> tuple[str, str]:
     """Load the job environment based on a configuration dictionary.
 
     Returns a tuple consisting of the module load string and the
