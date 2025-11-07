@@ -1,6 +1,6 @@
 """caput.
 
-Cluster Astronomical Python Utilities.
+Cluster Astronomical Parallel (Python) Utilities.
 
 Submodules
 ----------
