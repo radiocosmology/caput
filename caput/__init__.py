@@ -1,15 +1,4 @@
-"""caput.
-
-Cluster Astronomical Parallel (Python) Utilities.
-
-Submodules
-----------
-.. autosummary::
-    :toctree: _autosummary
-
-    config
-    mpiarray
-"""
+"""Cluster Astronomical Parallel (Python) Utilities."""
 
 from importlib.metadata import PackageNotFoundError, version
 
