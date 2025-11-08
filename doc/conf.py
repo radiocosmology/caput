@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 #
 # caput documentation build configuration file, created by
-# sphinx-quickstart on Thu Oct 10 12:52:16 2013.
+# sphinx-quickstart on Thu Oct 10 12:52:16 2013 and has been
+# heavily edited since...
 #
 # This file is execfile()d with the current directory set to its containing dir.
 #
@@ -12,35 +13,40 @@
 # serve to show the default.
 
 
-import os, re
-
-# Check if we are on readthedocs
-on_rtd = os.environ.get("READTHEDOCS", None) == "True"
-
+import os
+import re
 import sys
+
 import caput
 
+from datetime import datetime
+
 # Mock up modules missing on readthedocs.
-from unittest.mock import Mock as MagicMock
+# NOTE: mocking anything seems to make our build fail at the moment,
+# so commenting this out for now.
+# from unittest.mock import Mock as MagicMock
 
+# class Mock(MagicMock):
+#     @classmethod
+#     def __getattr__(cls, name):
+#         return Mock()
 
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-        return Mock()
-
+# Check if we are on readthedocs
+# on_rtd = os.environ.get("READTHEDOCS", None) == "True"
 
 # Do not mock up mpi4py. This is an "extra", and docs build without it.
-# MOCK_MODULES = ['h5py', 'mpi4py']
-MOCK_MODULES = ["h5py"]
-if on_rtd:
-    sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
+# MOCK_MODULES = ["h5py", "mpi4py", "zarr"]
+# MOCK_MODULES = ["h5py"]
+# if on_rtd:
+# sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
 
+# NOTE: we might also be able to set the mocks this way
+# autodoc_mock_imports = ["h5py", "mpi4py", "zarr"]
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-# sys.path.insert(0, os.path.abspath('../'))
+sys.path.insert(0, os.path.abspath("../"))
 
 # -- General configuration -----------------------------------------------------
 
@@ -51,42 +57,120 @@ if on_rtd:
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 # 'numpydoc' does not ship with sphinx. To get it use `pip install numpydoc`.
 extensions = [
-    "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary",
+    # "sphinx.ext.autodoc",
+    # "sphinx.ext.autosummary",
     "sphinx.ext.intersphinx",
     "sphinx.ext.mathjax",
-    "sphinx.ext.viewcode",
-    "sphinx.ext.napoleon",
-    "sphinx.ext.autosectionlabel",
+    "sphinx.ext.linkcode",
+    # "sphinx.ext.viewcode",
+    # "sphinx_autodoc_typehints",  # Automatically document param types (less noise in class signature)
+    # "sphinx.ext.napoleon",
+    "numpydoc",
+    "sphinx_copybutton",
+    # "sphinx_immaterial",  # Theme
+    "autoapi.extension",  # Automatically generate API docs
 ]
 
-napoleon_google_docstring = False
-napoleon_numpy_docstring = True
-napoleon_include_init_with_doc = False
-napoleon_include_private_with_doc = False
-napoleon_include_special_with_doc = False
-napoleon_use_admonition_for_examples = False
-napoleon_use_admonition_for_notes = False
-napoleon_use_admonition_for_references = False
-napoleon_use_ivar = False
-napoleon_use_param = True
-napoleon_use_rtype = True
-napoleon_type_aliases = None
-napoleon_attr_annotations = True
-
-autoclass_content = "both"  # include both class docstring and __init__
-autodoc_default_options = {
-    # Make sure that any autodoc declarations show the right members
-    "members": True,
-    "show-inheritance": True,
+## Mappings
+intersphinx_mapping = {
+    "h5py": ("http://docs.h5py.org/en/latest/", None),
+    "zarr": ("https://zarr.readthedocs.io/en/stable/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "python": ("https://docs.python.org/3/", None),
 }
-
-autosummary_generate = True  # Make _autosummary files and include them
-autosummary_imported_members = False
-
-intersphinx_mapping = {"h5py": ("http://docs.h5py.org/en/latest/", None)}
 intersphinx_cache_limit = 1
 
+## autoapi settings
+autoapi_dirs = ["../caput/"]
+autoapi_type = "python"
+# NOTE: autoapi is not able to parse `.pyx`, so cython docstrings
+# must exist in the corresponding `.pyi` file
+autoapi_file_patterns = ["*.py", "*.pyi"]
+autoapi_template_dir = "_templates/autoapi/"
+autoapi_keep_files = False # True for debugging
+
+autoapi_options = [
+    "members",
+    "special-members",
+    # "undoc-members",
+    "show-inheritance",
+    "show-module-summary",
+    "imported-members",
+]
+autoapi_ignore = []
+autoapi_add_toctree_entry = False
+autoapi_python_class_content = "class"
+autoapi_member_order = "groupwise"
+autoapi_own_page_level = "method"
+
+## numpydoc settings
+numpydoc_show_inherited_class_members = True
+numpydoc_class_members_toctree = True
+numpydoc_attributes_as_param_list = True
+numpydoc_xref_param_type = True
+# Ignore a few specific words when creating xrefs
+numpydoc_xref_ignore = {
+    "optional",
+    "Any",
+}
+# Don't check anything - we rely on `ruff` to check docstrings
+numpydoc_validation_checks = set()
+
+## Napoleon settings
+# NOTE: napoleon is disabled, but I've left these settings in here
+# for now in case we end up wanting to re-enable it
+# napoleon_google_docstring = False
+# napoleon_numpy_docstring = True
+#
+# napoleon_include_init_with_doc = False
+# napoleon_include_private_with_doc = False
+# napoleon_include_special_with_doc = True
+#
+# napoleon_use_admonition_for_examples = False
+# napoleon_use_admonition_for_notes = True
+# napoleon_use_admonition_for_references = True
+#
+# napoleon_use_ivar = False
+# napoleon_use_param = True
+# napoleon_use_rtype = False
+#
+# napoleon_preprocess_types = True
+# napoleon_type_aliases = None
+# napoleon_attr_annotations = True
+
+## Autodoc settings
+# autoclass_content = "class"  # include only the class docstring, not __init__
+# autodoc_default_options = {
+#     # Make sure that any autodoc declarations show the right members
+#     "members": True,
+#     "member-order": "bysource",
+#     "special-members": "__new__,__call__",
+#     "show-inheritance": True,
+# }
+
+# autosummary_generate = True  # Make _autosummary files and include them
+# autosummary_imported_members = True
+
+## Type hint settings
+# autodoc_typehints = (
+#     "both"  # Put typehints in both the signature and the description
+#     # "description"  # Put typehints into the description, not the signature
+# )
+
+# set_type_checking_flag = True
+# always_use_bars_union = True  # Use | for Union types rather than typing.Union
+# typehints_defaults = "braces"  # Show default values for typehints in braces
+# typehints_use_signature = False  # Show typehints in the function signature
+# typehints_use_signature_return = (
+#     False  # Show return typehints in the function signature
+# )
+
+## Manage warnings
+suppress_warnings = [
+    # We have other ways of finding these errors, and
+    # it doesn't really play well with private modules
+    "autoapi.python_import_resolution",
+]
 
 # This autodoc preprocessor replaces tokens like :class:`h5py.Dataset` with
 # :class:`h5py.Dataset <Dataset>`, as this is how h5py intersphinx domains are
@@ -98,12 +182,41 @@ def process_docstring(app, what, name, obj, options, lines):
         )
 
 
+def fix_ellipsis_in_signature(app, what, name, obj, options, signature, return_annotation):
+    """Ensure that Ellipsis is rendered as ... in type signatures."""
+    if signature:
+        signature = signature.replace("Ellipsis", "...")
+
+    if return_annotation:
+        return_annotation = return_annotation.replace("Ellipsis", "...")
+
+    return signature, return_annotation
+
+
+def autoapi_skip_member_handler(app, what, name, obj, skip, options):
+    # Force some private members in the `memdata` submodle
+    # to be included. At the moment, this works, but it doesn't
+    # link inheritance correctly
+    parts = name.split(".")
+
+    if "memdata" in parts:
+        if parts[-2] == "memdata" and what == "class":
+            return False
+
+    if parts[-1] == "logger":
+        # Always skip logger attribute
+        return True
+
+    return skip
+
+
 def setup(app):
     app.connect("autodoc-process-docstring", process_docstring)
+    app.connect("autoapi-skip-member", autoapi_skip_member_handler)
 
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ["_templates"]
+# templates_path = ["_templates/"]
 
 # The suffix of source filenames.
 source_suffix = ".rst"
@@ -116,7 +229,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "caput"
-copyright = "2013-2016, Kiyoshi Masui and J. Richard Shaw"
+copyright = f"2013-{datetime.now().year} Liam Gray, Kiyoshi Masui and J. Richard Shaw"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -139,7 +252,7 @@ release = caput.__version__
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ["_build"]
+exclude_patterns = ["_build", "_templates"]
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 # default_role = None
@@ -149,7 +262,7 @@ exclude_patterns = ["_build"]
 
 # If true, the current module name will be prepended to all description
 # unit titles (such as .. function::).
-# add_module_names = True
+add_module_names = False
 
 # If true, sectionauthor and moduleauthor directives will be shown in the
 # output. They are ignored by default.
@@ -162,30 +275,216 @@ pygments_style = "sphinx"
 # modindex_common_prefix = []
 
 
+# -- Options for github code linking -------------------------------------------
+# NOTE: there's a bunch of hackery here to make code linking work
+# with the `autoapi` extension. Existing extensions like `viewcode`
+# rely on actually importing items, so instead we use `linkcode` to
+# generate github links. However, the path info provided to `linkcode`
+# by `autoapi` is different from what it expects, so we have to manually
+# walk the project tree to generate a list of function definition files
+# and line numbers
+import os
+import ast
+from git import Repo
+
+
+def find_definitions_with_line_ranges(path):
+    """Get information about all members of a python file."""
+    with open(path, "r", encoding="utf-8") as f:
+        source = f.read()
+
+    tree = ast.parse(source)
+
+    results = {}
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            results[node.name] = (path, node.lineno, node.end_lineno)
+
+    return results
+
+
+def grep_directory():
+    """Compile a list of function definition locations."""
+    results = {}
+
+    for root, _, files in os.walk(f"../{project}"):
+        for fname in files:
+            suffix = fname.split(".")[-1]
+
+            if suffix != "py":
+                # If this is a cython file, change
+                # the suffix to use the corresponding
+                # stub file
+                if suffix == "pyx":
+                    parts = fname.split(".")
+                    parts[-1] = "pyi"
+                    fname = ".".join(parts)
+                else:
+                    continue
+
+            fpath = os.path.join(root, fname)
+
+            if os.path.exists(fpath):
+                results.update(find_definitions_with_line_ranges(fpath))
+
+    return results
+
+
+# Get the current git branch
+repo = Repo(search_parent_directories=True)
+try:
+    gitref = repo.active_branch.name
+except TypeError:
+    # In a detached state
+    hexsha = repo.head.object.hexsha
+    # Figure out which remote branches contain this commit
+    _possible_branches = repo.git.branch("-r", "--contains", hexsha)
+    # Update remotes
+    remote = repo.remotes["origin"]
+    remote.fetch()
+    
+    for _branch in _possible_branches.split(" "):
+        _branch_name = _branch.strip("origin/").strip()
+
+        if any(ref.remote_head == _branch_name for ref in remote.refs):
+            # Found a remote branch with this commit
+            gitref = _branch_name
+            break
+    else:
+        # Completely detached. Maybe this should just be
+        # an error instead?
+        gitref = hexsha
+
+# Compile a list of function line definitions
+funcdefs = grep_directory()
+
+
+# NOTE: this callback is used by `linkcode`
+# NOTE: this is specifically written to deal with the lack
+# of imports using `sphinx-autoapi`. It will almost certainly
+# fail if used with autodoc/autosummary.
+def linkcode_resolve(domain, info):
+    """Create links to github."""
+
+    if domain != "py":
+        return None
+
+    parts = info["fullname"].split(".")
+
+    global funcdefs
+    funcinfo = funcdefs.get(parts[-1])
+
+    if funcinfo is None:
+        raise ValueError(f"Could not find definition for function {parts[-1]}") 
+
+    filename = funcinfo[0].strip("../")
+    anchor = f"#L{funcinfo[1]}-L{funcinfo[2]}"
+
+    global gitref
+    # link to the current branch on github
+    result = f"https://github.com/radiocosmology/caput/blob/{gitref}/{filename}{anchor}"
+
+    return result
+
+
 # -- Options for HTML output ---------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-# html_theme = 'cloud'
-# html_theme_path = ["cloud"]
-# html_theme = 'default'
-
-html_theme = "sphinx_rtd_theme"
+# html_theme = "sphinx_immaterial"
+html_theme = "pydata_sphinx_theme"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.
-# html_theme_options = {}
+
+## sphinx immaterial settings
+#
+if html_theme == "sphinx_immaterial":
+    _html_primary_color = "light-blue"
+    _html_accent_color = "amber"
+
+    html_theme_options = {
+        # "collapse_navigation": False,
+        # "sticky_navigation": True,
+        # "navigation_depth": -1,
+        # "prev_next_buttons_location": "both",
+        # "style_external_links": True,
+        "font": False,
+        # "content.code.copy": True,
+        "repo_url": "https://github.com/radiocosmology/caput",
+        "repo_name": "caput",
+        "icon": {
+            "repo": "fontawesome/brands/github",
+            "edit": "material/file-edit-outline",
+        },
+        "palette": [
+            {
+                "media": "(prefers-color-scheme)",
+                "scheme": "slate",
+                "primary": _html_primary_color,
+                "accent": _html_accent_color,
+                "toggle": {
+                    "icon": "material/weather-sunny",
+                    "name": "Switch to light mode",
+                },
+            },
+            {
+                "media": "(prefers-color-scheme: light)",
+                "scheme": "default",
+                "primary": _html_primary_color,
+                "accent": _html_accent_color,
+                "toggle": {
+                    "icon": "material/weather-night",
+                    "name": "Switch to dark mode",
+                },
+            },
+            {
+                "media": "(prefers-color-scheme: dark)",
+                "scheme": "slate",
+                "primary": _html_primary_color,
+                "accent": _html_accent_color,
+                "toggle": {
+                    "icon": "material/eye-outline",
+                    "name": "Switch to system preference",
+                },
+            },
+        ],
+    }
+
+elif html_theme == "pydata_sphinx_theme":
+    html_theme_options = {
+        "github_url": "https://github.com/radiocosmology/caput",
+        "collapse_navigation": True,
+        "header_links_before_dropdown": 6,
+        "secondary_sidebar_items": {
+            "**": ["page-toc"],  # sourcelink
+            "index": ["page-toc"],
+        },
+        "navbar_end": {
+            # "search-button",
+            "theme-switcher",
+            # "version-switcher",
+            "navbar-icon-links",
+        },
+    }
+
+html_context = {"default_mode": "auto"}
+
+# sphinx-copybutton configurations
+copybutton_prompt_text = r">>> |\.\.\. |\$ |In \[\d*\]: | {2,5}\.\.\.: | {5,8}: "
+copybutton_prompt_is_regexp = True
 
 # Add any paths that contain custom themes here, relative to this directory.
 # html_theme_path = []
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-# html_title = None
+html_title = f"{project} v{version}"
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-# html_short_title = None
+html_short_title = f"{project}"
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
@@ -207,7 +506,7 @@ html_theme = "sphinx_rtd_theme"
 
 # If true, SmartyPants will be used to convert quotes and dashes to
 # typographically correct entities.
-# html_use_smartypants = True
+html_use_smartypants = False
 
 # Custom sidebar templates, maps document names to template names.
 # html_sidebars = {}
@@ -317,5 +616,4 @@ texinfo_documents = [
 # If false, no module index is generated.
 # texinfo_domain_indices = True
 
-# How to display URL addresses: 'footnote', 'no', or 'inline'.
-# texinfo_show_urls = 'footnote'
+# How to display URL addresses: 'footnote', 'no', or 'inline'. texinfo_show_urls = 'footnote'
