@@ -60,11 +60,12 @@ test = [
     "caput[complete]",
 ]
 docs = [
-    "Sphinx>=5.0",
-    "sphinx_rtd_theme",
-    "funcsigs",
-    "mock",
-    "sphinx-autodoc-typehints",
+    "gitpython",
+    "Sphinx>=5.0,<9",
+    "pydata_sphinx_theme",
+    "sphinx-autoapi",
+    "sphinx-copybutton",
+    "numpydoc",
     "caput[complete]",
 ]
 dev = ["caput[test]", "caput[docs]", "caput[profiling]", "ruff"]
