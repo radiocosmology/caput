@@ -42,16 +42,31 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 
 [project.optional-dependencies]
 mpi = ["mpi4py>=1.3"]
-compression = ["bitshuffle", "zarr>=2.11.0,<3", "numcodecs>=0.7.3,<0.16"]
-profiling = ["pyinstrument"]
-docs = ["Sphinx>=5.0", "sphinx_rtd_theme", "funcsigs", "mock"]
-lint = ["ruff", "black"]
-test = ["pytest", "pytest-lazy-fixtures"]
+compression = ["bitshuffle"]
+zarr = ["zarr>=2.11.0,<3", "numcodecs>=0.7.3"]
 fftw = ["pyfftw>=0.13.1"]
+profiling = ["pyinstrument"]
+# Install all optional extras
+complete = ["caput[mpi,zarr,compression,fftw]"]
+# Extras for tests and documentation
+test = [
+    "pytest",
+    "pytest-lazy-fixtures",
+    "caput[complete]",
+]
+docs = [
+    "Sphinx>=5.0",
+    "sphinx_rtd_theme",
+    "funcsigs",
+    "mock",
+    "sphinx-autodoc-typehints",
+    "caput[complete]",
+]
 
 [project.urls]
 Documentation = "https://caput.readthedocs.io/"
@@ -60,6 +75,7 @@ Repository = "https://github.com/radiocosmology/caput"
 [project.scripts]
 caput-pipeline = "caput.pipeline.runner._cli:cli"
 
+# setuptools configuration
 [tool.setuptools.dynamic]
 readme = { file = ["README.md"], content-type = "text/markdown" }
 
@@ -71,3 +87,19 @@ find = {}
 
 [tool.setuptools.package-data]
 "caput.pipeline.runner._scheduler" = ["_default_systems.toml"]
+
+# pytest configuration
+[tool.pytest.ini_options]
+# Required to use pyproject.toml for pytest configuration
+minversion = "6.0"
+# Uses recommended importlib mode for test discovery, which
+# is not the default for compatibility reasons
+addopts = [
+    "--import-mode=importlib",
+    "--verbose",
+    "--strict-markers",
+    ]
+# This isn't really necessary, but it makes it explicit
+# that pytest should only look in these directories for tests
+# `caput` is included to allow doctest discovery in the main package
+testpaths = ["tests", "caput"]
