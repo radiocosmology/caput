@@ -9,27 +9,8 @@ on:
     - master
 
 jobs:
-
-  lint-code-black:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-
-      - name: Update pip
-        run: pip install --upgrade pip
-
-      - name: Install pip dependencies
-        run: pip install black
-
-      - name: Check code with black
-        run: black --check .
   
-  lint-code-ruff:
+  lint-format-code-ruff:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,5 +26,8 @@ jobs:
       - name: Install pip dependencies
         run: pip install ruff
 
-      - name: Run ruff
+      - name: Run ruff linter check
         run: ruff check .
+
+      - name: Run ruff format check
+        run: ruff format --check .
