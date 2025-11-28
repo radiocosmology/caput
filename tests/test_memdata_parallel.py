@@ -7,7 +7,7 @@ import h5py
 import zarr
 import copy
 
-from caput.memdata import fileformats, memh5
+from caput import memdata
 from caput.util import mpitools
 from caput.mpiarray import MPIArray
 
@@ -24,12 +24,12 @@ def test_create_dataset():
     d_array_T = d_array.redistribute(axis=1)
 
     # Check that we must specify in advance if the dataset is distributed
-    g = memh5.MemGroup()
+    g = memdata.MemGroup()
     if comm is not None:
         with pytest.raises(RuntimeError):
             g.create_dataset("data", data=d_array)
 
-    g = memh5.MemGroup(distributed=True)
+    g = memdata.MemGroup(distributed=True)
 
     # Create an array from data
     g.create_dataset("data", data=d_array, distributed=True)
@@ -64,11 +64,11 @@ def test_create_dataset():
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
-        (lf("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (lf("h5_file_distributed"), h5py.File, memdata.fileformats.HDF5),
         (
             lf("zarr_file_distributed"),
             zarr.open_group,
-            fileformats.Zarr,
+            memdata.fileformats.Zarr,
         ),
     ],
 )
@@ -78,7 +78,7 @@ def test_io(
     """Test for I/O in MemGroup."""
 
     # Create distributed memh5 object
-    g = memh5.MemGroup(distributed=True)
+    g = memdata.MemGroup(distributed=True)
     g.attrs["rank"] = rank
 
     # Create an empty array with a specified shape
@@ -132,20 +132,20 @@ def test_io(
 
         # Check compression/chunks
         if chunks is None:
-            if file_format is fileformats.HDF5:
+            if file_format is memdata.fileformats.HDF5:
                 assert f["parallel_data"].chunks is None
 
-            elif file_format is fileformats.Zarr:
+            elif file_format is memdata.fileformats.Zarr:
                 assert f["parallel_data"].chunks == f["parallel_data"].shape
                 assert f["parallel_data"].compressor is None
         else:
             assert f["parallel_data"].chunks == chunks
 
-            if file_format is fileformats.Zarr:
+            if file_format is memdata.fileformats.Zarr:
                 assert f["parallel_data"].compressor is not None
 
     # Test that the read in group has the same structure as the original
-    g2 = memh5.MemGroup.from_file(
+    g2 = memdata.MemGroup.from_file(
         test_file,
         distributed=True,
         convert_attribute_strings=True,
@@ -175,18 +175,18 @@ def test_io(
 @pytest.mark.parametrize(
     "test_file,file_open_function,file_format",
     [
-        (lf("h5_file_distributed"), h5py.File, fileformats.HDF5),
+        (lf("h5_file_distributed"), h5py.File, memdata.fileformats.HDF5),
         (
             lf("zarr_file_distributed"),
             zarr.open_group,
-            fileformats.Zarr,
+            memdata.fileformats.Zarr,
         ),
     ],
 )
 def test_misc(test_file, file_open_function, file_format):
     """Misc tests for MemDiskGroupDistributed"""
 
-    dg = memh5.MemDiskGroup(distributed=True)
+    dg = memdata.MemDiskGroup(distributed=True)
 
     pdset = dg.create_dataset(
         "parallel_data",
@@ -202,7 +202,7 @@ def test_misc(test_file, file_open_function, file_format):
 
     dg.save(test_file, file_format=file_format)
 
-    dg2 = memh5.MemDiskGroup.from_file(
+    dg2 = memdata.MemDiskGroup.from_file(
         test_file, distributed=True, file_format=file_format
     )
 
@@ -217,14 +217,14 @@ def test_misc(test_file, file_open_function, file_format):
         if comm is not None:
             with pytest.raises(ValueError):
                 # MemDiskGroup will guess the file format
-                memh5.MemDiskGroup(data_group=f, distributed=True)
+                memdata.MemDiskGroup(data_group=f, distributed=True)
     mpitools.barrier()
 
 
 def test_redistribute():
     """Test redistribute in BasicCont."""
 
-    g = memh5.BasicCont(distributed=True)
+    g = memdata.BasicCont(distributed=True)
 
     # Create an array from data
     g.create_dataset("data", shape=(10, 10), distributed=True, distributed_axis=0)
@@ -238,7 +238,7 @@ def test_redistribute():
 
 def test_dataset_copy():
     # Check for string types
-    x = memh5.MemDatasetDistributed(shape=(4, 5), dtype=np.float32)
+    x = memdata.MemDatasetDistributed(shape=(4, 5), dtype=np.float32)
     x[:] = 0
 
     # Check a deepcopy using .copy

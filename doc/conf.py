@@ -376,7 +376,7 @@ def linkcode_resolve(domain, info):
     funcinfo = funcdefs.get(parts[-1])
 
     if funcinfo is None:
-        raise ValueError(f"Could not find definition for function {parts[-1]}") 
+        return None
 
     filename = funcinfo[0].strip("../")
     anchor = f"#L{funcinfo[1]}-L{funcinfo[2]}"
