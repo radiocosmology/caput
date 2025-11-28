@@ -1,4 +1,4 @@
-"""Unit tests for the memh5 module."""
+"""Unit tests for the memdata module."""
 
 import datetime
 import gc
@@ -14,13 +14,13 @@ from pytest_lazy_fixtures import lf
 import zarr
 import copy
 
-from caput.memdata import memh5, fileformats
+from caput import memdata
 
 
 def test_ro_dict():
-    """Test memh5.ro_dict."""
+    """Test memdata.ro_dict."""
     a = {"a": 5}
-    a = memh5.ro_dict(a)
+    a = memdata.ro_dict(a)
     assert a["a"] == 5
     assert list(a.keys()) == ["a"]
     # Convoluded test to make sure you can't write to it.
@@ -34,7 +34,7 @@ def test_ro_dict():
 
 def test_dataset_copy():
     # Check for string types
-    x = memh5.MemDatasetCommon(shape=(4, 5), dtype=np.float32)
+    x = memdata.MemDatasetCommon(shape=(4, 5), dtype=np.float32)
     x[:] = 0
 
     # Check a deepcopy using .copy
@@ -62,7 +62,7 @@ def test_dataset_copy():
 
 def test_memgroup_nested():
     """Test nested groups in MemGroup."""
-    root = memh5.MemGroup()
+    root = memdata.MemGroup()
     l1 = root.create_group("level1")
     l2 = l1.require_group("level2")
     assert root["level1"] == l1
@@ -72,7 +72,7 @@ def test_memgroup_nested():
 
 def test_memgroup_create_dataset():
     """Test creating datasets in MemGroup."""
-    g = memh5.MemGroup()
+    g = memdata.MemGroup()
     data = np.arange(100, dtype=np.float32)
     g.create_dataset("data", data=data)
     assert np.allclose(data, g["data"])
@@ -80,7 +80,7 @@ def test_memgroup_create_dataset():
 
 def test_memgroup_recursive_create():
     """Test creating nested groups at once in MemGroup."""
-    g = memh5.MemGroup()
+    g = memdata.MemGroup()
     with pytest.raises(ValueError):
         g.create_group("")
     g2 = g.create_group("level2/")
@@ -95,14 +95,14 @@ def test_memgroup_recursive_create():
 
 def test_memgroup_recursive_create_dataset():
     """Test creating nested datasets in MemGroup."""
-    g = memh5.MemGroup()
+    g = memdata.MemGroup()
     data = np.arange(10)
     g.create_dataset("a/ra", data=data)
-    assert memh5.is_group(g["a"])
+    assert memdata.is_group(g["a"])
     assert np.all(g["a/ra"][:] == data)
     g["a"].create_dataset("/ra", data=data)
     assert np.all(g["ra"][:] == data)
-    assert isinstance(g["a/ra"].parent, memh5.MemGroup)
+    assert isinstance(g["a/ra"].parent, memdata.MemGroup)
 
     # Check that d keeps g in scope.
     d = g["a/ra"]
@@ -161,7 +161,7 @@ def assertGroupsEqual(a, b):
     for key in a.keys():
         this_a = a[key]
         this_b = b[key]
-        if not memh5.is_group(a[key]):
+        if not memdata.is_group(a[key]):
             assertAttrsEqual(this_a.attrs, this_b.attrs)
             assert np.allclose(this_a, this_b)
         else:
@@ -199,14 +199,14 @@ def test_file_sanity(test_file, file_open_function):
         (lf("filled_h5_file"), h5py.File, None),
         (lf("filled_zarr_file"), zarr.open_group, None),
         (lf("filled_zarrzip_file"), zarr.open_group, None),
-        (lf("filled_h5_file"), h5py.File, fileformats.HDF5),
-        (lf("filled_zarr_file"), zarr.open_group, fileformats.Zarr),
-        (lf("filled_zarrzip_file"), zarr.open_group, fileformats.Zarr),
+        (lf("filled_h5_file"), h5py.File, memdata.fileformats.HDF5),
+        (lf("filled_zarr_file"), zarr.open_group, memdata.fileformats.Zarr),
+        (lf("filled_zarrzip_file"), zarr.open_group, memdata.fileformats.Zarr),
     ],
 )
 def test_to_from_file(test_file, file_open_function, file_format):
     """Tests that makes hdf5 objects, convert to mem and back."""
-    m = memh5.MemGroup.from_file(test_file, file_format=file_format)
+    m = memdata.MemGroup.from_file(test_file, file_format=file_format)
 
     # Check that read in file has same structure
     with file_open_function(test_file, "r") as f:
@@ -223,15 +223,15 @@ def test_to_from_file(test_file, file_open_function, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("filled_h5_file"), fileformats.HDF5),
-        (lf("filled_zarr_file"), fileformats.Zarr),
+        (lf("filled_h5_file"), memdata.fileformats.HDF5),
+        (lf("filled_zarr_file"), memdata.fileformats.Zarr),
     ],
 )
 def test_memdisk(test_file, file_format):
     """Test MemDiskGroup."""
-    f = memh5.MemDiskGroup(test_file, file_format=file_format)
+    f = memdata.MemDiskGroup(test_file, file_format=file_format)
     assert set(f.keys()) == set(f._data.keys())
-    m = memh5.MemDiskGroup(memh5.MemGroup.from_file(test_file, file_format=file_format))
+    m = memdata.MemDiskGroup(memdata.MemGroup.from_file(test_file, file_format=file_format))
     assert set(m.keys()) == set(f.keys())
     # Recursive indexing.
     assert set(f["/level1/"].keys()) == set(m["/level1/"].keys())
@@ -253,13 +253,13 @@ def test_memdisk(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("filled_h5_file"), fileformats.HDF5),
-        (lf("filled_zarr_file"), fileformats.Zarr),
+        (lf("filled_h5_file"), memdata.fileformats.HDF5),
+        (lf("filled_zarr_file"), memdata.fileformats.Zarr),
     ],
 )
 def test_compression(test_file, file_format, compression, compression_opts, chunks):
     # add a new compressed dataset
-    f = memh5.MemDiskGroup.from_file(test_file, file_format=file_format)
+    f = memdata.MemDiskGroup.from_file(test_file, file_format=file_format)
     rng = np.random.default_rng(12345)
     f.create_dataset(
         "new",
@@ -279,10 +279,10 @@ def test_compression(test_file, file_format, compression, compression_opts, chun
 
     # read back compression parameters from file
     with file_format.open(test_file + ".cmp") as fh:
-        if file_format is fileformats.HDF5:
+        if file_format is memdata.fileformats.HDF5:
             if compression is not None:
                 # for some reason .compression doesn't get set...
-                assert str(fileformats.H5FILTER) in fh["new"]._filters
+                assert str(memdata.fileformats.H5FILTER) in fh["new"]._filters
             assert fh["new"].chunks == chunks
         else:
             if compression is None:
@@ -293,7 +293,7 @@ def test_compression(test_file, file_format, compression, compression_opts, chun
                 assert fh["new"].chunks == chunks
 
 
-class TempSubClass(memh5.MemDiskGroup):
+class TempSubClass(memdata.MemDiskGroup):
     """A subclass of MemDiskGroup for testing."""
 
     pass
@@ -302,8 +302,8 @@ class TempSubClass(memh5.MemDiskGroup):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("h5_file"), fileformats.HDF5),
-        (lf("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), memdata.fileformats.HDF5),
+        (lf("zarr_file"), memdata.fileformats.Zarr),
         (lf("h5_file"), None),
         (lf("zarr_file"), None),
     ],
@@ -315,11 +315,11 @@ def test_io(test_file, file_format):
     tsc.create_dataset("dset", data=np.arange(10))
     tsc.save(test_file, file_format=file_format)
 
-    actual_file_format = fileformats.guess_file_format(test_file)
+    actual_file_format = memdata.fileformats.guess_file_format(test_file)
 
     # Load it from disk
-    tsc2 = memh5.MemDiskGroup.from_file(test_file, file_format=file_format)
-    tsc3 = memh5.MemDiskGroup.from_file(test_file, ondisk=True, file_format=file_format)
+    tsc2 = memdata.MemDiskGroup.from_file(test_file, file_format=file_format)
+    tsc3 = memdata.MemDiskGroup.from_file(test_file, ondisk=True, file_format=file_format)
 
     # Check that is is recreated with the correct type
     assert isinstance(tsc2, TempSubClass)
@@ -331,22 +331,22 @@ def test_io(test_file, file_format):
     # self.assertIsInstance(tsc3['dset'].parent, TempSubClass)
     tsc3.close()
 
-    with memh5.MemDiskGroup.from_file(
+    with memdata.MemDiskGroup.from_file(
         test_file, mode="r", ondisk=True, file_format=file_format
     ):
         # h5py will error if file already open
-        if actual_file_format == fileformats.HDF5:
+        if actual_file_format == memdata.fileformats.HDF5:
             with pytest.raises(IOError):
                 actual_file_format.open(test_file, "w")
         # ...zarr will not
         else:
             actual_file_format.open(test_file, "w")
 
-    with memh5.MemDiskGroup.from_file(
+    with memdata.MemDiskGroup.from_file(
         test_file, mode="r", ondisk=False, file_format=file_format
     ):
         f = actual_file_format.open(test_file, "w")
-        if actual_file_format == fileformats.HDF5:
+        if actual_file_format == memdata.fileformats.HDF5:
             f.close()
 
 
@@ -359,7 +359,7 @@ def fixture_history_dict():
 @pytest.fixture
 def h5_basiccont_file(h5_file, history_dict):
     """Provides a BasicCont file written to HDF5."""
-    d = memh5.BasicCont()
+    d = memdata.BasicCont()
     d.create_dataset("a", data=np.arange(5))
     d.add_history("test", history_dict)
     d.to_disk(h5_file)
@@ -369,10 +369,10 @@ def h5_basiccont_file(h5_file, history_dict):
 @pytest.fixture
 def zarr_basiccont_file(zarr_file, history_dict):
     """Provides a BasicCont file written to Zarr."""
-    d = memh5.BasicCont()
+    d = memdata.BasicCont()
     d.create_dataset("a", data=np.arange(5))
     d.add_history("test", history_dict)
-    d.to_disk(zarr_file, file_format=fileformats.Zarr)
+    d.to_disk(zarr_file, file_format=memdata.fileformats.Zarr)
     yield zarr_file, history_dict
 
 
@@ -395,15 +395,15 @@ def zarrzip_basiccont_file(zarr_basiccont_file):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("h5_basiccont_file"), fileformats.HDF5),
-        (lf("zarr_basiccont_file"), fileformats.Zarr),
-        (lf("zarrzip_basiccont_file"), fileformats.Zarr),
+        (lf("h5_basiccont_file"), memdata.fileformats.HDF5),
+        (lf("zarr_basiccont_file"), memdata.fileformats.Zarr),
+        (lf("zarrzip_basiccont_file"), memdata.fileformats.Zarr),
     ],
 )
 def test_access(test_file, file_format):
     """Test access to BasicCont content."""
     test_file = test_file[0]
-    d = memh5.BasicCont.from_file(test_file, file_format=file_format)
+    d = memdata.BasicCont.from_file(test_file, file_format=file_format)
     assert "history" in d._data
     assert "index_map" in d._data
     with pytest.raises(KeyError):
@@ -420,8 +420,8 @@ def test_access(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("h5_basiccont_file"), fileformats.HDF5),
-        (lf("zarr_basiccont_file"), fileformats.Zarr),
+        (lf("h5_basiccont_file"), memdata.fileformats.HDF5),
+        (lf("zarr_basiccont_file"), memdata.fileformats.Zarr),
     ],
 )
 def test_history(test_file, file_format):
@@ -432,7 +432,7 @@ def test_history(test_file, file_format):
     # Check file for config- and versiondump
     with file_format.open(basic_cont, "r") as f:
         history = f["history"].attrs["test"]
-        # if file_format == fileformats.HDF5:
+        # if file_format == memdata.fileformats.HDF5:
         assert history == json_prefix + json.dumps(history_dict)
         # else:
         #     assert history == history_dict
@@ -442,7 +442,7 @@ def test_history(test_file, file_format):
         f["history"].create_group("old_history_format")
         f["history/old_history_format"].attrs["foo"] = "bar"
 
-    with memh5.BasicCont.from_file(basic_cont, file_format=file_format) as m:
+    with memdata.BasicCont.from_file(basic_cont, file_format=file_format) as m:
         with warnings.catch_warnings(record=True) as w:
             # Cause all warnings to always be triggered.
             warnings.simplefilter("always")
@@ -459,18 +459,18 @@ def test_history(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("h5_file"), fileformats.HDF5),
-        (lf("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), memdata.fileformats.HDF5),
+        (lf("zarr_file"), memdata.fileformats.Zarr),
     ],
 )
 def test_to_from__file_unicode(test_file, file_format):
-    """Test that a unicode memh5 dataset is round tripped correctly."""
+    """Test that a unicode memdata dataset is round tripped correctly."""
     udata = np.array(["Test", "this", "works"])
     sdata = udata.astype("S")
     assert udata.dtype.kind == "U"
     assert sdata.dtype.kind == "S"
 
-    m = memh5.MemGroup()
+    m = memdata.MemGroup()
     udset = m.create_dataset("udata", data=udata)
     sdset = m.create_dataset("sdata", data=sdata)
     assert udset.dtype.kind == "U"
@@ -495,7 +495,7 @@ def test_to_from__file_unicode(test_file, file_format):
         assert fh["sdata"].dtype.kind == "S"
 
     # Test a load without conversion, types should be bytestrings
-    m2 = memh5.MemGroup.from_file(test_file, file_format=file_format)
+    m2 = memdata.MemGroup.from_file(test_file, file_format=file_format)
     assert m2["udata"].dtype.kind == "S"
     assert m2["sdata"].dtype.kind == "S"
     # Check the dtype here, for some reason Python 2 thinks the arrays are equal
@@ -504,7 +504,7 @@ def test_to_from__file_unicode(test_file, file_format):
     assert (m["sdata"].data == m2["sdata"].data).all()
 
     # Test a load *with* conversion, types should be unicode
-    m3 = memh5.MemGroup.from_file(
+    m3 = memdata.MemGroup.from_file(
         test_file,
         convert_attribute_strings=True,
         convert_dataset_strings=True,
@@ -519,15 +519,15 @@ def test_to_from__file_unicode(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("h5_file"), fileformats.HDF5),
-        (lf("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), memdata.fileformats.HDF5),
+        (lf("zarr_file"), memdata.fileformats.Zarr),
     ],
 )
 def test_failure(test_file, file_format):
     """Test that we fail when trying to write a non ASCII character."""
     udata = np.array(["\u03b2"])
 
-    m = memh5.MemGroup()
+    m = memdata.MemGroup()
     m.create_dataset("udata", data=udata)
 
     with pytest.raises(TypeError):
@@ -537,17 +537,17 @@ def test_failure(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("h5_file"), fileformats.HDF5),
-        (lf("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), memdata.fileformats.HDF5),
+        (lf("zarr_file"), memdata.fileformats.Zarr),
     ],
 )
 def test_to_from_hdf5(test_file, file_format):
-    """Test that a memh5 dataset JSON serialization is done correctly."""
+    """Test that a memdata dataset JSON serialization is done correctly."""
     json_prefix = "!!_memh5_json:"
     data = {"foo": {"bar": [1, 2, 3], "fu": "1"}}
     time = datetime.datetime.now()
 
-    m = memh5.MemGroup()
+    m = memdata.MemGroup()
     m.attrs["data"] = data
     m.attrs["datetime"] = {"datetime": time}
     m.attrs["ndarray"] = np.ndarray([1, 2, 3])
@@ -559,7 +559,7 @@ def test_to_from_hdf5(test_file, file_format):
             {"datetime": time.isoformat()}
         )
 
-    m2 = memh5.MemGroup.from_file(test_file, file_format=file_format)
+    m2 = memdata.MemGroup.from_file(test_file, file_format=file_format)
     assert m2.attrs["data"] == data
     assert m2.attrs["datetime"] == {"datetime": time.isoformat()}
 
@@ -567,13 +567,13 @@ def test_to_from_hdf5(test_file, file_format):
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
-        (lf("h5_file"), fileformats.HDF5),
-        (lf("zarr_file"), fileformats.Zarr),
+        (lf("h5_file"), memdata.fileformats.HDF5),
+        (lf("zarr_file"), memdata.fileformats.Zarr),
     ],
 )
 def test_json_failure(test_file, file_format):
     """Test that we get a TypeError if we try to serialize something else."""
-    m = memh5.MemGroup()
+    m = memdata.MemGroup()
     m.attrs["non_serializable"] = {"datetime": object}
 
     with pytest.raises(TypeError):

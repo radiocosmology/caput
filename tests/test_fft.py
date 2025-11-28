@@ -27,7 +27,7 @@ random_complex_array = rng.standard_normal(
 def test_invalid_type_fftw(x):
     """Test that an error is raised with a non-complex type."""
     with pytest.raises(TypeError):
-        fft.fftw.FFT(x.shape, x.dtype)
+        fft.fftw.FFTW(x.shape, x.dtype)
 
 
 @pytest.mark.parametrize("x", [random_complex_array])
@@ -35,7 +35,7 @@ def test_invalid_type_fftw(x):
 def test_forward_backward_fftw(x, ax):
     """Test that ifft(fft(x)) returns the original array."""
     # Test the direct class implementation
-    fftobj = fft.fftw.FFT(x.shape, x.dtype, ax)
+    fftobj = fft.fftw.FFTW(x.shape, x.dtype, ax)
 
     if np.isrealobj(x):
         # pyfftw will destroy the input array for
