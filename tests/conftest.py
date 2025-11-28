@@ -203,7 +203,7 @@ cook_params:
 @pytest.fixture
 def h5_file(rm_all_files):
     """Provides a file name and removes all files/dirs with the same prefix later."""
-    fname = "tmp_test_memh5.h5"
+    fname = "tmp_test_memdata.h5"
     yield fname
     rm_all_files(fname)
 
@@ -211,7 +211,7 @@ def h5_file(rm_all_files):
 @pytest.fixture
 def zarr_file(rm_all_files):
     """Provides a directory name and removes all files/dirs with the same prefix later."""
-    fname = "tmp_test_memh5.zarr"
+    fname = "tmp_test_memdata.zarr"
     yield fname
     rm_all_files(fname)
 
@@ -219,7 +219,7 @@ def zarr_file(rm_all_files):
 @pytest.fixture
 def h5_file_distributed(rm_all_files):
     """Provides a file name and removes all files/dirs with the same prefix later."""
-    fname = "tmp_test_memh5_distributed.h5"
+    fname = "tmp_test_memdata_distributed.h5"
     yield fname
     if mpitools.rank == 0:
         rm_all_files(fname)
@@ -228,7 +228,7 @@ def h5_file_distributed(rm_all_files):
 @pytest.fixture
 def zarr_file_distributed(rm_all_files):
     """Provides a directory name and removes all files/dirs with the same prefix later."""
-    fname = "tmp_test_memh5.zarr"
+    fname = "tmp_test_memdata.zarr"
     yield fname
     if mpitools.rank == 0:
         rm_all_files(fname)
