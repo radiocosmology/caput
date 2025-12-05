@@ -110,7 +110,7 @@ class ContainerBase(memh5.BasicCont):
         # argument), and infer what its value should be, or None if not
         # provided
         if args and "data_group" in kwargs:
-            raise ValueError(
+            raise TypeError(
                 "Received conflicting definitions of `data_group`, as both the first "
                 "positional and a keyword argument."
             )
