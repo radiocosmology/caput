@@ -8,41 +8,41 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from ..mpiarray import SelectionLike
-    from ._core import ContainerBase
+    from ._core import ContainerPrototype
 
 import numpy as np
 
 from ..memdata import _memh5
 from ..mpiarray import _apply_sel
-from ._core import ContainerBase
+from ._core import ContainerPrototype
 
 
-def empty_like(cont: ContainerBase, **kwargs: dict) -> ContainerBase:  # noqa: D417
+def empty_like(cont: ContainerPrototype, **kwargs: dict) -> ContainerPrototype:  # noqa: D417
     r"""Create an empty container with the same properties as `cont`.
 
     Parameters
     ----------
-    cont : ContainerBase
+    cont : ContainerPrototype
         Container to base this one off.
     \**kwargs : dict
         Optional definitions of specific axes we want to override. Works in the
-        same way as the :py:class:`ContainerBase` constructor, though `axes_from=obj` and
+        same way as the :py:class:`ContainerPrototype` constructor, though `axes_from=obj` and
         `attrs_from=obj` are implied.
 
     Returns
     -------
-    container : ContainerBase
+    container : ContainerPrototype
         New, empty container.
     """
-    if isinstance(cont, ContainerBase):
+    if isinstance(cont, ContainerPrototype):
         return cont.__class__(axes_from=cont, attrs_from=cont, **kwargs)
 
     raise RuntimeError(f"Unknown object type `{cont.__class__.__name__}`")
 
 
 def copy_datasets_filter(
-    source: ContainerBase,
-    dest: ContainerBase,
+    source: ContainerPrototype,
+    dest: ContainerPrototype,
     axis: str | Iterable[str] = [],
     selection: SelectionLike = {},
     exclude_axes: tuple[str] | list[str] | None = None,
@@ -54,9 +54,9 @@ def copy_datasets_filter(
 
     Parameters
     ----------
-    source : ContainerBase
+    source : ContainerPrototype
         Source container
-    dest : ContainerBase
+    dest : ContainerPrototype
         Destination container. The axes in this container should reflect the
         selections being made to the source.
     axis : str | tuple[str] | list[str]
