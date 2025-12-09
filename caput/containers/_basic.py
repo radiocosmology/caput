@@ -10,10 +10,10 @@ if TYPE_CHECKING:
     import numpy as np
 
 from .. import memdata
-from ._core import ContainerBase
+from ._core import ContainerPrototype
 
 
-class DataWeightContainer(ContainerBase):
+class DataWeightContainer(ContainerPrototype):
     """A base class for containers with generic data/weight datasets.
 
     This is meant to be a general-purpose container providing a common structure
@@ -55,7 +55,7 @@ class DataWeightContainer(ContainerBase):
         return dset
 
 
-class FreqContainer(ContainerBase):
+class FreqContainer(ContainerPrototype):
     """A simple container with a frequency axis."""
 
     _axes: ClassVar[tuple[str, ...]] = ("freq",)
