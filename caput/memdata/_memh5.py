@@ -12,7 +12,6 @@ import json
 import logging
 import posixpath
 import warnings
-from ast import literal_eval
 from collections.abc import Mapping
 from copy import deepcopy
 from typing import TYPE_CHECKING, TypeVar
@@ -1610,7 +1609,7 @@ class MemDatasetDistributed(MemDataset):
 
 
 class MemDiskGroup(_BaseGroup):
-    """Container whose data may either be stored on disk or in memory.
+    """Group whose data may either be stored on disk or in memory.
 
     This container is intended to have the same basic API :py:class:`h5py.Group`
     and :py:class:`.MemGroup` but whose underlying data could live either on disk
@@ -1619,8 +1618,7 @@ class MemDiskGroup(_BaseGroup):
     Aside from providing a few convenience methods, this class isn't that
     useful by itself. It is almost as easy to use :py:class:`h5py.Group`
     or :py:class:`.MemGroup` directly. Where it becomes more useful is for creating
-    more specialized data containers which can subclass this class.  A basic
-    but useful example is provided in :py:class:`.BasicCont`.
+    more specialized data containers which can subclass this class.
 
     This class also supports the same distributed features as :py:class:`.MemGroup`,
     but only when wrapping that class. Attempting to create a distributed object
@@ -1931,7 +1929,7 @@ class MemDiskGroup(_BaseGroup):
 
             # Axis selections won't warn if called from a baseclass without detecting
             # the subclass
-            if sel_args and not detect_subclass and cls in [MemDiskGroup, BasicCont]:
+            if sel_args and not detect_subclass and cls in [MemDiskGroup]:
                 warnings.warn(
                     "Cannot process axis selections as subclass is not known."
                 )
@@ -2257,247 +2255,6 @@ class MemDiskGroup(_BaseGroup):
                 file_format=file_format,
                 **kwargs,
             )
-
-
-class BasicCont(MemDiskGroup):
-    """Basic high level data container.
-
-    Basic one-level data container that allows any number of datasets in the
-    root group but no nesting. Data history tracking (in
-    :py:attr:`~.BasicCont.history`) and array axis interpretation (in
-    :py:attr:`~.BasicCont.index_map`) is also provided.
-
-    This container is intended to be an example of how a high level container,
-    with a strictly controlled data layout can be implemented by subclassing
-    :py:class:`MemDiskGroup`.
-
-    Notes
-    -----
-    Parameters are passed through to the :py:class:`MemDiskGroup` constructor.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Initialize new groups only if writable.
-        if self._data.file.mode == "r+":
-            self._data.require_group("history")
-            self._data.require_group("index_map")
-            self._data.require_group("reverse_map")
-
-            if "order" not in self._data["history"].attrs:
-                self._data["history"].attrs["order"] = "[]"
-
-    @property
-    def history(self):
-        """Stores the analysis history for this data.
-
-        Do not try to add a new entry by assigning to an element of this
-        property. Use :py:meth:`~.BasicCont.add_history` instead.
-
-        Returns
-        -------
-        history : ro_dict
-            Each entry is a dictionary containing metadata about that stage in
-            history.  There is also an 'order' entry which specifies how the
-            other entries are ordered in time.
-        """
-        out = {}
-        for name, value in self._data["history"].items():
-            warnings.warn(
-                f"memh5 dataset {self.name} is using a deprecated history format. Read support of "
-                "files using this format will be continued for now, but you should "
-                "update the instance of caput that wrote this file.",
-                DeprecationWarning,
-            )
-            out[name] = value.attrs
-
-        for name, value in self._data["history"].attrs.items():
-            out[name] = value
-
-        # TODO: this seems like a trememndous hack. I've changed it to a safer version of
-        # eval, but this should probably be removed
-        out["order"] = literal_eval(
-            _typeutils.bytes_to_unicode(self._data["history"].attrs["order"])
-        )
-
-        return ro_dict(out)
-
-    @property
-    def index_map(self):
-        """Stores representions of the axes of datasets.
-
-        The index map contains arrays used to interpret the axes of the
-        various datasets. For instance, the 'time', 'prod' and 'freq' axes of
-        the visibilities are described in the index map.
-
-        Do not try to add a new index_map by assigning to an item of this
-        property. Use :py:meth:`~.BasicCont.create_index_map` instead.
-
-        Returns
-        -------
-        index_map : ro_dict
-            Entries are 1D arrays used to interpret the axes of datasets.
-        """
-        return ro_dict({k: v[:] for k, v in self._data["index_map"].items()})
-
-    @property
-    def index_attrs(self):
-        """Exposes the attributes of each index_map entry.
-
-        Allows the user to implement custom behaviour associated with
-        the axis. Assignment to this dictionary does nothing but it does
-        allow attribute values to be changed.
-
-        Returns
-        -------
-        index_attrs : ro_dict
-            Attribute dicts for each index_map entry.
-        """
-        return ro_dict({k: v.attrs for k, v in self._data["index_map"].items()})
-
-    @property
-    def reverse_map(self):
-        """Stores mappings between :py:attr:`~.BasicCont.index_map` entries.
-
-        Do not try to add a new reverse_map by assigning to an item of this
-        property. Use :py:meth:`~.BasicCont.create_reverse_map` instead.
-
-        Returns
-        -------
-        reverse_map : ro_dict
-            Entries are 1D arrays used to map from product index to stack index.
-        """
-        out = {}
-        for name, value in self._data.get("reverse_map", {}).items():
-            out[name] = value[:]
-        return ro_dict(out)
-
-    def group_name_allowed(self, name):
-        """No groups are exposed to the user. Returns ``False``."""
-        return False
-
-    def dataset_name_allowed(self, name):
-        """Datasets may only be created and accessed in the root level group.
-
-        Returns ``True`` if *name* is a path in the root group i.e. '/dataset'.
-        """
-        parent_name, _ = posixpath.split(name)
-
-        return parent_name == "/"
-
-    def create_index_map(self, axis_name, index_map):
-        """Create a new index map."""
-        self._data["index_map"].create_dataset(axis_name, data=index_map)
-
-    def del_index_map(self, axis_name):
-        """Delete an index map."""
-        del self._data["index_map"][axis_name]
-
-    def create_reverse_map(self, axis_name, index_map):
-        """Create a new reverse map."""
-        self._data["reverse_map"].create_dataset(axis_name, data=index_map)
-
-    def del_reverse_map(self, axis_name):
-        """Delete an index map."""
-        del self._data["reverse_map"][axis_name]
-
-    def add_history(self, name, history=None):
-        """Create a new history entry.
-
-        Parameters
-        ----------
-        name : str
-            Name for history entry.
-        history : dict | None
-            History entry (optional). Needs to be json serializable.
-
-        Notes
-        -----
-        Previously only dictionaries with depth=1 were supported here. The key/value pairs of these
-        where added as attributes to the history group when written to disk. Reading the old
-        history format is still supported, however the history is now an attribute itself and
-        dictionaries of any depth are allowed as history entries.
-        """
-        if name == "order":
-            raise ValueError(
-                '"order" is a reserved name and may not be the name of a history entry.'
-            )
-        if history is None:
-            history = {}
-        order = self.history["order"]
-        order = [*order, name]
-
-        history_group = self._data["history"]
-        history_group.attrs["order"] = str(order)
-        history_group.attrs[name] = history
-
-    def redistribute(self, dist_axis):
-        """Redistribute parallel datasets along a specified axis.
-
-        Walks the tree of datasets and redistributes any distributed datasets
-        found with the specified axis. The underlying dataset objects remain
-        the same, but the underlying data arrays are new.
-
-        Parameters
-        ----------
-        dist_axis : int | str | Sequence[int | str]
-            The axis can be specified by an integer index (positive or
-            negative), or by a string label which must correspond to an entry in
-            the `axis` attribute on the dataset. If a list is supplied, each
-            entry is tried in turn, which allows different datasets to be
-            redistributed along differently labelled axes.
-        """
-        if not isinstance(dist_axis, list | tuple):
-            dist_axis = [dist_axis]
-
-        stack = list(self._data._storage_root.items())
-
-        # Crawl over the dataset tree and redistribute any matching datasets.
-        # NOTE: this is done using a non-recursive stack-based tree walk, the previous
-        # implementation used a recursive closure which generated a reference
-        # cycle and caused the entire container to be kept alive until an
-        # explicit gc run. So let this be a warning to be careful in this code.
-        while stack:
-            name, item = stack.pop()
-
-            # Recurse into subgroups
-            if isinstance(item, _Storage):
-                stack += list(item.items())
-
-            # Okay, we've found a distributed dataset, let's try and redistribute it
-            if isinstance(item, MemDatasetDistributed):
-                naxis = len(item.shape)
-
-                for axis in dist_axis:
-                    # Try processing if this is a string
-                    if isinstance(axis, str):
-                        if "axis" in item.attrs and axis in item.attrs["axis"]:
-                            axis = list(item.attrs["axis"]).index(axis)
-                        else:
-                            continue
-
-                    # Process if axis is an integer
-                    elif isinstance(axis, int):
-                        # Deal with negative axis index
-                        if axis < 0:
-                            axis = naxis + axis
-
-                    # Check axis is within bounds
-                    if axis >= naxis:
-                        continue
-
-                    # Excellent, found a matching axis, time to redistribute
-                    item.redistribute(axis)
-                    break
-
-                # Note that this clause is on the FOR.
-                else:
-                    # If we are here we didn't find a matching axis, emit a warning
-                    logger.info(
-                        "Could not find axis (from %s) to distribute dataset %s over.",
-                        str(dist_axis),
-                        name,
-                    )
 
 
 # Utilities
