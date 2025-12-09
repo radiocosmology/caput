@@ -3,37 +3,282 @@
 from __future__ import annotations
 
 import inspect
+import posixpath
+import warnings
+from ast import literal_eval
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .. import memdata
-from ..memdata._memh5 import ro_dict
+from ..memdata import _typeutils
 
 if TYPE_CHECKING:
-    from typing import ClassVar
+    from collections.abc import Mapping, Sequence
+    from typing import Any, ClassVar, Literal
 
     import numpy.typing as npt
 
     from ..mpiarray import SelectionLike
 
 
-__all__ = ["ContainerBase", "TableBase"]
+__all__ = ["Container", "ContainerPrototype", "TableSpec"]
 
 
-class ContainerBase(memdata.BasicCont):
-    """A base class for pipeline containers.
+class Container(memdata.MemDiskGroup):
+    """Basic high level data container.
+
+    Basic one-level data container that allows any number of datasets in the
+    root group but no nesting. Data history tracking (in
+    :py:attr:`~.Container.history`) and array axis interpretation (in
+    :py:attr:`~.Container.index_map`) is also provided.
+
+    Instead of subclassing this directly, most use casees will be better served
+    by subclassing :py:class:`.ContainerPrototype`, which provides additional facilities
+    to simplify the specification of container datasets and axes. This class is
+    intended to be more flexible - datasets can be added or deleted arbitrarily.
+
+    Notes
+    -----
+    Parameters are passed through to the :py:class:`~caput.memdata.MemDiskGroup`
+    constructor.
+    """
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # Initialize new groups only if writable.
+        if self._data.file.mode == "r+":
+            self._data.require_group("history")
+            self._data.require_group("index_map")
+            self._data.require_group("reverse_map")
+
+            if "order" not in self._data["history"].attrs:
+                self._data["history"].attrs["order"] = "[]"
+
+    @property
+    def history(self) -> memdata.ro_dict:
+        """Stores the analysis history for this data.
+
+        Do not try to add a new entry by assigning to an element of this
+        property. Use :py:meth:`~.Container.add_history` instead.
+
+        Returns
+        -------
+        history : ro_dict
+            Each entry is a dictionary containing metadata about that stage in
+            history.  There is also an 'order' entry which specifies how the
+            other entries are ordered in time.
+        """
+        out = {}
+        for name, value in self._data["history"].items():
+            warnings.warn(
+                f"dataset {self.name} is using a deprecated history format. Read support of "
+                "files using this format will be continued for now, but you should "
+                "update the instance of caput that wrote this file.",
+                DeprecationWarning,
+            )
+            out[name] = value.attrs
+
+        for name, value in self._data["history"].attrs.items():
+            out[name] = value
+
+        # TODO: this seems like a trememndous hack. I've changed it to a safer version of
+        # eval, but this should probably be removed
+        out["order"] = literal_eval(
+            _typeutils.bytes_to_unicode(self._data["history"].attrs["order"])
+        )
+
+        return memdata.ro_dict(out)
+
+    @property
+    def index_map(self) -> memdata.ro_dict:
+        """Stores representions of the axes of datasets.
+
+        The index map contains arrays used to interpret the axes of the
+        various datasets. For instance, the 'time', 'prod' and 'freq' axes of
+        the visibilities are described in the index map.
+
+        Do not try to add a new index_map by assigning to an item of this
+        property. Use :py:meth:`~.Container.create_index_map` instead.
+
+        Returns
+        -------
+        index_map : ro_dict
+            Entries are 1D arrays used to interpret the axes of datasets.
+        """
+        return memdata.ro_dict({k: v[:] for k, v in self._data["index_map"].items()})
+
+    @property
+    def index_attrs(self) -> memdata.ro_dict:
+        """Exposes the attributes of each index_map entry.
+
+        Allows the user to implement custom behaviour associated with
+        the axis. Assignment to this dictionary does nothing but it does
+        allow attribute values to be changed.
+
+        Returns
+        -------
+        index_attrs : ro_dict
+            Attribute dicts for each index_map entry.
+        """
+        return memdata.ro_dict({k: v.attrs for k, v in self._data["index_map"].items()})
+
+    @property
+    def reverse_map(self) -> memdata.ro_dict:
+        """Stores mappings between :py:attr:`~.Container.index_map` entries.
+
+        Do not try to add a new reverse_map by assigning to an item of this
+        property. Use :py:meth:`~.Container.create_reverse_map` instead.
+
+        Returns
+        -------
+        reverse_map : ro_dict
+            Entries are 1D arrays used to map from product index to stack index.
+        """
+        out = {}
+        for name, value in self._data.get("reverse_map", {}).items():
+            out[name] = value[:]
+        return memdata.ro_dict(out)
+
+    def group_name_allowed(self, name: str) -> Literal[False]:
+        """No groups are exposed to the user. Returns ``False``."""
+        return False
+
+    def dataset_name_allowed(self, name: str) -> bool:
+        """Datasets may only be created and accessed in the root level group.
+
+        Returns ``True`` if *name* is a path in the root group i.e. '/dataset'.
+        """
+        parent_name, _ = posixpath.split(name)
+
+        return parent_name == "/"
+
+    def create_index_map(self, axis_name: str, index_map: npt.ArrayLike[Any]) -> None:
+        """Create a new index map."""
+        self._data["index_map"].create_dataset(axis_name, data=index_map)
+
+    def del_index_map(self, axis_name: str) -> None:
+        """Delete an index map."""
+        del self._data["index_map"][axis_name]
+
+    def create_reverse_map(self, axis_name: str, index_map: npt.ArrayLike[Any]) -> None:
+        """Create a new reverse map."""
+        self._data["reverse_map"].create_dataset(axis_name, data=index_map)
+
+    def del_reverse_map(self, axis_name: str) -> None:
+        """Delete an index map."""
+        del self._data["reverse_map"][axis_name]
+
+    def add_history(self, name: str, history: Mapping | None = None) -> None:
+        """Create a new history entry.
+
+        Parameters
+        ----------
+        name : str
+            Name for history entry.
+        history : dict | None
+            History entry (optional). Needs to be json serializable.
+
+        Notes
+        -----
+        Previously only dictionaries with depth=1 were supported here. The key/value pairs of these
+        where added as attributes to the history group when written to disk. Reading the old
+        history format is still supported, however the history is now an attribute itself and
+        dictionaries of any depth are allowed as history entries.
+        """
+        if name == "order":
+            raise ValueError(
+                '"order" is a reserved name and may not be the name of a history entry.'
+            )
+        if history is None:
+            history = {}
+        order = self.history["order"]
+        order = [*order, name]
+
+        history_group = self._data["history"]
+        history_group.attrs["order"] = str(order)
+        history_group.attrs[name] = history
+
+    def redistribute(self, dist_axis: int | str | Sequence[int | str]) -> None:
+        """Redistribute parallel datasets along a specified axis.
+
+        Walks the tree of datasets and redistributes any distributed datasets
+        found with the specified axis. The underlying dataset objects remain
+        the same, but the underlying data arrays are new.
+
+        Parameters
+        ----------
+        dist_axis : int | str | Sequence[int | str]
+            The axis can be specified by an integer index (positive or
+            negative), or by a string label which must correspond to an entry in
+            the `axis` attribute on the dataset. If a list is supplied, each
+            entry is tried in turn, which allows different datasets to be
+            redistributed along differently labelled axes.
+        """
+        if not isinstance(dist_axis, list | tuple):
+            dist_axis: list = [dist_axis]
+
+        stack = list(self._data._storage_root.items())
+
+        # Crawl over the dataset tree and redistribute any matching datasets.
+        # NOTE: this is done using a non-recursive stack-based tree walk, the previous
+        # implementation used a recursive closure which generated a reference
+        # cycle and caused the entire container to be kept alive until an
+        # explicit gc run. So let this be a warning to be careful in this code.
+        while stack:
+            _, item = stack.pop()
+
+            # Recurse into subgroups
+            if isinstance(item, memdata._Storage):
+                stack += list(item.items())
+
+            # Okay, we've found a distributed dataset, let's try and redistribute it
+            if isinstance(item, memdata.MemDatasetDistributed):
+                naxis = len(item.shape)
+
+                for axis in dist_axis:
+                    # Try processing if this is a string
+                    if isinstance(axis, str):
+                        if "axis" in item.attrs and axis in item.attrs["axis"]:
+                            axis = list(item.attrs["axis"]).index(axis)
+                        else:
+                            continue
+
+                    # Process if axis is an integer
+                    elif isinstance(axis, int):
+                        # Deal with negative axis index
+                        if axis < 0:
+                            axis = naxis + axis
+
+                    # Check axis is within bounds
+                    if axis >= naxis:
+                        continue
+
+                    # Excellent, found a matching axis, time to redistribute
+                    item.redistribute(axis)
+                    break
+
+                # Note that this clause is on the FOR.
+                else:
+                    # If we are here we didn't find a matching axis, emit a warning
+                    warnings.warn(
+                        "Could not find axis (from {dist_axis}) to distribute dataset {name} over."
+                    )
+
+
+class ContainerPrototype(Container):
+    """A prototype class used to design containers using axis and dataset specifications.
 
     This class is designed to do much of the work of setting up pipeline
     containers. It should be subclassed, with two class variables set:
-    :py:attr:`~.ContainerBase._axes` and :py:attr:`~.ContainerBase._dataset_spec`.
+    :py:attr:`~.ContainerPrototype._axes` and :py:attr:`~.ContainerPrototype._dataset_spec`.
     See the :ref:`Notes <containerbase_notes>` section for details.
 
     Optional Parameters
     ~~~~~~~~~~~~~~~~~~~
     Some combination of the following parameters must br provided when creating
     a new container. In particular, the container requires axis definitions to
-    be provided for all axes in :py:attr:`~.ContainerBase._axes`, whether by
+    be provided for all axes in :py:attr:`~.ContainerPrototype._axes`, whether by
     direct keyword arguments, or by copying from another container.
 
     data_group : :py:class:`~caput.memdata.MemDiskGroup`
@@ -41,23 +286,23 @@ class ContainerBase(memdata.BasicCont):
         routines like :py:func:`~caput.memdata.tod.concatenate` and generally
         shouldn't be used directly. Either a keyword argument, or the first
         positional argument.
-    axes_from : :py:class:`~caput.memdata.BasicCont`, optional
+    axes_from : :py:class:`.Container`, optional
         Another container to copy axis definitions from. Must be supplied as
         keyword argument.
-    attrs_from : :py:class:`~caput.memdata.BasicCont`, optional
+    attrs_from : :py:class:`.Container`, optional
         Another container to copy dataset attributes from. Must be supplied as keyword
         argument. This applies to attributes in default datasets too.
-    dsets_from : :py:class:`~caput.memdata.BasicCont`, optional
+    dsets_from : :py:class:`.Container`, optional
         A container to copy datasets from. Any dataset which an axis whose definition
         has been explicitly set (i.e. does not come from `axes_from`) will not be
         copied.
-    copy_from : :py:class:`~caput.memdata.BasicCont`, optional
+    copy_from : :py:class:`.Container`, optional
         Set ``axes_from``, ``attrs_from`` and ``dsets_from`` to this instance if they are
         not set explicitly.
     skip_datasets : bool, optional
         Skip creating datasets. Instead, they will all need to be added manually
-        with :py:meth:`~.ContainerBase.add_dataset` regardless of the entry in
-        :py:attr:`~.ContainerBase._dataset_spec`. Default is ``False``.
+        with :py:meth:`~.ContainerPrototype.add_dataset` regardless of the entry in
+        :py:attr:`~.ContainerPrototype._dataset_spec`. Default is ``False``.
     distributed : bool, optional
         Should this be a distributed container? Defaults to ``True``.
     comm : :py:obj:`~mpi4py.MPI.Comm`, optional
@@ -71,14 +316,14 @@ class ContainerBase(memdata.BasicCont):
     -----
     .. _containerbase_notes:
 
-    Inheritance from other :py:class:`ContainerBase` subclasses should work as expected,
+    Inheritance from other :py:class:`ContainerPrototype` subclasses should work as expected,
     with datasets defined in parent classes appearing as expected, and being
     overridden where they are redefined in the derived class.
 
-    The variable :py:attr:`~.ContainerBase._axes` should be a tuple containing the names of axes that
+    The variable :py:attr:`~.ContainerPrototype._axes` should be a tuple containing the names of axes that
     datasets in this container will use.
 
-    The variable :py:attr:`~.ContainerBase._dataset_spec` should define the datasets. It's a dictionary
+    The variable :py:attr:`~.ContainerPrototype._dataset_spec` should define the datasets. It's a dictionary
     with the names of the datasets as keys. The value for each  key should be another dictionary. In that
     sub-dictionary, the key `axes` is mandatory and should be a list of the axes the dataset has (these
     should correspondto entries in `_axes`), as is the key `dtype` which should be a datatype understood by
@@ -328,11 +573,11 @@ class ContainerBase(memdata.BasicCont):
                 ]["compression_opts"]
 
     @property
-    def datasets(self) -> ro_dict[str, memdata.MemDataset]:
+    def datasets(self) -> memdata.ro_dict[str, memdata.MemDataset]:
         """A read-only view of the datasets in this container.
 
         Do not try to add a new dataset by adding keys to this property.
-        Use :py:attr:`~.ContainerBase.create_dataset` instead.
+        Use :py:attr:`~.ContainerPrototype.create_dataset` instead.
 
         Returns
         -------
@@ -343,7 +588,7 @@ class ContainerBase(memdata.BasicCont):
         for name, value in self._data.items():
             if not memdata.is_group(value):
                 out[name] = value
-        return ro_dict(out)
+        return memdata.ro_dict(out)
 
     @classmethod
     def _class_dataset_spec(cls) -> dict[str, dict]:
@@ -454,13 +699,13 @@ class ContainerBase(memdata.BasicCont):
         return selections
 
 
-class TableBase(ContainerBase):
+class TableSpec(ContainerPrototype):
     """A base class for containers holding tables of data.
 
-    Similar to the :py:class:`ContainerBase` class, a container is defined through a
-    dictionary given as a :py:attr:`~.TableBase._table_spec` class attribute when subclassing
+    Similar to the :py:class:`ContainerPrototype` class, a container is defined through a
+    dictionary given as a :py:attr:`~.TableSpec._table_spec` class attribute when subclassing
     this base class. The container may also hold generic datasets by specifying
-    :py:attr:`~.ContainerBase._dataset_spec` as with :py:class:`ContainerBase`.
+    :py:attr:`~.ContainerPrototype._dataset_spec` as with :py:class:`ContainerPrototype`.
     See :ref:`Notes <tablebase_notes>` for details.
 
     Optional Parameters

@@ -1,9 +1,9 @@
 """Time-ordered data containers and utilities.
 
 This module contains data containers, data formats, and utilities based on
-:py:mod:`~caput.memdata`. The data represented must have an axis representing time,
-and, in particular, concatenating multiple datasets along a time axis must be a
-sensible operation.
+:py:mod:`~caput.containers` and :py:mod:`~caput.memdata`. The data represented
+must have an axis representing time, and, in particular, concatenating multiple
+datasets along a time axis must be a sensible operation.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import numpy as np
 
 from .. import memdata, mpiarray
 from ..memdata import _typeutils, fileformats
+from . import Container
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -32,10 +33,10 @@ if TYPE_CHECKING:
 __all__ = ["TODReader", "TOData", "concatenate"]
 
 
-class TOData(memdata.BasicCont):
+class TOData(Container):
     """Basic time-ordered data container.
 
-    Inherits from :py:class:`~caput.memdata.BasicCont`. A data container with all
+    Inherits from :py:class:`~caput.containers.Container`. A data container with all
     the functionality of its base class but with the concept of a time axis
     which can be concatenated over. Currently the time axis must be the
     fastest-varying axis.
