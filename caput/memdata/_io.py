@@ -79,7 +79,7 @@ class lock_file:
     Examples
     --------
     >>> from caput import memdata
-    >>> container = memdata.BasicCont()
+    >>> container = memdata.MemDiskGroup()
     >>> with lock_file("file_to_create.h5") as fname:
     ...     container.save(fname)
     """
