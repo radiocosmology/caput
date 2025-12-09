@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from ...memdata import MemGroup
     from ...memdata._memh5 import GroupLike
 
-__all__ = ["BasicContMixin", "H5IOMixin"]
+__all__ = ["ContainerMixin", "H5IOMixin"]
 
 
 # Set the module logger.
@@ -410,15 +410,15 @@ class H5IOMixin:
                 )
 
 
-class BasicContMixin:
-    """Provides IO for BasicCont objects in pipeline tasks.
+class ContainerMixin:
+    """Provides IO for Container objects in pipeline tasks.
 
     As a mixin, this must be combined (using multiple inheritance) with a
     subclass of `TaskBase`, providing the full task API.
 
-    Provides the methods :py:meth:`~.BasicContMixin.read_input`,
-    :py:meth:`~.BasicContMixin.read_output` and :py:meth:`~.BasicContMixin.write_output`
-    for :py:class:`~caput.memdata.BasicCont` data which gets written to disk.
+    Provides the methods :py:meth:`~.ContainerMixin.read_input`,
+    :py:meth:`~.ContainerMixin.read_output` and :py:meth:`~.ContainerMixin.write_output`
+    for :py:class:`~caput.containers.Container` data which gets written to disk.
     """
 
     # TODO, implement reading on disk (i.e. no copy to memory).
@@ -441,12 +441,12 @@ class BasicContMixin:
 
         Returns
         -------
-        container : BasicCont
+        container : Container
             Container instance from a file.
         """
-        from ...memdata import BasicCont
+        from ...containers import Container
 
-        return BasicCont.from_file(
+        return Container.from_file(
             filename, distributed=self._distributed, comm=self._comm
         )
 
@@ -460,13 +460,13 @@ class BasicContMixin:
 
         Returns
         -------
-        container : BasicCont
+        container : Container
             Container instance from a file.
         """
         # Replicate code from read_input in case read_input is overridden.
-        from ...memdata import BasicCont
+        from ...containers import Container
 
-        return BasicCont.from_file(
+        return Container.from_file(
             filename, distributed=self._distributed, comm=self._comm
         )
 
@@ -483,7 +483,7 @@ class BasicContMixin:
         ----------
         filename : PathLike
             File name.
-        output : BasicCont
+        output : Container
             Data to be written.
         file_format : FileFormat
             File format to use. Default is ``None``, in which
@@ -491,7 +491,7 @@ class BasicContMixin:
         \**kwargs : Any
             Arbitrary keyword arguments.
         """
-        from ...memdata import BasicCont
+        from ...containers import Container
 
         file_format = fileformats.check_file_format(filename, file_format, output)
 
@@ -505,9 +505,9 @@ class BasicContMixin:
                 if not os.path.isdir(dirname):
                     raise e
         # Cases for `output` object type.
-        if not isinstance(output, BasicCont):
+        if not isinstance(output, Container):
             raise RuntimeError(
-                "Object to write out is not an instance of memdata.BasicCont"
+                "Object to write out is not an instance of containers.Container"
             )
 
         # Already in memory.
