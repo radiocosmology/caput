@@ -1,19 +1,20 @@
 """A high-level in-memory data container format for :py:mod:`caput.pipeline`.
 
-Containers are built on top of memdata's :py:class:`~caput.memdata.BasicCont` and provide a
-structured way to hold multi-dimensional data arrays with named axes and dataset
-specifications. New containers should generally inherit from :py:class:`.ContainerBase`
-or :py:class:`.TableBase`.
+Containers are built on top of memdata's :py:class:`~caput.memdata.MemDiskGroup` and
+provide a structured way to hold multi-dimensional data arrays. A basic interface is
+provided through :py:class:`.Container`, while :py:class:`.ContainerPrototype` and
+:py:class:`.TableSpec` act as base classes to define new containers based on named
+axis and dataset specifications.
 
 Examples
 --------
-Containers are subclasses of :py:class:`ContainerBase`. New containers are defined by
+Containers are subclasses of :py:class:`ContainerPrototype`. New containers are defined by
 specifying the axes and datasets in the subclass:
 
->>> from caput.containers import ContainerBase
+>>> from caput.containers import ContainerPrototype
 >>> import numpy as np
 >>>
->>> class MyContainer(ContainerBase):
+>>> class MyContainer(ContainerPrototype):
 ...     _axes = (
 ...         "time",
 ...         "freq",
@@ -31,7 +32,7 @@ specifying the axes and datasets in the subclass:
 ...         },
 ...     }
 
-When a container is instantiated, the datasets defined in :py:attr:`~.ContainerBase._dataset_spec`
+When a container is instantiated, the datasets defined in :py:attr:`~.ContainerPrototype._dataset_spec`
 are created with the specified properties. The axes define the dimensions of the datasets,
 and must be provided in the constructor, either by specifying the `index_map` directly
 or by copying from another container.
@@ -56,7 +57,7 @@ Each container must define a :py:attr:`_dataset_spec` class attribute, which is 
 mapping dataset names to their specifications. Each specification is itself a dictionary
 that defines properties such as axes, data type, and compression options. Dataset specs
 are **not** inherited from parent classes; each container must define its own complete spec.
-More information on dataset specifications can be found in :py:class:`.ContainerBase`.
+More information on dataset specifications can be found in :py:class:`.ContainerPrototype`.
 """
 
 from ._basic import (
@@ -64,8 +65,9 @@ from ._basic import (
     FreqContainer as FreqContainer,
 )
 from ._core import (
-    ContainerBase as ContainerBase,
-    TableBase as TableBase,
+    Container as Container,
+    ContainerPrototype as ContainerPrototype,
+    TableSpec as TableSpec,
 )
 from ._util import (
     empty_like as empty_like,
