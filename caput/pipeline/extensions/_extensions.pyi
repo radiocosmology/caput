@@ -4,11 +4,12 @@ from typing import Any
 from _typeshed import Incomplete
 from mpi4py import MPI
 
-from ...memdata import BasicCont, MemGroup, fileformats
+from ...containers import Container
+from ...memdata import MemGroup, fileformats
 from ...memdata._memh5 import GroupLike
 from .._pipeline import Task
 
-__all__ = ["BasicContMixin", "H5IOMixin"]
+__all__ = ["ContainerMixin", "H5IOMixin"]
 
 class _OneAndOne(Task):
     input_root: str
@@ -55,17 +56,17 @@ class H5IOMixin:
         **kwargs: dict,
     ) -> None: ...
 
-class BasicContMixin:
+class ContainerMixin:
     _distributed: bool
     _comm: MPI.Comm | None
     #
-    def read_input(self, filename: PathLike) -> BasicCont: ...
-    def read_output(self, filename: PathLike) -> BasicCont: ...
+    def read_input(self, filename: PathLike) -> Container: ...
+    def read_output(self, filename: PathLike) -> Container: ...
     #
     @staticmethod
     def write_output(
         filename: PathLike,
-        output: BasicCont,
+        output: Container,
         file_format: fileformats.FileFormat | None = None,
         **kwargs: Any,
     ) -> None: ...

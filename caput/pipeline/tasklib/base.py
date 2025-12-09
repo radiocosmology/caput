@@ -236,8 +236,8 @@ class MPILoggedTask(MPITask, LoggedTask):
         self._log = logadapter
 
 
-class ContainerTask(MPILoggedTask, extensions.BasicContMixin):
-    """Implements a task whose inputs and outputs are :py:class:`~caput.memdata.BasicCont` objects.
+class ContainerTask(MPILoggedTask, extensions.ContainerMixin):
+    """Implements a task whose inputs and outputs are :py:class:`~caput.containers.Container` objects.
 
     This task implements writing of the output when requested, and handles various
     types of metadata associated with the container objects.

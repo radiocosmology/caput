@@ -1,6 +1,6 @@
 r"""A collection of tasks for loading and saving files.
 
-Most of these are just variations on loading and saving :py:class:`~caput.memdata.BasicCont`
+Most of these are just variations on loading and saving :py:class:`~caput.containers.Container`
 containers from different input strings or containers attributes (or combinations thereof).
 
 File Groups
@@ -37,7 +37,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from ... import config
-from ...memdata import BasicCont, MemDataset, MemDiskGroup, fileformats
+from ...containers import Container
+from ...memdata import MemDataset, MemDiskGroup, fileformats
 from ..exceptions import PipelineStopIteration
 from .base import ContainerTask, MPILoggedTask
 
@@ -355,7 +356,7 @@ class BaseLoadFiles(SelectionsMixin, ContainerTask):
             clspath = self.comm.bcast(clspath, root=0)
             new_cls = MemDiskGroup._resolve_subclass(clspath)
         else:
-            new_cls = BasicCont
+            new_cls = Container
 
         cont = new_cls.from_file(
             filename,
@@ -390,7 +391,7 @@ class LoadFilesFromParams(BaseLoadFiles):
 
         Returns
         -------
-        container : BasicCont
+        container : Container
             A container populated with data from the loaded file.
         """
         # Garbage collect to workaround leaking memory from containers.
@@ -443,12 +444,12 @@ class LoadFilesFromAttrs(BaseLoadFiles):
 
         Parameters
         ----------
-        incont : BasicCont
+        incont : Container
             Input container whose attributes are used to construct the file path.
 
         Returns
         -------
-        container : BasicCont
+        container : Container
             A container populated with data from the loaded file.
         """
         # Construct the filename from the attributes in the input container
@@ -511,12 +512,12 @@ class LoadFilesAndSelect(BaseLoadFiles):
 
         Parameters
         ----------
-        incont : BasicCont
+        incont : Container
             Container whose attributes are used to determine the selection key.
 
         Returns
         -------
-        container : BasicCont | None
+        container : Container | None
             The selected file if found, otherwise ``None``.
         """
         if self.key_format is None:
@@ -985,7 +986,7 @@ class SaveZarrZip(ZipZarrContainers):
 
         Parameters
         ----------
-        container : BasicCont
+        container : Container
             Container to save out.
 
         Returns
