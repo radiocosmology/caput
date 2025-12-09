@@ -30,7 +30,6 @@ from ._memh5 import (
     MemDataset as MemDataset,
     MemDatasetCommon as MemDatasetCommon,
     MemDatasetDistributed as MemDatasetDistributed,
-    BasicCont as BasicCont,
     ro_dict as ro_dict,
     copyattrs as copyattrs,
     is_group as is_group,
@@ -48,7 +47,6 @@ from ._io import lock_file as lock_file
 from . import fileformats as fileformats
 
 __all__ = [
-    "BasicCont",
     "MemAttrs",
     "MemDataset",
     "MemDatasetCommon",
