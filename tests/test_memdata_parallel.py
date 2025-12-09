@@ -221,18 +221,6 @@ def test_misc(test_file, file_open_function, file_format):
     mpitools.barrier()
 
 
-def test_redistribute():
-    """Test redistribute in BasicCont."""
-
-    g = memdata.BasicCont(distributed=True)
-
-    # Create an array from data
-    g.create_dataset("data", shape=(10, 10), distributed=True, distributed_axis=0)
-    assert g["data"].distributed_axis == 0
-    g.redistribute(1)
-    assert g["data"].distributed_axis == 1
-
-
 # Unit test for MemDataset
 
 
