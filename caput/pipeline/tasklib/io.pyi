@@ -5,8 +5,8 @@ from typing import Any, ClassVar
 
 import numpy.typing as npt
 
-from ...containers import ContainerBase
-from ...memdata import BasicCont, MemDiskGroup, MemGroup
+from ...containers import Container, ContainerPrototype
+from ...memdata import MemDiskGroup, MemGroup
 from ...memdata._memh5 import FileLike
 from ...memdata.fileformats import FileFormat
 from ...mpiarray import SelectionLike
@@ -39,23 +39,23 @@ class BaseLoadFiles(SelectionsMixin, ContainerTask):
     redistribute: str | None
     def _load_file(
         self, filename: str, extra_message: str = ""
-    ) -> BasicCont | MemDiskGroup: ...
+    ) -> Container | MemDiskGroup: ...
 
 class LoadFilesFromParams(BaseLoadFiles):
     files: Sequence[PathLike]
     _file_ind: int
-    def process(self) -> BasicCont: ...
+    def process(self) -> Container: ...
 
 class LoadFilesFromAttrs(BaseLoadFiles):
     filename: PathLike
-    def process(self, incont: BasicCont) -> BasicCont: ...
+    def process(self, incont: Container) -> Container: ...
 
 class LoadFilesAndSelect(BaseLoadFiles):
     files: Sequence[PathLike]
     key_format: str
     collection: dict[int | str, FileLike]
     def setup(self) -> None: ...
-    def process(self, incont: BasicCont) -> BasicCont | None: ...
+    def process(self, incont: Container) -> Container | None: ...
 
 class LoadFilesFromPathAndTag(LoadFilesFromParams):
     paths: list[PathLike]
@@ -76,11 +76,11 @@ class Truncate(ContainerTask):
     dataset: dict[str, bool | float | dict[str, float]] | None
     ensure_chunked: bool
     default_params: ClassVar[dict]
-    def _get_params(self, container: ContainerBase, dset: str) -> dict | None: ...
+    def _get_params(self, container: ContainerPrototype, dset: str) -> dict | None: ...
     def _get_weights(
-        self, container: ContainerBase, dset: str, wdset: str
+        self, container: ContainerPrototype, dset: str, wdset: str
     ) -> npt.ArrayLike: ...
-    def process(self, data: ContainerBase) -> ContainerBase: ...
+    def process(self, data: ContainerPrototype) -> ContainerPrototype: ...
 
 class ZipZarrContainers(ContainerTask):
     containers: list[str]
@@ -102,7 +102,7 @@ class SaveZarrZip(ZipZarrContainers):
     output_format: FileFormat
     save: bool
     def setup(self) -> None: ...
-    def next(self, container: BasicCont) -> ZarrZipHandle: ...
+    def next(self, container: Container) -> ZarrZipHandle: ...
 
 class WaitZarrZip(MPILoggedTask):
     _handles: list[ZarrZipHandle] | None
