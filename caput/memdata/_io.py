@@ -38,17 +38,19 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
     """
     import h5py
 
-    has_mpi = h5py.get_config().mpi
-
     if isinstance(f, str):
+        fkwargs = {}
+
         # Open using MPI-IO if we can
-        if has_mpi and use_mpi:
+        if h5py.get_config().mpi and use_mpi:
             from mpi4py import MPI
 
-            comm = comm if comm is not None else MPI.COMM_WORLD
-            fh = h5py.File(f, mode, driver="mpio", comm=comm)
-        else:
-            fh = h5py.File(f, mode)
+            fkwargs["driver"] = "mpio"
+            fkwargs["comm"] = comm if comm is not None else MPI.COMM_WORLD
+
+        fh = h5py.File(f, mode, **fkwargs)
+        # Mark that this file was opened. This is *not* a standard
+        # attribute of a `File` object.
         fh.opened = True
     elif isinstance(f, h5py.File | h5py.Group):
         fh = f
@@ -58,7 +60,10 @@ def open_h5py_mpi(f, mode, use_mpi=True, comm=None):
             f"Can't write to {f} (Expected a h5py.File, h5py.Group or str filename)."
         )
 
-    fh.is_mpi = fh.file.driver == "mpio"
+    if isinstance(fh, h5py.Group):
+        fh.is_mpi = fh.file.driver == "mpio"
+    else:
+        fh.is_mpi = fh.driver == "mpio"
 
     return fh
 
