@@ -2826,15 +2826,9 @@ def _distributed_group_to_file(
             _write_distributed_datasets(f)
 
     elif file_format == fileformats.HDF5:
-        # Use MPI IO if possible, else revert to serialising
-        if h5py.get_config().mpi:
-            # Open file on all ranks
-            with open_h5py_mpi(fname, "r+", comm=group.comm) as f:
-                if not f.is_mpi:
-                    raise RuntimeError(f"Could not create file {fname!s} in MPI mode")
-                _write_distributed_datasets(f)
-        else:
-            _write_distributed_datasets(fname)
+        # Use MPI IO if possible, else revert to serialising. This
+        # is handled internally by `data.to_file`
+        _write_distributed_datasets(fname)
 
     else:
         raise ValueError(f"Unknown format={file_format}")
