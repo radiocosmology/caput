@@ -62,7 +62,7 @@ class MPILoggedTask(MPITask, LoggedTask):
     _log: _AddRankLogAdapter
     def __init__(self) -> None: ...
 
-class ContainerTask(MPILoggedTask, extensions.ContainerMixin):
+class ContainerTask(MPILoggedTask, extensions.ContainerIOMixin):
     save: bool | list[bool]
     output_root: str
     output_name: str | list[str]
