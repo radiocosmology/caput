@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from ...memdata import MemGroup
     from ...memdata._memh5 import GroupLike
 
-__all__ = ["ContainerMixin", "H5IOMixin"]
+__all__ = ["ContainerIOMixin", "GroupIOMixin"]
 
 
 # Set the module logger.
@@ -296,14 +296,14 @@ class IterBase(_OneAndOne):
         return output
 
 
-class H5IOMixin:
-    """Provides HDF5 IO for pipeline tasks.
+class GroupIOMixin:
+    """Provides Group IO for pipeline tasks.
 
     As a mixin, this must be combined (using multiple inheritance) with a
     subclass of `TaskBase`, providing the full task API.
 
     Provides the methods `read_input`, `read_output` and `write_output` for
-    HDF5 data.
+    HDF5-like data.
     """
 
     # TODO, implement reading on disk (i.e. no copy to memory).
@@ -314,7 +314,7 @@ class H5IOMixin:
         """Method for reading HDF5 input."""
         from ...memdata import MemGroup
 
-        return MemGroup.from_hdf5(filename, mode="r")
+        return MemGroup.from_file(filename, mode="r")
 
     @staticmethod
     def read_output(filename: str) -> MemGroup:
@@ -322,7 +322,7 @@ class H5IOMixin:
         from ...memdata import MemGroup
 
         # Replicate code from read_input in case read_input is overridden.
-        return MemGroup.from_hdf5(filename, mode="r")
+        return MemGroup.from_file(filename, mode="r")
 
     @staticmethod
     def write_output(  # noqa: D417
@@ -331,19 +331,19 @@ class H5IOMixin:
         file_format: fileformats.FileFormat | None = None,
         **kwargs: dict,
     ) -> None:
-        r"""Method for writing HDF5 output.
+        r"""Method for writing Group output.
 
         Parameters
         ----------
-        filename
+        filename : os.PathLike
             File name
-        output
+        output : MemDiskGroup
             `output` to be written. If this is a `h5py.Group` (which include `hdf5.File` objects)
             the buffer is flushed if `filename` points to the same file and a copy is made otherwise.
-        file_format
+        file_format : FileFormat
             File format to use. If this is not specified, the file format is guessed based on the type of
             `output` or the `filename`. If guessing is not successful, HDF5 is used.
-        \**kwargs
+        \**kwargs : Any
             Arbitrary keyword arguments.
         """
         import h5py
@@ -390,6 +390,7 @@ class H5IOMixin:
                 # Lock file as we write
                 with lock_file(filename, comm=out_copy.comm) as fn:
                     out_copy.to_hdf5(fn, mode="w")
+
         elif isinstance(output, zarr.Group):
             if os.path.isdir(filename) and os.path.samefile(
                 output.store.path, filename
@@ -410,14 +411,14 @@ class H5IOMixin:
                 )
 
 
-class ContainerMixin:
+class ContainerIOMixin:
     """Provides IO for Container objects in pipeline tasks.
 
     As a mixin, this must be combined (using multiple inheritance) with a
     subclass of `TaskBase`, providing the full task API.
 
-    Provides the methods :py:meth:`~.ContainerMixin.read_input`,
-    :py:meth:`~.ContainerMixin.read_output` and :py:meth:`~.ContainerMixin.write_output`
+    Provides the methods :py:meth:`~.ContainerIOMixin.read_input`,
+    :py:meth:`~.ContainerIOMixin.read_output` and :py:meth:`~.ContainerIOMixin.write_output`
     for :py:class:`~caput.containers.Container` data which gets written to disk.
     """
 
@@ -431,7 +432,7 @@ class ContainerMixin:
     def read_input(self, filename):
         """Method for reading input from disk.
 
-        Any file format supported by :py:class:`~caput.memdata.BasicCont`
+        Any file format supported by :py:class:`~caput.containers.Container`
         is supported.
 
         Parameters
@@ -455,7 +456,7 @@ class ContainerMixin:
 
         Parameters
         ----------
-        filename : PathLike
+        filename : os.PathLike
             Path to a file to read.
 
         Returns
@@ -514,14 +515,14 @@ class ContainerMixin:
         output.save(filename, file_format=file_format, **kwargs)
 
 
-class SingleH5Base(H5IOMixin, SingleBase):
+class SingleH5Base(GroupIOMixin, SingleBase):
     """Base class for tasks with hdf5 input and output.
 
     Inherits from :class:`H5IOMixin` and :class:`SingleBase`.
     """
 
 
-class IterH5Base(H5IOMixin, IterBase):
+class IterH5Base(GroupIOMixin, IterBase):
     """Base class for iterating over hdf5 input and output.
 
     Inherits from :class:`H5IOMixin` and :class:`IterBase`.

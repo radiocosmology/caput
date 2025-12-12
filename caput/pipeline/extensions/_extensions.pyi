@@ -9,7 +9,7 @@ from ...memdata import MemGroup, fileformats
 from ...memdata._memh5 import GroupLike
 from .._pipeline import Task
 
-__all__ = ["ContainerMixin", "H5IOMixin"]
+__all__ = ["ContainerIOMixin", "GroupIOMixin"]
 
 class _OneAndOne(Task):
     input_root: str
@@ -43,7 +43,7 @@ class IterBase(_OneAndOne):
     def __init__(self) -> None: ...
     def next(self, input=None): ...
 
-class H5IOMixin:
+class GroupIOMixin:
     @staticmethod
     def read_input(filename: str) -> MemGroup: ...
     @staticmethod
@@ -56,7 +56,7 @@ class H5IOMixin:
         **kwargs: dict,
     ) -> None: ...
 
-class ContainerMixin:
+class ContainerIOMixin:
     _distributed: bool
     _comm: MPI.Comm | None
     #
@@ -71,5 +71,5 @@ class ContainerMixin:
         **kwargs: Any,
     ) -> None: ...
 
-class SingleH5Base(H5IOMixin, SingleBase): ...
-class IterH5Base(H5IOMixin, IterBase): ...
+class SingleH5Base(GroupIOMixin, SingleBase): ...
+class IterH5Base(GroupIOMixin, IterBase): ...
