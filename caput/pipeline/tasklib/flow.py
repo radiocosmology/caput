@@ -74,6 +74,29 @@ class AccumulateList(MPILoggedTask):
         return items if self.group_size is None else None
 
 
+class GatherInputs(MPILoggedTask):
+    """Gather an arbitrary number of inputs into a list.
+
+    The relevant number of inputs is determined by the task
+    configuration keys.
+    """
+
+    def next(self, *inputs):  # noqa: D417
+        r"""Gather the inputs into a list.
+
+        Parameters
+        ----------
+        \*inputs : list[Any]
+            Arbitrary number of inputs.
+
+        Returns
+        -------
+        output : list[Any]
+            A list containing all the inputs.
+        """
+        return list(inputs)
+
+
 class Delete(MPILoggedTask):
     """Delete pipeline products to free memory."""
 
