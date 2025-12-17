@@ -597,8 +597,10 @@ source %(venv)s
 
 cd %(workdir)s
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores
 
-srun python %(scriptpath)s run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
+mpirun --map-by l3cache:PE=$SLURM_CPUS_PER_TASK --report-bindings python %(scriptpath)s run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
 
 # Set the status
 echo FINISHED > %(statuspath)s
