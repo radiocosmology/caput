@@ -95,7 +95,7 @@ class PFB:
         This will improve accuracy.
     """
 
-    def __init__(self, ntap, lblock, window=None, oversample=4):
+    def __init__(self, ntap, lblock, window=None, oversample=16):
         self.ntap = ntap
         self.lblock = lblock
 
