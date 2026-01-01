@@ -18,7 +18,7 @@ PFB
 """
 
 import numpy as np
-from scipy.interpolate import interp1d
+from scipy.interpolate import CubicSpline, interp1d
 
 
 def sinc_window(ntap, lblock):
@@ -102,6 +102,8 @@ class PFB:
         self.window = sinc_hamming if window is None else window
         self.oversample = oversample
 
+        self._profile_interp = None
+
     def apply(self, timestream):
         """Apply the PFB to a timestream.
 
@@ -136,6 +138,82 @@ class PFB:
             spec[bi] = ft[: ((self.lblock // 2) * self.ntap) : self.ntap]
 
         return spec
+
+    def compute_channel_profile(self, norm=True):
+        """Compute the profile of a single frequency channel.
+
+        This method computes the profile at a natural set of frequencies
+        relative to the channel center. The output is suitable for
+        input into separate code that constructs an interpolating function.
+        If you plan to evaluate the same profile many times, use
+        `evaluate_channel_profile` instead, since it will automatically
+        construct an interpolating function and then evaluate it for
+        subsequent calls.
+
+        Note that this is the voltage profile; the absolute value of the
+        output should be squared to obtain the profile corresponding to a
+        visibility.
+
+        Parameters
+        ----------
+        norm : bool, optional
+            Normalize the profile to its peak (real-part) value.
+            Default: True.
+
+        Returns
+        -------
+        rel_freq : np.ndarray
+            Array of frequencies at which the profile was computed, as
+            fractions of the channel width and relative to the center of
+            the channel. (For example, 0 is the center of the channel
+            and [-0.5, 0.5] are the channel edges.)
+        w : np.ndarray
+            Channel profile evaluated at `rel_freq`.
+        """
+        N = self.ntap * self.lblock
+        Nfft = N * self.oversample
+
+        window = self.window(self.ntap, self.lblock).astype(np.complex128)
+        w = np.fft.fftshift(np.fft.fft(window, n=Nfft))
+        rel_freq = np.fft.fftshift(np.fft.fftfreq(Nfft, d=1.0 / self.lblock))
+
+        if norm:
+            w /= w.real.max()
+
+        return rel_freq, w
+
+    def evaluate_channel_profile(self, channel_width_frac=None, norm=True):
+        """Evaluate the profile of a single frequency channel.
+
+        On the first call, this method computes the profile on a dense
+        set of frequencies and constructs and interpolating function.
+        This interpolating function is evaluated on subsequent calls.
+
+        Note that this is the voltage profile; the absolute value of the
+        output should be squared to obtain the profile corresponding to a
+        visibility.
+
+        Parameters
+        ----------
+        channel_width_frac : array_like
+            Array of frequencies at which to evaluate channel profile, as
+            a fraction of the channel width and centered at the center
+            of the channel. (For example, 0 is the center of the channel
+            and [-0.5, 0.5] are the channel edges.)
+        norm : bool, optional
+            Normalize the profile to its peak (real-part) value.
+            Default: True.
+
+        Returns
+        -------
+        profile : array_like
+            The channel profile.
+        """
+        if self._profile_interp is None:
+            rel_freq, w = self.compute_channel_profile(norm=norm)
+            self._profile_interp = CubicSpline(rel_freq, w, extrapolate=False)
+
+        return self._profile_interp(channel_width_frac)
 
     _decorr_interp = None
 
