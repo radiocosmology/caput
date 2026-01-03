@@ -1,9 +1,9 @@
 """Utilities for making MPI usage transparent.
 
 This module exposes much of the functionality of :mod:`mpi4py` but will still
-run in serial if MPI is not present on the system. It is thus useful for
+run in serial if MPI is not present on the system. It is, thus, useful for
 writing code that can be run in either parallel or serial. Also it exposes all
-attributes of the :mod:`mpi4py.MPI` by the :class:`_SelfWrapper` class for
+attributes of the :mod:`mpi4py.MPI` module by the :class:`_SelfWrapper` class for
 convenience. You can just use::
 
     mpitools.attr
@@ -198,11 +198,11 @@ def can_allocate(
     nbytes : int
         Number of bytes that we want to allocate.
     scope : {"shared", "process", "global"}, optional
-        Whether to find available memory on a global, per-node, or
-        per-process basis. Default is "shared".
+        Whether to find available memory on a per-node, per-process, or
+        global basis. Default is "shared".
     comm : MPI.Comm | None, optional
         MPI communicator.
-    scomm : MPI.Comm, optional
+    scomm : MPI.Comm | None, optional
         MPI shared memory communicator.
 
     Returns
@@ -314,9 +314,9 @@ def available_memory_shared() -> int:
 
 
 def enable_mpi_exception_handler():
-    """Install an MPI aware exception handler.
+    """Install an MPI-aware exception handler.
 
-    When enabled the whole MPI job will abort if *any* MPI process fails. If it's not
+    When enabled, the whole MPI job will abort if *any* MPI process fails. If it's not
     enabled, an MPI job will continue until it is killed by the scheduler.
 
     The downside of enabling this is that it can cause slurm job steps and interactive
@@ -354,7 +354,7 @@ def enable_mpi_exception_handler():
 class MPILogFilter(logging.Filter):
     """Filter log entries by MPI rank.
 
-    Also this will optionally add MPI rank information, and add an elapsed time
+    Also, this will optionally add MPI rank information, and add an elapsed time
     entry.
 
     Parameters
@@ -365,7 +365,7 @@ class MPILogFilter(logging.Filter):
         Log level for messages from rank=0. Default is `INFO`.
     level_all : int, optional
         Log level for messages from all other ranks. Default is `WARN`.
-    comm : MPI.Comm | None
+    comm : MPI.Comm | None, optional
         MPI Communicator to use (default :py:obj:`None`).
     """
 
@@ -415,7 +415,7 @@ class _close_message:
 
 
 def active_comm(aprocs: list) -> MPI.Comm | None:
-    """Return a communicator consists of a list of processes in `aprocs`."""
+    """Return a communicator consisting of processes listed in `aprocs`."""
     if _comm is None:
         return None
 
@@ -424,7 +424,7 @@ def active_comm(aprocs: list) -> MPI.Comm | None:
 
 
 def active(aprocs: list) -> MPI.Comm | None:
-    """Make a list of processes in `aprocs` active, while others wait."""
+    """Make processes listed in `aprocs` active, while others wait."""
     if _comm is None:
         return None
 
@@ -447,7 +447,10 @@ def active(aprocs: list) -> MPI.Comm | None:
 
 
 def close(aprocs: list) -> None:
-    """Send a message to the waiting processes to close their waiting."""
+    """Send a message to the waiting processes to close their waiting.
+
+    Waiting process include all processes **NOT** listed in `aprocs`.
+    """
     if rank0 and _comm is not None:
         for i in list(set(range(size)) - set(aprocs)):
             _comm.isend(_close_message(), dest=i)
@@ -469,7 +472,7 @@ def partition_list_mpi(
     method : {"con", "alt", "rand"}, optional
         How to split the list, can be "con": contiguous, "alt": alternating,
         "rand": random. Default is "con".
-    comm : MPI.Comm | None
+    comm : MPI.Comm | None, optional
         MPI communicator to use (default :py:obj:`COMM_WORLD`).
 
     Returns
@@ -477,11 +480,17 @@ def partition_list_mpi(
     partitioned_list : list
         The sub-list for the current MPI process.
     """
-    if comm is not None:
-        rank = comm.rank
-        size = comm.size
+    global rank
+    global size
 
-    return partition_list(full_list, rank, size, method=method)
+    r = rank
+    c = size
+
+    if comm is not None:
+        r = comm.rank
+        c = comm.size
+
+    return partition_list(full_list, r, c, method=method)
 
 
 def mpirange(*args: Any, **kargs: Any) -> list:
@@ -495,7 +504,7 @@ def mpirange(*args: Any, **kargs: Any) -> list:
 
 
 def split_all(n: int, comm: MPI.Comm | None = _comm) -> np.ndarray:
-    """Split a range (0, n-1) into sub-ranges for each MPI Process.
+    """Split a range of integers ``[0, n)`` into sub-ranges for each MPI Process.
 
     Parameters
     ----------
@@ -515,7 +524,7 @@ def split_all(n: int, comm: MPI.Comm | None = _comm) -> np.ndarray:
 
     See Also
     --------
-    :py:func:`split_m`, :py:func:`split_local`
+    :py:func:`~caput.util.arraytools.split_m`, :py:func:`split_local`
     """
     m = size if comm is None else comm.size
 
@@ -523,7 +532,7 @@ def split_all(n: int, comm: MPI.Comm | None = _comm) -> np.ndarray:
 
 
 def split_local(n: int, comm: MPI.Comm | None = _comm) -> np.ndarray:
-    """Split a range (0, n-1) into sub-ranges for each MPI Process.
+    """Split a range of integers ``[0, n)`` into sub-ranges for each MPI Process.
 
     This returns the parameters only for the current rank.
 
@@ -545,7 +554,7 @@ def split_local(n: int, comm: MPI.Comm | None = _comm) -> np.ndarray:
 
     See Also
     --------
-    :py:func:`split_all`, :py:func:`split_local`
+    :py:func:`split_all`, :py:func:`~caput.util.arraytools.split_m`
     """
     pse = split_all(n, comm=comm)
     m = rank if comm is None else comm.rank

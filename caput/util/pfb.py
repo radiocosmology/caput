@@ -150,7 +150,7 @@ class PFB:
     _decorr_interp = None
 
     def decorrelation_ratio(self, delay: npt.ArrayLike) -> np.ndarray[np.float64]:
-        """Calculate the decorrelation caused by a relative relay of two timestreams.
+        """Calculate the decorrelation caused by a relative delay between two timestreams.
 
         This is caused by the fact that the PFB is generated from a finite time window
         of data.

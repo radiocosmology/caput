@@ -128,19 +128,19 @@ def bit_truncate_relative(val, prec):
 def bit_truncate_max_complex(
     val: np.ndarray[np.complex128], prec: np.float32, prec_max_row: np.float32
 ) -> np.ndarray[np.complex128]:
-    """Truncate using a relative per element and per the maximum of the last dimension.
+    """Truncate using a relative per-element and per the maximum of the last dimension.
 
     This scheme allows elements to be truncated based on their own value and a
-    measure of their relative importance compared to other elements. In practice the
-    per element absolute precision for an element `val[i, j]` is given by `max(prec *
-    val[i, j], prec_max_dim * val[i].max())`
+    measure of their relative importance compared to other elements. In practice, the
+    per-element absolute precision for an element `val[i, j]` is given by `max(prec *
+    val[i, j], prec_max_dim * val[i].max())`.
 
     Parameters
     ----------
     val : complex array_like
         The array of values to truncate the precision of. These values are modified in place.
     prec : float
-        The fractional precision on each elements.
+        The fractional precision on each element.
     prec_max_row : float
         The precision to use relative to the maximum of the of each row.
 

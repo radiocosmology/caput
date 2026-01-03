@@ -48,7 +48,7 @@ class LRUCache(cachetools.LRUCache):
 
 
 def partition_list(full_list: list, i: int, n: int, method: str = "con") -> list:
-    """Partition a list into `n` pieces. Return the `i` th partition.
+    """Partition a list into `n` pieces. Return the `i`th partition.
 
     Parameters
     ----------
@@ -58,10 +58,10 @@ def partition_list(full_list: list, i: int, n: int, method: str = "con") -> list
         The index of the partition to return.
     n : int
         The number of partitions to create.
-    method: {"con", "alt", "rand"}, optional
+    method : {"con", "alt", "rand"}, optional
         The method to use for partitioning. Options are:
 
-        - "con": contiguous partitionsI
+        - "con": contiguous partitions
         - "alt": alternating partitions
         - "rand": random partitions
 
@@ -70,7 +70,7 @@ def partition_list(full_list: list, i: int, n: int, method: str = "con") -> list
     Returns
     -------
     partition : list
-        The `i` th partition of the list.
+        The `i`th partition of the list.
     """
 
     def _partition(N: int, n: int, i: int) -> tuple[int, int]:
@@ -100,7 +100,7 @@ def partition_list(full_list: list, i: int, n: int, method: str = "con") -> list
 
 
 def split_m(n: int, m: int) -> np.ndarray:
-    """Split a range (0, n-1) into m sub-ranges of similar length.
+    """Split a range of integers ``[0, n)`` into `m` sub-ranges of similar length.
 
     Parameters
     ----------
@@ -115,12 +115,12 @@ def split_m(n: int, m: int) -> np.ndarray:
         :py:obj:`np.ndarray` of shape (3, m) where each column contains:
 
         - Number in each sub-range
-        - Starting of each sub-range.
+        - Start of each sub-range.
         - End of each sub-range.
 
     See Also
     --------
-    :py:func:`split_all`, :py:func:`split_local`
+    :py:func:`~caput.util.mpitools.split_all`, :py:func:`~caput.util.mpitools.split_local`
     """
     base = n // m
     rem = n % m
@@ -138,12 +138,12 @@ def unique_ordered(x: Iterable) -> list:
     Parameters
     ----------
     x : Iterable
-        An iterable which may or may not container duplicate values.
+        An iterable which may or may not contain duplicate values.
 
     Returns
     -------
     unique : list
-        Unique items in x with order preserved.
+        Unique items in `x` with order preserved.
     """
     seen = set()
     # So the method is only resolved once
@@ -316,7 +316,7 @@ def listize(**_) -> Callable:
 
         def __get__(self, obj, objtype=None):
             # As a descriptor, this gets called whenever this is used to wrap a
-            # function, and simply binds it to the instance
+            # function, and simply binds it to the
 
             if obj is None:
                 return self

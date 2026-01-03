@@ -34,7 +34,7 @@ class Profiler:
     comm : MPI.Comm | None
         An optional MPI communicator. This is only used for labelling the output files.
     path : os.PathLike | None
-        The optional path under which to write the profiles.  If not set use the
+        The optional path under which to write the profiles.  If not set, use the
         current directory.
     """
 
@@ -116,7 +116,7 @@ class IOUsage:
     Parameters
     ----------
     logger : logging.Logger | None
-        If a logging object is passed the values of the IO done counters are logged
+        If this is not `None`, the values of the IO done counters will be logged
         at INFO level.
     """
 
@@ -204,7 +204,7 @@ class PSUtilProfiler(psutil.Process):
     label : str, optional
         Default description of what is being profiled.
     logger : logging.Logger | None, optional
-        If a logging object is passed the values of the IO done counters are logged
+        If no `None`, the values of the IO done counters will be logged
         at INFO level.
     comm : MPI.Comm | None, optional
         An optional MPI communicator. This is only used for labelling the output files.
@@ -326,9 +326,9 @@ class PSUtilProfiler(psutil.Process):
         self._monitor_thread.start()
 
     def stop(self) -> None:
-        """Stop profiler.
+        """Stop profiling.
 
-        Dump results to csv file and/or log and/or set results on
+        Dump results to a CSV file and/or log and/or set results on
         :py:attr:`~.PSUtilProfiler.usage`. :py:meth:`~.PSUtilProfiler.start`
         must be called first.
 
@@ -461,7 +461,7 @@ class PSUtilProfiler(psutil.Process):
             ``cpu_times`` : dict
                 dict version of `psutil.cpu_times`. Process CPU times since `start` was called in seconds.
             ``cpu_percent`` :  float
-                Process CPU utilization since `start` was called as percentage. Can be >100 if multiple threads run on
+                Process CPU utilization since `start` was called as a percentage. Can be >100 if multiple threads run on
                 different cores. See `PSUtil.cpu_count` for available cores.
             ``disk_io`` : dict
                 dict version of `psutil.io_counters` (on Linux) or `psutil.disk_io_counters` (on MacOS).
