@@ -55,18 +55,19 @@ profiling = ["pyinstrument"]
 complete = ["caput[mpi,zarr,compression,fftw]"]
 # Extras for tests and documentation
 test = [
-    "pytest",
-    "pytest-lazy-fixtures",
     "caput[complete]",
+    "pytest",
+    "pytest-mpi",
+    "pytest-lazy-fixtures",
 ]
 docs = [
+    "caput[complete]",
     "gitpython",
     "Sphinx>=5.0,<9",
     "pydata_sphinx_theme",
     "sphinx-autoapi",
     "sphinx-copybutton",
     "numpydoc",
-    "caput[complete]",
 ]
 dev = ["caput[test]", "caput[docs]", "caput[profiling]", "ruff"]
 
