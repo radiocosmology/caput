@@ -127,7 +127,7 @@ def _from_template(templatefile: os.PathLike, var: Any) -> Generator[str]:
         varname, vals = v.split("=", 1)
         vardict[varname] = vals.split(",")
 
-    template_string = templatefile.read()
+    template_string = _load_template(templatefile)
 
     # Loop over the outer product of all the variables
     for vars_single in itertools.product(*vardict.values()):
@@ -153,6 +153,12 @@ def _load_config(configfile: os.PathLike) -> dict[str, Any]:
 
     with open(configfile) as f:
         return yaml.safe_load(f)
+
+
+def _load_template(templatefile: os.PathLike) -> str:
+    """Read a template file and return a string."""
+    with open(templatefile) as f:
+        return f.read()
 
 
 def _load_venv(configfile: os.PathLike) -> None:
