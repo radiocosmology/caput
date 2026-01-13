@@ -28,23 +28,30 @@ else:
 # Set up project extensions
 extensions = [
     Extension(
-        name="caput.weighted_median",
-        sources=["caput/weighted_median.pyx"],
+        name="caput.algorithms.median.weighted",
+        sources=["caput/algorithms/median/weighted.pyx"],
         include_dirs=[numpy.get_include()],
         language="c++",
         extra_compile_args=[*omp_args, "-std=c++11", "-g0", "-O3"],
         extra_link_args=[*omp_args, "-std=c++11"],
     ),
     Extension(
-        name="caput.truncate",
-        sources=["caput/truncate.pyx"],
+        name="caput.util.truncate",
+        sources=["caput/util/truncate.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=[*omp_args, "-g0", "-O3"],
         extra_link_args=omp_args,
     ),
     Extension(
-        name="caput._fast_tools",
-        sources=["caput/_fast_tools.pyx"],
+        name="caput.astro.coordinates._spherical",
+        sources=["caput/astro/coordinates/_spherical.pyx"],
+        include_dirs=[numpy.get_include()],
+        extra_compile_args=[*omp_args, "-g0", "-O3"],
+        extra_link_args=omp_args,
+    ),
+    Extension(
+        name="caput.algorithms._invert_no_zero._invert_no_zero",
+        sources=["caput/algorithms/_invert_no_zero/_invert_no_zero.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=[*omp_args, "-g0", "-O3"],
         extra_link_args=omp_args,

@@ -6,9 +6,13 @@ import tempfile
 import numpy as np
 import pytest
 
-from caput.pipeline import PipelineStopIteration, TaskBase, IterBase, Manager
-from caput.scripts.runner import cli
-from caput import config, fileformats, mpiutil
+from caput.memdata import fileformats
+from caput.pipeline import Manager, Task
+from caput.pipeline.exceptions import PipelineStopIteration
+from caput.pipeline.runner._cli import cli
+
+from caput.util import mpitools
+from caput import config
 
 
 @pytest.fixture(scope="session")
@@ -25,7 +29,7 @@ def datasets():
     return dset1, dset2
 
 
-class PrintEggs(TaskBase):
+class PrintEggs(Task):
     """Simple task used for testing."""
 
     eggs = config.Property(proptype=list)
@@ -50,7 +54,7 @@ class PrintEggs(TaskBase):
         print("Finished PrintEggs.")
 
 
-class GetEggs(TaskBase):
+class GetEggs(Task):
     """Simple task used for testing."""
 
     eggs = config.Property(proptype=list)
@@ -76,7 +80,7 @@ class GetEggs(TaskBase):
         print("Finished GetEggs.")
 
 
-class CookEggs(IterBase):
+class CookEggs(Task):
     """Simple task used for testing."""
 
     style = config.Property(proptype=str)
@@ -199,7 +203,7 @@ cook_params:
 @pytest.fixture
 def h5_file(rm_all_files):
     """Provides a file name and removes all files/dirs with the same prefix later."""
-    fname = "tmp_test_memh5.h5"
+    fname = "tmp_test_memdata.h5"
     yield fname
     rm_all_files(fname)
 
@@ -207,7 +211,7 @@ def h5_file(rm_all_files):
 @pytest.fixture
 def zarr_file(rm_all_files):
     """Provides a directory name and removes all files/dirs with the same prefix later."""
-    fname = "tmp_test_memh5.zarr"
+    fname = "tmp_test_memdata.zarr"
     yield fname
     rm_all_files(fname)
 
@@ -215,18 +219,18 @@ def zarr_file(rm_all_files):
 @pytest.fixture
 def h5_file_distributed(rm_all_files):
     """Provides a file name and removes all files/dirs with the same prefix later."""
-    fname = "tmp_test_memh5_distributed.h5"
+    fname = "tmp_test_memdata_distributed.h5"
     yield fname
-    if mpiutil.rank == 0:
+    if mpitools.rank == 0:
         rm_all_files(fname)
 
 
 @pytest.fixture
 def zarr_file_distributed(rm_all_files):
     """Provides a directory name and removes all files/dirs with the same prefix later."""
-    fname = "tmp_test_memh5.zarr"
+    fname = "tmp_test_memdata.zarr"
     yield fname
-    if mpiutil.rank == 0:
+    if mpitools.rank == 0:
         rm_all_files(fname)
 
 

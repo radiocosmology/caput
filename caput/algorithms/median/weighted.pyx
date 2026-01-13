@@ -1,0 +1,512 @@
+# distutils: language = c++
+# cython: language_level = 2
+"""Fast weighted median."""
+
+import numpy as np
+import numpy.typing as npt
+
+from libcpp.memory cimport shared_ptr
+from libcpp.deque cimport deque
+from cython.parallel import prange, parallel
+from MedianTree cimport Tree, Data
+
+cimport numpy as np
+cimport cython
+
+__all__ = []
+
+# Required for numpy 2.0 compatibility
+np.import_array()
+
+# Define the fused types that can be used for the data or weights in the median routine
+ctypedef fused data_t:
+    int
+    long
+    float
+    double
+
+ctypedef fused weight_t:
+    int
+    long
+    float
+    double
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef data_t _quickselect_weight(data_t[::1] A, weight_t[::1] W, double qs, char method):
+    # A, W: data and weights respectively, both are modified in place
+    # qs: the amount of weight that we are selecting the element at
+    # method: one of l, h or s to indicate whether to take the lower, higher or split
+    #         (average) value if there is a tie
+
+    cdef int i = 0, j = len(A) - 1
+    cdef int ii, jj
+    cdef double weights_left
+    cdef data_t pivot
+
+    cdef data_t min_d, max_d
+    cdef data_t min_w, max_w
+
+    while True:
+        ii = i
+        jj = j
+        pivot = A[(ii + jj) // 2]
+        weights_left = 0
+
+        # Construct a Hoare partition of the array, while summing up the weights of the
+        # left hand partition as we go. Although it would be a bit neater if this was
+        # an external function, explicitly inlining it allows us to calculate the
+        # weight sum as we go
+        while True:
+
+            # Move the left pointer forward until we find a list element which doesn't
+            # satisfy the criterion. For every element that satisfies we need to
+            # accumulate its weight
+            while A[ii] < pivot:
+                weights_left += W[ii]
+                ii += 1
+
+            # Move the right pointer back until we find a list element which doesn't
+            # satisfy the criterion
+            while A[jj] > pivot:
+                jj -= 1
+
+            # If the pointers meet or overlap then we're done
+            if ii >= jj:
+
+                # If the pointers match exactly then this means the last element didn't
+                # get its weight added into the total
+                if ii == jj:
+                    weights_left += W[ii]
+
+                break
+
+            # If, not we need swap the elements and start again, the new left hand
+            # element has it's weight added
+            A[ii], A[jj] = A[jj], A[ii]
+            W[ii], W[jj] = W[jj], W[ii]
+            weights_left += W[ii]
+
+            # Advance to the next elements
+            ii += 1
+            jj -= 1
+
+        # If the total sum of the weights on the left equals the weight target that
+        # means that the target element lies exactly on the boundary. In this case the
+        # standard behaviour is to find the mean of the bounding elements. The easiest
+        # way to do that is to find the maximum element in the left partition and the
+        # minimum of the right
+        if qs == weights_left:
+
+            i = _max_non_zero(A, W, 0, jj)
+            j = _min_non_zero(A, W, jj + 1, len(A) - 1)
+
+            if (W[j] == 0 and W[i] > 0) or method == "l":
+                return A[i]
+            elif (W[i] == 0 and W[j] > 0) or method == "h":
+                return A[j]
+            else:  # method == "s":
+                return <data_t>((A[i] + A[j]) / 2)
+
+        # Otherwise the target element is in the left partition...
+        elif qs <= weights_left:
+            j = jj
+
+        # ... or in the right
+        else:
+            i = jj + 1
+            qs -= weights_left
+
+        # When the list is a single element long, we're done and can just return it
+        if i == j:
+            return A[i]
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef int _max_non_zero(data_t[::1] d, weight_t[::1] w, int i, int j):
+    # Find the maximum element in the array with non-zero weight. If all elements have
+    # non-zero weight return the maximum of those
+    cdef int ii
+    cdef int cur = i
+
+    for ii in range(i+1, j+1):
+        if (w[cur] > 0) == (w[ii] > 0):
+            if d[ii] > d[cur]:
+                cur = ii
+        elif w[ii] > 0:
+            cur = ii
+
+    return cur
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cdef int _min_non_zero(data_t[::1] d, weight_t[::1] w, int i, int j):
+    # Find the minimum element in the array with non-zero weight. If all elements have
+    # non-zero weight return the minimum of those
+    cdef int ii
+    cdef int cur = i
+
+    for ii in range(i+1, j+1):
+        if (w[cur] > 0) == (w[ii] > 0):
+            if d[ii] < d[cur]:
+                cur = ii
+        elif w[ii] > 0:
+            cur = ii
+
+    return cur
+
+
+@cython.wraparound(False)
+@cython.boundscheck(False)
+cpdef void _quickselect(
+    data_t[:, ::1] A,
+    weight_t[:, ::1] W,
+    double q,
+    char method,
+    data_t[::1] quantile,
+    data_t[::1] At,
+    weight_t[::1] Wt
+):
+    # Worker routine for the weighted quickselect
+
+    cdef double wt, qs
+    cdef int i, j
+
+    for i in range(A.shape[0]):
+
+        wt = 0
+
+        for j in range(A.shape[1]):
+            At[j] = A[i, j]
+            Wt[j] = W[i, j]
+            wt += W[i, j]
+
+        # If all the weights are zero just ensures to do a regular quantile calculation
+        # by using uniform non-zero weights
+        if wt == 0:
+            for j in range(W.shape[1]):
+                Wt[j] = 1
+            wt = W.shape[1]
+
+        qs = wt * q
+
+
+        quantile[i] = _quickselect_weight(At, Wt, qs, method)
+
+
+def quantile(A, W, q, method = "split"):
+    cdef char methodc = _check_method(method)
+
+    # Ensure that the inputs are numpy arrays
+    if not isinstance(A, np.ndarray):
+        A = np.array(A)
+    if not isinstance(W, np.ndarray):
+        W = np.array(W)
+
+
+    if A.shape != W.shape:
+        raise ValueError("Shapes of A and W much match.")
+
+    if q < 0 or q > 1:
+        raise ValueError("Quantile must be a number between zero and one.")
+
+    # Reshape the arrays to 2D. The last axis is the one along which the quantile will
+    # be calculated
+    Ar = A.reshape(-1, A.shape[-1])
+    Wr = W.reshape(-1, W.shape[-1])
+
+    # Allocate the temporaries and output arrays
+    At = np.ndarray(Ar.shape[-1], dtype=A.dtype)
+    Wt = np.ndarray(Wr.shape[-1], dtype=W.dtype)
+    res = np.ndarray(Ar.shape[0], dtype=Ar.dtype)
+
+    # NOTE: this is super annoying. In theory this is what Cython fused types are meant
+    # to be for, but in practice it seems to be impossible to combine arbitrarily sized
+    # arrays (which require you to treat the arrays as Python objects), and fused
+    # types. Explicitly dispatching to the correct routines seems to be the lesser of
+    # all evils here
+    if A.dtype == np.intc:
+        if W.dtype == np.intc:
+            _quickselect[int, int](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == int:
+            _quickselect[int, long](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.single:
+            _quickselect[int, float](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.double:
+            _quickselect[int, double](Ar, Wr, q, methodc, res, At, Wt)
+        else:
+            raise TypeError("Type of weight array is not supported.")
+    elif A.dtype == int:
+        if W.dtype == np.intc:
+            _quickselect[long, int](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == int:
+            _quickselect[long, long](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.single:
+            _quickselect[long, float](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.double:
+            _quickselect[long, double](Ar, Wr, q, methodc, res, At, Wt)
+        else:
+            raise TypeError("Type of weight array is not supported.")
+    elif A.dtype == np.single:
+        if W.dtype == np.intc:
+            _quickselect[float, int](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == int:
+            _quickselect[float, long](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.single:
+            _quickselect[float, float](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.double:
+            _quickselect[float, double](Ar, Wr, q, methodc, res, At, Wt)
+        else:
+            raise TypeError("Type of weight array is not supported.")
+    elif A.dtype == np.double:
+        if W.dtype == np.intc:
+            _quickselect[double, int](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == int:
+            _quickselect[double, long](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.single:
+            _quickselect[double, float](Ar, Wr, q, methodc, res, At, Wt)
+        elif W.dtype == np.double:
+            _quickselect[double, double](Ar, Wr, q, methodc, res, At, Wt)
+        else:
+            raise TypeError("Type of weight array is not supported.")
+    else:
+        raise TypeError("Type of data array is not supported.")
+
+    # If the input was 1D dimensional, the output should be scalar. If it wasn't then
+    # it the output has the same shape as the input without the last axis.
+    if A.ndim == 1:
+        return res[0]
+    else:
+        return res.reshape(A.shape[:-1])
+
+
+def weighted_median(A, W, method = "split"):
+    return quantile(A, W, 0.5, method=method)
+
+
+def _check_arrays(
+    data: npt.ArrayLike, weights: npt.ArrayLike,
+) -> tuple[np.ndarray, np.ndarray]:
+
+    # make sure these are numpy arrays
+    if not isinstance(data, np.ndarray):
+        data = np.array(data, dtype=np.float64)
+    if not isinstance(weights, np.ndarray):
+        weights = np.array(weights, dtype=np.float64)
+
+    # Ensure data is numeric
+    if not np.issubdtype(data.dtype, np.number):
+        raise ValueError(
+            f"Data must be a subdtype of numpy.number (got {data.dtype})"
+        )
+    if not np.issubdtype(weights.dtype, np.number):
+        raise ValueError(
+            f"Weights must be a subdtype of numpy.number (got {weights.dtype})"
+        )
+    # Ensure data is not complex
+    if np.iscomplexobj(data):
+        raise ValueError(f"Data must be real (got {data.dtype})")
+    if np.iscomplexobj(weights):
+        raise ValueError(f"Weights must be real (got {weights.dtype})")
+
+    if data.ndim != weights.ndim:
+        raise ValueError(
+            f"Expected data and weights to have same dimensions "
+            f"(is {data.ndim} and {weights.ndim})."
+        )
+
+    return data, weights
+
+
+def _check_method(method: str) -> int:
+    METHODS = ['split', 'lower', 'higher']
+    METHODS_C = ['s', 'l', 'h']
+
+    if method not in METHODS:
+        raise ValueError(f"Method should be one of {METHODS}, found {method}")
+    
+    return ord(METHODS_C[METHODS.index(method)])
+
+
+def moving_weighted_median(data, weights, size, method = "split"):
+    data, weights = _check_arrays(data, weights)
+    cdef char c_method = _check_method(method)
+
+    if size == 0:
+        raise ValueError('Got size=0, what do you expect me to do with that?')
+    if size == 1:
+        return np.where(weights != 0, data, weights)
+
+    if data.ndim == 1:
+        if isinstance(size, (tuple, list)):
+            if len(size) > 1:
+                raise ValueError('Size ({}) has too many dimensions for 1D data.'.format(size))
+            size = size[0]
+
+        if size % 2 == 0:
+            raise ValueError('Need an uneven window size (got {}).'.format(size))
+        return _mwm_1D(data, weights, size, c_method)
+
+    if data.ndim == 2:
+        if any(np.asarray(size) % 2 == 0):
+            raise ValueError('Need an uneven window size (got {}).'.format(size))
+        # Window moves along column rather than row, so if the window size 
+        # in dim 1 is larger than dim 0 this will run significantly faster
+        # on the transposed array
+        if size[0] < size[1]:
+            return _mwm_2D(data.T, weights.T, tuple(reversed(size)), c_method).T
+        else:
+            return _mwm_2D(data, weights, size, c_method)
+    raise NotImplementedError('weighted_median() is only implemented for 1 and 2 dimensions, not {}'
+                         .format(data.ndim))
+
+
+def _mwm_1D(
+    np.ndarray[data_t, ndim=1] data,
+    np.ndarray[weight_t, ndim=1] weights,
+    int size,
+    char method,
+):
+    """Moving weighted median on a 1D array."""
+    cdef Py_ssize_t len_data = data.shape[0]
+    medians = np.ndarray(len_data, dtype=np.float64)
+    cdef Tree[double] avl
+    cdef deque[shared_ptr[Data[double]]] fifo
+    cdef shared_ptr[Data[double]] node
+
+    # Dummy node to enter into the fifo but not in the tree
+    cdef shared_ptr[Data[double]] dummy = shared_ptr[Data[double]](new Data[double](0, 0))
+
+    # Add all elements that are in the window on start
+    for i in range(min(size // 2 + 1, len_data)):
+        if weights[i] != 0:
+            node = avl.insert(data[i], weights[i])
+        else:
+            node = dummy
+        fifo.push_back(node)
+
+    medians[0] = avl.weighted_median(method)
+
+    # move window over the rest of the data
+    for i in range(1, len_data):
+        edge_r = i + size // 2
+        edge_l = i - size // 2 - 1
+        if edge_l >= 0:
+            node = fifo.front()
+            if node.get()[0].weight != 0:
+                if avl.remove(node) is False:
+                    raise RuntimeError('Error computing moving weighted median: Tried to remove a '
+                                       'node that doesn`t exist from the tree.')
+            fifo.pop_front()
+        if edge_r < len_data:
+            if weights[edge_r] != 0:
+                node = avl.insert(data[edge_r], weights[edge_r])
+            else:
+                node = dummy
+            fifo.push_back(node)
+
+        # Get the median giving NaN if the tree if empty (all zero weights)
+        medians[i] = avl.weighted_median(method) if avl.size() else np.nan
+    return medians
+
+@cython.boundscheck(False)  # Deactivate bounds checking
+@cython.wraparound(False)   # Deactivate negative indexing.
+def _mwm_2D(
+    np.ndarray[data_t, ndim=2] data,
+    np.ndarray[weight_t, ndim=2] weights,
+    tuple[int, 2] size,
+    char method,
+):
+    """Moving weighted median on a 2D array."""
+    # The 2D moving window goes through the matrix row-by-row, to simplify keeping track of
+    # elements in the window with a fifo queue. But moving the window through the data in a zig-zag
+    # could be more effizient, because it would reuse more elements when it jumps to the next line.
+    cdef int len_data_y = data.shape[0]
+    cdef int len_data_x = data.shape[1]
+    cdef int len_queue = len_data_x*len_data_y
+
+    cdef int size_y = size[0]
+    cdef int size_x = size[1]
+    cdef int rad_y = size_y // 2
+    cdef int rad_x = size_x // 2
+
+    medians = np.ndarray((len_data_y, len_data_x), dtype=np.float64)
+    cdef Tree[double] avl
+    cdef deque[shared_ptr[Data[double]]] fifo
+    cdef shared_ptr[Data[double]] node
+    cdef shared_ptr[Data[double]] dummy
+
+    cdef int upper_limit
+    cdef int lower_limit
+    cdef int edge_r
+    cdef int edge_l
+
+    cdef double[:, ::1] median_view = medians
+
+    cdef int row, x, col, y
+
+    with nogil, parallel():
+        # Get a FIFO for each thread
+        fifo = deque[shared_ptr[Data[double]]]()
+
+        # Dummy node to enter into the fifo but not in the tree
+        dummy = shared_ptr[Data[double]](new Data[double](0, 0))
+
+        # Loop over cols (in parallel using OpenMP).
+        for col in prange(len_data_x, schedule='static'):
+            # Too bad we have to throw away the tree to jump to the next row (see the comment under
+            # the function definition)
+            avl = Tree[double]()
+            fifo.clear()
+
+            # find upper (low x) and lower (high x) window edges
+            upper_limit = col - rad_x
+            if upper_limit < 0:
+                upper_limit = 0
+            lower_limit = col + rad_x + 1
+            if lower_limit > len_data_x:
+                lower_limit = len_data_x
+
+            # Add all elements that are in the window on start the col
+            for y in range(min(size_y // 2 + 1, len_data_y)):
+                for x in range(upper_limit, lower_limit):
+                    if weights[y,x] != 0:
+                        node = avl.insert(data[y, x], weights[y, x])
+                    else:
+                        node = dummy
+                    fifo.push_back(node)
+
+            median_view[0, col] = avl.weighted_median(method)
+
+            # move window over the col
+            for row in range(1, len_data_y):
+                edge_r = row + rad_y
+                edge_l = row - rad_y - 1
+
+                if edge_l >= 0:
+                    # pop from fifo/tree what falls out of the window on the top
+                    for x in range(upper_limit, lower_limit):
+                        node = fifo.front()
+
+                        # only remove from tree if it's not the dummy node
+                        if node.get()[0].weight != 0:
+                            if avl.remove(node) is False:
+                                with gil:
+                                    raise RuntimeError('Error computing moving weighted median: '
+                                                       'Tried to remove a node that doesn`t exist '
+                                                       'from the tree.')
+                        fifo.pop_front()
+                if edge_r < len_data_y:
+                    # add a row of elements to the window from the bottom
+                    for x in range(upper_limit, lower_limit):
+                        if weights[edge_r, x] != 0:
+                            node = avl.insert(data[edge_r, x], weights[edge_r, x])
+                        else:
+                            node = dummy
+                        fifo.push_back(node)
+                median_view[row, col] = avl.weighted_median(method)
+
+    return medians
