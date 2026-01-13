@@ -17,12 +17,12 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         python-version: ["3.10", "3.13", "3.14"]
         editable-install: ["", "--editable"]
-        # Just check the editable install once to make sure there
-        # are no issues
         exclude:
+          # Just check the editable install once to make sure there
+          # are no issues
           - python-version: "3.10"
             editable-install: "--editable"
-          - python-version: "3.13"
+          - python-version: "3.14"
             editable-install: "--editable"
           # NOTE: numcodecs is failing to compile on macOS with Python 3.14. Wheels
           # should be available before Dec. 1 2025, so we should re-enable this
@@ -57,17 +57,16 @@ jobs:
       - name: Install core package with MPI compiler
         run: CC=mpicc pip install ${{ matrix.editable-install }} .[test]
 
-      - name: Run tests serially
-        run: pytest .
+    - name: Run tests serial
+      run: pytest .
 
       # TODO: figure out why this produces import errors on CI when
       # using a standard install, but works with editable install
       - name: Run doctests
         run: pytest --doctest-modules --ignore=./tests --doctest-continue-on-failure --doctest-ignore-import-errors .
 
-      - name: Run specific parallel tests
-        run: |
-          mpirun --oversubscribe -np 4 pytest tests/test_memdata_parallel.py
-          mpirun --oversubscribe -np 4 pytest tests/test_mpiarray.py
-          mpirun -np 1 pytest tests/test_selection_parallel.py
-          mpirun --oversubscribe -np 2 pytest tests/test_selection_parallel.py
+    - name: Run tests parallel with a single process
+      run: mpirun -np 1 pytest . --with-mpi
+
+    - name: Run tests parallel with four processes
+      run: mpirun --oversubscribe -np 4 pytest . --with-mpi
