@@ -54,6 +54,7 @@ def zarrzip_basiccont_file(zarr_basiccont_file):
     yield zarrzip_file, history_dict
 
 
+@pytest.mark.mpi_skip
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
@@ -79,6 +80,7 @@ def test_access(test_file, file_format):
         d.create_dataset("index_map/stuff", data=np.arange(5))
 
 
+@pytest.mark.mpi_skip
 @pytest.mark.parametrize(
     "test_file,file_format",
     [
@@ -116,3 +118,17 @@ def test_history(test_file, file_format):
             assert "deprecated" in str(w[-1].message)
 
     assert old_history_format == {"foo": "bar"}
+
+
+def test_redistribute():
+    """Test redistribute in the base :py:class:`~caput.containers.Container`."""
+
+    g = containers.Container(distributed=True)
+
+    g.create_dataset("data", shape=(10, 10), distributed=True, distributed_axis=0)
+
+    assert g["data"].distributed_axis == 0
+
+    g.redistribute(1)
+
+    assert g["data"].distributed_axis == 1
