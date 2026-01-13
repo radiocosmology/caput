@@ -33,13 +33,26 @@ $ pip install caput[complete]@git+https://github.com/radiocosmology/caput.git
 ```
 
 ## Contributing
-Developers are recommended to do an editable `dev` install:
+Developers are recommended to use an editable `dev` install, which will install
+all of the necessary dependencies to contribute to the project.
 ```
-$ pip install caput[dev]@git+https://github.com/radiocosmology/caput.git
+$ git clone https://github.com/radiocosmology/caput.git
+$ cd caput
+$ pip install .[dev]
+```
+
+### Pre-commit
+**caput** uses [pre-commit](https://pre-commit.com/) to run checks on git commits.
+`pre-commit` is included as a `dev` dependency, but the `pre-commit` hooks must be
+manually installed.
+```
+$ pre-commit install
 ```
 
 ### Ruff
-All new code must be formatted and checked using
+All new code must be formatted and checked using [ruff](https://docs.astral.sh/ruff/).
+`ruff` checks will run automatically on commits when `pre-commit` is configured,
+but they can also be run manually.
 ```
 $ ruff format
 $ ruff check
