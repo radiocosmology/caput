@@ -52,3 +52,12 @@ At minimum, all new code must include type hints for:
 - Global variables
 
 Additional type hints are encouraged but not required.
+
+### Tests
+Tests which should only be run with MPI should be marked using `pytest.mark.mpi`.
+Tests that are expected to xfail when run with MPI should be marked with
+`pytest.mark.mpi_xfail`.  Finally, tests that should be skipped when running
+with MPI should use `pytest.mark.mpi_skip`. When running test with MPI, the
+invocation should include the flag `--with-mpi` in order for these marks to be
+set correctly. See [pytest-mpi](https://pytest-mpi.readthedocs.io/en/latest/markers.html)
+for more information.
