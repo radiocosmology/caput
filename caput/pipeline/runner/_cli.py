@@ -77,7 +77,7 @@ def run(configfile, profile, profiler, mpi_abort, psutil):
 @cli.command()
 @click.argument(
     "templatefile",
-    type=click.File(mode="r"),
+    type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
 )
 @click.option(
     "--var",
