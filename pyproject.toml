@@ -56,6 +56,7 @@ complete = ["caput[mpi,zarr,compression,fftw]"]
 # Extras for tests and documentation
 test = [
     "caput[complete]",
+    "pre-commit",
     "pytest",
     "pytest-mpi",
     "pytest-lazy-fixtures",
