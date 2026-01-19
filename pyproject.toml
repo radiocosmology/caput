@@ -88,6 +88,7 @@ enabled = true
 find = {}
 
 [tool.setuptools.package-data]
+caput = ["py.typed", "*.pyi"]
 "caput.pipeline.runner._scheduler" = ["_default_systems.toml"]
 
 # pytest configuration
