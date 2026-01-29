@@ -413,7 +413,6 @@ def _resolve_job_script(conf: dict, directories: dict) -> str:
     conf["mpiproc"] = conf["nodes"] * conf["pernode"]
     conf["workdir"] = directories["workdir"]
     conf["finaldir"] = directories["finaldir"]
-    conf["scriptpath"] = _fix_path(__file__)
     conf["logpath"] = directories["jobdir"] / "jobout.log"
     conf["configpath"] = directories["jobdir"] / "config.yaml"
     conf["statuspath"] = directories["jobdir"] / "STATUS"
