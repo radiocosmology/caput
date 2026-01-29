@@ -211,7 +211,7 @@ class _AddRankLogAdapter(logging.LoggerAdapter):
 
     calling_obj = None
 
-    def process(self, msg, **kwargs):
+    def process(self, msg, kwargs):
         if "extra" not in kwargs:
             kwargs["extra"] = {}
 
