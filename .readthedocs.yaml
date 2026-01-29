@@ -7,18 +7,20 @@ version: 2
 
 # Build info
 build:
-  os: ubuntu-22.04
+  os: ubuntu-lts-latest
   tools:
-    python: "3.11"
-
-# Build documentation in the docs/ directory with Sphinx
-sphinx:
-  configuration: doc/conf.py
-  fail_on_warning: false
-
-python:
-  install:
-    - method: pip
-      path: .
-      extra_requirements:
-        - docs
+    python: "3.13"
+  apt_packages:
+    - libopenmpi-dev
+    - openmpi-bin
+    - libhdf5-serial-dev
+  jobs:
+    post_checkout:
+      - git fetch --unshallow origin || true
+      - git fetch origin "+refs/heads/*:refs/remotes/origin/*" --prune
+      - git branch -r
+    install:
+      - pip install --editable .[docs]
+    build:
+      html:
+        - BUILDDIR=$READTHEDOCS_OUTPUT SPHINXOPTS=-W make -C doc html 

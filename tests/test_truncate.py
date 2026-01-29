@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from caput import truncate
+from caput.util import truncate
 
 
 def test_bit_truncate():
@@ -85,7 +85,7 @@ def test_truncate_array():
         == np.asarray([32, 32], dtype=np.float32)
     ).all()
     assert (
-        truncate.bit_truncate_relative_double(
+        truncate.bit_truncate_relative(
             np.asarray([32.121, 32.5], dtype=np.float64), 1 / 32
         )
         == np.asarray([32, 32], dtype=np.float64)

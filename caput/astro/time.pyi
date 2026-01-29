@@ -1,0 +1,66 @@
+from datetime import datetime
+from typing import TypeVar, overload
+
+import numpy as np
+import numpy.typing as npt
+from skyfield import timelib
+
+__all__ = [
+    "datetime_to_timestr",
+    "datetime_to_unix",
+    "ensure_unix",
+    "era_to_unix",
+    "leap_seconds_between",
+    "naive_datetime_to_utc",
+    "time_of_day",
+    "timestr_to_datetime",
+    "unix_to_datetime",
+    "unix_to_era",
+]
+
+TimeLike = TypeVar("TimeLike", bound=np.floating | str | datetime | timelib.Time)
+
+@overload
+def unix_to_era(unix_time: np.floating) -> np.floating: ...
+@overload
+def unix_to_era(unix_time: npt.ArrayLike[np.floating]) -> np.ndarray[np.floating]: ...
+@overload
+def era_to_unix(era: np.floating, time0: np.integer | np.floating) -> np.floating: ...
+@overload
+def era_to_unix(
+    era: npt.ArrayLike[np.floating], time0: np.integer | np.floating
+) -> np.ndarray[np.floating]: ...
+@overload
+def unix_to_datetime(unix_time: np.floating) -> datetime: ...
+@overload
+def unix_to_datetime(unix_time: npt.ArrayLike[np.floating]) -> np.ndarray[datetime]: ...
+@overload
+def datetime_to_unix(dt: datetime) -> np.float64: ...
+@overload
+def datetime_to_unix(dt: npt.ArrayLike[datetime]) -> np.ndarray[np.float64]: ...
+@overload
+def datetime_to_timestr(dt: datetime) -> str: ...
+@overload
+def datetime_to_timestr(dt: npt.ArrayLike[datetime]) -> np.ndarray[str]: ...
+@overload
+def timestr_to_datetime(time_str: str) -> datetime: ...
+@overload
+def timestr_to_datetime(time_str: npt.ArrayLike[str]) -> np.ndarray[datetime]: ...
+@overload
+def leap_seconds_between(time_a: np.floating, time_b: np.floating) -> np.int64: ...
+@overload
+def leap_seconds_between(
+    time_a: npt.ArrayLike[np.floating], time_b: npt.ArrayLike[np.floating]
+) -> np.ndarray[np.int64]: ...
+@overload
+def ensure_unix(time: TimeLike) -> np.floating: ...
+@overload
+def ensure_unix(time: npt.ArrayLike[TimeLike]) -> np.ndarray[np.floating]: ...
+@overload
+def naive_datetime_to_utc(dt: datetime) -> datetime: ...
+@overload
+def naive_datetime_to_utc(dt: npt.ArrayLike[datetime]) -> np.ndarray[datetime]: ...
+@overload
+def time_of_day(time: TimeLike) -> np.floating: ...
+@overload
+def time_of_day(time: npt.ArrayLike[TimeLike]) -> np.ndarray[np.floating]: ...

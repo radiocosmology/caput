@@ -5,9 +5,6 @@ Installation
 
     pip install git+https://github.com/radiocosmology/caput.git
 
-caput depends on h5py_, numpy_ and PyYAML_. For full functionality it also
-requires click_, mpi4py_ and Skyfield_.
-
 .. _GitHub: https://github.com/KeepSafe/aiohttp
 .. _h5py: http:/www.h5py.org/
 .. _numpy: http://www.numpy.org/

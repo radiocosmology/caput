@@ -27,6 +27,11 @@ develop-eggs
 lib
 lib64
 
+# Sphinx docs
+_build
+_autosummary
+_autoapi
+
 # Installer logs
 pip-log.txt
 
@@ -37,7 +42,7 @@ nosetests.xml
 
 # Unit test files
 *.tmp_test*
-*/perf*
+*.perf*
 
 # Translations
 *.mo

@@ -1,22 +1,4 @@
-"""caput.
-
-Submodules
-----------
-.. autosummary::
-    :toctree: _autosummary
-
-    config
-    interferometry
-    memh5
-    misc
-    mpiarray
-    mpiutil
-    pfb
-    pipeline
-    time
-    tod
-    weighted_median
-"""
+"""Cluster Astronomical Parallel (Python) Utilities."""
 
 from importlib.metadata import PackageNotFoundError, version
 
