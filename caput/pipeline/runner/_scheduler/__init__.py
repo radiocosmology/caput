@@ -288,31 +288,27 @@ def _resolve_system_config(conf: dict) -> dict:
         ) from exc
 
     # Resolve default system parameters from registered systems
+    sysname = cluster_conf["system"]
     try:
-        system = REGISTERED_CLUSTERS[cluster_conf["system"]]
-    except KeyError as exc:
-        raise ValueError(
-            "Cluster configuration must specify a queue system. "
-            f"Got {cluster_conf.keys()}"
-        ) from exc
-
-    if system not in REGISTERED_SYSTEMS:
-        # As a fallback, see if the user specified a known system directly
-        cluster_name = cluster_conf.get("system")
-
-        if cluster_name is not None and cluster_name in REGISTERED_CLUSTERS:
-            system = REGISTERED_CLUSTERS[cluster_name]
+        system = REGISTERED_SYSTEMS[sysname]
+    except KeyError:
+        # As a fallback, see if the user specified a known system
+        # using a cluster name
+        if sysname in REGISTERED_CLUSTERS:
+            sysname = REGISTERED_CLUSTERS[sysname]
+            system = REGISTERED_SYSTEMS[sysname]
 
         else:
             raise ValueError(
                 f"Specified system `{system}`: is not known. "
-                f"Known systems are: {list(REGISTERED_SYSTEMS.keys())}"
+                f"Known systems are: {list(REGISTERED_SYSTEMS.keys())} "
+                f"and known clusters are: {list(REGISTERED_CLUSTERS.keys())}"
             )
 
-    cluster_name["system"] = system
+        cluster_conf["system"] = sysname
 
     # Certain keys are required
-    required_keys = set(REGISTERED_SYSTEMS[system].get("required", set()))
+    required_keys = set(system.get("required", set()))
 
     # Check to see if any required keys are missing
     missing_keys = required_keys - set(cluster_conf.keys())
