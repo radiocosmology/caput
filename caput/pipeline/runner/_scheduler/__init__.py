@@ -298,6 +298,11 @@ def _resolve_system_config(conf: dict) -> dict:
             sysname = REGISTERED_CLUSTERS[sysname]
             system = REGISTERED_SYSTEMS[sysname]
 
+            logger.warning(
+                "Specifying a queue system using a cluster name is deprecated and may "
+                "be removed in future updates; use the queue system name instead. "
+                f"`{sysname}` will be used; available systems are: {list(REGISTERED_SYSTEMS.keys())}"
+            )
         else:
             raise ValueError(
                 f"Specified system `{system}`: is not known. "
