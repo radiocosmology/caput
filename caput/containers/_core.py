@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .. import memdata
-from ..memdata import _typeutils
+from ..util import typeutils
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -85,7 +85,7 @@ class Container(memdata.MemDiskGroup):
         # TODO: this seems like a trememndous hack. I've changed it to a safer version of
         # eval, but this should probably be removed
         out["order"] = literal_eval(
-            _typeutils.bytes_to_unicode(self._data["history"].attrs["order"])
+            typeutils.bytes_to_unicode(self._data["history"].attrs["order"])
         )
 
         return memdata.ro_dict(out)

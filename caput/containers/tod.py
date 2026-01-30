@@ -16,7 +16,7 @@ import h5py
 import numpy as np
 
 from .. import memdata, mpiarray
-from ..memdata import _typeutils, fileformats
+from ..util import typeutils
 from . import Container
 
 if TYPE_CHECKING:
@@ -158,7 +158,7 @@ class TODReader:
     files : FileLike
         Files containing data. Filename patterns with wild cards (e.g.
         "foo\*.h5") are supported.
-    file_format : fileformats.FileFormat, optional
+    file_format : memdata.fileformats.FileFormat, optional
             File format to use. Default `None` (format will be guessed).
     """
 
@@ -188,7 +188,7 @@ class TODReader:
         first_file.time_axes = data_empty.time_axes
         datasets = _copy_non_time_data(first_file)
         # Zarr arrays are flushed automatically flushed and closed
-        if toclose and (file_format == fileformats.HDF5):
+        if toclose and (file_format == memdata.fileformats.HDF5):
             first_file.close()
 
         # Set the metadata attributes.
@@ -413,7 +413,7 @@ def concatenate(
         if axis in concatenation_axes:
             # Initialize the dataset.
             if convert_dataset_strings:
-                dtype = _typeutils.dtype_to_unicode(index_map.dtype)
+                dtype = typeutils.dtype_to_unicode(index_map.dtype)
             else:
                 dtype = index_map.dtype
             out.create_index_map(
@@ -424,7 +424,7 @@ def concatenate(
             out.create_index_map(
                 axis,
                 (
-                    _typeutils.ensure_unicode(index_map)
+                    typeutils.ensure_unicode(index_map)
                     if convert_dataset_strings
                     else index_map
                 ),
@@ -469,7 +469,7 @@ def concatenate(
                 current_concat_index_n[axis],
             )
             out.index_map[axis][out_slice] = (
-                _typeutils.ensure_unicode(data.index_map[axis][in_slice])
+                typeutils.ensure_unicode(data.index_map[axis][in_slice])
                 if convert_attribute_strings
                 else data.index_map[axis][in_slice]
             )
@@ -486,7 +486,7 @@ def concatenate(
             attrs = dataset.attrs
 
             # Figure out which axis we are concatenating over.
-            for a in _typeutils.bytes_to_unicode(attrs["axis"]):
+            for a in typeutils.bytes_to_unicode(attrs["axis"]):
                 if a in concatenation_axes:
                     axis = a
                     break
@@ -520,7 +520,7 @@ def concatenate(
                 attrs = dataset.attrs
 
             # Do this *after* the filter, in case filter changed axis order.
-            axis_ind = list(_typeutils.bytes_to_unicode(attrs["axis"])).index(axis)
+            axis_ind = list(typeutils.bytes_to_unicode(attrs["axis"])).index(axis)
 
             # Slice input data if the filter doesn't do it.
             if not filter_time_slice:
@@ -686,7 +686,7 @@ def _copy_non_time_data(
                 target = out if entry.name == "/" else out.require_group(entry.name)
             else:
                 arr = (
-                    _typeutils.ensure_unicode(entry[:])
+                    typeutils.ensure_unicode(entry[:])
                     if convert_dataset_strings
                     else entry[:]
                 )
@@ -710,7 +710,7 @@ def _dset_has_axis(entry: Any, axes: tuple[str]) -> bool:
 
     # Assume is a dataset. We need to ensure the output strings are Unicode as h5py may
     # return them as byte strings if the input is an h5py.Dataset
-    dset_axes = _typeutils.bytes_to_unicode(entry.attrs.get("axis", ()))
+    dset_axes = typeutils.bytes_to_unicode(entry.attrs.get("axis", ()))
 
     return len(set(dset_axes).intersection(axes)) > 0
 

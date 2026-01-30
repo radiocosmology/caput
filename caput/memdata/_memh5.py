@@ -20,8 +20,8 @@ import h5py
 import numpy as np
 
 from .. import mpiarray
-from ..util import importtools, mpitools, objecttools
-from . import _typeutils, fileformats
+from ..util import importtools, mpitools, objecttools, typeutils
+from . import fileformats
 from ._io import open_h5py_mpi
 
 logger = logging.getLogger(__name__)
@@ -1236,7 +1236,7 @@ class MemDatasetCommon(MemDataset):
         self = cls.__new__(cls)
         super(MemDatasetCommon, self).__init__(**kwargs)
 
-        self._data = _typeutils.ensure_native_byteorder(data)
+        self._data = typeutils.ensure_native_byteorder(data)
         self._chunks = chunks
         self._compression = compression
         self._compression_opts = compression_opts
@@ -2375,7 +2375,7 @@ def copyattrs(a1, a2, convert_strings=False):
             return value
 
         # If we are copying into memh5 ensure that any string are unicode
-        return _typeutils.bytes_to_unicode(value)
+        return typeutils.bytes_to_unicode(value)
 
     def _map_json(value):
         # Serialize/deserialize "special" json values
@@ -2452,7 +2452,7 @@ def deep_group_copy(
 
     An axis downselection can be specified by supplying the
     parameter 'selections'. For example to select the first two indexes in
-    g1["foo"]["bar"], do::
+    g1["foo"]["bar"], do:
 
     >>> g1 = MemGroup()
     >>> foo = g1.create_group("foo")
@@ -2565,16 +2565,16 @@ def deep_group_copy(
             # Convert unicode strings back into ascii byte strings. This will break
             # if there are characters outside of the ascii range
             if to_file:
-                data = _typeutils.ensure_bytestring(data)
+                data = typeutils.ensure_bytestring(data)
 
             # Convert strings in an HDF5 dataset into unicode
             else:
-                data = _typeutils.ensure_unicode(data)
+                data = typeutils.ensure_unicode(data)
 
         elif to_file:
             # If we shouldn't convert we at least need to ensure there aren't any
             # Unicode characters before writing
-            data = _typeutils.check_unicode(entry)
+            data = typeutils.check_unicode(entry)
 
         dset_args = {"dtype": data.dtype, "shape": data.shape, "data": data}
         # If we're copying memory to memory we can allow distributed datasets
@@ -2800,7 +2800,7 @@ def _distributed_group_to_file(
     def _write_distributed_datasets(dest):
         for name in distributed_dataset_names:
             dset = group[name]
-            data = _typeutils.check_unicode(dset)
+            data = typeutils.check_unicode(dset)
 
             data.to_file(
                 dest,
@@ -2933,10 +2933,10 @@ def _distributed_group_from_file(
 
                         # Convert ascii string back to unicode if requested
                         if convert_dataset_strings:
-                            cdata = _typeutils.ensure_unicode(cdata)
+                            cdata = typeutils.ensure_unicode(cdata)
 
                         # only needed until fixed: https://github.com/mpi4py/mpi4py/issues/177
-                        cdata = _typeutils.ensure_native_byteorder(cdata)
+                        cdata = typeutils.ensure_native_byteorder(cdata)
 
                     cdata = comm.bcast(cdata, root=0)
 

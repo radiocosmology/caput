@@ -33,6 +33,8 @@ from ._memh5 import (
     ro_dict as ro_dict,
     copyattrs as copyattrs,
     is_group as is_group,
+    get_file as get_file,
+    deep_group_copy as deep_group_copy,
 )
 
 # For now, also re-export some private classes so
@@ -58,7 +60,9 @@ __all__ = [
     "_Storage",
     "_StorageRoot",
     "copyattrs",
+    "deep_group_copy",
     "fileformats",
+    "get_file",
     "is_group",
     "local_file",
     "ro_dict",

@@ -8,4 +8,5 @@ from . import (
     pfb as pfb,
     profiler as profiler,
     truncate as truncate,
+    typeutils as typeutils,
 )
