@@ -2,11 +2,10 @@ name: caput-ci-docs
 on:
   pull_request:
     branches:
-    - master
-    - refactor-dev
+      - main
   push:
     branches:
-    - master
+      - main
 
 jobs:
 
@@ -14,27 +13,27 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-    - name: Set up Python 3.14
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.14"
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
 
-    - name: Install apt dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
+      - name: Install apt dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
 
-    - name: Update pip
-      run: pip install --upgrade pip
+      - name: Update pip
+        run: pip install --upgrade pip
 
-    # TODO: figure out to mock some of these packages so that we don't
-    # have to install everything
-    # editable install seems to be required to build api reference for
-    # .pyx files, which are not included in a standard install
-    - name: Install pip dependencies
-      run: pip install --editable .[docs]
+      # TODO: figure out to mock some of these packages so that we don't
+      # have to install everything
+      # editable install seems to be required to build api reference for
+      # .pyx files, which are not included in a standard install
+      - name: Install pip dependencies
+        run: pip install --editable .[docs]
 
-    - name: Build sphinx docs
-      run: SPHINXOPTS=-W make -C doc html
+      - name: Build sphinx docs
+        run: SPHINXOPTS=-W make -C doc html
