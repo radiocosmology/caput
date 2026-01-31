@@ -2,11 +2,10 @@ name: caput-ci-tests
 on:
   pull_request:
     branches:
-    - master
-    - refactor-dev
+      - main
   push:
     branches:
-    - master
+      - main
 
 jobs:
 
@@ -33,42 +32,42 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
-    - name: Install apt dependencies
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
+      - name: Install apt dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-serial-dev
 
-    - name: Install brew dependencies
-      if: matrix.os == 'macos-latest'
-      run: |
-        brew update
-        CC=mpicc brew install open-mpi hdf5-mpi
+      - name: Install brew dependencies
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          CC=mpicc brew install open-mpi hdf5-mpi
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v6
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Update pip
-      run: pip install --upgrade pip
+      - name: Update pip
+        run: pip install --upgrade pip
 
-    - name: Install core package with MPI compiler
-      run: CC=mpicc pip install ${{ matrix.editable-install }} .[test]
+      - name: Install core package with MPI compiler
+        run: CC=mpicc pip install ${{ matrix.editable-install }} .[test]
 
-    - name: Run tests serially
-      run: pytest .
+      - name: Run tests serially
+        run: pytest .
 
-    # TODO: figure out why this produces import errors on CI when
-    # using a standard install, but works with editable install
-    - name: Run doctests
-      run: pytest --doctest-modules --ignore=./tests --doctest-continue-on-failure --doctest-ignore-import-errors .
+      # TODO: figure out why this produces import errors on CI when
+      # using a standard install, but works with editable install
+      - name: Run doctests
+        run: pytest --doctest-modules --ignore=./tests --doctest-continue-on-failure --doctest-ignore-import-errors .
 
-    - name: Run specific parallel tests
-      run: |
-        mpirun --oversubscribe -np 4 pytest tests/test_memdata_parallel.py
-        mpirun --oversubscribe -np 4 pytest tests/test_mpiarray.py
-        mpirun -np 1 pytest tests/test_selection_parallel.py
-        mpirun --oversubscribe -np 2 pytest tests/test_selection_parallel.py
+      - name: Run specific parallel tests
+        run: |
+          mpirun --oversubscribe -np 4 pytest tests/test_memdata_parallel.py
+          mpirun --oversubscribe -np 4 pytest tests/test_mpiarray.py
+          mpirun -np 1 pytest tests/test_selection_parallel.py
+          mpirun --oversubscribe -np 2 pytest tests/test_selection_parallel.py
