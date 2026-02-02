@@ -50,7 +50,7 @@ mpi = ["mpi4py>=1.3"]
 compression = ["bitshuffle"]
 zarr = ["zarr>=2.11.0,<3", "numcodecs>=0.7.3"]
 fftw = ["pyfftw>=0.13.1"]
-profiling = ["pyinstrument"]
+profiling = ["pyinstrument>5"]
 # Install all optional extras
 complete = ["caput[mpi,zarr,compression,fftw]"]
 # Extras for tests and documentation
