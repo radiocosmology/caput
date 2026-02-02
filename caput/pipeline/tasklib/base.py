@@ -704,12 +704,33 @@ def group_tasks(*tasks):
     """
 
     class TaskGroup(*tasks):
-        # TODO: figure out how to make the setup work at the moment it just picks the first in MRO
-        # def setup(self, x): pass
+        def setup(self, *args):
+            """Call setup for each subtask.
+
+            Assumes that *all* setup arguments have been provided, so dispatch in order
+            based on the number of arguments required by each subtask.
+
+            If two subtasks take the same input argument, it must be provided multiple times.
+            """
+            import inspect
+
+            for t in tasks:
+                setup_argspec = inspect.getfullargspec(t.setup)
+                # Number of arguments excluding `self`
+                n_args = len(setup_argspec.args) - 1
+                # Pop the arguments off the front of the list
+                setup_args = args[:n_args]
+                args = args[n_args:]
+
+                self.log.debug(
+                    f"Calling setup for subtask {t!s} with {n_args} arguments."
+                )
+                t.setup(self, *setup_args)
 
         def process(self, x):
+            """Call process for each subtask in sequence."""
             for t in tasks:
-                self.log.debug(f"Calling process for subtask {t.__name__!s}")
+                self.log.debug(f"Calling process for subtask {t!s}")
                 x = t.process(self, x)
 
             return x
