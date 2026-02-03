@@ -324,7 +324,7 @@ def _resolve_system_config(conf: dict) -> dict:
     return cluster_conf
 
 
-def _create_job_directories(conf: dict, overwrite: str) -> dict[str, Path]:
+def _create_job_directories(conf: dict, overwrite: str) -> dict[str, Path] | None:
     """Create job directories based on a configuration dictionary."""
     directories = {}
 
@@ -424,6 +424,23 @@ def _resolve_job_script(conf: dict, directories: dict) -> str:
     conf["usetemp"] = 1 if conf["finaldir"] != conf["workdir"] else 0
 
     system = conf["system"]
+
+    # Find the specified run command and any arguments. If not
+    # provided, check if a default is available in the queue
+    # system config. Otherwise, fall back to `mpirun`, since
+    # this is probably available anywhere where there's a
+    # MPI environment
+    if "invoke" not in conf:
+        conf["invoke"] = REGISTERED_SYSTEMS[system].get("invoke", "mpirun")
+
+    if "invoke_args" not in conf:
+        # Nothing here, but still need an empty string to
+        # satisfy the script template
+        conf["invoke_args"] = ""
+
+    # Fill invocation arguments, since this can be provided
+    # as a separate script
+    conf["invoke_args"] = conf["invoke_args"] % conf
 
     # Get the default system queue script and fill in the template variables
     return REGISTERED_SYSTEMS[system]["script"] % conf
