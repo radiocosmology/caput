@@ -1,5 +1,7 @@
 [slurm]
 command = "sbatch"
+invoke = "srun"
+invoke_args = ""
 required = ["name", "nodes", "time", "mem", "directory", "ompnum", "pernode", "account"]
 script = """#!/bin/bash
 #SBATCH --account=%(account)s
@@ -29,7 +31,10 @@ source %(venv)s
 cd %(workdir)s
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
-srun caput-pipeline run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+
+%(invoke)s %(invoke_args)s caput-pipeline run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
 
 # Set the status
 echo FINISHED > %(statuspath)s
@@ -49,6 +54,8 @@ options = "--mail-user={email} --mail-type={mailtype}"
 
 [pbs]
 command = "qsub"
+invoke = "mpirun"
+invoke_args = "-np %(mpiproc)i -npernode %(pernode)i -bind-to none"
 required = ["name", "nodes", "time", "directory", "ppn", "queue"]
 script = """#!/bin/bash
 #PBS -l nodes=%(nodes)i:ppn=%(ppn)i
@@ -76,7 +83,7 @@ source %(venv)s
 cd %(workdir)s
 export OMP_NUM_THREADS=%(ompnum)i
 
-mpirun -np %(mpiproc)i -npernode %(pernode)i -bind-to none caput-pipeline run %(configpath)s &> %(logpath)s
+%(invoke)s %(invoke_args)s caput-pipeline run %(configpath)s &> %(logpath)s
 
 # Set the status
 echo FINISHED > %(statuspath)s
