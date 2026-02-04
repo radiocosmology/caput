@@ -230,14 +230,15 @@ class Manager(config.Reader):
         Parameters
         ----------
         lint : bool, optional
-            Instantiate Manager only to lint config. Disables debug logging.
+            Instantiate Manager only to lint config. Disables
+            logging for info level and below.
         """
         # set root log level and set up default formatter
         loglvl_root = self.logging.get("root", "WARNING")
 
-        # Don't allow INFO log level when linting
-        if lint and loglvl_root == "DEBUG":
-            loglvl_root = "INFO"
+        # Don't allow standard logging while linting
+        if lint:
+            loglvl_root = "WARNING"
 
         logging.basicConfig(level=getattr(logging, loglvl_root))
         for module, level in self.logging.items():
