@@ -163,8 +163,6 @@ def cpu_count(
             scomm = world_scomm
         elif comm is not None:
             scomm = comm.Split_type(MPI.COMM_TYPE_SHARED)
-        else:
-            scomm = None
 
     try:
         nproc_per_node = comm.size // scomm.size
@@ -387,22 +385,24 @@ class MPILogFilter(logging.Filter):
         self.size = comm.size if comm else size
 
     def filter(self, record: logging.LogRecord) -> bool:
-        """Return True if we should filter the record."""
+        """Return True if the record should be logged."""
         # Add MPI info if desired
-        try:
-            record.mpi_rank
-        except AttributeError:
-            if self.add_mpi_info:
-                record.mpi_rank = self.rank
-                record.mpi_size = self.size
+        if not hasattr(record, "mpi_rank") and self.add_mpi_info:
+            record.mpi_rank = self.rank
+            record.mpi_size = self.size
+
+        # Try to get the rank stored in the record, otherwise
+        # assume the rank of the current process. In most cases
+        # these should be the same thing
+        rank = getattr(record, "mpi_rank", self.rank)
 
         # Add a new field with the elapsed time in seconds (as a float)
         record.elapsedTime = record.relativeCreated * 1e-3
 
-        # Return whether we should filter the record or not.
-        return (record.mpi_rank == 0 and record.levelno >= self.level_rank0) or (
-            record.mpi_rank > 0 and record.levelno >= self.level_all
-        )
+        if rank == 0:
+            return record.levelno >= self.level_rank0
+
+        return record.levelno >= self.level_all
 
 
 # Comm Management

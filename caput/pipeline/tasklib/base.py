@@ -92,19 +92,23 @@ class SetMPILogging(Task):
             level_all=self.level_all, level_rank0=self.level_rank0
         )
 
-        # This uses the fact that caput.pipeline.Manager has already
-        # attempted to set up the logging. We just insert our custom filter
-        root_logger = logging.getLogger()
-        ch = root_logger.handlers[0]
-        ch.addFilter(filt)
-
         formatter = logging.Formatter(
             "%(elapsedTime)8.1fs "
             + mpi_fmt
             + " - %(levelname)-8s %(name)s: %(message)s"
         )
 
-        ch.setFormatter(formatter)
+        # Insert our custom filter and formatter at the root level.
+        handlers = logging.getLogger().handlers
+
+        if not handlers:
+            raise RuntimeError(
+                f"No handlers found for root logger {logging.getLogger()}"
+            )
+
+        for handler in handlers:
+            handler.addFilter(filt)
+            handler.setFormatter(formatter)
 
 
 class LoggedTask(Task):
