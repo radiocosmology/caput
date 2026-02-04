@@ -12,25 +12,11 @@ from .._pipeline import Task
 __all__ = [
     "ContainerTask",
     "LoggedTask",
-    "MPILogFilter",
     "MPILoggedTask",
     "MPITask",
     "SetMPILogging",
     "group_tasks",
 ]
-
-class MPILogFilter(logging.Filter):
-    add_mpi_info: bool
-    level_rank0: int
-    level_all: int
-    comm: MPI.Comm
-    def __init__(
-        self,
-        add_mpi_info: bool = True,
-        level_rank0: int = logging.INFO,
-        level_all: int = logging.WARN,
-    ) -> None: ...
-    def filter(self, record: logging.LogRecord) -> bool: ...
 
 def _log_level(
     x: int | Literal["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "CRITICAL"],
