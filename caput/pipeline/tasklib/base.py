@@ -20,61 +20,11 @@ from .. import Task, exceptions, extensions
 __all__ = [
     "ContainerTask",
     "LoggedTask",
-    "MPILogFilter",
     "MPILoggedTask",
     "MPITask",
     "SetMPILogging",
     "group_tasks",
 ]
-
-
-class MPILogFilter(logging.Filter):
-    """Filter log entries by MPI rank.
-
-    Also this will optionally add MPI rank information, and add an elapsed time
-    entry.
-
-    Parameters
-    ----------
-    add_mpi_info : bool, optional
-        Add MPI rank/size info to log records that don't already have it.
-    level_rank0 : int, optional
-        Log level for messages from rank=0. Default is `logging.INFO`.
-    level_all : int, optional
-        Log level for messages from all other ranks. Default is `logging.WARN`.
-    """
-
-    def __init__(
-        self,
-        add_mpi_info: bool = True,
-        level_rank0: int = logging.INFO,
-        level_all: int = logging.WARN,
-    ):
-        from mpi4py import MPI
-
-        self.add_mpi_info = add_mpi_info
-
-        self.level_rank0 = level_rank0
-        self.level_all = level_all
-
-        self.comm = MPI.COMM_WORLD
-
-    def filter(self, record):
-        """Add MPI info if desired."""
-        try:
-            record.mpi_rank
-        except AttributeError:
-            if self.add_mpi_info:
-                record.mpi_rank = self.comm.rank
-                record.mpi_size = self.comm.size
-
-        # Add a new field with the elapsed time in seconds (as a float)
-        record.elapsedTime = record.relativeCreated * 1e-3
-
-        # Return whether we should filter the record or not.
-        return (record.mpi_rank == 0 and record.levelno >= self.level_rank0) or (
-            record.mpi_rank > 0 and record.levelno >= self.level_all
-        )
 
 
 def _log_level(x):
@@ -131,14 +81,16 @@ class SetMPILogging(Task):
     def __init__(self):
         import math
 
-        from mpi4py import MPI
+        from ...util import mpitools
 
         logging.captureWarnings(True)
 
-        rank_length = int(math.log10(MPI.COMM_WORLD.size)) + 1
+        rank_length = int(math.log10(mpitools.size)) + 1
 
         mpi_fmt = f"[MPI %(mpi_rank){rank_length:d}d/%(mpi_size){rank_length:d}d]"
-        filt = MPILogFilter(level_all=self.level_all, level_rank0=self.level_rank0)
+        filt = mpitools.MPILogFilter(
+            level_all=self.level_all, level_rank0=self.level_rank0
+        )
 
         # This uses the fact that caput.pipeline.Manager has already
         # attempted to set up the logging. We just insert our custom filter
