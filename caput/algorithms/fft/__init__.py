@@ -14,13 +14,13 @@ import scipy.fft
 
 from ...util import mpitools
 
-from . import fftw as fftw
+try:
+    from . import fftw as fftw
+except ImportError:
+    pass
 
 # Overwrite any existing backends on import
 scipy.fft.set_global_backend("scipy", only=True)
-
-# Re-export only from `scipy.fft`
-# __all__ = scipy.fft.__all__
 
 # Only use this lookup once
 _nworkers = mpitools.cpu_count()
@@ -34,12 +34,19 @@ def _set_workers(func):
     return _inner
 
 
-_non_scipy_symboles = {"fftw"}
+# Importable symbols which are independent of `scipy.fft`
+_non_scipy_symbols = {"fftw"}
 
 
 # Re-export all scipy symbols with multiple workers set
 def __getattr__(name):
-    if name in _non_scipy_symboles:
-        return globals()[name]
+    if name in _non_scipy_symbols:
+        try:
+            return globals()[name]
+        except (KeyError, ValueError):
+            raise AttributeError(
+                f"Unable to find symbol {name}. "
+                "This is likely due to a missing optional dependency."
+            )
 
     return _set_workers(getattr(scipy.fft, name))
