@@ -224,26 +224,29 @@ class Manager(config.Reader):
 
         return self
 
-    def _setup_logging(self, lint=False):
+    def _setup_logging(self, lint=False, default="INFO"):
         """Set up logging based on the config.
 
         Parameters
         ----------
         lint : bool, optional
             Instantiate Manager only to lint config. Disables
-            logging for info level and below.
+            logging below INFO level.
+        default : str, optional
+            Default log level to apply to every module. This must
+            be provided as a string matching a :py:mod:`logging`
+            alias for an integer log level. Default is "INFO".
         """
-        # set root log level and set up default formatter
-        loglvl_root = self.logging.get("root", "WARNING")
+        if lint or ("root" not in self.logging):
+            # Default to INFO level logging
+            self.logging["root"] = "INFO"
 
-        # Don't allow standard logging while linting
-        if lint:
-            loglvl_root = "WARNING"
+        lvldefault = getattr(logging, default)
 
-        logging.basicConfig(level=getattr(logging, loglvl_root))
         for module, level in self.logging.items():
-            if module != "root":
-                logging.getLogger(module).setLevel(getattr(logging, level))
+            loglvl = getattr(logging, level, lvldefault)
+            # Set the log level for each module
+            logging.getLogger(module).setLevel(loglvl)
 
     def run(self):
         """Run the pipeline through to completion.
