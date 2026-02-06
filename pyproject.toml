@@ -11,7 +11,8 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "caput"
 description = "Cluster Astronomical Python Utilities"
-license = { file = "LICENSE" }
+license = "GPL-2.0-or-later"
+license-files = ["LICENSE"]
 authors = [
     { name = "The CHIME Collaboration", email = "lgray@phas.ubc.ca" }
 ]
