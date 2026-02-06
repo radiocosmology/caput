@@ -24,11 +24,6 @@ jobs:
             editable-install: "--editable"
           - python-version: "3.14"
             editable-install: "--editable"
-          # NOTE: numcodecs is failing to compile on macOS with Python 3.14. Wheels
-          # should be available before Dec. 1 2025, so we should re-enable this
-          # test fairly soon
-          - python-version: "3.14"
-            os: macos-latest
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -56,10 +51,14 @@ jobs:
 
       - name: Disable OpenMP warning on macos
         if: matrix.os == 'macos-latest'
-        run: export CAPUT_NO_OPENMP=1
+        run: echo "CAPUT_NO_OPENMP=1" >> "$GITHUB_ENV"
+
+      - name: Disable zstd assembly for recent macos with missing wheel
+        if: matrix.os == 'macos-latest' && matrix.python-version == '3.14'
+        run: echo "CFLAGS=-DZSTD_DISABLE_ASM" >> "$GITHUB_ENV"
 
       - name: Install core package with MPI compiler
-        run: CC=mpicc pip install ${{ matrix.editable-install }} .[test]
+        run: CC=mpicc pip install ${{ matrix.editable-install }} ".[test]"
 
       - name: Run tests serial
         run: pytest .
