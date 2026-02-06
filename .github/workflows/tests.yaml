@@ -54,6 +54,10 @@ jobs:
       - name: Update pip
         run: pip install --upgrade pip
 
+      - name: Disable OpenMP warning on macos
+        if: matrix.os == 'macos-latest'
+        run: export CAPUT_NO_OPENMP=1
+
       - name: Install core package with MPI compiler
         run: CC=mpicc pip install ${{ matrix.editable-install }} .[test]
 
