@@ -4,46 +4,48 @@ invoke = "srun"
 invoke_args = ""
 required = ["name", "nodes", "time", "mem", "directory", "ompnum", "pernode", "account"]
 script = """#!/bin/bash
-#SBATCH --account=%(account)s
-#SBATCH --nodes=%(nodes)i
-#SBATCH --ntasks-per-node=%(pernode)i # number of MPI processes
-#SBATCH --cpus-per-task=%(ompnum)i # number of OpenMP processes
-#SBATCH --mem=%(mem)s # memory per node
-#SBATCH --time=%(time)s
-#SBATCH --job-name=%(name)s
+#SBATCH --account={account:s}
+#SBATCH --nodes={nodes:d}
+#SBATCH --ntasks-per-node={pernode:d} # number of MPI processes
+#SBATCH --cpus-per-task={ompnum:d} # number of OpenMP processes
+#SBATCH --mem={mem:s} # memory per node
+#SBATCH --time={time:s}
+#SBATCH --job-name={name:s}
 
 # exit if a command returns non-zero code
 set -e
 
 # set status to crashed upon non-zero status of command
-function setCrashed {
-    echo CRASHED > %(statuspath)s
-}
+function setCrashed {{
+    echo CRASHED > {statuspath:s}
+}}
 
 trap setCrashed ERR
 
-echo RUNNING > %(statuspath)s
+echo RUNNING > {statuspath:s}
 
-%(modules)s
+{modules:s}
 
-source %(venv)s
+source {venv:s}
 
-cd %(workdir)s
+cd {workdir:s}
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
+# Try to keep threads together - this is usually more optimal
+# for computationaly intensive tasks
 export OMP_PROC_BIND=close
 export OMP_PLACES=cores
 
-%(invoke)s %(invoke_args)s caput-pipeline run %(profile)s %(profiler)s %(psutil)s %(configpath)s &> %(logpath)s
+{invoke:s} {invoke_args:s} caput-pipeline run {profile:s} {profiler:s} {psutil:s} {configpath:s} &> {logpath:s}
 
 # Set the status
-echo FINISHED > %(statuspath)s
+echo FINISHED > {statuspath:s}
 
 # If the job was successful, then move the output to its final location
-if [ %(usetemp)s -eq 1 ]
+if [ {usetemp:d} -eq 1 ]
 then
-    mkdir -p $(dirname \"%(finaldir)s\")
-    mv \"%(workdir)s\" \"%(finaldir)s\"
+    mkdir -p $(dirname \"{finaldir:s}\")
+    mv \"{workdir:s}\" \"{finaldir:s}\"
 fi
 """
 
@@ -55,44 +57,44 @@ options = "--mail-user={email} --mail-type={mailtype}"
 [pbs]
 command = "qsub"
 invoke = "mpirun"
-invoke_args = "-np %(mpiproc)i -npernode %(pernode)i -bind-to none"
+invoke_args = "-np {mpiproc:d} -npernode {pernode:d} -bind-to none"
 required = ["name", "nodes", "time", "directory", "ppn", "queue"]
 script = """#!/bin/bash
-#PBS -l nodes=%(nodes)i:ppn=%(ppn)i
-#PBS -q %(queue)s
+#PBS -l nodes={nodes:d}:ppn={ppn:d}
+#PBS -q {queue:s}
 #PBS -r n
 #PBS -m abe
 #PBS -V
-#PBS -l walltime=%(time)s
-#PBS -N %(name)s
+#PBS -l walltime={time:s}
+#PBS -N {name:s}
 
 # exit if a command returns non-zero code
 set -e
 
 # set status to crashed upon non-zero status of command
-function setCrashed {
-    echo CRASHED > %(statuspath)s
-}
+function setCrashed {{
+    echo CRASHED > {statuspath:s}
+}}
 
 trap setCrashed ERR
 
-%(module)s
+{module:s}
 
-source %(venv)s
+source {venv:s}
 
-cd %(workdir)s
-export OMP_NUM_THREADS=%(ompnum)i
+cd {workdir:s}
+export OMP_NUM_THREADS={ompnum:d}
 
-%(invoke)s %(invoke_args)s caput-pipeline run %(configpath)s &> %(logpath)s
+{invoke:s} {invoke_args:s} caput-pipeline run {configpath:s} &> {logpath:s}
 
 # Set the status
-echo FINISHED > %(statuspath)s
+echo FINISHED > {statuspath:s}
 
 # If the job was successful, then move the output to its final location
-if [ %(usetemp)s -eq 1 ]
+if [ {usetemp:d} -eq 1 ]
 then
-    mkdir -p $(dirname \"%(finaldir)s\")
-    mv \"%(workdir)s\" \"%(finaldir)s\"
+    mkdir -p $(dirname \"{finaldir:s}\")
+    mv \"{workdir:s}\" \"{finaldir:s}\"
 fi
 """
 

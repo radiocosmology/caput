@@ -438,9 +438,18 @@ def _resolve_job_script(conf: dict, directories: dict) -> str:
         # satisfy the script template
         conf["invoke_args"] = ""
 
+    # Path does not support type specifiers, so convert all `Path`
+    # objects to strings
+    # Also, `time` can be provided in multiple different formats,
+    # which can cause issues with yaml parsing. Explicitly
+    # case `time` to a string
+    for key, value in conf.items():
+        if isinstance(value, Path) or key == "time":
+            conf[key] = str(value)
+
     # Fill invocation arguments, since this can be provided
     # as a separate script
-    conf["invoke_args"] = conf["invoke_args"] % conf
+    conf["invoke_args"] = conf["invoke_args"].format(**conf)
 
     # Get the default system queue script and fill in the template variables
-    return REGISTERED_SYSTEMS[system]["script"] % conf
+    return REGISTERED_SYSTEMS[system]["script"].format(**conf)
