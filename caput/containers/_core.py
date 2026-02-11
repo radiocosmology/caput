@@ -226,7 +226,7 @@ class Container(memdata.MemDiskGroup):
         # cycle and caused the entire container to be kept alive until an
         # explicit gc run. So let this be a warning to be careful in this code.
         while stack:
-            _, item = stack.pop()
+            name, item = stack.pop()
 
             # Recurse into subgroups
             if isinstance(item, memdata._Storage):
@@ -262,7 +262,7 @@ class Container(memdata.MemDiskGroup):
                 else:
                     # If we are here we didn't find a matching axis, emit a warning
                     warnings.warn(
-                        "Could not find axis (from {dist_axis}) to distribute dataset {name} over."
+                        f"Could not find axis (from {dist_axis}) to distribute dataset {name} over."
                     )
 
 
