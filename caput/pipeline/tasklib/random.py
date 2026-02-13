@@ -27,7 +27,38 @@ class RandomTask(MPILoggedTask):
     seed = config.Property(proptype=int, default=None)
     threads = config.Property(proptype=int, default=None)
 
-    _rng = None
+    def __init__(self) -> None:
+        """Generate and set a new random seed for this task.
+
+        This will generate a new random seed on rank 0, broadcast it to all ranks,
+        and set the `_local_seed` attribute accordingly.
+
+        .. warning::
+            Generating the seed is a collective operation so all ranks must
+            participate in the call to `__init__`.
+        """
+        # Initialize the base class
+        super().__init__()
+
+        seed = self.seed
+
+        if seed is None:
+            # Generate a random seed on rank 0 and broadcast it to all ranks
+            seed = np.random.SeedSequence().entropy
+            seed = self.comm.bcast(seed, root=0)
+
+        self.log.info(f"Using random seed: {seed}")
+        # Construct the new MPI-process and task specific seed. This mixes an integer
+        # checksum of the class name with the MPI-rank to generate a new hash.
+        # NOTE: the slightly odd (rank + 1) is to ensure that even rank=0 mixes in
+        # the class seed
+        cls_name = f"{self.__module__}.{self.__class__.__name__}"
+        cls_seed = zlib.adler32(cls_name.encode())
+
+        self._local_seed = seed + (self.comm.rank + 1) * cls_seed
+        # Don't set the random number generator until the first
+        # time it gets called
+        self._rng = None
 
     @property
     def rng(self):
@@ -48,38 +79,13 @@ class RandomTask(MPILoggedTask):
 
         return self._rng
 
-    _local_seed = None
-
     @property
     def local_seed(self):
         """Get the seed to be used on this rank.
-
-        .. warning::
-            Generating the seed is a collective operation if the seed is not set,
-            and so all ranks must participate in the first access of this property.
 
         Returns
         -------
         rank_local_seed : int
             Seed local to this rank.
         """
-        if self._local_seed is None:
-            if self.seed is None:
-                # Use seed sequence to generate a random seed
-                seed = np.random.SeedSequence().entropy
-                seed = self.comm.bcast(seed, root=0)
-            else:
-                seed = self.seed
-
-            self.log.info(f"Using random seed: {seed}")
-
-            # Construct the new MPI-process and task specific seed. This mixes an
-            # integer checksum of the class name with the MPI-rank to generate a new
-            # hash.
-            # NOTE: the slightly odd (rank + 1) is to ensure that even rank=0 mixes in
-            # the class seed
-            cls_name = f"{self.__module__}.{self.__class__.__name__}"
-            cls_seed = zlib.adler32(cls_name.encode())
-            self._local_seed = seed + (self.comm.rank + 1) * cls_seed
-
         return self._local_seed
