@@ -59,7 +59,7 @@ def bytes_to_unicode(s: Any) -> Any:
     return s
 
 
-def dtype_to_unicode(dt: npt.DTypeLike) -> np.dtype:
+def dtype_to_unicode(dt: np.dtype) -> np.dtype:
     """Convert byte strings in a dtype to unicode.
 
     This will attempt to parse a numpy dtype and convert strings to unicode.
@@ -80,7 +80,7 @@ def dtype_to_unicode(dt: npt.DTypeLike) -> np.dtype:
     return _convert_dtype(dt, "|S", "<U")
 
 
-def dtype_to_bytestring(dt: npt.DTypeLike) -> np.dtype:
+def dtype_to_bytestring(dt: np.dtype) -> np.dtype:
     """Convert unicode strings in a dtype to byte strings.
 
     This will attempt to parse a numpy dtype and convert strings to bytes.
@@ -102,7 +102,7 @@ def dtype_to_bytestring(dt: npt.DTypeLike) -> np.dtype:
 
 
 def _convert_dtype(
-    dt: npt.DTypeLike, type_from: np._ByteOrderChar, type_to: np._ByteOrderChar
+    dt: np.dtype, type_from: np._ByteOrderChar, type_to: np._ByteOrderChar
 ) -> np.dtype:
     """Convert types in a numpy dtype to another type.
 
@@ -195,7 +195,7 @@ def has_matching_byteorder(arr_byteorder: np._ByteOrderChar) -> bool:
     )
 
 
-def has_kind(dt: npt.DTypeLike, kind: npt._DTypeKind) -> bool:
+def has_kind(dt: np.dtype, kind: str) -> bool:
     """Test if a numpy datatype has any fields of a specified type.
 
     Parameters
@@ -232,7 +232,7 @@ def has_kind(dt: npt.DTypeLike, kind: npt._DTypeKind) -> bool:
     return _iter_conv(dt.descr)
 
 
-def has_unicode(dt: npt.DTypeLike) -> bool:
+def has_unicode(dt: np.dtype) -> bool:
     """Test if data type contains any unicode fields.
 
     See :py:func:`.has_kind`.
@@ -240,7 +240,7 @@ def has_unicode(dt: npt.DTypeLike) -> bool:
     return has_kind(dt, "U")
 
 
-def has_bytestring(dt: npt.DTypeLike) -> bool:
+def has_bytestring(dt: np.dtype) -> bool:
     """Test if data type contains any unicode fields.
 
     See :py:func:`.has_kind`.
@@ -248,7 +248,7 @@ def has_bytestring(dt: npt.DTypeLike) -> bool:
     return has_kind(dt, "S")
 
 
-def ensure_native_byteorder(arr: npt.ArrayLike[Any]) -> npt.ArrayLike[Any]:
+def ensure_native_byteorder(arr: npt.NDArray[Any]) -> npt.NDArray[Any]:
     """If architecture and arr byteorder are the same, ensure byteorder is native.
 
     Because of https://github.com/mpi4py/mpi4py/issues/177 mpi4py does not handle
@@ -271,7 +271,7 @@ def ensure_native_byteorder(arr: npt.ArrayLike[Any]) -> npt.ArrayLike[Any]:
     return arr
 
 
-def ensure_bytestring(arr: npt.ArrayLike[Any]) -> npt.ArrayLike[Any]:
+def ensure_bytestring(arr: npt.NDArray[Any]) -> npt.NDArray[Any]:
     """If needed convert the array to contain bytestrings not unicode.
 
     Parameters
@@ -290,7 +290,7 @@ def ensure_bytestring(arr: npt.ArrayLike[Any]) -> npt.ArrayLike[Any]:
     return arr
 
 
-def ensure_unicode(arr: npt.ArrayLike[Any]) -> npt.ArrayLike[Any]:
+def ensure_unicode(arr: npt.NDArray[Any]) -> npt.NDArray[Any]:
     """If needed convert the array to contain unicode strings not bytestrings.
 
     Parameters
@@ -309,7 +309,7 @@ def ensure_unicode(arr: npt.ArrayLike[Any]) -> npt.ArrayLike[Any]:
     return arr
 
 
-def check_unicode(dset: DatasetLike[Any]) -> npt.ArrayLike[Any]:
+def check_unicode(dset: DatasetLike) -> npt.NDArray[Any]:
     """Test if dataset contains unicode so we can raise an appropriate error.
 
     If there is no unicode, return the data from the array.
