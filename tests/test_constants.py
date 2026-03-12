@@ -17,7 +17,8 @@ def test_special_constants():
     """Check that we get the correct values for custom constants."""
     assert constants.solar_mass == 1.98892e30
     assert constants.second == 1.0
-    assert constants.t_sidereal == 86164.09056
+    assert constants.sidereal_second == 0.9972695683734868
+    assert constants.t_sidereal == 86164.09070746927
     assert constants.a_rad == 7.565733250280007e-16
     assert constants.nu21 == 1420.40575177
 

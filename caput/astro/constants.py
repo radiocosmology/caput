@@ -29,9 +29,6 @@ solar_mass: float = 1.98892e30
 second: float = 1.0
 """One second in seconds."""
 
-t_sidereal: float = 23.9344696 * hour
-"""One sidereal day in seconds, equal to `23.9344696 * hour`."""
-
 a_rad: float = 4.0 * Stefan_Boltzmann / c
 r"""Radiation constant (in J m\ :sup:`-3` K\ :sup:`-4}`, equal to `4 * Stefan_Boltzmann / c`."""
 
@@ -53,6 +50,9 @@ stellar_second: float = 1.0 / 1.00273781191135448 * UT1_second
 """Approximate length of a stellar second.
 This comes from the definition of ERA-UT1 (see IERS Conventions TR Chapter 1) giving
 the first ratio a UT1 and stellar second."""
+
+t_sidereal: float = sidereal_second * day
+"""One sidereal day in SI seconds.  This is `sidereal_second * day`."""
 
 # Aliases. Included in this dict in case we ever want
 # to change/remove them
