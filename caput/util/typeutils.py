@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     import numpy.typing as npt
 
-    from ._memh5 import DatasetLike
+    from ..memdata._memh5 import DatasetLike
 
 
 def bytes_to_unicode(s: Any) -> Any:
