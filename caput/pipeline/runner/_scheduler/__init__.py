@@ -69,6 +69,9 @@ def template_queue(
     templatefile: os.PathLike,
     var: str,
     overwrite: Literal["never", "failed"],
+    profile: bool = False,
+    profiler: str | None = "cProfiler",
+    psutil: bool = False,
     email: str | None = None,
     mailtype: str | None = None,
 ):
@@ -89,6 +92,14 @@ def template_queue(
     overwrite : {"never", "failed"}
         How to handle job directories which already exist. If "failed",
         only jobs which have reported `FAILED` will be re-queued.
+    profile : bool, optional
+        If True, use a profiler to monitor the time and resource usage of
+        the pipeline job. Default is False.
+    profiler : {"cprofile", "pyinstrument"}, optional
+        Which profiler to use if `profile` is True. Default is `cprofile`.
+    psutil : bool, optional
+        If True, use `psutil` to monitor the memory use of the pipeline job.
+        Default is False.
     email : str | None, optional
         Email address for job status notifications.
     mailtype : str | None, optional
@@ -101,6 +112,9 @@ def template_queue(
         queue(
             configfile=tfh_name,
             submit=True,
+            profile=profile,
+            profiler=profiler,
+            psutil=psutil,
             overwrite=overwrite,
             email=email,
             mailtype=mailtype,
