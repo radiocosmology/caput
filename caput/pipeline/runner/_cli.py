@@ -21,6 +21,60 @@ def cli():
     pass
 
 
+def profiler_options(f):
+    """Options for profiling a pipeline run."""
+    options = [
+        click.option(
+            "--profile",
+            is_flag=True,
+            default=False,
+            help=(
+                "Run the job in a profiler. This will output a `profile_<rank>.prof` file per "
+                "MPI rank if using cProfile or `profile_<rank>.txt` file for pyinstrument."
+            ),
+        ),
+        click.option(
+            "--profiler",
+            type=click.Choice(["cProfile", "pyinstrument"], case_sensitive=False),
+            default="cProfile",
+            help="Set the profiler to use. Default is cProfile.",
+        ),
+        click.option(
+            "--psutil",
+            is_flag=True,
+            default=False,
+            help=(
+                "Run the job with a psutil profiler for each task. The output "
+                "can be found in the caput logs, at the INFO level."
+            ),
+        ),
+    ]
+
+    for opt in reversed(options):
+        f = opt(f)
+
+    return f
+
+
+def mpi_abort_option(f):
+    """Option for MPI aware exception handler."""
+    options = [
+        click.option(
+            "--mpi-abort/--no-mpi-abort",
+            default=True,
+            help=(
+                "Enable an MPI aware exception handler such that all ranks will exit when any "
+                "one throws an exception."
+            ),
+        )
+    ]
+
+    for opt in reversed(options):
+        f = opt(f)
+
+    return f
+
+
 @cli.command("lint")
 @click.argument(
     "configfile",
@@ -33,48 +87,20 @@ def lint_config(configfile):
 
 
 @cli.command()
+@profiler_options
+@mpi_abort_option
 @click.argument(
     "configfile",
     type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
 )
-@click.option(
-    "--profile",
-    is_flag=True,
-    default=False,
-    help=(
-        "Run the job in a profiler. This will output a `profile_<rank>.prof` file per "
-        "MPI rank if using cProfile or `profile_<rank>.txt` file for pyinstrument."
-    ),
-)
-@click.option(
-    "--profiler",
-    type=click.Choice(["cProfile", "pyinstrument"], case_sensitive=False),
-    default="cProfile",
-    help="Set the profiler to use. Default is cProfile.",
-)
-@click.option(
-    "--mpi-abort/--no-mpi-abort",
-    default=True,
-    help=(
-        "Enable an MPI aware exception handler such that all ranks will exit when any "
-        "one throws an exception."
-    ),
-)
-@click.option(
-    "--psutil",
-    is_flag=True,
-    default=False,
-    help=(
-        "Run the job with a psutil profiler for each task. The output "
-        "can be found in the caput logs, at the INFO level."
-    ),
-)
-def run(configfile, profile, profiler, mpi_abort, psutil):
+def run(profile, profiler, psutil, mpi_abort, configfile):
     """Run a pipeline immediately from the given CONFIGFILE."""
     _core.run_pipeline(configfile, profile, profiler, mpi_abort, psutil)
 
 
 @cli.command()
+@profiler_options
+@mpi_abort_option
 @click.argument(
     "templatefile",
     type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
@@ -111,7 +137,18 @@ def run(configfile, profile, profiler, mpi_abort, psutil):
         "or -m syntax for PBS"
     ),
 )
-def template_run(templatefile, submit, var, overwrite, email=None, mailtype=None):
+def template_run(
+    profile,
+    profiler,
+    psutil,
+    mpi_abort,
+    templatefile,
+    submit,
+    var,
+    overwrite,
+    email=None,
+    mailtype=None,
+):
     """Run a pipeline from the given TEMPLATEFILE.
 
     This is either run immediately (default), or can be placed in the batch
@@ -124,12 +161,15 @@ def template_run(templatefile, submit, var, overwrite, email=None, mailtype=None
     substitutions the outer product of all possible values is generated.
     """
     if submit:
-        _scheduler.template_queue(templatefile, var, overwrite, email, mailtype)
+        _scheduler.template_queue(
+            templatefile, var, overwrite, profile, profiler, psutil, email, mailtype
+        )
     else:
-        _core.template_run(templatefile, var)
+        _core.template_run(templatefile, var, profile, profiler, mpi_abort, psutil)
 
 
 @cli.command()
+@profiler_options
 @click.argument(
     "configfile",
     type=click.Path(exists=True, dir_okay=False, readable=True, resolve_path=True),
@@ -141,30 +181,6 @@ def template_run(templatefile, submit, var, overwrite, email=None, mailtype=None
     "--lint/--nolint",
     default=True,
     help="Check the pipeline for errors before submitting it.",
-)
-@click.option(
-    "--profile",
-    is_flag=True,
-    default=False,
-    help=(
-        "Run the job in a profiler. This will output a `profile_<rank>.prof` file per "
-        "MPI rank if using cProfile or `profile_<rank>.txt` file for pyinstrument,"
-    ),
-)
-@click.option(
-    "--profiler",
-    type=click.Choice(["cProfile", "pyinstrument"], case_sensitive=False),
-    default="cProfile",
-    help="Set the profiler to use. Default is cProfile.",
-)
-@click.option(
-    "--psutil",
-    is_flag=True,
-    default=False,
-    help=(
-        "Run the job with a psutil profiler for each task. The output "
-        "can be found in the caput logs, at the INFO level."
-    ),
 )
 @click.option(
     "--overwrite",
@@ -189,12 +205,12 @@ def template_run(templatefile, submit, var, overwrite, email=None, mailtype=None
     ),
 )
 def queue(
+    profile,
+    profiler,
+    psutil,
     configfile,
     submit=False,
     lint=True,
-    profile=False,
-    profiler="cProfiler",
-    psutil=False,
     overwrite="never",
     email=None,
     mailtype=None,

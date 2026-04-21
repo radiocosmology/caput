@@ -80,7 +80,14 @@ def run_pipeline(
 
 
 def template_run(  # noqa: D417
-    templatefile: os.PathLike, var: Any, *args: Any, **kwargs: Any
+    templatefile: os.PathLike,
+    var: Any,
+    profile: bool,
+    profiler: Literal["cprofile", "pyinstrument"],
+    mpi_abort: bool,
+    psutil: bool,
+    *args: Any,
+    **kwargs: Any,
 ) -> None:
     r"""Run a pipeline from the given `templatefile`.
 
@@ -102,7 +109,7 @@ def template_run(  # noqa: D417
         Keyword arguments to pass to `run_pipeline`.
     """
     for tfh_name in _from_template(templatefile, var):
-        run_pipeline(tfh_name, *args, **kwargs)
+        run_pipeline(tfh_name, profile, profiler, mpi_abort, psutil, *args, **kwargs)
 
 
 def _from_template(templatefile: os.PathLike, var: Any) -> Generator[str]:
