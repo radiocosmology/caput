@@ -58,11 +58,11 @@ class CheckMPIEnvironment(MPILoggedTask):
             self.log.critical(
                 f"MPI test failed to respond in {self.timeout} seconds. Aborting..."
             )
-            comm.Abort()
+            comm.Abort(1)
 
         if not (recvs == sends).all():
             self.log.critical("MPI test did not receive the correct data. Aborting...")
-            comm.Abort()
+            comm.Abort(1)
 
         # Stop successful processes from finshing if any task has failed
         comm.Barrier()
