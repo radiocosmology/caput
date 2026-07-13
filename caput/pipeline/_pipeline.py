@@ -566,7 +566,7 @@ class Manager(config.Reader):
         """
         # Check that only the expected keys are in the task spec.
         for key in task_spec.keys():
-            if key not in ["type", "params", "requires", "in", "out"]:
+            if key not in ["type", "params", "requires", "in", "out", "if"]:
                 raise config.CaputConfigError(
                     f"Task got an unexpected key '{key}' in 'tasks' list."
                 )
@@ -577,9 +577,13 @@ class Manager(config.Reader):
         except KeyError as e:
             raise config.CaputConfigError("'type' not specified for task.") from e
 
+        # If the task specifies a conditional and that condition is false,
+        # replace this task with a :py:class:`NoOp`
+        if "if" in task_spec and not task_spec["if"]:
+            task_cls = NoOp
         # Find the tasks class either in the local set, or by importing a fully
         # qualified class name
-        if task_path in local_tasks:
+        elif task_path in local_tasks:
             task_cls = local_tasks[task_path]
         else:
             try:
@@ -1227,3 +1231,19 @@ class Task(config.Reader):
                 result = True
 
         return result
+
+
+class NoOp(Task):
+    """Pass along an input.
+
+    Primarily useful to support optional tasks.
+    """
+
+    def next(self, *input):
+        """Forward any input."""
+        return input
+
+    @classmethod
+    def _from_config(cls, config):
+        """Ignore any config parameters because this task only cares about keys."""
+        return super()._from_config({})
