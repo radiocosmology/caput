@@ -595,6 +595,28 @@ class LoadFiles(LoadFilesFromParams):
         self.files = files
 
 
+class LoadAllFiles(LoadFilesFromParams):
+    """Load all files input files in a single pass and return as a list of containers."""
+
+    def process(self):
+        """Load all files before returning.
+
+        Returns
+        -------
+        list[Container]
+            List of loaded containers.
+        """
+        filelist = []
+
+        while True:
+            try:
+                filelist.append(super().process())
+            except PipelineStopIteration:
+                break
+
+        return filelist
+
+
 class Save(ContainerTask):
     """Save out the input, and pass it on.
 
