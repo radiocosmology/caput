@@ -371,12 +371,12 @@ class ContainerTask(MPILoggedTask, extensions.ContainerIOMixin):
         if not isinstance(output, tuple):
             output = (output,)
 
-        # Insert the input tags into the output containers
-        for opt in output:
-            opt.attrs["input_tags"] = input_tags
-
         # Process each output individually
         output = tuple(self._process_output(opt, ii) for ii, opt in enumerate(output))
+        # Insert the input tags into the output containers. Output
+        # may contain nested iterables
+        for opt in _iterate_nested(output):
+            opt.attrs["input_tags"] = input_tags
 
         # Increment internal counter
         self._count = self._count + 1
@@ -417,29 +417,44 @@ class ContainerTask(MPILoggedTask, extensions.ContainerIOMixin):
         return output if len(output) > 1 else output[0]
 
     def _process_output(self, output, ii=0):
-        """Check a single output container and write it if needed."""
-        if not isinstance(output, MemDiskGroup):
-            raise exceptions.PipelineRuntimeError(
-                f"Task must output a valid memdata container; given {type(output)}"
-            )
+        """Check a single output and write it if needed.
 
-        # Set the tag according to the format
-        idict = self._interpolation_dict(output, ii)
+        The output is allowed to be a list of containers, where each
+        container is handled in the same way.
+        """
+        if not isinstance(output, (list, tuple)):
+            output = [output]
+            _single_output = True
+        else:
+            _single_output = False
 
-        # Set the attributes in the output container (including from the `tag` config
-        # option)
-        attrs_to_set = {} if self.attrs is None else self.attrs.copy()
-        attrs_to_set["tag"] = self.tag
-        for attrname, attrval in attrs_to_set.items():
-            if isinstance(attrval, str):
-                attrval = attrval.format(**idict)
-            output.attrs[attrname] = attrval
+        for opt in output:
+            if not isinstance(opt, MemDiskGroup):
+                raise exceptions.PipelineRuntimeError(
+                    f"Task must output a valid memdata container; given {type(opt)}"
+                )
 
-        # Check for NaN's etc
-        output = self._nan_process_output(output)
+            # Set the tag according to the format
+            idict = self._interpolation_dict(opt, ii)
 
-        # Write the output if needed
-        self._save_output(output, ii)
+            # Set the attributes in the output container (including from the `tag` config
+            # option)
+            attrs_to_set = {} if self.attrs is None else self.attrs.copy()
+            attrs_to_set["tag"] = self.tag
+            for attrname, attrval in attrs_to_set.items():
+                if isinstance(attrval, str):
+                    attrval = attrval.format(**idict)
+                opt.attrs[attrname] = attrval
+
+            # Check for NaN's etc
+            opt = self._nan_process_output(opt)
+
+            # Write the output if needed
+            self._save_output(opt, ii)
+
+        if _single_output:
+            # make sure that we recover the original output type
+            output = output[0]
 
         return output
 
@@ -626,6 +641,14 @@ class ContainerTask(MPILoggedTask, extensions.ContainerIOMixin):
 
         # All ranks need to know if any rank found a NaN/Inf
         return self.comm.allreduce(found, op=MPI.MAX)
+
+
+def _iterate_nested(x):
+    for item in x:
+        if isinstance(item, (list, tuple, set)):
+            yield from _iterate_nested(item)
+        else:
+            yield item
 
 
 # Alias for backwards compatibility
