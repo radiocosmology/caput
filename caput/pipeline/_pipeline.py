@@ -539,8 +539,9 @@ class Manager(config.Reader):
         for task_spec in self.task_specs:
             in_ = task_spec.get("in", None)
             requires = task_spec.get("requires", None)
+            after = task_spec.get("after", None)
 
-            for key, value in (["in", in_], ["requires", requires]):
+            for key, value in (["in", in_], ["requires", requires], ["after", after]):
                 if value is None:
                     continue
                 if not isinstance(value, list):
@@ -566,7 +567,7 @@ class Manager(config.Reader):
         """
         # Check that only the expected keys are in the task spec.
         for key in task_spec.keys():
-            if key not in ["type", "params", "requires", "in", "out", "if"]:
+            if key not in ["type", "params", "requires", "in", "out", "if", "after"]:
                 raise config.CaputConfigError(
                     f"Task got an unexpected key '{key}' in 'tasks' list."
                 )
@@ -677,9 +678,10 @@ class Manager(config.Reader):
         requires = _check_duplicate("requires", "requires", task_spec, kwargs)
         in_ = _check_duplicate("in", "in_", task_spec, kwargs)
         out = _check_duplicate("out", "out", task_spec, kwargs)
+        after = _check_duplicate("after", "after", task_spec, kwargs)
 
         try:
-            task._setup_keys(in_, out, requires)
+            task._setup_keys(in_, out, requires, after)
         # Want to blindly catch errors
         except Exception as exc:
             raise config.CaputConfigError(f"Error adding task {task!s}\n") from exc
@@ -695,9 +697,9 @@ class Manager(config.Reader):
 def _format_product_keys(keys):
     """Formats the pipeline task product keys.
 
-    In the pipeline config task list, the values of 'requires', 'in' and 'out'
-    are keys representing data products.  This function gets that key from the
-    task's entry of the task list, defaults to zero, and ensures it's formated
+    In the pipeline config task list, the values of 'requires', 'in', 'out', and
+    'after' are keys representing data products.  This function gets that key from
+    the task's entry of the task list, defaults to zero, and ensures it's formated
     as a sequence of strings.
     """
     if keys is None:
@@ -754,12 +756,17 @@ class Task(config.Reader):
         If true, signals to the pipeline runner to make a call to `breakpoint` each
         time this task is run. This will drop the interpreter into pdb, allowing for
         interactive debugging of the current pipeline and task state. Default is False.
+    after_first_only : bool
+        If true, keys in the `after` queue only have to be received once, even if `next`
+        iterates multiple times. Otherwise, and iteration of `after` keys must be received
+        prior to each iteration. Default is False.
     """
 
     broadcast_inputs = config.Property(proptype=bool, default=False)
     limit_outputs = config.Property(proptype=int, default=None)
     base_priority = config.Property(proptype=int, default=0)
     breakpoint = config.Property(proptype=bool, default=False)
+    after_first_only = config.Property(proptype=bool, default=False)
 
     # Overridable Attributes
     # -----------------------
@@ -859,6 +866,11 @@ class Task(config.Reader):
             # This task hasn't been initialized
             return False
 
+        if self._after is not None and not bool(
+            min((q.qsize() for q in self._after), default=1)
+        ):
+            return False
+
         if self._pipeline_state == "setup":
             # True if all `requires` items have been provided
             # This also returns True is `self._requires` is empty
@@ -943,8 +955,8 @@ class Task(config.Reader):
 
         return self
 
-    def _setup_keys(self, in_, out=None, requires=None):  # noqa: D417
-        r"""Setup the 'requires', 'in' and 'out' keys for this task.
+    def _setup_keys(self, in_, out=None, requires=None, after=None):  # noqa: D417
+        r"""Setup the 'requires', 'in', 'out', and 'after' keys for this task.
 
         Parameters
         ----------
@@ -954,6 +966,9 @@ class Task(config.Reader):
             The names of the output data products.
         requires : Sequence[str] | str | None
             The names of the required data products for the `setup` method.
+        after : Sequence[str] | str | None
+            The names of data products which must be produced for this task
+            to proceed, even if they are not used by this task
 
         Raises
         ------
@@ -965,6 +980,7 @@ class Task(config.Reader):
         requires = _format_product_keys(requires)
         in_ = _format_product_keys(in_)
         out = _format_product_keys(out)
+        after = _format_product_keys(after)
 
         # Inspect the `setup` method to see how many arguments it takes.
         setup_argspec = inspect.getfullargspec(self.setup)
@@ -1028,6 +1044,10 @@ class Task(config.Reader):
         # produce multiple values, queue up items which may be used in the
         # future
         self._in = [queue.Queue() for _ in range(n_in)]
+        # Store after keys
+        self._after_keys = after
+        # Set up queues for wait keys
+        self._after = [queue.Queue() for _ in range(len(after))]
         # Store output keys
         self._out_keys = out
         # Keep track of the number of times this task has produced output
@@ -1082,6 +1102,7 @@ class Task(config.Reader):
                     )
 
             self._in = None
+            self._after = None
             self._pipeline_state = "finish"
 
         elif self._pipeline_state == "finish":
@@ -1129,6 +1150,9 @@ class Task(config.Reader):
             else:  # noqa RET506
                 # Get the next set of data to be run.
                 args = tuple(in_.get() for in_ in self._in)
+                # If `after` keys are not pinned, remove them from the queue
+                if not self.after_first_only:
+                    _ = [q.get() for q in self._after]
 
             # Call the next iteration of `next`. If it is done running,
             # advance the task state and continue
@@ -1227,6 +1251,23 @@ class Task(config.Reader):
                     )
 
                 self._in[ii].put(product)
+
+                result = True
+
+        if key in self._after_keys:
+            indices = (ii for ii, k in enumerate(self._after_keys) if k == key)
+
+            for ii in indices:
+                logger.debug(
+                    f"{self!s} stowing data product with key {key} for `after`."
+                )
+                if self._after is None:
+                    raise exceptions.PipelineRuntimeError(
+                        f"Tried to queue 'after' data product, but task state is {self._pipeline_state}"
+                    )
+                # data product isn't actually needed - just record that it was revceived
+                if (not self.after_first_only) or self._after[ii].empty():
+                    self._after[ii].put(True)
 
                 result = True
 
