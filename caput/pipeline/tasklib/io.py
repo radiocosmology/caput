@@ -36,6 +36,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from caput.config import CaputConfigError
+
 from ... import config
 from ...containers import Container
 from ...memdata import MemDataset, MemDiskGroup, fileformats
@@ -615,6 +617,87 @@ class LoadAllFiles(LoadFilesFromParams):
                 break
 
         return filelist
+
+
+class LoadFileBatches(BaseLoadFiles):
+    """Load batches of files and pass along an entire batch.
+
+    File batches are passed as a dict where each entry is a list of files
+    or a glob string, which is expanded to a list.On each pass, this task
+    loads one item from each entry.
+
+    In addition, each entry is allowed to be a list of files.
+    In this case, the entire sub-list is loaded and passed as a list.
+
+    The top-level lists must all have equal length.
+
+    Attributes
+    ----------
+    file_batches : dict[str, PathLik | list[PathLike]]
+        Batches of files to be loaded together.
+    """
+
+    file_batches = config.Property(proptype=dict)
+
+    _file_ind = 0
+    _max_len = None
+
+    def setup(self):
+        """Ensure that all batch lists have the same length."""
+        for key, entry in self.file_batches.items():
+            if self._max_len is None:
+                self._max_len = len(entry)
+
+            if len(entry) != self._max_len:
+                raise CaputConfigError(
+                    f"Batch entry `{key}` has a different length from the rest: "
+                    f"{len(entry)} != {self._max_len}"
+                )
+        # `SelectionsMixin` setup to resolve selections
+        super().setup()
+
+    def process(self):
+        """Load a batch of files and return.
+
+        Returns
+        -------
+        list[Container | list[Container]]
+            Single batch of files
+        """
+        if self._file_ind == self._max_len:
+            raise PipelineStopIteration
+
+        outputs = {key: [] for key in self.file_batches.keys()}
+
+        for key in self.file_batches.keys():
+            entry = self.file_batches[key][self._file_ind]
+
+            # package each entry as a list so we can always just iterate,
+            # even if there's only one item
+            if not isinstance(entry, list):
+                entry = [entry]
+
+            for ii, item in enumerate(entry):
+                message = f"[batch {self._file_ind + 1}/{self._max_len}; item {ii + 1}/{len(entry)} for entry `{key}`]"
+
+                cont = self._load_file(item, extra_message=message)
+                # repeat attr checks
+                if "tag" not in cont.attrs:
+                    # Get the first part of the actual filename and use it as the tag
+                    tag = os.path.splitext(os.path.basename(item))[0]
+
+                    cont.attrs["tag"] = tag
+
+                outputs[key].append(cont)
+
+        self._file_ind += 1
+
+        # construct the output list and return
+        for key, item in outputs.items():
+            if len(item) == 1:
+                outputs[key] = item[0]
+
+        return tuple(outputs.values())
 
 
 class Save(ContainerTask):

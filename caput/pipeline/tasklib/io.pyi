@@ -67,6 +67,16 @@ class LoadFiles(LoadFilesFromParams):
     files: ClassVar[list[PathLike] | None]
     def setup(self, files: Sequence[PathLike]): ...
 
+class LoadAllFiles(LoadFilesFromParams):
+    def process(self): ...
+
+class LoadFileBatches(BaseLoadFiles):
+    file_batches: ClassVar[dict[list[PathLike | list[PathLike]]]]
+    _file_ind: int
+    _max_len: int | None
+    def setup(self): ...
+    def process(self) -> list[Container | list[Container]]: ...
+
 class Save(ContainerTask):
     root: PathLike
     count: int
