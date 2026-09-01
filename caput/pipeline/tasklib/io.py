@@ -136,6 +136,50 @@ def list_or_glob(files):
     )
 
 
+def dict_of_files(files):
+    """Expand a dict of files, where each entry is a string, list, or glob.
+
+    Parameters
+    ----------
+    files : dict[PathLike] | dict[Sequence[PathLike]]
+        Input dict of files. Glob patterns are flattened to lists of file strings.
+
+    Returns
+    -------
+    file_dict : dict[PathLike] | dict[Sequence[PathLike]]
+        Input dict with file globs expanded and validated.
+
+    Raises
+    ------
+    :py:exc:`~caput.config.CaputConfigError`
+        If `files` has the wrong type or if it refers to a file that doesn't exist.
+    """
+    if not isinstance(files, dict):
+        raise CaputConfigError("Input must be a dictionary!")
+
+    file_dict = {}
+
+    for key, items in files.items():
+        if isinstance(items, list | tuple):
+            batch_items = items
+        else:
+            batch_items = [items]
+
+        expanded_items = []
+        for item in batch_items:
+            if isinstance(item, list | tuple):
+                group = []
+                for sub in item:
+                    group.extend(list_or_glob(sub))
+                expanded_items.append(group)
+            else:
+                expanded_items.append(list_or_glob(item))
+
+        file_dict[key] = expanded_items
+
+    return file_dict
+
+
 def list_of_filegroups(groups):
     """Process a file group/groups.
 
@@ -623,7 +667,7 @@ class LoadFileBatches(BaseLoadFiles):
     """Load batches of files and pass along an entire batch.
 
     File batches are passed as a dict where each entry is a list of files
-    or a glob string, which is expanded to a list.On each pass, this task
+    or a glob string, which is expanded to a list. On each pass, this task
     loads one item from each entry.
 
     In addition, each entry is allowed to be a list of files.
@@ -633,17 +677,25 @@ class LoadFileBatches(BaseLoadFiles):
 
     Attributes
     ----------
-    file_batches : dict[str, PathLik | list[PathLike]]
+    file_batches : dict[str, PathLike | list[PathLike]]
         Batches of files to be loaded together.
     """
 
-    file_batches = config.Property(proptype=dict)
+    file_batches = config.Property(proptype=dict_of_files)
 
     _file_ind = 0
     _max_len = None
 
     def setup(self):
         """Ensure that all batch lists have the same length."""
+        if not self.file_batches:
+            raise CaputConfigError("`file_batches` must contain at least one entry!")
+
+        if self._out_keys and len(self._out_keys) != len(self.file_batches):
+            raise CaputConfigError(
+                f"Expected {len(self._out_keys)} outputs per batch; got {len(self.file_batches)}"
+            )
+
         for key, entry in self.file_batches.items():
             if self._max_len is None:
                 self._max_len = len(entry)
@@ -661,7 +713,7 @@ class LoadFileBatches(BaseLoadFiles):
 
         Returns
         -------
-        list[Container | list[Container]]
+        tuple[Container | list[Container]]
             Single batch of files
         """
         if self._file_ind == self._max_len:
