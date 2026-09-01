@@ -5,12 +5,25 @@ invoke_args = ""
 required = ["name", "nodes", "time", "mem", "directory", "ompnum", "pernode", "account"]
 script = """#!/bin/bash
 #SBATCH --account={account:s}
-#SBATCH --nodes={nodes:d}
-#SBATCH --ntasks-per-node={pernode:d} # number of MPI processes
-#SBATCH --cpus-per-task={ompnum:d} # number of OpenMP processes
-#SBATCH --mem={mem:s} # memory per node
 #SBATCH --time={time:s}
 #SBATCH --job-name={name:s}
+#SBATCH --nodes={nodes:d}
+#SBATCH --mem={mem:s} # memory per node
+#SBATCH --ntasks-per-node={pernode:d} # number of MPI processes
+#SBATCH --cpus-per-task={ompnum:d} # number of OpenMP processes
+#SBATCH --hint=nomultithread # one hardware thread per physical core
+#SBATCH --mem-bind=local # keep memory allocation on the same numa node as cores
+#SBATCH --distribution=block:block # keep cpuset contiguous when spanning socks
+
+# --- OpenMP config ---
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+# Try to keep threads together - this is usually more optimal
+# for computationaly intensive tasks
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+
+# --- Rayon config ---
+export RAYON_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 # exit if a command returns non-zero code
 set -e
@@ -24,17 +37,12 @@ trap setCrashed ERR
 
 echo RUNNING > {statuspath:s}
 
+# load modules
 {modules:s}
-
+# activate virtual environment
 source {venv:s}
-
+# move into workind directory
 cd {workdir:s}
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
-
-# Try to keep threads together - this is usually more optimal
-# for computationaly intensive tasks
-export OMP_PROC_BIND=close
-export OMP_PLACES=cores
 
 {invoke:s} {invoke_args:s} caput-pipeline run {profile:s} {profiler:s} {psutil:s} {configpath:s} &> {logpath:s}
 
@@ -68,6 +76,16 @@ script = """#!/bin/bash
 #PBS -l walltime={time:s}
 #PBS -N {name:s}
 
+# --- OpenMP config ---
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
+# Try to keep threads together - this is usually more optimal
+# for computationaly intensive tasks
+export OMP_PROC_BIND=close
+export OMP_PLACES=cores
+
+# --- Rayon config ---
+export RAYON_NUM_THREADS=$SLURM_CPUS_PER_TASK
+
 # exit if a command returns non-zero code
 set -e
 
@@ -78,14 +96,16 @@ function setCrashed {{
 
 trap setCrashed ERR
 
-{module:s}
+echo RUNNING > {statuspath:s}
 
+# load modules
+{modules:s}
+# activate virtual environment
 source {venv:s}
-
+# move into workind directory
 cd {workdir:s}
-export OMP_NUM_THREADS={ompnum:d}
 
-{invoke:s} {invoke_args:s} caput-pipeline run {configpath:s} &> {logpath:s}
+{invoke:s} {invoke_args:s} caput-pipeline run {profile:s} {profiler:s} {psutils:s} {configpath:s} &> {logpath:s}
 
 # Set the status
 echo FINISHED > {statuspath:s}
