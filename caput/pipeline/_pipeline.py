@@ -580,8 +580,12 @@ class Manager(config.Reader):
 
         # If the task specifies a conditional and that condition is false,
         # replace this task with a :py:class:`NoOp`
-        if "if" in task_spec and not task_spec["if"]:
-            task_cls = NoOp
+        if "if" in task_spec:
+            if not isinstance(task_spec["if"], bool):
+                raise config.CaputConfigError("`if` key is not a boolean!")
+            if not task_spec["if"]:
+                task_cls = NoOp
+
         # Find the tasks class either in the local set, or by importing a fully
         # qualified class name
         elif task_path in local_tasks:
@@ -699,7 +703,7 @@ def _format_product_keys(keys):
 
     In the pipeline config task list, the values of 'requires', 'in', 'out', and
     'after' are keys representing data products.  This function gets that key from
-    the task's entry of the task list, defaults to zero, and ensures it's formated
+    the task's entry of the task list, defaults to zero, and ensures it's formatted
     as a sequence of strings.
     """
     if keys is None:
@@ -1282,7 +1286,17 @@ class NoOp(Task):
 
     def next(self, *input):
         """Forward any input."""
-        return input
+        input = list(input)
+
+        n_out = len(self._out_keys)
+        n_inp = len(input)
+
+        if n_out < n_inp:
+            input = input[:n_out]
+        elif n_out > n_inp:
+            input.extend([None] * (n_out - n_inp))
+
+        return tuple(input)
 
     @classmethod
     def _from_config(cls, config):
