@@ -36,6 +36,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from caput.config import CaputConfigError
+
 from ... import config
 from ...containers import Container
 from ...memdata import MemDataset, MemDiskGroup, fileformats
@@ -132,6 +134,50 @@ def list_or_glob(files):
     raise config.CaputConfigError(
         f"Argument must be list, glob pattern, or file path, got {files!r}"
     )
+
+
+def dict_of_files(files):
+    """Expand a dict of files, where each entry is a string, list, or glob.
+
+    Parameters
+    ----------
+    files : dict[PathLike] | dict[Sequence[PathLike]]
+        Input dict of files. Glob patterns are flattened to lists of file strings.
+
+    Returns
+    -------
+    file_dict : dict[PathLike] | dict[Sequence[PathLike]]
+        Input dict with file globs expanded and validated.
+
+    Raises
+    ------
+    :py:exc:`~caput.config.CaputConfigError`
+        If `files` has the wrong type or if it refers to a file that doesn't exist.
+    """
+    if not isinstance(files, dict):
+        raise CaputConfigError("Input must be a dictionary!")
+
+    file_dict = {}
+
+    for key, items in files.items():
+        if isinstance(items, list | tuple):
+            batch_items = items
+        else:
+            batch_items = [items]
+
+        expanded_items = []
+        for item in batch_items:
+            if isinstance(item, list | tuple):
+                group = []
+                for sub in item:
+                    group.extend(list_or_glob(sub))
+                expanded_items.append(group)
+            else:
+                expanded_items.append(list_or_glob(item))
+
+        file_dict[key] = expanded_items
+
+    return file_dict
 
 
 def list_of_filegroups(groups):
@@ -593,6 +639,117 @@ class LoadFiles(LoadFilesFromParams):
             raise RuntimeError(f'Argument must be list of files. Got "{files}"')
 
         self.files = files
+
+
+class LoadAllFiles(LoadFilesFromParams):
+    """Load all files input files in a single pass and return as a list of containers."""
+
+    def process(self):
+        """Load all files before returning.
+
+        Returns
+        -------
+        list[Container]
+            List of loaded containers.
+        """
+        filelist = []
+
+        while True:
+            try:
+                filelist.append(super().process())
+            except PipelineStopIteration:
+                break
+
+        return filelist
+
+
+class LoadFileBatches(BaseLoadFiles):
+    """Load batches of files and pass along an entire batch.
+
+    File batches are passed as a dict where each entry is a list of files
+    or a glob string, which is expanded to a list. On each pass, this task
+    loads one item from each entry.
+
+    In addition, each entry is allowed to be a list of files.
+    In this case, the entire sub-list is loaded and passed as a list.
+
+    The top-level lists must all have equal length.
+
+    Attributes
+    ----------
+    file_batches : dict[str, PathLike | list[PathLike]]
+        Batches of files to be loaded together.
+    """
+
+    file_batches = config.Property(proptype=dict_of_files)
+
+    _file_ind = 0
+    _max_len = None
+
+    def setup(self):
+        """Ensure that all batch lists have the same length."""
+        if not self.file_batches:
+            raise CaputConfigError("`file_batches` must contain at least one entry!")
+
+        if self._out_keys and len(self._out_keys) != len(self.file_batches):
+            raise CaputConfigError(
+                f"Expected {len(self._out_keys)} outputs per batch; got {len(self.file_batches)}"
+            )
+
+        for key, entry in self.file_batches.items():
+            if self._max_len is None:
+                self._max_len = len(entry)
+
+            if len(entry) != self._max_len:
+                raise CaputConfigError(
+                    f"Batch entry `{key}` has a different length from the rest: "
+                    f"{len(entry)} != {self._max_len}"
+                )
+        # `SelectionsMixin` setup to resolve selections
+        super().setup()
+
+    def process(self):
+        """Load a batch of files and return.
+
+        Returns
+        -------
+        tuple[Container | list[Container]]
+            Single batch of files
+        """
+        if self._file_ind == self._max_len:
+            raise PipelineStopIteration
+
+        outputs = {key: [] for key in self.file_batches.keys()}
+
+        for key in self.file_batches.keys():
+            entry = self.file_batches[key][self._file_ind]
+
+            # package each entry as a list so we can always just iterate,
+            # even if there's only one item
+            if not isinstance(entry, list):
+                entry = [entry]
+
+            for ii, item in enumerate(entry):
+                message = f"[batch {self._file_ind + 1}/{self._max_len}; item {ii + 1}/{len(entry)} for entry `{key}`]"
+
+                cont = self._load_file(item, extra_message=message)
+                # repeat attr checks
+                if "tag" not in cont.attrs:
+                    # Get the first part of the actual filename and use it as the tag
+                    tag = os.path.splitext(os.path.basename(item))[0]
+
+                    cont.attrs["tag"] = tag
+
+                outputs[key].append(cont)
+
+        self._file_ind += 1
+
+        # construct the output list and return
+        for key, item in outputs.items():
+            if len(item) == 1:
+                outputs[key] = item[0]
+
+        return tuple(outputs.values())
 
 
 class Save(ContainerTask):
