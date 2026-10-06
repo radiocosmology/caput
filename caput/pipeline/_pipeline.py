@@ -7,6 +7,7 @@ import inspect
 import logging
 import queue
 import re
+import weakref
 from copy import deepcopy
 
 import yaml
@@ -148,6 +149,9 @@ class Manager(config.Reader):
         # Precompile the key pattern to skip
         self.key_match = re.compile(self.key_pattern)
 
+        # record the prior global logging state
+        self._logging_prior_state = {}
+
     @classmethod
     def from_yaml_file(cls, file_name, lint=False, psutil_profiling=False):
         """Initialize the pipeline from a YAML configuration file.
@@ -244,9 +248,20 @@ class Manager(config.Reader):
         lvldefault = getattr(logging, default)
 
         for module, level in self.logging.items():
-            loglvl = getattr(logging, level, lvldefault)
-            # Set the log level for each module
-            logging.getLogger(module).setLevel(loglvl)
+            new_loglvl = getattr(logging, level, lvldefault)
+            # Get the logger for this module
+            this_logger = logging.getLogger(module)
+            # Record the previous state for each modified module
+            self._logging_prior_state[module] = this_logger.level
+            # Set the new log level
+            this_logger.setLevel(new_loglvl)
+
+        # set up a finalizer to reset global logging state
+        # when the manager goes out of scope
+        # gets called when the last reference to an instance disappears
+        self._finalizer = weakref.finalize(
+            self, _restore_logging_from_dict, self._logging_prior_state
+        )
 
     def run(self):
         """Run the pipeline through to completion.
@@ -1304,3 +1319,11 @@ class NoOp(Task):
     def _from_config(cls, config):
         """Ignore any config parameters because this task only cares about keys."""
         return super()._from_config({})
+
+
+def _restore_logging_from_dict(d: dict):
+    for name, state in d.items():
+        try:
+            logging.getLogger(name).setLevel(state)
+        except:  # noqa E722
+            continue
