@@ -156,7 +156,7 @@ class HDF5(FileFormat):
     compression = _compression_enabled
 
     @classmethod
-    def open(cls, *args, **kwargs) -> h5py.File:  # noqa: D417
+    def open(cls, *args, **kwargs) -> h5py.File:
         r"""Open an HDF5 file using h5py.
 
         Parameters
@@ -247,7 +247,7 @@ class Zarr(FileFormat):
     compression = _compression_enabled
 
     @classmethod
-    def open(cls, *args, **kwargs):  # noqa: D417
+    def open(cls, *args, **kwargs):
         r"""Open a zarr file.
 
         Parameters

@@ -325,7 +325,7 @@ class GroupIOMixin:
         return MemGroup.from_file(filename, mode="r")
 
     @staticmethod
-    def write_output(  # noqa: D417
+    def write_output(
         filename: str,
         output: GroupLike,
         file_format: fileformats.FileFormat | None = None,
@@ -472,7 +472,7 @@ class ContainerIOMixin:
         )
 
     @staticmethod
-    def write_output(  # noqa: D417
+    def write_output(
         filename,
         output,
         file_format=None,

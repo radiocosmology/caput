@@ -180,7 +180,7 @@ class _decorator:
         self.__signature__ = sig.replace(parameters=dec_params)
 
 
-def vectorize(**base_kwargs: Any) -> Callable:  # noqa: D417
+def vectorize(**base_kwargs: Any) -> Callable:
     r"""Improved vectorization decorator.
 
     Unlike the :py:class:`np.vectorize` decorator this version works on methods in

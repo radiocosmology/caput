@@ -71,7 +71,7 @@ class TOData(Container):
         return time
 
     @classmethod
-    def from_mult_files(  # noqa: D417
+    def from_mult_files(
         cls,
         files: FileLike | Sequence[FileLike],
         data_group: GroupLike | None = None,

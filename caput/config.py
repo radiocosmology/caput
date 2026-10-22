@@ -208,7 +208,7 @@ class Reader:
     """A class that allows the values of Properties to be assigned from a dictionary."""
 
     @classmethod
-    def from_config(cls, config: dict, *args: Any, **kwargs: Any) -> Reader:  # noqa: D417
+    def from_config(cls, config: dict, *args: Any, **kwargs: Any) -> Reader:
         r"""Create a new instance with values loaded from config.
 
         Parameters
@@ -393,7 +393,7 @@ def enum(options: list[Any], default: Any | None = None) -> Property:
     return Property(proptype=_prop, default=default)
 
 
-def list_type(  # noqa: D417
+def list_type(
     type_: npt.DtypeLike | None = None,
     length: int | None = None,
     maxlength: int | None = None,

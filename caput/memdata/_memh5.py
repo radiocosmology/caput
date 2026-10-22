@@ -315,7 +315,7 @@ class _BaseGroup(_MemObjMixin, Mapping):
         keys = list(self._get_storage().keys())
         yield from keys
 
-    def require_dataset(self, name, shape, dtype, **kwargs):  # noqa: D417
+    def require_dataset(self, name, shape, dtype, **kwargs):
         r"""Require a dataset to exist, create if it doesn't.
 
         All arguments are passed through to create_dataset.
@@ -446,7 +446,7 @@ class MemGroup(_BaseGroup):
         )
 
     @classmethod
-    def from_hdf5(  # noqa: D417
+    def from_hdf5(
         cls,
         filename,
         distributed=False,
@@ -500,7 +500,7 @@ class MemGroup(_BaseGroup):
         )
 
     @classmethod
-    def from_file(  # noqa: D417
+    def from_file(
         cls,
         filename,
         distributed=False,
@@ -584,7 +584,7 @@ class MemGroup(_BaseGroup):
 
         return self
 
-    def to_hdf5(  # noqa: D417
+    def to_hdf5(
         self,
         filename,
         mode="w",
@@ -624,7 +624,7 @@ class MemGroup(_BaseGroup):
             **kwargs,
         )
 
-    def to_file(  # noqa: D417
+    def to_file(
         self,
         filename,
         mode="w",
@@ -722,7 +722,7 @@ class MemGroup(_BaseGroup):
         # Underlying storage has been created. Return the group object.
         return self[name]
 
-    def create_dataset(  # noqa: D417
+    def create_dataset(
         self,
         name,
         shape=None,
@@ -1201,7 +1201,7 @@ class MemDatasetCommon(MemDataset):
         self._compression_opts = compression_opts
 
     @classmethod
-    def from_numpy_array(  # noqa: D417
+    def from_numpy_array(
         cls,
         data,
         chunks=None,
@@ -1407,7 +1407,7 @@ class MemDatasetDistributed(MemDataset):
         self._compression_opts = compression_opts
 
     @classmethod
-    def from_mpi_array(  # noqa: D417
+    def from_mpi_array(
         cls,
         data,
         chunks=None,
@@ -1836,7 +1836,7 @@ class MemDiskGroup(_BaseGroup):
     # For creating new instances. #
 
     @classmethod
-    def from_file(  # noqa: D417
+    def from_file(
         cls,
         file_,
         ondisk=False,
@@ -2129,7 +2129,7 @@ class MemDiskGroup(_BaseGroup):
 
         return self.__class__.from_file(self._data)
 
-    def to_disk(self, filename, file_format=fileformats.HDF5, **kwargs):  # noqa: D417
+    def to_disk(self, filename, file_format=fileformats.HDF5, **kwargs):
         r"""Return a version of this data that lives on disk.
 
         Cannot run if the underlying data is distributed. Use :meth:`save` instead.
@@ -2198,7 +2198,7 @@ class MemDiskGroup(_BaseGroup):
         """Called when copy.deepcopy is called on this class."""
         return self.copy()
 
-    def save(  # noqa: D417
+    def save(
         self,
         filename,
         convert_attribute_strings=None,
