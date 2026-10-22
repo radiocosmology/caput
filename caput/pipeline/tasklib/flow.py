@@ -26,7 +26,7 @@ class AccumulateList(MPILoggedTask):
         super().__init__()
         self._items = []
 
-    def next(self, input_):  # noqa: D417
+    def next(self, input_):
         r"""Append an input to the list of inputs.
 
         Parameters
@@ -81,7 +81,7 @@ class GatherInputs(MPILoggedTask):
     configuration keys.
     """
 
-    def next(self, *inputs):  # noqa: D417
+    def next(self, *inputs):
         r"""Gather the inputs into a list.
 
         Parameters

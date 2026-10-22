@@ -1359,7 +1359,7 @@ class MPIArray(np.ndarray):
 
         return _expand_sel(sel, self.ndim)
 
-    def transpose(self, *axes: Sequence[int] | int | None) -> MPIArray:  # noqa: D417
+    def transpose(self, *axes: Sequence[int] | int | None) -> MPIArray:
         r"""Transpose the array axes.
 
         Parameters
@@ -1394,7 +1394,7 @@ class MPIArray(np.ndarray):
 
         return tdata
 
-    def reshape(self, *shape: Sequence[int | None], order: str = "C") -> MPIArray:  # noqa: D417
+    def reshape(self, *shape: Sequence[int | None], order: str = "C") -> MPIArray:
         r"""Reshape the array.
 
         Must not attempt to reshape the distributed axis. That axis must be
@@ -1765,7 +1765,7 @@ class MPIArray(np.ndarray):
     # which facilitates the use of a diverse set of ufuncs
     # some which return nothing, and some which return something
 
-    def __array_ufunc__(  # noqa: D417
+    def __array_ufunc__(
         self,
         ufunc: np.ufunc,
         method: Literal["__call__", "reduce", "accumulate"],

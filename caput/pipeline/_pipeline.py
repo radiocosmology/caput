@@ -636,7 +636,7 @@ class Manager(config.Reader):
 
         return task
 
-    def add_task(self, task, task_spec={}, **kwargs):  # noqa: D417
+    def add_task(self, task, task_spec={}, **kwargs):
         r"""Add a task instance to the pipeline.
 
         Parameters
@@ -954,7 +954,7 @@ class Task(config.Reader):
 
         return self
 
-    def _setup_keys(self, in_, out=None, requires=None, after=None):  # noqa: D417
+    def _setup_keys(self, in_, out=None, requires=None, after=None):
         r"""Setup the 'requires', 'in', 'out', and 'after' keys for this task.
 
         Parameters

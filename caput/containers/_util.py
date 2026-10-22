@@ -17,7 +17,7 @@ from ..mpiarray import _apply_sel
 from ._core import ContainerPrototype
 
 
-def empty_like(cont: ContainerPrototype, **kwargs: dict) -> ContainerPrototype:  # noqa: D417
+def empty_like(cont: ContainerPrototype, **kwargs: dict) -> ContainerPrototype:
     r"""Create an empty container with the same properties as `cont`.
 
     Parameters
