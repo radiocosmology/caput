@@ -215,6 +215,12 @@ def queue(
         then move to a final location if the job successfully finishes. This
         may be slow, if the temporary and final directories are not on the
         same filesystem.
+    ``email``
+        If set, send a job status notification to the provided email address.
+        The type of notification is set via `mailtype`.
+    ``mailtype``
+        The type of email notification to send (i.e. job start, end, failure,
+        etc...). The exact type and format is specific to each queue system.
     """
     import os
     import shutil
@@ -227,11 +233,34 @@ def queue(
 
     conf = _load_config(configfile)
 
+    # Insert email parameters if they were provided, overwriting
+    # any defaults from the config
+    if email is not None:
+        conf["email"] = email
+    if mailtype is not None:
+        conf["mailtype"] = mailtype
+
     # Resolve the full queue system configuration and
     resolved_config = _resolve_system_config(conf)
 
     system = resolved_config["system"]
     system_config = REGISTERED_SYSTEMS[system]
+
+    # Validate email settings for this system
+    if conf.get("email") is not None:
+        if (mailtype := conf.get("mailtype")) is None:
+            logger.warning(f"Must specify {system} mailtype for email notifications")
+        else:
+            mail_config = system_config.get("mail")
+
+            if mail_config is None:
+                logger.warning(f"Email notifications not supported for {system}")
+            else:
+                if mailtype not in mail_config["types"]:
+                    raise ValueError(
+                        f"Invalid {system} mailtype specified: ({mailtype}). "
+                        f"Valid types are: ({mail_config['types']})."
+                    )
 
     directories = _create_job_directories(resolved_config, overwrite)
 
@@ -258,34 +287,12 @@ def queue(
     with open(directories["jobdir"] / "jobscript.sh", "w") as f:
         f.write(jobscript)
 
-    # Resolve mail options, if available for the queue system
-    extra_options = []
-
-    if email is not None:
-        if mailtype is None:
-            logger.warning(f"Must specify {system} mailtype for email notifications")
-
-        mail_config = system_config.get("mail")
-
-        if mail_config is None:
-            logger.warning(f"Email notifications not supported for {system}")
-        else:
-            if mailtype not in mail_config["types"]:
-                raise ValueError(
-                    f"Invalid {system} mailtype specified: ({mailtype}). "
-                    f"Valid types are: ({mail_config['types']})."
-                )
-
-            extra_options = (
-                mail_config["options"].format(email=email, mailtype=mailtype).split()
-            )
-
     if submit:
         # NOTE: explicitly set the environment to what Python thinks it should
         # be. This is because mpi4py will incorrectly modify the environment
         # using lowlevel calls which Python cannot detect.
         subprocess.run(
-            [system_config["command"], *extra_options, "jobscript.sh"],
+            [system_config["command"], "jobscript.sh"],
             cwd=directories["jobdir"],
             env=os.environ,
         )
@@ -319,7 +326,7 @@ def _resolve_system_config(conf: dict) -> dict:
             )
         else:
             raise ValueError(
-                f"Specified system `{system}`: is not known. "
+                f"Specified system `{sysname}`: is not known. "
                 f"Known systems are: {list(REGISTERED_SYSTEMS.keys())} "
                 f"and known clusters are: {list(REGISTERED_CLUSTERS.keys())}"
             )
@@ -464,6 +471,10 @@ def _resolve_job_script(conf: dict, directories: dict) -> str:
     # Fill invocation arguments, since this can be provided
     # as a separate script
     conf["invoke_args"] = conf["invoke_args"].format(**conf)
+
+    # Form valid email config parameters
+    conf["email"] = conf.get("email", "NONE")
+    conf["mailtype"] = conf.get("mailtype", "NONE")
 
     # Get the default system queue script and fill in the template variables
     return REGISTERED_SYSTEMS[system]["script"].format(**conf)

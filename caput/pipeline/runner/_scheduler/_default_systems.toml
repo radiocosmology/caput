@@ -14,6 +14,9 @@ script = """#!/bin/bash
 #SBATCH --hint=nomultithread # one hardware thread per physical core
 #SBATCH --mem-bind=local # keep memory allocation on the same numa node as cores
 #SBATCH --distribution=block:block # keep cpuset contiguous when spanning socks
+# --- Email config ---
+#SBATCH --mail-user={email:s}
+#SBATCH --mail-type={mailtype:s}
 
 # --- OpenMP config ---
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
@@ -75,6 +78,9 @@ script = """#!/bin/bash
 #PBS -V
 #PBS -l walltime={time:s}
 #PBS -N {name:s}
+# --- Email config ---
+#PBS -M {email:s}
+#PBS -m {mailtype:s}
 
 # --- OpenMP config ---
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
