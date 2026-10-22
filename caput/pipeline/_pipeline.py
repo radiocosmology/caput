@@ -580,12 +580,11 @@ class Manager(config.Reader):
 
         # If the task specifies a conditional and that condition is false,
         # replace this task with a :py:class:`NoOp`
-        if "if" in task_spec:
-            if not isinstance(task_spec["if"], bool):
-                raise config.CaputConfigError("`if` key is not a boolean!")
-            if not task_spec["if"]:
-                task_cls = NoOp
+        if not isinstance(task_spec.get("if", False), bool):
+            raise config.CaputConfigError("Found non-boolean task `if` key!")
 
+        if not task_spec.get("if", True):
+            task_cls = NoOp
         # Find the tasks class either in the local set, or by importing a fully
         # qualified class name
         elif task_path in local_tasks:
@@ -593,11 +592,7 @@ class Manager(config.Reader):
         else:
             try:
                 task_cls = importtools.import_class(task_path)
-            except (
-                config.CaputConfigError,
-                AttributeError,
-                ModuleNotFoundError,
-            ) as exc:
+            except Exception as exc:
                 raise config.CaputConfigError(
                     f"Error loading task `{task_path}`\n"
                 ) from exc
