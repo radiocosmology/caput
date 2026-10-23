@@ -234,7 +234,11 @@ def queue(
     conf = _load_config(configfile)
 
     # Insert email parameters if they were provided, overwriting
-    # any defaults from the config
+    # any defaults from the config. Make sure that something is
+    # there, at least
+    conf.setdefault("email")
+    conf.setdefault("mailtype")
+
     if email is not None:
         conf["email"] = email
     if mailtype is not None:
@@ -247,14 +251,19 @@ def queue(
     system_config = REGISTERED_SYSTEMS[system]
 
     # Validate email settings for this system
-    if conf.get("email") is not None:
-        if (mailtype := conf.get("mailtype")) is None:
-            logger.warning(f"Must specify {system} mailtype for email notifications")
+    if conf["mailtype"] is not None:
+        if conf["email"] is None:
+            logger.warning(
+                "Both user and mailtype are required for email notifications"
+            )
+            conf["mailtype"] = None
         else:
             mail_config = system_config.get("mail")
 
             if mail_config is None:
                 logger.warning(f"Email notifications not supported for {system}")
+                conf["email"] = None
+                conf["mailtype"] = None
             else:
                 if mailtype not in mail_config["types"]:
                     raise ValueError(
@@ -473,8 +482,10 @@ def _resolve_job_script(conf: dict, directories: dict) -> str:
     conf["invoke_args"] = conf["invoke_args"].format(**conf)
 
     # Form valid email config parameters
-    conf["email"] = conf.get("email", "NONE")
-    conf["mailtype"] = conf.get("mailtype", "NONE")
+    if conf.get("mailtype") is None:
+        conf["mailtype"] = "NONE"
+    if conf.get("email") is None:
+        conf["email"] = "nouser@nothing.com"
 
     # Get the default system queue script and fill in the template variables
     return REGISTERED_SYSTEMS[system]["script"].format(**conf)
