@@ -1,0 +1,9 @@
+---
+name: caput-PR-check
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+jobs:
+  description:
+    uses: radiocosmology/.github/.github/workflows/pr-description-check.yaml@main
