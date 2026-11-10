@@ -8,6 +8,8 @@ from caput.containers import tod
 
 
 class TestConcatenation(unittest.TestCase):
+    """Test concatenation and reading of time-ordered data."""
+
     def setUp(self):
         chan = np.arange(15)
         ntime = [15, 67, 35, 23, 91]
@@ -35,6 +37,7 @@ class TestConcatenation(unittest.TestCase):
         self.todlist = todlist
 
     def test_from_files(self):
+        """Construct time-ordered data from input files."""
         data = tod.TOData.from_mult_files(self.todlist)
         self.assertTrue(
             np.all(
@@ -45,6 +48,7 @@ class TestConcatenation(unittest.TestCase):
         self.assertEqual(data["dset1"].shape, (self.nchan, self.ntime))
 
     def test_reader(self):
+        """Check reader behavior."""
         reader = tod.TODReader(self.todlist)
         reader.time_sel = (7, 87)
         reader.dataset_sel = ("dset1",)
@@ -61,6 +65,7 @@ class TestConcatenation(unittest.TestCase):
         self.assertEqual(list(data.keys()), ["dset1"])
 
     def test_reader_time_range(self):
+        """Read a time-ordered data subset by time range."""
         reader = tod.TODReader(self.todlist)
         reader.select_time_range(start_time=300.0, stop_time=500.0)
 
@@ -75,6 +80,7 @@ class TestConcatenation(unittest.TestCase):
         self.assertTrue(np.all(data["dset2"][:] == data.index_map["time"]))
 
     def test_index_attr(self):
+        """Read time-ordered data index attributes."""
         for d in self.todlist:
             d.index_attrs["time"]["alignment"] = 1
 
@@ -90,7 +96,3 @@ class TestConcatenation(unittest.TestCase):
                 data.time[:] - (abs(np.median(np.diff(data.time[:]))) / 2),
             )
         )
-
-
-if __name__ == "__main__":
-    unittest.main()

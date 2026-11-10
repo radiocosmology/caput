@@ -7,8 +7,11 @@ import caput
 from caput.pipeline import Manager
 
 
-class TestConfig(unittest.TestCase):
+class TestMetadata(unittest.TestCase):
+    """Test metadata defaults and configuration overrides."""
+
     def test_default_params(self):
+        """Check default params behavior."""
         testconfig = """
         pipeline:
             bla: "foo"
@@ -28,6 +31,7 @@ class TestConfig(unittest.TestCase):
         )
 
     def test_metadata_params(self):
+        """Check metadata params behavior."""
         testconfig = """
         foo: bar
         pipeline:
@@ -55,6 +59,7 @@ class TestConfig(unittest.TestCase):
         )
 
     def test_metadata_params_no_config(self):
+        """Check metadata params no config behavior."""
         testconfig = """
         pipeline:
             save_versions: numpy

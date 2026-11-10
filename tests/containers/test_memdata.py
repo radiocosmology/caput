@@ -34,8 +34,9 @@ def test_ro_dict():
 # Unit test for MemDataset
 
 
-def test_dataset_copy():
-    # Check for string types
+def test_common_dataset_copy():
+    """Check dataset copy behavior."""
+    # Check for string types.
     x = memdata.MemDatasetCommon(shape=(4, 5), dtype=np.float32)
     x[:] = 0
 
@@ -265,6 +266,7 @@ def test_memdisk(test_file, file_format):
 )
 def test_compression(test_file, file_format, compression, compression_opts, chunks):
     # add a new compressed dataset
+    """Check compression behavior."""
     f = memdata.MemDiskGroup.from_file(test_file, file_format=file_format)
     rng = np.random.default_rng(12345)
     f.create_dataset(
@@ -546,7 +548,7 @@ def test_create_dataset():
         ),
     ],
 )
-def test_io(
+def test_distributed_group_io(
     test_file, file_open_function, file_format, compression, compression_opts, chunks
 ):
     """Test for I/O in MemGroup."""
@@ -695,8 +697,9 @@ def test_misc(test_file, file_open_function, file_format):
     mpitools.barrier()
 
 
-def test_dataset_copy():
-    # Check for string types
+def test_distributed_dataset_copy():
+    """Check dataset copy behavior."""
+    # Check for string types.
     x = memdata.MemDatasetDistributed(shape=(4, 5), dtype=np.float32)
     x[:] = 0
 

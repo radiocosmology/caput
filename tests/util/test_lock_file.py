@@ -10,6 +10,8 @@ from caput.memdata import lock_file
 
 
 class TestLock(unittest.TestCase):
+    """Test lock-file creation, conflict handling, and cleanup."""
+
     def setUp(self):
         self.dir = tempfile.mkdtemp()
 
@@ -79,7 +81,3 @@ class TestLock(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.dir)
-
-
-if __name__ == "__main__":
-    unittest.main()
