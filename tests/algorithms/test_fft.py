@@ -5,7 +5,6 @@ import pytest
 
 from caput.algorithms import fft
 
-
 ARRAY_SIZE = (100, 111)
 SEED = 12345
 ATOL = 1e-12
@@ -78,7 +77,7 @@ def test_forward_backward_scipy(x, ax):
 @pytest.mark.parametrize("x", [random_complex_array])
 @pytest.mark.parametrize("ax", [(0,), (1,), None])
 def test_equal_scipy_fftw(x, ax):
-    """Test that `fftw` and `scipy_fft` give the same results.'"""
+    """Test that `fftw` and `scipy_fft` give the same results.'."""
     Xc = fft.fftw.fft(x, ax)
     ixc = fft.fftw.ifft(Xc, ax)
 

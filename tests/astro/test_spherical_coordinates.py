@@ -1,7 +1,8 @@
 """Test interferometry routines."""
 
-import pytest
 from math import pi, sqrt
+
+import pytest
 
 from caput.astro.coordinates import spherical
 
@@ -28,7 +29,6 @@ def test_sphdist():
 
 
 def test_rotate_ypr():
-
     # No rotation
     """Check rotate yaw-pitch-roll rotation behavior."""
     basis = spherical.rotate_ypr([0, 0, 0], 1, 2, 3)

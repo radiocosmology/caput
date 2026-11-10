@@ -1,12 +1,11 @@
 """Unit tests for the invert_no_zero module."""
 
-from mpi4py import MPI
 import numpy as np
 import pytest
+from mpi4py import MPI
 
-from caput.mpiarray import MPIArray
 from caput.algorithms import invert_no_zero
-
+from caput.mpiarray import MPIArray
 
 ARRAY_SIZE = (100, 111)
 SEED = 12345
