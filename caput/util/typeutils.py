@@ -210,26 +210,16 @@ def has_kind(dt: np.dtype, kind: str) -> bool:
     dtype_has_kind : bool
         True if it contains the requested kind.
     """
-    # For scalar types the conversion is easy
-    if not dt.names:
-        return dt.kind == kind
-
     # For compound types we must recurse over the full compound type structure
-    def _iter_conv(x):
-        for item in x:
-            type_ = item[1]
+    dt = np.dtype(dt)
 
-            # Recursively convert the type
-            if isinstance(type_, list) and _iter_conv(type_):
-                return True
-            if isinstance(type_, tuple) and type_[0][1] == kind:
-                return True
-            if type_[1] == kind:
-                return True
+    if dt.names:
+        return any(has_kind(dt.fields[n][0], kind) for n in dt.names)
 
-        return False
+    if dt.subdtype:
+        return has_kind(dt.subdtype[0], kind)
 
-    return _iter_conv(dt.descr)
+    return dt.kind == kind
 
 
 def has_unicode(dt: np.dtype) -> bool:
