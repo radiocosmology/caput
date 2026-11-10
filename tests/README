@@ -1,1 +1,11 @@
-Unit tests using the python `unittest` framework.
+Unit tests are written for `pytest` and grouped by domain:
+
+- `algorithms/`: numerical algorithms and transforms
+- `astro/`: astronomical constants, coordinates, and time
+- `config/`: configuration parsing and validation
+- `containers/`: containers, in-memory data, selections, and time-ordered data
+- `mpi/`: distributed arrays
+- `pipeline/`: pipeline behavior
+- `util/`: utility functions
+
+The shared fixtures are defined in `conftest.py` at the root of this directory.

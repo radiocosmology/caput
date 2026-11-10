@@ -33,6 +33,7 @@ testdict = {"name": "Richard", "ageinyears": 40, "petname": "Sooty"}
 
 # Tests
 def test_default_params():
+    """Check default params behavior."""
     person1 = Person()
 
     assert person1.name == "Bill"
@@ -41,6 +42,7 @@ def test_default_params():
 
 
 def test_set_params():
+    """Check set params behavior."""
     person = Person()
     person.name = "Mick"
 
@@ -48,6 +50,7 @@ def test_set_params():
 
 
 def test_read_config():
+    """Check read config behavior."""
     person = Person()
     person.read_config(testdict)
 
@@ -56,6 +59,7 @@ def test_read_config():
 
 
 def test_inherit_read_config():
+    """Check inherit read config behavior."""
     person = PersonWithPet()
     person.read_config(testdict)
 
@@ -65,6 +69,7 @@ def test_inherit_read_config():
 
 
 def test_pickle():
+    """Check pickle behavior."""
     person = PersonWithPet()
     person.read_config(testdict)
     person2 = pickle.loads(pickle.dumps(person))
@@ -75,6 +80,7 @@ def test_pickle():
 
 
 def test_list_type():
+    """Check list type behavior."""
     lt = ListTypeTests()
 
     with pytest.raises(config.CaputConfigError):
@@ -104,6 +110,7 @@ def test_no_line():
     # in an earlier version of the linting code where `__line__` keys were getting
     # inserted into dict types config properties
 
+    """Ensure dictionary configuration values do not gain parser line metadata."""
     dt = DictTypeTests()
 
     # Test with an empty dict

@@ -31,6 +31,7 @@ for file in files:
 
 def test_epoch():
     # At the J2000 epoch, sidereal time and transit RA should be the same.
+    """Check epoch behavior."""
     epoch = datetime(2000, 1, 1, 11, 58, 56)
 
     # Create an observer at an arbitrary location
@@ -53,6 +54,7 @@ def test_transit_array():
     # Do a simple test of transit_RA in an array. Use the fact that the RA
     # advances predictably to predict the answers
 
+    """Check transit array behavior."""
     epoch = datetime(2000, 1, 1, 11, 58, 56)
 
     # Create an observer at an arbitrary location
@@ -78,6 +80,7 @@ def test_transit_array():
 
 
 def test_delta():
+    """Check delta behavior."""
     delta = np.arange(0, 200000, 1000)  # Seconds.
     # time.time() when I wrote this.  No leap seconds for the next few
     # days.
@@ -109,6 +112,7 @@ def test_delta():
 def test_lsa_skyfield():
     # Check an lsa calculated by caput.time against one calculated by PyEphem
 
+    """Check local sidereal angle skyfield behavior."""
     dt = datetime(2014, 10, 2, 13, 4, 5)
     dt_utc = dt.replace(tzinfo=api.utc)
 
@@ -125,6 +129,7 @@ def test_lsa_skyfield():
 def test_lsa_tra():
     # Near the epoch transit RA and LRA should be extremely close
 
+    """Check local sidereal angle tra behavior."""
     dt = datetime(2001, 2, 3, 4, 5, 6)
 
     t1 = ctime.datetime_to_unix(dt)
@@ -139,6 +144,7 @@ def test_reverse_lsa():
     # Check that the lsa_to_unix routine correctly inverts a call to
     # unix_to_lsa
 
+    """Check reverse local sidereal angle behavior."""
     dt1 = datetime(2018, 3, 12, 1, 2, 3)
     t1 = ctime.datetime_to_unix(dt1)
 
@@ -154,6 +160,7 @@ def test_reverse_lsa():
 
 
 def test_lsa_array():
+    """Check local sidereal angle array behavior."""
     dt = datetime(2000, 1, 1, 12, 0, 0)
 
     t1 = ctime.datetime_to_unix(dt)
@@ -201,6 +208,7 @@ def test_lsd():
 
 
 def test_lsd_array():
+    """Check local sidereal day array behavior."""
     dt = datetime(2025, 1, 1, 12, 0, 0)
 
     t1 = ctime.datetime_to_unix(dt)
@@ -226,6 +234,7 @@ def test_lsd_array():
 
 def test_era_accuracy():
     # Pick a time to check the ERA around
+    """Check Earth rotation angle accuracy behavior."""
     dts = ctime.ensure_unix(datetime(2000, 1, 1))
 
     # These should give back the same time, but the accuracy of the STELLAR_S constant
@@ -238,12 +247,14 @@ def test_era_accuracy():
 
 
 def test_datetime_to_string():
+    """Check datetime to string behavior."""
     dt = datetime(2014, 4, 21, 16, 33, 12, 12356)
     fdt = ctime.datetime_to_timestr(dt)
     assert fdt == "20140421T163312Z"
 
 
 def test_string_to_datetime():
+    """Check string to datetime behavior."""
     dt = ctime.timestr_to_datetime("20140421T163312Z_stone")
     ans = datetime(2014, 4, 21, 16, 33, 12)
     assert dt == ans
@@ -288,6 +299,7 @@ def test_time_precision():
 
 
 def test_datetime_to_unix():
+    """Check datetime to unix behavior."""
     unix_time = time.time()
     dt = datetime.fromtimestamp(unix_time, timezone.utc)
     new_unix_time = ctime.datetime_to_unix(dt)
@@ -297,6 +309,7 @@ def test_datetime_to_unix():
 def test_leap_seconds():
     # 'test_' removed from name to deactivate the test untill this can be
     # implemented.
+    """Check leap seconds behavior."""
     l_second_date = datetime(2009, 1, 1, 0, 0, 0)
     l_second_date = ctime.datetime_to_unix(l_second_date)
     before = l_second_date - 10000
@@ -317,6 +330,7 @@ def test_era_known():
     # http://dc.zah.uni-heidelberg.de/apfs/times/q/form (note the latter
     # uses UT1, so we have maximum precision of 1s)
 
+    """Check Earth rotation angle known behavior."""
     dt = datetime(2016, 4, 3, 2, 1, 0)
 
     t1 = ctime.datetime_to_unix(dt)
@@ -337,6 +351,7 @@ def test_era_known():
 
 def test_era_inverse():
     # Check a full forward/inverse cycle
+    """Check Earth rotation angle inverse behavior."""
     dt = datetime(2016, 4, 3, 2, 1, 0)
     t1 = ctime.datetime_to_unix(dt)
     era = ctime.unix_to_era(t1)
@@ -359,6 +374,7 @@ def test_ensure_unix():
     # Check that ensure_unix is doing its job for both scalar and array
     # inputs
 
+    """Check ensure unix behavior."""
     dt = datetime(2016, 4, 3, 2, 1, 0)
     dt_list = [datetime(2016, 4, 3, 2, 1, 0), datetime(2016, 4, 3, 2, 1, 0)]
 
@@ -395,6 +411,7 @@ def eph():
 def test_transit_times(chime, eph):
     # Routines to test the transit time calculations
 
+    """Check predicted transit times against expected astronomical events."""
     dts = datetime(2020, 11, 5)
     dte = datetime(2020, 11, 7)
 
@@ -425,6 +442,7 @@ def test_transit_times(chime, eph):
 
 
 def test_rise_set_times(chime, eph):
+    """Check predicted rise and set times."""
     dts = datetime(2020, 11, 5)
     dte = datetime(2020, 11, 7)
 

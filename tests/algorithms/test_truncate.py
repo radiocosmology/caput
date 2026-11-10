@@ -5,6 +5,7 @@ from caput.util import truncate
 
 
 def test_bit_truncate():
+    """Check bit truncate behavior."""
     assert truncate.bit_truncate_int(129, 1) == 128
     assert truncate.bit_truncate_int(-129, 1) == -128
     assert truncate.bit_truncate_int(1, 1) == 0
@@ -32,6 +33,7 @@ def test_bit_truncate():
 
 
 def test_truncate_float():
+    """Check truncate float behavior."""
     assert truncate.bit_truncate_float(32.121, 1) == 32
     assert truncate.bit_truncate_float(-32.121, 1) == -32
     assert truncate.bit_truncate_float(32.125, 0) == 32.125
@@ -78,6 +80,7 @@ def test_truncate_float():
 
 
 def test_truncate_array():
+    """Check truncate array behavior."""
     assert (
         truncate.bit_truncate_relative(
             np.asarray([32.121, 32.5], dtype=np.float32), 1 / 32
@@ -93,6 +96,7 @@ def test_truncate_array():
 
 
 def test_truncate_weights():
+    """Check truncate weights behavior."""
     assert (
         truncate.bit_truncate_weights(
             np.asarray([32.121, 32.5], dtype=np.float32),
@@ -112,6 +116,7 @@ def test_truncate_weights():
 
 
 def test_truncate_relative():
+    """Check truncate relative behavior."""
     assert (
         truncate.bit_truncate_relative(
             np.asarray([32.121, 32.5], dtype=np.float32),
