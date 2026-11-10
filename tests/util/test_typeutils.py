@@ -33,10 +33,6 @@ def test_dtype_string_conversion_handles_compound_and_nested_fields():
     assert as_bytes["nested"]["label"].kind == "S"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="has_kind indexes nested compound descriptors as if they were scalar fields.",
-)
 def test_string_kind_detection_recurses_into_compound_fields():
     """Detect byte and Unicode strings in both top-level and nested fields."""
     dtype = np.dtype([("plain", "i4"), ("nested", [("label", "U5")])])
