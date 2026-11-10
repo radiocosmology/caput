@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from caput.algorithms.median import weighted_median, moving_weighted_median
+from caput.algorithms.median import moving_weighted_median, weighted_median
 
 
 def py_weighted_median(data, weights):
@@ -260,11 +260,7 @@ class TestMWM(unittest.TestCase):
         res_cython = moving_weighted_median(values, weights, 5)
         t_cython = time.time() - t0
         np.testing.assert_array_equal(res_py, res_cython)
-        print(
-            "1D moving weighted median with {} elements took {}s / {}s".format(
-                N, t_py, t_cython
-            )
-        )
+        print(f"1D moving weighted median with {N} elements took {t_py}s / {t_cython}s")
 
     def test_2d_mwm_big(self):
         """Check 2d moving weighted median big behavior."""
@@ -277,9 +273,7 @@ class TestMWM(unittest.TestCase):
         moving_weighted_median(values, weights, (N_w, N_w))
         t_cython = time.time() - t0
         print(
-            "2D moving {0}x{0} weighted median with {1}x{1} elements took {2}s".format(
-                N_w, N, t_cython
-            )
+            f"2D moving {N_w}x{N_w} weighted median with {N}x{N} elements took {t_cython}s"
         )
 
     def test_zero_weights(self):
@@ -325,7 +319,6 @@ class TestMWM(unittest.TestCase):
     def test_2d_mwm_small_large_window(self):
         # Try a window that is much larger than the input array.
         # This has caused crashes in older versions
-
         """Check 2d moving weighted median small large window behavior."""
         values = [
             [8.0, 6.0, 1.0, 5.0],

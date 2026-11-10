@@ -1,15 +1,13 @@
 """Serial version of the selection tests."""
 
-import pytest
-from pytest_lazy_fixtures import lf
 import numpy as np
-
+import pytest
 from mpi4py import MPI
+from pytest_lazy_fixtures import lf
 
 from caput import mpiarray
+from caput.memdata import MemGroup, fileformats
 from caput.util import mpitools
-from caput.memdata import fileformats, MemGroup
-
 
 comm = MPI.COMM_WORLD
 
@@ -117,7 +115,6 @@ def test_file_select(container_on_disk, file_format):
 )
 def test_file_select_index(container_on_disk, file_format):
     """Tests that makes hdf5 objects and tests selecting on their axes."""
-
     # now test index selection
     m = MemGroup.from_file(
         container_on_disk[0], selections=index_sel, file_format=file_format
@@ -153,7 +150,6 @@ def xfail_zarr_listsel(request):
 @pytest.mark.usefixtures("xfail_zarr_listsel")
 def test_file_select_distributed(container_on_disk, fsel, isel, file_format, ind):
     """Load H5/Zarr file into parallel container while down-selecting axes."""
-
     if ind == slice(None):
         sel = {"dset1": (fsel, isel, slice(None)), "dset2": (fsel, slice(None))}
     else:

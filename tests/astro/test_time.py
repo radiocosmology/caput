@@ -5,11 +5,12 @@ from datetime import datetime, timezone
 
 import numpy as np
 import pytest
-from skyfield import earthlib, api
 from pytest import approx, raises
+from skyfield import api, earthlib
 
-from caput.astro import time as ctime, skyfield as csf, observer, constants
-
+from caput.astro import constants, observer
+from caput.astro import skyfield as csf
+from caput.astro import time as ctime
 
 # Download the required Skyfield files from a mirror on a CHIME server.
 #
@@ -53,7 +54,6 @@ def test_epoch():
 def test_transit_array():
     # Do a simple test of transit_RA in an array. Use the fact that the RA
     # advances predictably to predict the answers
-
     """Check transit array behavior."""
     epoch = datetime(2000, 1, 1, 11, 58, 56)
 
@@ -111,7 +111,6 @@ def test_delta():
 
 def test_lsa_skyfield():
     # Check an lsa calculated by caput.time against one calculated by PyEphem
-
     """Check local sidereal angle skyfield behavior."""
     dt = datetime(2014, 10, 2, 13, 4, 5)
     dt_utc = dt.replace(tzinfo=api.utc)
@@ -128,7 +127,6 @@ def test_lsa_skyfield():
 
 def test_lsa_tra():
     # Near the epoch transit RA and LRA should be extremely close
-
     """Check local sidereal angle tra behavior."""
     dt = datetime(2001, 2, 3, 4, 5, 6)
 
@@ -143,7 +141,6 @@ def test_lsa_tra():
 def test_reverse_lsa():
     # Check that the lsa_to_unix routine correctly inverts a call to
     # unix_to_lsa
-
     """Check reverse local sidereal angle behavior."""
     dt1 = datetime(2018, 3, 12, 1, 2, 3)
     t1 = ctime.datetime_to_unix(dt1)
@@ -188,7 +185,6 @@ def test_lsa_array():
 
 def test_lsd():
     """Test Local Earth Rotation Day (LSD) definition."""
-
     obs = observer.Observer(113.2, 62.4)
     obs.lsd_start_day = ctime.datetime_to_unix(datetime(2014, 1, 2))
 
@@ -265,7 +261,6 @@ def test_from_unix_time():
 
     This is as much a test of Skyfield as our code.
     """
-
     unix_time = random.random() * 2e6
     dt = datetime.fromtimestamp(unix_time, timezone.utc)
     st = csf.unix_to_skyfield_time(unix_time)
@@ -282,12 +277,13 @@ def test_from_unix_time():
 
 
 def test_time_precision():
-    """Make sure we have ~0.03 ms precision and that we aren't overflowing
+    """Ensure ~0.03ms precision and no overflows.
+
+    Make sure we have ~0.03 ms precision and that we aren't overflowing
     anything at double precision. This number comes from the precision on
     Julian date time representations:
-    http://aa.usno.navy.mil/software/novas/USNOAA-TN2011-02.pdf
+    http://aa.usno.navy.mil/software/novas/USNOAA-TN2011-02.pdf.
     """
-
     delta = 0.001  # Try a 1 ms shift
     unix_time = time.time()
     unix_time2 = unix_time + delta
@@ -329,7 +325,6 @@ def test_era_known():
     # Check an ERA calculated by caput.time against one calculated by
     # http://dc.zah.uni-heidelberg.de/apfs/times/q/form (note the latter
     # uses UT1, so we have maximum precision of 1s)
-
     """Check Earth rotation angle known behavior."""
     dt = datetime(2016, 4, 3, 2, 1, 0)
 
@@ -373,7 +368,6 @@ def test_era_inverse():
 def test_ensure_unix():
     # Check that ensure_unix is doing its job for both scalar and array
     # inputs
-
     """Check ensure unix behavior."""
     dt = datetime(2016, 4, 3, 2, 1, 0)
     dt_list = [datetime(2016, 4, 3, 2, 1, 0), datetime(2016, 4, 3, 2, 1, 0)]
@@ -410,7 +404,6 @@ def eph():
 
 def test_transit_times(chime, eph):
     # Routines to test the transit time calculations
-
     """Check predicted transit times against expected astronomical events."""
     dts = datetime(2020, 11, 5)
     dte = datetime(2020, 11, 7)
@@ -466,8 +459,7 @@ def test_rise_set_times(chime, eph):
 
 
 def test_solar_ephemerides(chime):
-    """Test solar ephemerides"""
-
+    """Test solar ephemerides."""
     dts = datetime(2020, 11, 5)
     dte = datetime(2020, 11, 7)
 
@@ -495,8 +487,7 @@ def test_solar_ephemerides(chime):
 
 
 def test_lunar_ephemerides(chime):
-    """Test lunar ephemerides"""
-
+    """Test lunar ephemerides."""
     dts = datetime(2020, 11, 5)
     dte = datetime(2020, 11, 7)
 

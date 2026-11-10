@@ -1,6 +1,7 @@
 """Unit tests for the tools module."""
 
 import numpy as np
+
 from caput import mpiarray
 from caput.util import objecttools
 

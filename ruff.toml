@@ -4,7 +4,6 @@ exclude = [
     ".github",
     "build",
     "doc",
-    "tests",
 ]
 
 target-version = "py310"
@@ -40,6 +39,7 @@ ignore = [
 "*/__init__.py" = ["I", "F401", "F403"]
 "caput/astro/constants.py" = ["F403", "F405"]
 "caput/astro/coordinates/spherical.py" = ["F405"]
+"tests/**" = ["D100", "D101", "D102", "D103"]
 
 [format]
 docstring-code-format = true

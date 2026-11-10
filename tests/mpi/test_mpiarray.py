@@ -5,26 +5,24 @@ Designed to be run as an MPI job with four processes like::
     $ mpirun -np 4 python test_mpiarray.py
 """
 
-from typing import Union
-from packaging import version
-import pytest
-from pytest_lazy_fixtures import lf
 import h5py
 import numpy as np
+import pytest
 import zarr
+from packaging import version
+from pytest_lazy_fixtures import lf
 
+from caput import mpiarray
 from caput.memdata import fileformats
 from caput.util import mpitools
-from caput import mpiarray
 
 
-def _arange_dtype(N: int, dtype: Union[np.dtype, str]) -> np.ndarray:
+def _arange_dtype(N: int, dtype: np.dtype | str) -> np.ndarray:
     dtype = np.dtype(dtype)
 
     if dtype.kind == "U":
         return np.array([f"{ii}" for ii in range(N)], dtype=dtype)
-    else:
-        return np.arange(N, dtype=dtype)
+    return np.arange(N, dtype=dtype)
 
 
 def test_construction():
@@ -606,7 +604,6 @@ def test_ufunc_call():
 def test_ufunc_broadcast():
     # Test a call ufunc where one of the arguments will get broadcasted to a higher
     # dimensionality
-
     """Check NumPy ufunc broadcast behavior."""
     rank = mpitools.rank
     size = mpitools.size
@@ -739,7 +736,7 @@ def test_ufunc_reduce():
 
         dist_array.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
 
-        assert (df_total == size ** 2).all()
+        assert (df_total == size**2).all()
 
         # Test MPIArray.allreduce()
 
@@ -748,7 +745,7 @@ def test_ufunc_reduce():
         df_sum = dist_array.sum()
         df_total = np.zeros_like(df_sum)
 
-        assert dist_array.sum().allreduce() == size ** 2
+        assert dist_array.sum().allreduce() == size**2
 
         df_sum.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
 
@@ -797,7 +794,6 @@ def test_ufunc_accumulate():
 
 def test_ufunc_misc():
     # Test miscellaneous ufunc related issues
-
     """Check miscellaneous supported NumPy ufunc behavior."""
     size = mpitools.size
 

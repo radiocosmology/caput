@@ -109,7 +109,6 @@ def test_no_line():
     # This tests that dicts get set as config parameters as expected, and covers a flaw
     # in an earlier version of the linting code where `__line__` keys were getting
     # inserted into dict types config properties
-
     """Ensure dictionary configuration values do not gain parser line metadata."""
     dt = DictTypeTests()
 

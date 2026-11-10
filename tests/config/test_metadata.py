@@ -1,9 +1,9 @@
 import unittest
-import yaml
 
 import numpy
-import caput
+import yaml
 
+import caput
 from caput.pipeline import Manager
 
 

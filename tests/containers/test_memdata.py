@@ -1,22 +1,21 @@
 """Unit tests for the memdata module."""
 
+import copy
 import datetime
 import gc
 import json
 from pathlib import Path
-import warnings
 from zipfile import ZipFile
 
 import h5py
 import numpy as np
 import pytest
-from pytest_lazy_fixtures import lf
 import zarr
-import copy
+from pytest_lazy_fixtures import lf
 
 from caput import memdata
-from caput.util import mpitools
 from caput.mpiarray import MPIArray
+from caput.util import mpitools
 
 
 def test_ro_dict():
@@ -145,7 +144,6 @@ def filled_zarr_file(zarr_file):
 @pytest.fixture
 def filled_zarrzip_file(filled_zarr_file):
     """Provides a .zarr.zip file with some content."""
-
     zarrzip_file = filled_zarr_file + ".zip"
 
     zp = Path(filled_zarr_file)
@@ -237,7 +235,9 @@ def test_memdisk(test_file, file_format):
     """Test MemDiskGroup."""
     f = memdata.MemDiskGroup(test_file, file_format=file_format)
     assert set(f.keys()) == set(f._data.keys())
-    m = memdata.MemDiskGroup(memdata.MemGroup.from_file(test_file, file_format=file_format))
+    m = memdata.MemDiskGroup(
+        memdata.MemGroup.from_file(test_file, file_format=file_format)
+    )
     assert set(m.keys()) == set(f.keys())
     # Recursive indexing.
     assert set(f["/level1/"].keys()) == set(m["/level1/"].keys())
@@ -328,7 +328,9 @@ def test_io(test_file, file_format):
 
     # Load it from disk
     tsc2 = memdata.MemDiskGroup.from_file(test_file, file_format=file_format)
-    tsc3 = memdata.MemDiskGroup.from_file(test_file, ondisk=True, file_format=file_format)
+    tsc3 = memdata.MemDiskGroup.from_file(
+        test_file, ondisk=True, file_format=file_format
+    )
 
     # Check that is is recreated with the correct type
     assert isinstance(tsc2, TempSubClass)
@@ -552,7 +554,6 @@ def test_distributed_group_io(
     test_file, file_open_function, file_format, compression, compression_opts, chunks
 ):
     """Test for I/O in MemGroup."""
-
     # Create distributed memh5 object
     g = memdata.MemGroup(distributed=True)
     g.attrs["rank"] = rank
@@ -660,8 +661,7 @@ def test_distributed_group_io(
     ],
 )
 def test_misc(test_file, file_open_function, file_format):
-    """Misc tests for MemDiskGroupDistributed"""
-
+    """Misc tests for MemDiskGroupDistributed."""
     dg = memdata.MemDiskGroup(distributed=True)
 
     pdset = dg.create_dataset(
