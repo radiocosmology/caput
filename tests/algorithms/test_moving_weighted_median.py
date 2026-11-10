@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from caput.algorithms.median import weighted_median, moving_weighted_median
+from caput.algorithms.median import moving_weighted_median, weighted_median
 
 
 def py_weighted_median(data, weights):
@@ -130,7 +130,10 @@ def py_mwm_nd(values, weights, size):
 
 
 class TestMWM(unittest.TestCase):
+    """Test the Python and compiled moving weighted median implementations."""
+
     def test_the_test(self):
+        """Check weighted medians for unequal weights and tied values."""
         mwm = py_mwm_1d(
             values=[1, 2, 3, 4, 5, 6, 7, 8], weights=[1, 2, 3, 4, 5, 6, 7, 8], size=3
         )
@@ -145,6 +148,7 @@ class TestMWM(unittest.TestCase):
 
     def test_the_nd_test(self):
         # 2D
+        """Check the two-dimensional moving weighted median."""
         values = [[1, 2, 3], [2, 3, 1], [3, 1, 2]]
         mwm = py_mwm_nd(values, values, (3, 3))
         np.testing.assert_array_equal(
@@ -153,6 +157,7 @@ class TestMWM(unittest.TestCase):
 
     def test_wm(self):
         # As we return the same type as the input, the split median will get rounded down
+        """Compare weighted-median methods and supported input forms."""
         assert weighted_median(
             [1, 2, 3, 4, 5, 6, 7, 8], [1, 0, 0, 0, 0, 0, 0, 1]
         ) == int(4.5)
@@ -220,12 +225,14 @@ class TestMWM(unittest.TestCase):
 
     def test_weighted_median_methods(self):
         # Note this test
+        """Check weighted median methods behavior."""
         values = np.array([9, 2, 5, 5, 2, 9])
         weights = np.array([3, 0, 5, 0, 8, 0])
         np.testing.assert_equal(weighted_median(values, weights, method="lower"), 2)
         np.testing.assert_equal(weighted_median(values, weights, method="higher"), 5)
 
     def test_1d_mwm_int(self):
+        """Check 1d moving weighted median int behavior."""
         values = [0, 0, 7, 0, 9, 42, 0, 1, 9, 1]
         weights = [0, 7, 1, 23, 0, 4, 7, 8, 9, 0]
         np.testing.assert_array_almost_equal(
@@ -233,6 +240,7 @@ class TestMWM(unittest.TestCase):
         )
 
     def test_1d_mwm(self):
+        """Check 1d moving weighted median behavior."""
         values = [0.1, 0, 7.7, 0, 9.999, 42, 0, 1, 9, 1]
         weights = [0, 7.5, 0.33, 23.23, 0, 4, 7, 8, 9, 0]
         np.testing.assert_array_equal(
@@ -241,6 +249,7 @@ class TestMWM(unittest.TestCase):
 
     # These two are just for measuring performance:
     def test_1d_mwm_big(self):
+        """Check 1d moving weighted median big behavior."""
         N = 100
         values = np.random.random_sample(N)
         weights = np.random.random_sample(N)
@@ -251,13 +260,10 @@ class TestMWM(unittest.TestCase):
         res_cython = moving_weighted_median(values, weights, 5)
         t_cython = time.time() - t0
         np.testing.assert_array_equal(res_py, res_cython)
-        print(
-            "1D moving weighted median with {} elements took {}s / {}s".format(
-                N, t_py, t_cython
-            )
-        )
+        print(f"1D moving weighted median with {N} elements took {t_py}s / {t_cython}s")
 
     def test_2d_mwm_big(self):
+        """Check 2d moving weighted median big behavior."""
         N = 100
         M = 100
         N_w = 5
@@ -267,12 +273,11 @@ class TestMWM(unittest.TestCase):
         moving_weighted_median(values, weights, (N_w, N_w))
         t_cython = time.time() - t0
         print(
-            "2D moving {0}x{0} weighted median with {1}x{1} elements took {2}s".format(
-                N_w, N, t_cython
-            )
+            f"2D moving {N_w}x{N_w} weighted median with {N}x{N} elements took {t_cython}s"
         )
 
     def test_zero_weights(self):
+        """Check zero weights behavior."""
         values = [1, 1, 1]
         weights = [0, 0, 0]
         np.testing.assert_array_equal(
@@ -280,6 +285,7 @@ class TestMWM(unittest.TestCase):
         )
 
     def test_2d_mwm_small(self):
+        """Check 2d moving weighted median small behavior."""
         values = [[9, 2], [5, 5], [2, 9]]
         weights = [[3, 0], [5, 0], [8, 0]]
         np.testing.assert_array_equal(
@@ -313,7 +319,7 @@ class TestMWM(unittest.TestCase):
     def test_2d_mwm_small_large_window(self):
         # Try a window that is much larger than the input array.
         # This has caused crashes in older versions
-
+        """Check 2d moving weighted median small large window behavior."""
         values = [
             [8.0, 6.0, 1.0, 5.0],
             [6.0, 6.0, 8.0, 10.0],
@@ -334,6 +340,7 @@ class TestMWM(unittest.TestCase):
         np.testing.assert_array_equal(cy_res, cy_res[0, 0])
 
     def test_2d_mwm_int(self):
+        """Check 2d moving weighted median int behavior."""
         values = np.asarray(np.random.randint(0, 10, (14, 8)), np.float64)
         weights = np.asarray(np.random.randint(0, 10, (14, 8)), np.float64)
         np.testing.assert_array_equal(
@@ -342,6 +349,7 @@ class TestMWM(unittest.TestCase):
         )
 
     def test_2d_mwm(self):
+        """Check 2d moving weighted median behavior."""
         values = np.random.rand(14, 8)
         weights = np.random.rand(14, 8)
         np.testing.assert_array_equal(
@@ -351,6 +359,7 @@ class TestMWM(unittest.TestCase):
 
     # weights are all zeros for a region that is smaller than the window
     def test_small_zero_weight(self):
+        """Check zero-weight regions smaller than the moving window."""
         window = (3, 3)
         zero_shape = (2, 2)
         shape = (10, 10)
@@ -366,6 +375,7 @@ class TestMWM(unittest.TestCase):
     # weights are all zeros for a region that is the size of the window, this has historically
     # caused a segfault
     def test_med_zero_weight(self):
+        """Check a window containing only zero-weight samples."""
         window = (3,)
         zero_shape = (3,)
         shape = (10,)

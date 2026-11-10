@@ -1,21 +1,23 @@
 """Test lock file functionality."""
 
-import unittest
-import tempfile
 import os
-import pytest
 import shutil
+import tempfile
+import unittest
+
+import pytest
 
 from caput.memdata import lock_file
 
 
 class TestLock(unittest.TestCase):
+    """Test lock-file creation, conflict handling, and cleanup."""
+
     def setUp(self):
         self.dir = tempfile.mkdtemp()
 
     def test_lock_new(self):
-        """Test the normal behaviour"""
-
+        """Test the normal behaviour."""
         base = "newfile.dat"
         newfile_name = os.path.join(self.dir, base)
         lockfile_name = os.path.join(self.dir, "." + base + ".lock")
@@ -37,8 +39,7 @@ class TestLock(unittest.TestCase):
         self.assertFalse(os.path.exists(lockfile_name))
 
     def test_lock_exception(self):
-        """Check what happens in an exception"""
-
+        """Check what happens in an exception."""
         base = "newfile2.dat"
         newfile_name = os.path.join(self.dir, base)
         lockfile_name = os.path.join(self.dir, "." + base + ".lock")
@@ -56,8 +57,7 @@ class TestLock(unittest.TestCase):
         self.assertFalse(os.path.exists(lockfile_name))
 
     def test_lock_exception_preserve(self):
-        """Check what happens in an exception when asked to preserve the temp file"""
-
+        """Check what happens in an exception when asked to preserve the temp file."""
         base = "newfile3.dat"
         newfile_name = os.path.join(self.dir, base)
         lockfile_name = os.path.join(self.dir, "." + base + ".lock")
@@ -79,7 +79,3 @@ class TestLock(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.dir)
-
-
-if __name__ == "__main__":
-    unittest.main()

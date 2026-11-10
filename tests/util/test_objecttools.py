@@ -1,12 +1,14 @@
 """Unit tests for the tools module."""
 
 import numpy as np
+
 from caput import mpiarray
 from caput.util import objecttools
 
 
 def test_allequal():
     # Test some basic types
+    """Compare nested Python, NumPy, and MPI array values."""
     assert objecttools.allequal(1, 1)
     assert objecttools.allequal("x", "x")
     assert objecttools.allequal([1, 2, 3], [1, 2, 3])

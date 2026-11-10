@@ -1,12 +1,11 @@
 """Unit tests for the invert_no_zero module."""
 
-from mpi4py import MPI
 import numpy as np
 import pytest
+from mpi4py import MPI
 
-from caput.mpiarray import MPIArray
 from caput.algorithms import invert_no_zero
-
+from caput.mpiarray import MPIArray
 
 ARRAY_SIZE = (100, 111)
 SEED = 12345
@@ -24,6 +23,7 @@ random_complex_array = rng.standard_normal(
     "a", [random_complex_array, random_float_array, random_double_array]
 )
 def test_invert_no_zero(a):
+    """Check invert no zero behavior."""
     zero_ind = ((0, 10, 12), (56, 34, 78))
     good_ind = np.ones(a.shape, dtype=bool)
     good_ind[zero_ind] = False
@@ -47,6 +47,7 @@ def test_invert_no_zero(a):
 
 
 def test_invert_no_zero_mpiarray():
+    """Check invert no zero MPI array behavior."""
     comm = MPI.COMM_WORLD
     comm.Barrier()
 
@@ -65,6 +66,7 @@ def test_invert_no_zero_mpiarray():
 
 
 def test_invert_no_zero_noncontiguous():
+    """Check invert no zero noncontiguous behavior."""
     a = np.arange(100, dtype=np.float64).reshape(10, 10)
 
     res = np.ones((10, 10), dtype=np.float64)

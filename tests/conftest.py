@@ -6,13 +6,12 @@ import tempfile
 import numpy as np
 import pytest
 
+from caput import config
 from caput.memdata import fileformats
 from caput.pipeline import Manager, Task
 from caput.pipeline.exceptions import PipelineStopIteration
 from caput.pipeline.runner._cli import cli
-
 from caput.util import mpitools
-from caput import config
 
 
 @pytest.fixture(scope="session")
@@ -46,7 +45,7 @@ class PrintEggs(Task):
         """Run next."""
         if self.i >= len(self.eggs):
             raise PipelineStopIteration()
-        print("Spam and %s eggs." % self.eggs[self.i])
+        print(f"Spam and {self.eggs[self.i]} eggs.")
         self.i += 1
 
     def finish(self):
@@ -91,7 +90,7 @@ class CookEggs(Task):
 
     def process(self, _input):
         """Run process."""
-        print("Cooking %s %s eggs." % (self.style, _input))
+        print(f"Cooking {self.style} {_input} eggs.")
 
     def finish(self):
         """Run finish."""
@@ -154,8 +153,7 @@ cook_params:
             runner = CliRunner()
             if parameters is None:
                 return runner.invoke(cli, ["run", configfile.name])
-            else:
-                return runner.invoke(cli, ["run", *parameters, configfile.name])
+            return runner.invoke(cli, ["run", *parameters, configfile.name])
 
     return _run_pipeline
 
@@ -194,7 +192,6 @@ cook_params:
         manager : Manager
             Initialized pipeline manager.
         """
-
         return Manager.from_yaml_str(configstr)
 
     return _get_pipeline

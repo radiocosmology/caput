@@ -51,6 +51,7 @@ def test_invalid_prefix(name):
 
 @pytest.mark.parametrize("name", ["pico_giga_year"])
 def test_too_many_prefixes(name):
+    """Check too many prefixes behavior."""
     with pytest.raises(AttributeError) as err:
         getattr(constants, name)
 

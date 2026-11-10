@@ -5,26 +5,24 @@ Designed to be run as an MPI job with four processes like::
     $ mpirun -np 4 python test_mpiarray.py
 """
 
-from typing import Union
-from packaging import version
-import pytest
-from pytest_lazy_fixtures import lf
 import h5py
 import numpy as np
+import pytest
 import zarr
+from packaging import version
+from pytest_lazy_fixtures import lf
 
+from caput import mpiarray
 from caput.memdata import fileformats
 from caput.util import mpitools
-from caput import mpiarray
 
 
-def _arange_dtype(N: int, dtype: Union[np.dtype, str]) -> np.ndarray:
+def _arange_dtype(N: int, dtype: np.dtype | str) -> np.ndarray:
     dtype = np.dtype(dtype)
 
     if dtype.kind == "U":
         return np.array([f"{ii}" for ii in range(N)], dtype=dtype)
-    else:
-        return np.arange(N, dtype=dtype)
+    return np.arange(N, dtype=dtype)
 
 
 def test_construction():
@@ -213,6 +211,7 @@ def test_io(filename, file_open_function, file_format):
 
 
 def test_transpose():
+    """Check transpose behavior."""
     gshape = (1, 11, 2, 14)
 
     l0, s0, _ = mpitools.split_local(11)
@@ -276,6 +275,7 @@ def test_transpose():
 def test_copy():
     # Test that standard numpy.copy() method works
     # for MPIArrays
+    """Check copy behavior."""
     size = mpitools.size
 
     arr = mpiarray.ones((3, size, 14), axis=1, dtype=np.float32)
@@ -294,6 +294,7 @@ def test_copy():
 
 
 def test_reshape():
+    """Check reshape behavior."""
     gshape = (1, 11, 2, 14)
 
     # Redistribute with the axis in the middle
@@ -336,6 +337,7 @@ def test_reshape():
 # hardcoded to only work with exactly 4 processes
 @pytest.mark.mpi_skip
 def test_global_getslice():
+    """Check global getslice behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -479,6 +481,7 @@ def test_global_getslice():
 
 
 def test_global_setslice():
+    """Check global setslice behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -546,6 +549,7 @@ def test_global_setslice():
 
 
 def test_ufunc_call():
+    """Check NumPy ufunc call behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -600,7 +604,7 @@ def test_ufunc_call():
 def test_ufunc_broadcast():
     # Test a call ufunc where one of the arguments will get broadcasted to a higher
     # dimensionality
-
+    """Check NumPy ufunc broadcast behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -645,6 +649,7 @@ def test_ufunc_broadcast():
 
 def test_ufunc_2output():
     # Test a ufunc (divmod) which will return two outputs simultaneously
+    """Check NumPy ufuncs that return two outputs."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -672,6 +677,7 @@ def test_ufunc_2output():
 
 
 def test_ufunc_reduce():
+    """Check NumPy ufunc reduce behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -730,7 +736,7 @@ def test_ufunc_reduce():
 
         dist_array.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
 
-        assert (df_total == size ** 2).all()
+        assert (df_total == size**2).all()
 
         # Test MPIArray.allreduce()
 
@@ -739,7 +745,7 @@ def test_ufunc_reduce():
         df_sum = dist_array.sum()
         df_total = np.zeros_like(df_sum)
 
-        assert dist_array.sum().allreduce() == size ** 2
+        assert dist_array.sum().allreduce() == size**2
 
         df_sum.comm.Allreduce(df_sum, df_total, op=MPI.SUM)
 
@@ -751,6 +757,7 @@ def test_ufunc_reduce():
 
 def test_ufunc_reduce_multi():
     # Test that reductions over multiple axes don't break things
+    """Check NumPy ufunc reduce multi behavior."""
     size = mpitools.size
 
     dist_array = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
@@ -771,6 +778,7 @@ def test_ufunc_reduce_multi():
 
 def test_ufunc_accumulate():
     # Test that reductions over multiple axes don't break things
+    """Check NumPy ufunc accumulate behavior."""
     size = mpitools.size
 
     dist_array = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
@@ -786,7 +794,7 @@ def test_ufunc_accumulate():
 
 def test_ufunc_misc():
     # Test miscellaneous ufunc related issues
-
+    """Check miscellaneous supported NumPy ufunc behavior."""
     size = mpitools.size
 
     dist_array1 = mpiarray.MPIArray((size, 4, 4), axis=0, dtype=np.float64)
@@ -822,6 +830,7 @@ def test_ufunc_misc():
 
 
 def test_slice_newaxis():
+    """Check slice newaxis behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -841,6 +850,7 @@ def test_slice_newaxis():
 
 
 def test_slice_ellipsis():
+    """Check slice ellipsis behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -868,6 +878,7 @@ def test_slice_ellipsis():
 
 
 def test_slice_npint64():
+    """Check slice npint64 behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -881,6 +892,7 @@ def test_slice_npint64():
 
 
 def test_mpi_array_fill():
+    """Check mpi array fill behavior."""
     rank = mpitools.rank
     size = mpitools.size
 
@@ -902,6 +914,7 @@ def test_mpi_array_fill():
 
 
 def test_call_ravel():
+    """Check ravel behavior for a distributed array."""
     size = mpitools.size
 
     arr_ones = mpiarray.ones((4, size, 17), axis=1)
@@ -910,6 +923,7 @@ def test_call_ravel():
 
 
 def test_call_median():
+    """Check median behavior for a distributed array."""
     size = mpitools.size
 
     arr = mpiarray.ones((4, size, 17), axis=1)

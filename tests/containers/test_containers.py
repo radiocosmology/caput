@@ -1,13 +1,13 @@
 """Unit tests for the containers module."""
 
-import pytest
 import json
-import numpy as np
 import warnings
-
 from pathlib import Path
-from pytest_lazy_fixtures import lf
 from zipfile import ZipFile
+
+import numpy as np
+import pytest
+from pytest_lazy_fixtures import lf
 
 from caput import containers, memdata
 
@@ -122,7 +122,6 @@ def test_history(test_file, file_format):
 
 def test_redistribute():
     """Test redistribute in the base :py:class:`~caput.containers.Container`."""
-
     g = containers.Container(distributed=True)
 
     g.create_dataset("data", shape=(10, 10), distributed=True, distributed_axis=0)

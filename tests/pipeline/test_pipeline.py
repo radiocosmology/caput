@@ -10,7 +10,6 @@ def test_pipeline(run_pipeline):
 
 def test_pipeline_multiple_outputs(run_pipeline):
     """Test running a very simple pipeline with a multi-output task."""
-
     multi_eggs_pipeline_conf = """
 ---
 pipeline:
@@ -42,7 +41,6 @@ def test_manual_pipeline_interactive(get_pipeline):
     tasks are exectued as expected. Breakpoints should have no
     effect.
     """
-
     interactive_eggs_pipeline_conf = """
 ---
 pipeline:
@@ -90,7 +88,6 @@ cook_params:
 
 def test_manual_pipeline(get_pipeline):
     """Test running a pipeline with interactive mode and breakpoints disabled."""
-
     breakpoint_eggs_pipeline_conf = """
 ---
 pipeline:
